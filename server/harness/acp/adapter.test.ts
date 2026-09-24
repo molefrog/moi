@@ -259,7 +259,7 @@ describe('rpcTimeoutMs', () => {
 })
 
 describe('replayedUserParts', () => {
-  const envelope = renderMoiContext({ activeTab: 'agent' })
+  const envelope = renderMoiContext({ activeTab: 'overview' })
 
   test('strips the appended moi-context envelope from replayed text', () => {
     const stored = appendMoiContext('fix the login bug', envelope)

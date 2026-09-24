@@ -39,12 +39,12 @@ describe('WelcomeState', () => {
 
     expect(renderedParagraphs(html)).toEqual([
       'moi is the personal workspace built for you by your agent. It grows and adapts to your needs.',
-      'Ask the Agent to build widgets on the Overview page, or more complex tools as separate Views. Use Scratchpad for exploring and shaping ideas with your agent.',
+      'Ask the agent to build widgets on the Overview page, or more complex tools as separate Views. Use Scratchpad for exploring and shaping ideas with your agent.',
       'Try an example:'
     ])
   })
 
-  test('renders four inline tab actions and three prompt bubbles with icons', () => {
+  test('renders three inline tab actions and three prompt bubbles with icons', () => {
     const html = renderWelcome()
 
     const welcomeTerms = [...html.matchAll(/<button[^>]+data-welcome-destination.*?<\/button>/gs)]
@@ -52,9 +52,9 @@ describe('WelcomeState', () => {
       ...html.matchAll(/<button(?![^>]+data-welcome-destination).*?<\/button>/gs)
     ]
 
-    expect(welcomeTerms).toHaveLength(4)
+    expect(welcomeTerms).toHaveLength(3)
     expect(welcomeTerms.every(([term]) => term.includes('<svg'))).toBe(true)
-    expect(html).toContain('data-welcome-destination="agent"')
+    expect(html).not.toContain('data-welcome-destination="agent"')
     expect(html).toContain('data-welcome-destination="overview"')
     expect(html).toContain('data-welcome-destination="views"')
     expect(html).toContain('data-welcome-destination="scratchpad"')
@@ -115,7 +115,7 @@ describe('WelcomeState', () => {
     expect(html).not.toContain('workspace-local SQLite database')
 
     const context = renderMoiContext({
-      activeTab: 'agent',
+      activeTab: 'overview',
       directives: [...CHAT_WELCOME_PROMPTS[0].context]
     })
     expect(context).toContain('# This message only')

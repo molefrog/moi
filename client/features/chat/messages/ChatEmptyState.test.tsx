@@ -25,7 +25,7 @@ describe('resolveChatEmptyState', () => {
   test('gives the welcome state first priority', () => {
     expect(
       resolveChatEmptyState({
-        isViewBuilderDraft: false,
+        isViewDraft: false,
         hasSentMessageFromMoi: false,
         isWorkspacePendingAnalysis: true
       })
@@ -35,7 +35,7 @@ describe('resolveChatEmptyState', () => {
   test('shows the workspace exploration state for a pending imported workspace', () => {
     expect(
       resolveChatEmptyState({
-        isViewBuilderDraft: false,
+        isViewDraft: false,
         hasSentMessageFromMoi: true,
         isWorkspacePendingAnalysis: true
       })
@@ -45,21 +45,21 @@ describe('resolveChatEmptyState', () => {
   test('uses the simple empty state without pending analysis', () => {
     expect(
       resolveChatEmptyState({
-        isViewBuilderDraft: false,
+        isViewDraft: false,
         hasSentMessageFromMoi: true,
         isWorkspacePendingAnalysis: false
       })
     ).toBe('empty')
   })
 
-  test('gives the view builder priority', () => {
+  test('gives the pending view priority', () => {
     expect(
       resolveChatEmptyState({
-        isViewBuilderDraft: true,
+        isViewDraft: true,
         hasSentMessageFromMoi: false,
         isWorkspacePendingAnalysis: true
       })
-    ).toBe('view-builder')
+    ).toBe('view-draft')
   })
 })
 
@@ -81,7 +81,7 @@ describe('ChatEmptyState', () => {
   })
 
   test('renders the focused new-view prompt', () => {
-    const html = renderState('view-builder')
+    const html = renderState('view-draft')
 
     expect(html).toContain('mo-root')
     expect(html).toContain('--mo-head:var(--accent)')

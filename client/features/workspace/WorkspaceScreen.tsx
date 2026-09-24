@@ -3,13 +3,10 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence } from 'motion/react'
 
 import {
-  IconArticle,
   IconBrowserPlus,
   IconLayout2,
   IconLayoutSidebarRight,
-  IconLetterCase,
   IconMessages,
-  IconSettings,
   IconSketching
 } from '@tabler/icons-react'
 
@@ -22,30 +19,23 @@ import { ChatPopup } from '@/client/features/chat/ChatPopup'
 import { ThemePanel } from '@/client/features/workspace/ThemePanel'
 import { Overview } from '@/client/features/overview/Overview'
 import { PanelHeader } from '@/client/components/shared/PanelHeader'
-import { WorkspaceIcon } from '@/client/components/shared/WorkspaceIcon'
 import { Button } from '@/client/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/client/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
+import { toast } from '@/client/components/ui/toast'
 import {
   useAppletChatMessage,
   useAppletChatAttachment
 } from '@/client/features/chat/applet-chat-intents'
 import { useChat } from '@/client/features/chat/useChat'
+import { usePinnedSession } from '@/client/features/chat/sessions/useSelectedSession'
 import {
-  WorkspaceSettingsDialog,
-  WorkspaceSettingsDialogTrigger
-} from '@/client/features/settings/WorkspaceSettingsDialog'
-import { ViewBuilder, type ViewBuilderHandle } from '@/client/features/views/ViewBuilder'
+  PendingViewScreen,
+  type PendingViewHandle
+} from '@/client/features/views/PendingViewScreen'
 import { ViewManager } from '@/client/features/views/ViewManager'
 import { getViewIcon, getViewLabel } from '@/client/features/views/view-presentation'
-import { useViewBuilderActions } from '@/client/features/views/useViewBuilderActions'
-import { useViewBuilderDrafts } from '@/client/features/views/useViewBuilderDrafts'
+import { useViewActions } from '@/client/features/views/useViewActions'
+import { useViewDrafts } from '@/client/features/views/useViewDrafts'
 import { useFitsSplitLayout } from '@/client/features/workspace/useFitsSplitLayout'
 import { useWorkspaceComposerState } from '@/client/features/chat/composer/useWorkspaceComposerState'
 import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
@@ -56,13 +46,13 @@ import {
   useLive
 } from '@/client/features/chat/chat-store'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
+import { WorkspaceMenu } from '@/client/features/workspace/WorkspaceMenu'
 import {
   effectiveOpenTabs,
   normalizeTabsState,
   tabAvailable
 } from '@/client/features/workspace/tab-resolution'
 import { useWorkspaceNavigation } from '@/client/features/workspace/useWorkspaceNavigation'
-import { resolveAppIcon } from '@/client/lib/app-icon-registry'
 import { cn } from '@/client/lib/cn'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 import { useUiStore } from '@/client/store/ui'
@@ -72,19 +62,16 @@ import {
   WorkspaceTabs
 } from '@/client/features/workspace/WorkspaceTabs'
 import { isDefaultWidget } from '@/lib/default-widgets'
+import { composerDraftKey, draftSessionId } from '@/lib/session-drafts'
 import type {
+  CompiledView,
   LayoutMode,
-  ViewBuilder as ViewBuilderData,
+  PendingView,
   ViewInfo,
   WidgetInfo,
   WorkspaceTabId
 } from '@/lib/types'
-import {
-  viewBuilderIdFromTab,
-  viewBuilderTabId,
-  viewIdFromTab,
-  viewTabId
-} from '@/lib/workspace-tabs'
+import { viewIdFromTab, viewTabId } from '@/lib/workspace-tabs'
 
 import { WorkspaceSplitLayout } from './WorkspaceSplitLayout'
 import { UnavailablePage } from './UnavailablePage'
@@ -95,12 +82,9 @@ const Scratchpad = lazy(() =>
   }))
 )
 
-const viewBuilderIcon = (builder: ViewBuilderData) => resolveAppIcon(builder.icon) ?? IconArticle
-
 type WorkspaceScreenProps = {
   widgets: WidgetInfo[]
   views: ViewInfo[]
-  builders: ViewBuilderData[]
 }
 
 type WidgetMode = 'idle' | 'customizing' | 'theming'
@@ -108,10 +92,9 @@ type WidgetMode = 'idle' | 'customizing' | 'theming'
 function tabItemFor(
   tab: WorkspaceTabId,
   views: ViewInfo[],
-  builders: ViewBuilderData[],
   closable: boolean,
   agentRunning: boolean,
-  builderRunning: (sessionId: string) => boolean
+  viewRunning: (sessionId: string) => boolean
 ): WorkspaceTabItem | null {
   if (tab === 'agent') {
     return {
@@ -139,25 +122,18 @@ function tabItemFor(
       closable
     }
   }
-  const builderId = viewBuilderIdFromTab(tab)
-  const builder = builderId ? builders.find(candidate => candidate.id === builderId) : null
-  if (builder) {
-    return {
-      key: tab,
-      Icon: viewBuilderIcon(builder),
-      label: builder.title || builder.viewId || 'New view',
-      closable,
-      loading: builderRunning(builder.sessionId)
-    }
-  }
   const viewId = viewIdFromTab(tab)
   const view = viewId ? views.find(v => v.id === viewId) : null
   return view
     ? {
         key: tab,
-        Icon: getViewIcon(view, builders),
+        Icon: getViewIcon(view),
         label: getViewLabel(view),
-        closable
+        closable: closable || view.status !== 'compiled',
+        loading:
+          view.status !== 'compiled' &&
+          !!view.executionSessionId &&
+          viewRunning(view.executionSessionId)
       }
     : null
 }
@@ -172,56 +148,10 @@ function applyVisibleTabOrder(
   return open.map(tab => (visibleSet.has(tab) ? orderedVisible[cursor++] : tab))
 }
 
-type WorkspaceMenuProps = {
-  onOpenTheme: () => void
-}
-
-function WorkspaceMenu({ onOpenTheme }: WorkspaceMenuProps) {
-  const { layout, name, provider } = useWorkspaceLayoutCtx()
-  const [iconHovered, setIconHovered] = useState(false)
-
-  return (
-    <WorkspaceSettingsDialog>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          className="flex min-w-0 cursor-pointer items-center gap-2 rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-          aria-label={`${name ?? 'Workspace'} menu`}
-          onPointerEnter={() => setIconHovered(true)}
-          onPointerLeave={() => setIconHovered(false)}
-        >
-          <WorkspaceIcon
-            icon={iconHovered ? { ...layout.icon, type: 'glyph', value: 'dots' } : layout.icon}
-            workspaceType={provider}
-            workspaceTheme={layout.theme}
-            className="size-5 rounded-sm"
-          />
-          {name && <span className="truncate text-sm font-medium text-foreground">{name}</span>}
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" sideOffset={6} className="w-36">
-          <DropdownMenuGroup>
-            <DropdownMenuItem onClick={onOpenTheme}>
-              <IconLetterCase stroke={1.75} />
-              Theme
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              nativeButton
-              render={<WorkspaceSettingsDialogTrigger />}
-              className="w-full"
-            >
-              <IconSettings stroke={1.75} />
-              Settings
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </WorkspaceSettingsDialog>
-  )
-}
-
-export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenProps) {
+export function WorkspaceScreen({ widgets, views: allViews }: WorkspaceScreenProps) {
   const { layout, setLayout, workspaceId } = useWorkspaceLayoutCtx()
   const theme = resolveWorkspaceTheme(layout.theme)
-  const builderActions = useViewBuilderActions()
+  const viewActions = useViewActions()
   const {
     ref: rowRef,
     fits: canUseSplit,
@@ -230,14 +160,17 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   const [widgetMode, setWidgetMode] = useState<WidgetMode>('idle')
   const [floatingChatOpen, setFloatingChatOpen] = useState(false)
   const [chatFocusRequest, setChatFocusRequest] = useState(0)
-  const builderRefs = useRef(new Map<string, ViewBuilderHandle>())
+  const pendingViewRefs = useRef(new Map<string, PendingViewHandle>())
   const dockedChatWidth = useUiStore(state => state.dockedChatWidth)
   const setDockedChatWidth = useUiStore(state => state.setDockedChatWidth)
   const sessionActivity = useLive(state => state.activity)
+  const views = allViews.filter((view): view is CompiledView => view.status === 'compiled')
+  const pendingViews = allViews.filter((view): view is PendingView => view.status !== 'compiled')
   const hasRunningSession = hasRunningWorkspaceActivity(sessionActivity, workspaceId)
-  const builderDrafts = useViewBuilderDrafts({
-    builders,
-    onSave: (builderId, requirements) => builderActions.save(builderId, requirements)
+  const viewDrafts = useViewDrafts({
+    workspaceId,
+    pendingViews,
+    onSave: (viewId, requirements) => viewActions.save(viewId, requirements)
   })
 
   useWorkspaceTheme(layout.theme)
@@ -245,7 +178,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   // Split needs the open set to decide whether it's available at all, and the
   // navigation hook needs split to resolve the active tab — so the open set is
   // derived from the raw layout here, before either.
-  const openTabIds = effectiveOpenTabs(normalizeTabsState(layout.tabs), views, builders)
+  const openTabIds = effectiveOpenTabs(normalizeTabsState(layout.tabs), allViews)
   const nonAgentOpenTabs = openTabIds.filter(tab => tab !== 'agent')
   const hasWorkspaceContent = nonAgentOpenTabs.length > 0
   const hasAppletWidgets = widgets.some(widget => !isDefaultWidget(widget.id))
@@ -268,8 +201,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     isUnavailable,
     onNavigationClick
   } = useWorkspaceNavigation({
-    views,
-    builders,
+    views: allViews,
     split: dockedSplit
   })
 
@@ -278,9 +210,11 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   // in its `<moi-context>` envelope.
   const {
     view,
+    forkedFromSessionId,
     chatLoaded,
     previewTurn,
     sessionId,
+    composerSessionId,
     processing,
     error,
     loadError,
@@ -290,7 +224,8 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     selectSession,
     dismissError
   } = useChat({ activeTab, appletParams })
-  const { composerBanner, builderComposerBanner, agentAvailability } = useWorkspaceComposerState(
+  const { pinnedSessionId } = usePinnedSession()
+  const { composerBanner, viewDraftComposerBanner, agentAvailability } = useWorkspaceComposerState(
     workspaceId,
     {
       chatError: error,
@@ -313,28 +248,27 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   const canCloseTabs = openTabIds.length > 1
   const tabItems = visibleTabIds
     .map(tab =>
-      tabItemFor(
-        tab,
-        views,
-        builders,
-        canCloseTabs || viewBuilderIdFromTab(tab) !== null,
-        hasRunningSession,
-        sessionId => isSessionRunning(sessionActivity, workspaceId, sessionId)
+      tabItemFor(tab, allViews, canCloseTabs, hasRunningSession, sessionId =>
+        isSessionRunning(sessionActivity, workspaceId, sessionId)
       )
     )
     .filter((tab): tab is WorkspaceTabItem => Boolean(tab))
   const activeViewId = viewIdFromTab(activeTab)
   const activeView = activeViewId ? views.find(v => v.id === activeViewId) : undefined
-  const activeBuilderId = viewBuilderIdFromTab(activeTab)
-  const activeBuilder = activeBuilderId
-    ? builders.find(builder => builder.id === activeBuilderId)
+  const activePendingView = activeViewId
+    ? pendingViews.find(pendingView => pendingView.id === activeViewId)
     : undefined
-  const activeDraftBuilder =
-    activeBuilder?.status === 'draft' &&
-    !isSessionRunning(sessionActivity, workspaceId, activeBuilder.sessionId)
-      ? activeBuilder
+  const activeDraftView =
+    !pinnedSessionId &&
+    sessionId === null &&
+    activePendingView?.status === 'draft' &&
+    (!activePendingView.executionSessionId ||
+      !isSessionRunning(sessionActivity, workspaceId, activePendingView.executionSessionId))
+      ? activePendingView
       : undefined
-  const activeDraftBuilderId = activeDraftBuilder?.id
+  const activeDraftViewId = activeDraftView?.id
+  const startupPending = !pinnedSessionId && activePendingView?.status === 'starting'
+  const visibleChatLoaded = chatLoaded && !startupPending
   const canAnnotate =
     widgetMode === 'idle' &&
     ((activeTab === 'overview' && hasAppletWidgets) || activeView !== undefined)
@@ -346,7 +280,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     targetRef: annotationTargetRef
   } = useChatAnnotation({
     workspaceId,
-    sessionId,
+    sessionId: composerSessionId,
     activeTab,
     mode,
     available: canAnnotate,
@@ -355,51 +289,16 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   })
 
   useEffect(() => {
-    const open = tabsState.open.filter(tab => tabAvailable(tab, views, builders))
+    const open = tabsState.open.filter(tab => tabAvailable(tab, allViews))
     if (open.length === tabsState.open.length) return
-    const nextOpen = effectiveOpenTabs(tabsState, views, builders)
+    const nextOpen = effectiveOpenTabs(tabsState, allViews)
     setLayout({
       tabs: {
         open: nextOpen,
         active: nextOpen.includes(tabsState.active) ? tabsState.active : nextOpen[0]
       }
     })
-  }, [builders, setLayout, tabsState, views])
-
-  useEffect(() => {
-    const replacements = new Map<WorkspaceTabId, WorkspaceTabId>()
-    for (const builder of builders) {
-      if (builder.status !== 'ready' || !builder.viewId) continue
-      if (!views.some(view => view.id === builder.viewId)) continue
-      replacements.set(viewBuilderTabId(builder.id), viewTabId(builder.viewId))
-    }
-    if (replacements.size === 0) return
-
-    // The URL follows a replaced builder tab to the view that took its place.
-    const urlReplacement = replacements.get(activeTab)
-    if (urlReplacement) navigateToTab(urlReplacement, { replace: true })
-
-    const replacementViews = new Set(replacements.values())
-    const sourceForView = new Map(
-      [...replacements].map(([builderTab, viewTab]) => [viewTab, builderTab])
-    )
-    const open: WorkspaceTabId[] = []
-    let changed = false
-    for (const tab of tabsState.open) {
-      const source = sourceForView.get(tab)
-      if (replacementViews.has(tab) && source && tabsState.open.includes(source)) {
-        changed = true
-        continue
-      }
-      const replacement = replacements.get(tab)
-      const next = replacement ?? tab
-      if (replacement) changed = true
-      if (!open.includes(next)) open.push(next)
-    }
-    if (!changed) return
-    const active = replacements.get(tabsState.active) ?? tabsState.active
-    setLayout({ tabs: { open: open.length > 0 ? open : ['overview'], active } })
-  }, [activeTab, builders, navigateToTab, setLayout, tabsState, views])
+  }, [allViews, setLayout, tabsState])
 
   useEffect(() => {
     if (mode !== 'fullscreen' || activeTab === 'agent') {
@@ -408,10 +307,10 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   }, [activeTab, mode])
 
   useEffect(() => {
-    if (!activeDraftBuilderId) return
+    if (!activeDraftViewId) return
     if (mode === 'fullscreen') setFloatingChatOpen(true)
     setChatFocusRequest(request => request + 1)
-  }, [activeDraftBuilderId, mode])
+  }, [activeDraftViewId, mode])
 
   // Tab switching is navigation; the saved default and the open set follow via
   // the navigation hook. Only the chat side effects belong to the screen.
@@ -424,9 +323,8 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   }
 
   const createView = () => {
-    // Do NOT select the draft's pre-minted sessionId here: no session exists
-    // behind it until submit. Submit selects it once the chat actually starts.
-    void builderActions.create().then(builder => openTab(viewBuilderTabId(builder.id)))
+    // A pending view has no chat until its first submission.
+    void viewActions.create().then(pendingView => openTab(viewTabId(pendingView.id)))
   }
 
   const navigateFromWelcome = (destination: WelcomeDestination) => {
@@ -450,11 +348,27 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     }
   })
 
+  const deletePendingView = async (pendingView: PendingView) => {
+    const sketch = pendingViewRefs.current.get(pendingView.id)
+    try {
+      await viewActions.discard(pendingView.id)
+    } catch (error) {
+      toast.add({
+        title: error instanceof Error ? error.message : 'Couldn’t discard view',
+        type: 'error'
+      })
+      return false
+    }
+    await sketch?.resetSketch()
+    viewDrafts.clear(pendingView.id)
+    return true
+  }
+
   const closeTab = (tab: WorkspaceTabId) => {
     if (tab === 'overview') return
-    const builderId = viewBuilderIdFromTab(tab)
-    const builder = builderId ? builders.find(candidate => candidate.id === builderId) : undefined
-    if ((!canCloseTabs && !builder) || !openSet.has(tab)) return
+    const viewId = viewIdFromTab(tab)
+    const pendingView = viewId ? pendingViews.find(candidate => candidate.id === viewId) : undefined
+    if ((!canCloseTabs && !pendingView) || !openSet.has(tab)) return
     let open = tabsState.open.filter(t => t !== tab)
     if (open.length === 0) open = ['overview']
     // The neighbor that takes over when the tab on screen closes.
@@ -462,7 +376,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     const nextTab =
       visibleTabIds[visibleIndex + 1] ??
       visibleTabIds[visibleIndex - 1] ??
-      open.find(t => tabAvailable(t, views, builders)) ??
+      open.find(t => tabAvailable(t, allViews)) ??
       'overview'
     const active =
       tabsState.active === tab || !open.includes(tabsState.active) ? nextTab : tabsState.active
@@ -470,24 +384,20 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     // tabsStateRef) can't resurrect the closed tab.
     setTabs({ open, active })
     if (activeTab === tab) navigateToTab(nextTab)
-    if (builder?.status === 'draft') {
-      void builderRefs.current.get(builder.id)?.resetSketch()
-      builderDrafts.clear(builder.id)
-      void builderActions.discard(builder.id)
-    }
+    if (pendingView?.status === 'draft') void deletePendingView(pendingView)
   }
 
-  const discardBuilder = (builder: ViewBuilderData) => {
-    const tab = viewBuilderTabId(builder.id)
-    if (openSet.has(tab)) {
-      let open = tabsState.open.filter(item => item !== tab)
-      if (open.length === 0) open = ['overview']
-      setTabs({ open, active: tabsState.active === tab ? open[0] : tabsState.active })
-      if (activeTab === tab) navigateToTab(open[0])
-    }
-    void builderRefs.current.get(builder.id)?.resetSketch()
-    builderDrafts.clear(builder.id)
-    void builderActions.discard(builder.id)
+  const discardPendingView = async (pendingView: PendingView) => {
+    if (!(await deletePendingView(pendingView))) return
+
+    const tab = viewTabId(pendingView.id)
+    if (!openSet.has(tab)) return
+    let open = tabsState.open.filter(item => item !== tab)
+    if (open.length === 0) open = ['overview']
+    const nextTab = open.find(item => tabAvailable(item, allViews)) ?? 'overview'
+    const active = tabsState.active === tab ? nextTab : tabsState.active
+    setTabs({ open, active })
+    if (activeTab === tab) navigateToTab(nextTab, { replace: true })
   }
 
   const reorderTabs = (orderedVisibleTabs: WorkspaceTabId[]) => {
@@ -498,7 +408,9 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
 
   const openChat = (intent?: string) => {
     if (intent !== undefined) {
-      useUiStore.getState().setComposerDraft(workspaceId, intent)
+      useUiStore
+        .getState()
+        .setComposerDraft(composerDraftKey(workspaceId, composerSessionId), intent)
     }
     if (mode === 'fullscreen' && activeTab !== 'agent') {
       setFloatingChatOpen(true)
@@ -514,7 +426,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   // in full-screen mode the chat is a closed popover, and a run the user can't
   // see is worse than a panel that opens itself.
   useAppletChatMessage({ sessionId, send, revealChat: openChat, agentAvailability })
-  useAppletChatAttachment(sessionId, openChat)
+  useAppletChatAttachment(composerSessionId, openChat)
 
   const createItems: CreateWorkspaceTabItem[] = [
     ...(!dockedSplit && !openSet.has('agent')
@@ -537,26 +449,14 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
           }
         ] satisfies CreateWorkspaceTabItem[])
       : []),
-    ...views
-      .map(v => ({ view: v, tab: viewTabId(v.id) }))
+    ...allViews
+      .map(view => ({ view, tab: viewTabId(view.id) }))
       .filter(({ tab }) => !openSet.has(tab))
       .map(
         ({ view, tab }): CreateWorkspaceTabItem => ({
           key: tab,
-          Icon: getViewIcon(view, builders),
+          Icon: getViewIcon(view),
           label: getViewLabel(view),
-          onClick: () => openTab(tab)
-        })
-      ),
-    ...builders
-      .filter(builder => builder.status !== 'ready')
-      .map(builder => ({ builder, tab: viewBuilderTabId(builder.id) }))
-      .filter(({ tab }) => !openSet.has(tab))
-      .map(
-        ({ builder, tab }): CreateWorkspaceTabItem => ({
-          key: tab,
-          Icon: viewBuilderIcon(builder),
-          label: builder.title || builder.viewId || 'New view',
           onClick: () => openTab(tab)
         })
       ),
@@ -568,37 +468,24 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     }
   ]
 
-  const changeBuilderDraft = useCallback(
-    (value: string) => {
-      if (activeDraftBuilder) builderDrafts.change(activeDraftBuilder.id, value)
-    },
-    [activeDraftBuilder, builderDrafts]
-  )
-  const removeBuilderDrawing = useCallback(() => {
-    if (activeDraftBuilder) {
-      void builderRefs.current.get(activeDraftBuilder.id)?.resetSketch()
+  const removeViewDrawing = useCallback(() => {
+    if (activeDraftView) {
+      void pendingViewRefs.current.get(activeDraftView.id)?.resetSketch()
     }
-  }, [activeDraftBuilder])
-  const submitBuilderDraft = useCallback(
-    async (value: string) => {
-      if (!activeDraftBuilder) return
-      const builderView = builderRefs.current.get(activeDraftBuilder.id)
-      await builderView?.prepareSketchForSend()
-      await builderActions.submit(activeDraftBuilder, value)
+  }, [activeDraftView])
+  const sendChat = async (text: string, options?: Parameters<typeof send>[1]) => {
+    if (activePendingView?.status === 'draft') {
+      await pendingViewRefs.current.get(activePendingView.id)?.prepareSketchForSend()
+      await viewActions.submit(activePendingView, text)
       // Submit clears the sent attachment. Keep the canvas until the built view replaces it.
-      builderDrafts.clear(activeDraftBuilder.id)
-    },
-    [activeDraftBuilder, builderActions, builderDrafts]
-  )
+      viewDrafts.clear(activePendingView.id)
+    } else await send(text, options)
+  }
 
-  const builderChatDraft = activeDraftBuilder
+  const viewChatDraft = activeDraftView
     ? {
-        sessionId: activeDraftBuilder.sessionId,
-        builderId: activeDraftBuilder.id,
-        initialValue: activeDraftBuilder.input.requirements,
-        onChange: changeBuilderDraft,
-        onRemoveDrawing: removeBuilderDrawing,
-        onSubmit: submitBuilderDraft
+        sessionId: draftSessionId(viewTabId(activeDraftView.id)),
+        onRemoveDrawing: removeViewDrawing
       }
     : undefined
 
@@ -608,20 +495,21 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       agent={theme.agent}
       active={mode === 'split'}
       focusRequest={chatFocusRequest}
-      chatLoaded={chatLoaded}
+      chatLoaded={visibleChatLoaded}
       hasWorkspaceApplets={hasWorkspaceApplets}
       view={view}
+      forkedFromSessionId={forkedFromSessionId}
       previewTurn={previewTurn}
       sessionId={sessionId}
       processing={processing}
-      composerBanner={activeDraftBuilder ? builderComposerBanner : composerBanner}
+      composerBanner={activeDraftView ? viewDraftComposerBanner : composerBanner}
       agentAvailability={agentAvailability}
-      send={send}
+      send={sendChat}
       stop={stop}
       onNavigateFromWelcome={navigateFromWelcome}
       onClose={() => setMode('fullscreen')}
       annotation={dockedAnnotation}
-      builderDraft={builderChatDraft}
+      viewDraft={viewChatDraft}
       docked
     />
   )
@@ -634,12 +522,13 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       chatLoaded={chatLoaded}
       hasWorkspaceApplets={hasWorkspaceApplets}
       view={view}
+      forkedFromSessionId={forkedFromSessionId}
       previewTurn={previewTurn}
       sessionId={sessionId}
       processing={processing}
       composerBanner={composerBanner}
       agentAvailability={agentAvailability}
-      send={send}
+      send={sendChat}
       stop={stop}
       onNavigateFromWelcome={navigateFromWelcome}
     />
@@ -672,7 +561,6 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
               }
               widgets={widgets}
               views={views}
-              builders={builders}
               onOpenView={viewId => openTab(viewTabId(viewId))}
               onCreateView={createView}
               onCreateWidget={() => {
@@ -686,30 +574,34 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
             </Suspense>
           ) : null}
 
-          {builders
-            .filter(builder => builder.status !== 'ready')
-            .map(builder => (
-              <ViewBuilder
-                key={builder.id}
-                ref={handle => {
-                  if (handle) builderRefs.current.set(builder.id, handle)
-                  else builderRefs.current.delete(builder.id)
-                }}
-                active={!isUnavailable && activeBuilder?.id === builder.id}
-                builder={builder}
-                chatDocked={mode === 'split'}
-                workspaceId={workspaceId}
-                onEditingStart={() => {
-                  if (mode === 'fullscreen') setFloatingChatOpen(false)
-                }}
-                onContinueInChat={openChat}
-                onOpenChat={() => {
-                  selectSession(builder.sessionId)
-                  openChat()
-                }}
-                onDiscard={() => discardBuilder(builder)}
-              />
-            ))}
+          {pendingViews.map(pendingView => (
+            <PendingViewScreen
+              key={pendingView.id}
+              ref={handle => {
+                if (handle) pendingViewRefs.current.set(pendingView.id, handle)
+                else pendingViewRefs.current.delete(pendingView.id)
+              }}
+              active={!isUnavailable && activePendingView?.id === pendingView.id}
+              pendingView={pendingView}
+              running={
+                !!pendingView.executionSessionId &&
+                isSessionRunning(sessionActivity, workspaceId, pendingView.executionSessionId)
+              }
+              sketchSessionId={
+                pendingView.status === 'draft'
+                  ? (pinnedSessionId ?? draftSessionId(viewTabId(pendingView.id)))
+                  : undefined
+              }
+              chatDocked={mode === 'split'}
+              workspaceId={workspaceId}
+              onEditingStart={() => {
+                if (mode === 'fullscreen') setFloatingChatOpen(false)
+              }}
+              onContinueInChat={openChat}
+              onOpenChat={openChat}
+              onDiscard={() => discardPendingView(pendingView)}
+            />
+          ))}
 
           {/* Views are not part of the chain above: ViewManager keeps them
                 mounted across tab switches (and collapses to nothing while
@@ -756,14 +648,14 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => setMode('split')}
-                  aria-label="Dock agent"
+                  aria-label="Dock chat"
                   className="text-muted-foreground"
                 >
                   <IconLayoutSidebarRight stroke={1.75} />
                 </Button>
               }
             />
-            <TooltipContent>Dock agent</TooltipContent>
+            <TooltipContent>Dock chat</TooltipContent>
           </Tooltip>
         )}
       </PanelHeader>
@@ -808,20 +700,21 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
               agent={theme.agent}
               active={floatingChatOpen}
               focusRequest={chatFocusRequest}
-              chatLoaded={chatLoaded}
+              chatLoaded={visibleChatLoaded}
               hasWorkspaceApplets={hasWorkspaceApplets}
               view={view}
+              forkedFromSessionId={forkedFromSessionId}
               previewTurn={previewTurn}
               sessionId={sessionId}
               processing={processing}
-              composerBanner={activeDraftBuilder ? builderComposerBanner : composerBanner}
+              composerBanner={activeDraftView ? viewDraftComposerBanner : composerBanner}
               agentAvailability={agentAvailability}
-              send={send}
+              send={sendChat}
               stop={stop}
               onNavigateFromWelcome={navigateFromWelcome}
               onClose={onClose}
               annotation={popupAnnotation}
-              builderDraft={builderChatDraft}
+              viewDraft={viewChatDraft}
             />
           )}
         </ChatPopup>

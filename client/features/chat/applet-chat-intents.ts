@@ -15,11 +15,13 @@ import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { appUiKeys } from '@/client/api/app-ui-keys'
 import { toast } from '@/client/components/ui/toast'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
-import type { SelectedSessionState } from '@/lib/types'
+import type { WorkspaceSessionSelection, WorkspaceTabId } from '@/lib/types'
+import { useCurrentTabId } from './sessions/useSelectedSession'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import type { AgentAvailability } from '@/client/lib/agent-availability'
 
 type UseAppletChatMessageOptions = {
+  tabId: WorkspaceTabId
   sessionId: string | null
   send: (draft: string, options?: ChatSendOptions) => void
   // Bring the chat on screen before the run starts. On a view tab in
@@ -55,9 +57,12 @@ export function createAppletMessageHandler(
 ) {
   const pending = new Set<() => void>()
   let disposed = false
-  const selectedSession = () =>
-    queryClient.getQueryData<SelectedSessionState>(appUiKeys.selectedSession(workspaceId))
-      ?.sessionId ?? null
+  const selectedSession = () => {
+    const state = queryClient.getQueryData<WorkspaceSessionSelection>(
+      appUiKeys.sessionSelection(workspaceId)
+    )
+    return state?.pinned ?? state?.selected[getOptions().tabId] ?? null
+  }
 
   async function handle(event: AppletChatMessage): Promise<void> {
     if (disposed) return
@@ -75,6 +80,7 @@ export function createAppletMessageHandler(
     }
 
     const sessionId = selectedSession()
+    const tabId = getOptions().tabId
     let active = true
     let loadingToast: string | undefined
     const finish = () => {
@@ -93,7 +99,7 @@ export function createAppletMessageHandler(
       })
     }
     const unsubscribe = queryClient.getQueryCache().subscribe(() => {
-      if (selectedSession() !== sessionId) cancel()
+      if (selectedSession() !== sessionId || getOptions().tabId !== tabId) cancel()
     })
     pending.add(cancel)
     // A selection change can reach the cache before React has replaced the
@@ -114,7 +120,7 @@ export function createAppletMessageHandler(
       const options = getOptions()
       const blocked = appletSendBlockedReason(options.agentAvailability)
       if (blocked) throw new Error(blocked)
-      if (options.sessionId !== sessionId) {
+      if (options.sessionId !== sessionId || options.tabId !== tabId) {
         cancel()
         return
       }
@@ -145,10 +151,11 @@ export function createAppletMessageHandler(
   }
 }
 
-export function useAppletChatMessage(options: UseAppletChatMessageOptions): void {
+export function useAppletChatMessage(options: Omit<UseAppletChatMessageOptions, 'tabId'>): void {
   const workspaceId = useWorkspaceId()
   const queryClient = useQueryClient()
-  const latest = useLatestRef(options)
+  const tabId = useCurrentTabId()
+  const latest = useLatestRef({ ...options, tabId })
   useLayoutEffect(() => {
     const handler = createAppletMessageHandler(workspaceId, queryClient, () => latest.current)
     const unsubscribe = appletRuntime(workspaceId).on('sendChatMessage', event => {
@@ -158,7 +165,7 @@ export function useAppletChatMessage(options: UseAppletChatMessageOptions): void
       unsubscribe()
       handler.dispose()
     }
-  }, [workspaceId, queryClient, latest])
+  }, [workspaceId, queryClient, latest, tabId])
 }
 
 export function useAppletChatAttachment(sessionId: string | null, revealChat: () => void): void {

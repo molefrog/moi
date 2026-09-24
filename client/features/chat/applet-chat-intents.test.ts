@@ -7,7 +7,7 @@ import type { AppletChatMessage } from '@/client/features/applets/applet-runtime
 import { type ChatSendOptions, ownsComposerAttachments, attachmentsForSend } from './chat-send'
 import { liveStore } from './chat-store'
 import { stageTextAttachment } from './composer/attachments/draft-attachments'
-import type { SelectedSessionState, UploadInfo } from '@/lib/types'
+import type { WorkspaceSessionSelection, UploadInfo } from '@/lib/types'
 import { drainChatDirectives, pushChatDirective } from '@/client/features/workspace/moi-context'
 
 import { canSubmitComposerAction } from '@/client/components/shared/Composer'
@@ -79,7 +79,10 @@ describe('immediate applet sends', () => {
   let log: ReturnType<typeof spyOn<typeof appletLog, 'reportAppletError'>>
 
   function select(sessionId: string | null) {
-    queryClient.setQueryData(appUiKeys.selectedSession(workspaceId), { sessionId })
+    queryClient.setQueryData(appUiKeys.sessionSelection(workspaceId), {
+      selected: { overview: sessionId },
+      pinned: null
+    })
   }
   function deferredUpload() {
     const deferred = Promise.withResolvers<Response>()
@@ -109,9 +112,10 @@ describe('immediate applet sends', () => {
     close = spyOn(toast, 'close').mockImplementation(() => {})
     log = spyOn(appletLog, 'reportAppletError').mockImplementation(() => {})
     handler = createAppletMessageHandler(workspaceId, queryClient, () => ({
+      tabId: 'overview',
       sessionId:
-        queryClient.getQueryData<SelectedSessionState>(appUiKeys.selectedSession(workspaceId))
-          ?.sessionId ?? null,
+        queryClient.getQueryData<WorkspaceSessionSelection>(appUiKeys.sessionSelection(workspaceId))
+          ?.selected.overview ?? null,
       send,
       revealChat: reveal,
       agentAvailability: availability
@@ -292,6 +296,7 @@ describe('immediate applet sends', () => {
   test('a stale rendered send callback cannot target a previously selected chat', async () => {
     handler.dispose()
     handler = createAppletMessageHandler(workspaceId, queryClient, () => ({
+      tabId: 'overview',
       sessionId: 'old-session',
       send,
       revealChat: reveal,

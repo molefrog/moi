@@ -3,7 +3,7 @@ import { describe, expect, test } from 'bun:test'
 import type { SessionInfo } from '@/lib/types'
 
 import { removeArchivedSession } from './api'
-import { groupSessionsByDate, sessionBadge } from './ChatSelector'
+import { groupSessionsByDate, groupSessionsForTab, sessionBadge } from './ChatSelector'
 
 function session(sessionId: string, summary: string, lastModified: string): SessionInfo {
   return {
@@ -68,6 +68,81 @@ describe('groupSessionsByDate', () => {
       '5 days ago',
       new Date(2026, 6, 24).toLocaleDateString([], { month: 'short', day: 'numeric' })
     ])
+  })
+})
+
+describe('groupSessionsForTab', () => {
+  const now = new Date(2026, 6, 30, 12)
+  const sessions: SessionInfo[] = [
+    { sessionId: 'generic', summary: 'Generic', lastModified: now.getTime() - 3 },
+    { sessionId: 'view', summary: 'View', lastModified: now.getTime(), tabId: 'views/words' },
+    {
+      sessionId: 'scratchpad',
+      summary: 'Sketch',
+      lastModified: now.getTime() - 1,
+      tabId: 'scratchpad'
+    },
+    {
+      sessionId: 'overview',
+      summary: 'Overview',
+      lastModified: now.getTime() - 2,
+      tabId: 'overview'
+    }
+  ]
+
+  test('Overview shows chats outside views, grouped by day and newest first', () => {
+    const groups = groupSessionsForTab(
+      [
+        ...sessions,
+        {
+          sessionId: 'agent',
+          summary: 'Agent',
+          lastModified: now.getTime() - 4,
+          tabId: 'agent'
+        },
+        {
+          sessionId: 'older',
+          summary: 'Older',
+          lastModified: new Date(2026, 6, 29, 12).getTime(),
+          tabId: 'scratchpad'
+        },
+        {
+          sessionId: 'deleted-view',
+          summary: 'Deleted view',
+          lastModified: now.getTime() - 5,
+          tabId: 'views/deleted'
+        }
+      ],
+      'overview',
+      now
+    )
+    expect(
+      groups.map(group => [group.label, group.sessions.map(session => session.sessionId)])
+    ).toEqual([
+      ['Today', ['scratchpad', 'overview', 'generic', 'agent']],
+      ['Yesterday', ['older']]
+    ])
+    expect(sessions.map(session => session.sessionId)).toEqual([
+      'generic',
+      'view',
+      'scratchpad',
+      'overview'
+    ])
+  })
+
+  test('views and Scratchpad only show their own chats, grouped by date', () => {
+    for (const tabId of ['views/words', 'scratchpad'] as const) {
+      const groups = groupSessionsForTab(sessions, tabId, now)
+      expect(groups).toEqual([
+        {
+          key: '2026-6-30',
+          label: 'Today',
+          sessions: sessions.filter(session => session.tabId === tabId)
+        }
+      ])
+    }
+    expect(groupSessionsForTab(sessions, 'views/empty', now)).toEqual([])
+    expect(groupSessionsForTab([], 'overview', now)).toEqual([])
   })
 })
 

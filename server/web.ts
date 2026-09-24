@@ -7,15 +7,15 @@ import { api } from './api'
 import { AttachmentUploadError } from './attachment-message'
 import { PORT } from './constants'
 import { control } from './control'
-import { EVENTS_TOPIC, publishEvent, setEventServer } from './events'
+import { EVENTS_TOPIC, setEventServer } from './events'
 import { killBuildWorkers } from './applets/build-worker'
 import { killAllWorkers } from './functions'
 import { startScratchpadSweeper } from './scratchpad'
 import { navigationRelay } from './navigation-relay'
 import { resolveScratchOp } from './scratchpad-relay'
 import { allHarnesses, harnessFor } from './harness/registry'
-import { getWorkspace } from './registry'
-import { saveSelectedSession } from './selected-session'
+import { getWorkspace, listWorkspaces } from './registry'
+import { failInterruptedViewStarts, sendWorkspaceMessage } from './view-sessions'
 import {
   addClient,
   broadcast,
@@ -90,6 +90,8 @@ function upgrade(server: Upgradable, req: Request, data: WsData) {
 // Bun owns the fullstack surface: the HTML shell + dev bundler/HMR, and the two
 // WebSocket channels (which need Bun's native `server.upgrade` + pub/sub). Every
 // HTTP API route is delegated to the Hono app (`./api`) via `fetch`.
+await Promise.all((await listWorkspaces()).map(failInterruptedViewStarts))
+
 export const app = Bun.serve<WsData>({
   port: PORT,
   hostname: process.env.HOST ?? '127.0.0.1',
@@ -161,44 +163,29 @@ export const app = Bun.serve<WsData>({
         if (data.type === 'chat' && (data.content?.trim() || data.attachments?.length)) {
           const workspace = await getWorkspace(data.workspaceId)
           if (!workspace) return
-          if (data.isNew) {
-            const selection = await saveSelectedSession(workspace.path, data.sessionId, null)
-            if (selection.changed) {
-              publishEvent({
-                type: 'selected-session:updated',
-                workspaceId: workspace.id,
-                sessionId: selection.sessionId
+          void sendWorkspaceMessage(workspace, {
+            workspaceId: data.workspaceId,
+            workspacePath: workspace.path,
+            sessionId: data.sessionId,
+            isNew: data.isNew,
+            content: data.content.trim(),
+            attachments: data.attachments,
+            optimisticId: data.optimisticId,
+            model: data.model,
+            effort: data.effort,
+            fastMode: data.fastMode,
+            stream: data.stream,
+            context: data.context,
+            agentId: workspace.agentId
+          }).catch(error => {
+            if (error instanceof AttachmentUploadError) {
+              broadcast(workspace.id, {
+                kind: 'error',
+                sessionId: data.sessionId,
+                content: error.message
               })
             }
-          }
-          // Harnesses ignore fields they don't support (see SendMessageInput).
-          // Their failures surface internally; attachment resolution happens
-          // before a harness owns the send, so surface that one here.
-          void harnessFor(workspace)
-            .sendMessage({
-              workspaceId: data.workspaceId,
-              workspacePath: workspace.path,
-              sessionId: data.sessionId,
-              isNew: data.isNew,
-              content: data.content.trim(),
-              attachments: data.attachments,
-              optimisticId: data.optimisticId,
-              model: data.model,
-              effort: data.effort,
-              fastMode: data.fastMode,
-              stream: data.stream,
-              context: data.context,
-              agentId: workspace.agentId
-            })
-            .catch(error => {
-              if (error instanceof AttachmentUploadError) {
-                broadcast(data.workspaceId, {
-                  kind: 'error',
-                  sessionId: data.sessionId,
-                  content: error.message
-                })
-              }
-            })
+          })
         }
         if (data.type === 'stop') {
           const workspace = await getWorkspace(data.workspaceId)

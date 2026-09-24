@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import type { ViewBuilder } from '@/lib/types'
+import type { PendingView } from '@/lib/types'
 
 import { api } from './api'
 import { DATA_DIR } from './data-dir'
@@ -12,17 +12,19 @@ import type { SendMessageInput } from './harness/types'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from './registry'
 import { DEFAULT_SELECTED_SESSION_PATH, setSelectedSessionPath } from './selected-session'
 import { addUpload } from './uploads'
-import { setViewBuilderStorePath } from './view-builders'
+import { setPendingViewStorePath } from './pending-views'
+import { DEFAULT_SESSION_STORE_PATH, setSessionStorePath } from './session-store'
 
 let tempDir: string
 const originalCodexAvailability = codexHarness.availability
 const originalCodexSendMessage = codexHarness.sendMessage
 
 beforeEach(async () => {
-  tempDir = await mkdtemp(join(tmpdir(), 'moi-api-view-builders-'))
+  tempDir = await mkdtemp(join(tmpdir(), 'moi-api-pending-views-'))
   setRegistryPath(join(tempDir, 'workspaces.json'))
   setSelectedSessionPath(join(tempDir, 'selected-sessions.json'))
-  setViewBuilderStorePath(join(tempDir, 'view-builders.json'))
+  setPendingViewStorePath(join(tempDir, 'pending-views.json'))
+  setSessionStorePath(join(tempDir, 'sessions.json'))
   codexHarness.availability = async () => ({ status: 'available' })
   codexHarness.sendMessage = async () => {}
 })
@@ -32,19 +34,20 @@ afterEach(async () => {
   codexHarness.sendMessage = originalCodexSendMessage
   setRegistryPath(DEFAULT_REGISTRY_PATH)
   setSelectedSessionPath(DEFAULT_SELECTED_SESSION_PATH)
-  setViewBuilderStorePath(join(DATA_DIR, 'view-builders.json'))
+  setPendingViewStorePath(join(DATA_DIR, 'pending-views.json'))
+  setSessionStorePath(DEFAULT_SESSION_STORE_PATH)
   await rm(tempDir, { recursive: true, force: true })
 })
 
-describe('view builder sketch submission', () => {
+describe('pending view sketch submission', () => {
   test('accepts a sketch-only first message and forwards its context', async () => {
     const workspacePath = join(tempDir, 'workspace')
     await mkdir(workspacePath)
     const workspace = await registerWorkspace(workspacePath, { type: 'codex' })
-    const createResponse = await api.request(`/api/workspaces/${workspace.id}/view-builders`, {
+    const createResponse = await api.request(`/api/workspaces/${workspace.id}/views`, {
       method: 'POST'
     })
-    const draft = (await createResponse.json()) as ViewBuilder
+    const draft = (await createResponse.json()) as PendingView
     const upload = await addUpload({
       workspaceId: workspace.id,
       filename: 'Sketch.png',
@@ -59,18 +62,14 @@ describe('view builder sketch submission', () => {
       sent.push(input)
     }
 
-    const response = await api.request(
-      `/api/workspaces/${workspace.id}/view-builders/${draft.id}/submit`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          input: { requirements: '' },
-          attachments: [{ type: 'upload', uploadId: upload.id }],
-          availableIcons: ['chart']
-        })
-      }
-    )
+    const response = await api.request(`/api/workspaces/${workspace.id}/views/${draft.id}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requirements: '',
+        attachments: [{ type: 'upload', uploadId: upload.id }]
+      })
+    })
 
     if (!response.ok) throw new Error(await response.text())
     expect(response.status).toBe(200)
@@ -85,10 +84,10 @@ describe('view builder sketch submission', () => {
     const workspacePath = join(tempDir, 'workspace')
     await mkdir(workspacePath)
     const workspace = await registerWorkspace(workspacePath, { type: 'codex' })
-    const created = await api.request(`/api/workspaces/${workspace.id}/view-builders`, {
+    const created = await api.request(`/api/workspaces/${workspace.id}/views`, {
       method: 'POST'
     })
-    const draft = (await created.json()) as ViewBuilder
+    const draft = (await created.json()) as PendingView
     const attachments: NonNullable<SendMessageInput['attachments']> = [
       { type: 'text', source: 'view:orders', label: 'Order', text: 'Order ID: 1042' }
     ]
@@ -107,18 +106,14 @@ describe('view builder sketch submission', () => {
     codexHarness.sendMessage = async input => {
       sent.push(input)
     }
-    const response = await api.request(
-      `/api/workspaces/${workspace.id}/view-builders/${draft.id}/submit`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          input: { requirements: '' },
-          attachments,
-          availableIcons: ['chart']
-        })
-      }
-    )
+    const response = await api.request(`/api/workspaces/${workspace.id}/views/${draft.id}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requirements: '',
+        attachments
+      })
+    })
     expect(response.status).toBe(200)
     expect(sent[0]?.attachments).toEqual(attachments)
     expect(sent[0]?.content).toBe('')
@@ -126,19 +121,16 @@ describe('view builder sketch submission', () => {
 
   test('rejects a first message with neither text nor a sketch', async () => {
     const workspace = await registerWorkspace(join(tempDir, 'workspace'), { type: 'codex' })
-    const createResponse = await api.request(`/api/workspaces/${workspace.id}/view-builders`, {
+    const createResponse = await api.request(`/api/workspaces/${workspace.id}/views`, {
       method: 'POST'
     })
-    const draft = (await createResponse.json()) as ViewBuilder
+    const draft = (await createResponse.json()) as PendingView
 
-    const response = await api.request(
-      `/api/workspaces/${workspace.id}/view-builders/${draft.id}/submit`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input: { requirements: '' }, availableIcons: ['chart'] })
-      }
-    )
+    const response = await api.request(`/api/workspaces/${workspace.id}/views/${draft.id}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requirements: '' })
+    })
 
     expect(response.status).toBe(400)
     expect(await response.text()).toBe('View requirements or an attachment are required')
@@ -146,58 +138,50 @@ describe('view builder sketch submission', () => {
 
   test('rejects malformed sketch upload ids', async () => {
     const workspace = await registerWorkspace(join(tempDir, 'workspace'), { type: 'codex' })
-    const createResponse = await api.request(`/api/workspaces/${workspace.id}/view-builders`, {
+    const createResponse = await api.request(`/api/workspaces/${workspace.id}/views`, {
       method: 'POST'
     })
-    const draft = (await createResponse.json()) as ViewBuilder
+    const draft = (await createResponse.json()) as PendingView
 
-    const response = await api.request(
-      `/api/workspaces/${workspace.id}/view-builders/${draft.id}/submit`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          input: { requirements: '' },
-          attachments: ['not-an-upload'],
-          availableIcons: ['chart']
-        })
-      }
-    )
+    const response = await api.request(`/api/workspaces/${workspace.id}/views/${draft.id}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requirements: '',
+        attachments: ['not-an-upload']
+      })
+    })
 
     expect(response.status).toBe(400)
     expect(await response.text()).toBe('Invalid attachments')
   })
 })
 
-describe('view builder availability', () => {
-  test('rejects submission before changing a builder to building', async () => {
+describe('pending view availability', () => {
+  test('rejects submission before starting a view build', async () => {
     const workspace = await registerWorkspace(join(tempDir, 'workspace'), { type: 'codex' })
-    const createResponse = await api.request(`/api/workspaces/${workspace.id}/view-builders`, {
+    const createResponse = await api.request(`/api/workspaces/${workspace.id}/views`, {
       method: 'POST'
     })
-    const draft = (await createResponse.json()) as ViewBuilder
+    const draft = (await createResponse.json()) as PendingView
     const reason =
       'Run curl -fsSL https://chatgpt.com/codex/install.sh | sh in your terminal to install Codex'
     codexHarness.availability = async () => ({ status: 'unavailable', reason })
 
-    const response = await api.request(
-      `/api/workspaces/${workspace.id}/view-builders/${draft.id}/submit`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          input: { requirements: 'Build a customer dashboard' },
-          availableIcons: ['chart']
-        })
-      }
-    )
+    const response = await api.request(`/api/workspaces/${workspace.id}/views/${draft.id}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requirements: 'Build a customer dashboard'
+      })
+    })
 
     expect(response.status).toBe(400)
     expect(await response.text()).toBe(reason)
 
-    const listResponse = await api.request(`/api/workspaces/${workspace.id}/view-builders`)
-    const { builders } = (await listResponse.json()) as { builders: ViewBuilder[] }
-    expect(builders).toHaveLength(1)
-    expect(builders[0].status).toBe('draft')
+    const listResponse = await api.request(`/api/workspaces/${workspace.id}/views`)
+    const { views } = (await listResponse.json()) as { views: PendingView[] }
+    expect(views).toHaveLength(1)
+    expect(views[0].status).toBe('draft')
   })
 })

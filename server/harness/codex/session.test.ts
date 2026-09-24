@@ -107,7 +107,7 @@ describe('Codex live session lifecycle', () => {
     f.handlers.set('turn/start', () => {
       throw new CodexRpcError('Model unavailable', -32600)
     })
-    await f.send('follow up')
+    await expect(f.send('follow up')).rejects.toThrow('Model unavailable')
     expect(f.active()).toBe(false)
     expect(f.frames().at(-1)).toMatchObject({ kind: 'error', terminal: true })
   })
@@ -258,20 +258,24 @@ describe('Codex live session lifecycle', () => {
       mediaType: 'image/gif',
       bytes: Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64')
     })
-    await f.send('inspect', {
-      model: 'text',
-      attachments: [{ type: 'upload', uploadId: upload.id }]
-    })
+    await expect(
+      f.send('inspect', {
+        model: 'text',
+        attachments: [{ type: 'upload', uploadId: upload.id }]
+      })
+    ).rejects.toThrow('does not accept images')
     expect(f.calls.some(call => call.method === 'turn/start')).toBe(false)
     expect(f.frames().at(-1)).toMatchObject({
       kind: 'error',
       content: expect.stringContaining('does not accept images')
     })
     await f.send('start text turn', { model: 'text' })
-    await f.send('switch mid-turn', {
-      model: 'vision',
-      attachments: [{ type: 'upload', uploadId: upload.id }]
-    })
+    await expect(
+      f.send('switch mid-turn', {
+        model: 'vision',
+        attachments: [{ type: 'upload', uploadId: upload.id }]
+      })
+    ).rejects.toThrow('does not accept images')
     expect(f.calls.some(call => call.method === 'turn/steer')).toBe(false)
     expect(f.active()).toBe(true)
     f.emit('turn/completed', { turn: { id: 'turn-1', status: 'completed', items: [] } })
@@ -432,7 +436,7 @@ describe('Codex live session lifecycle', () => {
       f.handlers.set('turn/steer', () => {
         throw error
       })
-      await f.send('follow-up')
+      await expect(f.send('follow-up')).rejects.toThrow(error.message)
     }
     expect(f.calls.filter(call => call.method === 'turn/start')).toHaveLength(1)
     expect(f.active()).toBe(true)

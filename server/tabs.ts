@@ -19,13 +19,12 @@ const STATIC_TABS: { id: WorkspaceTabId; title: string }[] = [
   { id: 'scratchpad', title: 'Scratchpad' }
 ]
 
-// The `moi tabs` listing: static tabs plus each built view, the saved default
-// marked. View builders are transient build-state, not addressable tabs, so
-// they don't list (and a builder default simply marks no row).
+// The `moi tabs` listing: static tabs plus every compiled or pending view, with
+// the saved default marked.
 export function assembleTabRows(views: ViewInfo[], defaultTab: WorkspaceTabId): TabRow[] {
   return [
     ...STATIC_TABS,
-    ...views.map(view => ({ id: viewTabId(view.id), title: view.config.title || view.id }))
+    ...views.map(view => ({ id: viewTabId(view.id), title: view.title || view.id }))
   ].map(row => ({
     ...row,
     isDefault: row.id === defaultTab,

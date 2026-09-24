@@ -8,10 +8,12 @@ import type {
 } from '@/lib/types'
 import { uploadChatFile } from './composer/attachments/uploads'
 import { attachmentPart } from '@/lib/moi-attachments'
+import { composerDraftKey } from '@/lib/session-drafts'
 import type { QueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { attachmentKey, liveStore } from '@/client/features/chat/chat-store'
+import { useUiStore } from '@/client/store/ui'
 import type { StagedAttachment } from '@/client/features/chat/composer/attachments/types'
 import { resolveSelectedModel } from '@/client/features/chat/composer/model-order'
 import type { MoiUserMessageOptions } from '@/client/features/workspace/moi-context'
@@ -161,6 +163,7 @@ export function startOptimisticTurn({
 }
 
 type StartOptimisticSessionInput = {
+  tabId?: SessionInfo['tabId']
   queryClient: QueryClient
   workspaceId: string
   sessionId: string
@@ -169,6 +172,7 @@ type StartOptimisticSessionInput = {
 }
 
 export function startOptimisticSession({
+  tabId,
   queryClient,
   workspaceId,
   sessionId,
@@ -178,7 +182,7 @@ export function startOptimisticSession({
   const summary = formatChatTitle(text, filenames)
   if (!summary) return
   queryClient.setQueryData<SessionInfo[]>(workspaceKeys.sessions(workspaceId), current => [
-    { sessionId, summary, lastModified: Date.now() },
+    { sessionId, summary, lastModified: Date.now(), ...(tabId ? { tabId } : {}) },
     ...(current ?? []).filter(session => session.sessionId !== sessionId)
   ])
 }
@@ -220,4 +224,32 @@ export function resolveChatRunOptions(
     ...(fastMode !== undefined ? { fastMode } : {}),
     stream
   }
+}
+
+export function moveChatDraft(workspaceId: string, from: string, to: string) {
+  liveStore.getState().renameSession(workspaceId, from, to)
+  useUiStore
+    .getState()
+    .moveComposerDraft(composerDraftKey(workspaceId, from), composerDraftKey(workspaceId, to))
+}
+
+export function prepareOptimisticSend(
+  input: Omit<StartOptimisticTurnInput, 'parts'> & { text: string },
+  ready: readonly StagedAttachment[],
+  prepared = prepareDraftAttachments(ready)
+) {
+  const parts: Part[] = [...prepared.parts]
+  if (input.text) parts.push({ type: 'text', text: input.text })
+  return {
+    attachments: prepared.attachments,
+    optimisticId: startOptimisticTurn({ ...input, parts })
+  }
+}
+
+export function finishComposerSend(workspaceId: string, sent: readonly StagedAttachment[]) {
+  // Local IDs survive native session renames. Remove only this send's snapshot,
+  // preserving files staged while an HTTP submission was in flight.
+  for (const attachment of sent)
+    liveStore.getState().removeAttachment(workspaceId, attachment.localId)
+  useUiStore.getState().markMessageSentFromMoi(workspaceId)
 }

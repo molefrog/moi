@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 
-import { IconChevronDown, IconChevronsRight, IconX } from '@tabler/icons-react'
+import {
+  IconChevronDown,
+  IconChevronsRight,
+  IconPin,
+  IconPinnedFilled,
+  IconX
+} from '@tabler/icons-react'
+import { draftSessionId } from '@/lib/session-drafts'
+import { useCurrentTabId, usePinnedSession } from './sessions/useSelectedSession'
 
 import { canSubmitComposerAction, focusComposer } from '@/client/components/shared/Composer'
 import { AgentBlobatar } from '@/client/components/shared/AgentBlobatar'
@@ -24,6 +32,7 @@ import {
   resolveChatEmptyState
 } from './messages/ChatEmptyState'
 import { ChatSelector } from './sessions/ChatSelector'
+import { useWorkspaceSessions } from './sessions/api'
 import { TurnView } from './messages/TurnView'
 import { Button } from '@/client/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
@@ -31,19 +40,13 @@ import { cn } from '@/client/lib/cn'
 import type { AgentAvailability } from '@/client/lib/agent-availability'
 import { useUiStore } from '@/client/store/ui'
 
-export type ViewBuilderChatDraft = {
+export type ViewChatDraft = {
   sessionId: string
-  builderId: string
-  // Server-saved requirements the composer falls back to; the live draft text
-  // is subscribed from the UI store by builder id inside ChatComposer, so
-  // typing never re-renders this panel or the screen hosting it.
-  initialValue: string
-  onChange: (value: string) => void
   onRemoveDrawing: (localId: string) => void
-  onSubmit: (value: string) => Promise<void>
 }
 
 type ChatPanelProps = {
+  forkedFromSessionId?: string
   agent: AgentTheme
   active?: boolean
   focusRequest?: number
@@ -62,18 +65,19 @@ type ChatPanelProps = {
   composerBanner?: ComposerBanner
   agentAvailability: AgentAvailability
   annotation?: ComposerAnnotationControls
-  send: (text: string, options?: ChatSendOptions) => void
+  send: (text: string, options?: ChatSendOptions) => Promise<void>
   stop: () => void
   onNavigateFromWelcome: (destination: WelcomeDestination) => void
   // Chat on a separate tab doesn't have a close button
   onClose?: () => void
-  builderDraft?: ViewBuilderChatDraft
+  viewDraft?: ViewChatDraft
 }
 
 const EMPTY_TURNS: Turn[] = []
 const EMPTY_NOTICES: SystemNotice[] = []
 
 export function ChatPanel({
+  forkedFromSessionId,
   agent,
   active = true,
   focusRequest = 0,
@@ -91,14 +95,18 @@ export function ChatPanel({
   stop,
   onNavigateFromWelcome,
   onClose,
-  builderDraft
+  viewDraft
 }: ChatPanelProps) {
   const workspaceId = useWorkspaceId()
+  const { data: sessions } = useWorkspaceSessions(workspaceId)
+  const sourceName = sessions?.find(session => session.sessionId === forkedFromSessionId)?.summary
+  const tabId = useCurrentTabId()
+  const { pinnedSessionId, pin, pending: pinPending } = usePinnedSession()
   const composerRef = useRef<HTMLTextAreaElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
-  const effectiveSessionId = builderDraft?.sessionId ?? sessionId ?? null
-  const modelSessionId = builderDraft ? null : (sessionId ?? null)
-  const turns = builderDraft ? EMPTY_TURNS : view.turns
+  const effectiveSessionId = viewDraft?.sessionId ?? sessionId ?? draftSessionId(tabId)
+  const modelSessionId = viewDraft ? null : (sessionId ?? null)
+  const turns = viewDraft ? EMPTY_TURNS : view.turns
   const hasSentMessageFromMoi = useUiStore(state => state.hasSentMessageFromMoi)
   const isWorkspacePendingAnalysis = useUiStore(state =>
     (state.workspaceIdsPendingAnalysis ?? []).includes(workspaceId)
@@ -108,14 +116,16 @@ export function ChatPanel({
       attachment => attachment.kind !== 'text' && attachment.status === 'uploading'
     )
   )
-  const promptDisabled = !canSubmitComposerAction(true, attachmentsUploading, agentAvailability)
+  const chatReady = chatLoaded || !!viewDraft
+  const promptDisabled =
+    !chatReady || !canSubmitComposerAction(true, attachmentsUploading, agentAvailability)
   // Visual grouping: fold consecutive tool-only assistant turns into one
   // synthetic turn so OpenAI Codex–style traces (which serialize one
   // assistant message per agent step) don't render with the wider
   // inter-turn gap between every tool call. See `dev/turn-spacing.md`.
   // Group saved history once, then merge previews into just the trailing run.
-  const effectivePreviewTurn = builderDraft ? null : previewTurn
-  const notices = builderDraft ? EMPTY_NOTICES : view.notices
+  const effectivePreviewTurn = viewDraft ? null : previewTurn
+  const notices = viewDraft ? EMPTY_NOTICES : view.notices
   const savedGroups = useMemo(() => groupTurns(turns), [turns])
   const groupedTurns = useMemo(
     () => appendPreviewTurn(savedGroups, effectivePreviewTurn),
@@ -126,12 +136,13 @@ export function ChatPanel({
   // a notice never splits a tool-only run apart.
   const timeline = useMemo(() => interleaveNotices(groupedTurns, notices), [groupedTurns, notices])
   const lastTurnId = groupedTurns.length > 0 ? groupedTurns[groupedTurns.length - 1].id : null
-  const effectiveProcessing = builderDraft ? false : processing
+  const effectiveProcessing = viewDraft ? false : processing
   const showEmptyState =
-    !!builderDraft || (chatLoaded && timeline.length === 0 && !effectiveProcessing)
+    !!viewDraft ||
+    (!forkedFromSessionId && chatLoaded && timeline.length === 0 && !effectiveProcessing)
   const showTranscript = chatLoaded && !showEmptyState
   const emptyStateKind = resolveChatEmptyState({
-    isViewBuilderDraft: !!builderDraft,
+    isViewDraft: !!viewDraft,
     hasSentMessageFromMoi,
     isWorkspacePendingAnalysis
   })
@@ -153,11 +164,10 @@ export function ChatPanel({
   // they expect to see their message and the reply.
   const handleSend = useCallback(
     async (text: string, options?: ChatSendOptions) => {
-      if (builderDraft) await builderDraft.onSubmit(text)
-      else send(text, options)
+      await send(text, options)
       scrollToBottom()
     },
-    [builderDraft, send, scrollToBottom]
+    [send, scrollToBottom]
   )
 
   const handlePromptSelect = useCallback(
@@ -172,21 +182,41 @@ export function ChatPanel({
     <div className="flex min-h-0 flex-1 flex-col pt-2 pb-3">
       <header className="mx-auto flex w-full max-w-[calc(var(--chat-max-container)+40px)] min-w-0 items-center justify-between pr-2 pb-2 pl-2">
         <div className="min-w-0 flex-1">
-          <ChatSelector isViewBuilder={!!builderDraft} />
+          <ChatSelector isViewDraft={!!viewDraft} />
         </div>
+        {sessionId && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className={cn(docked && 'text-muted-foreground')}
+                  disabled={pinPending}
+                  onClick={() => pin(pinnedSessionId ? null : sessionId)}
+                  aria-label={pinnedSessionId ? 'Unpin chat' : 'Pin chat'}
+                  aria-pressed={!!pinnedSessionId}
+                >
+                  {pinnedSessionId ? <IconPinnedFilled stroke={1.75} /> : <IconPin stroke={1.75} />}
+                </Button>
+              }
+            />
+            <TooltipContent>{pinnedSessionId ? 'Unpin chat' : 'Pin chat'}</TooltipContent>
+          </Tooltip>
+        )}
         {onClose && docked && (
           <Tooltip>
             <TooltipTrigger
               render={
-                <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Undock agent">
+                <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Undock chat">
                   <IconChevronsRight className="size-5! text-muted-foreground" stroke={1.5} />
                 </Button>
               }
             />
-            <TooltipContent>Undock agent</TooltipContent>
+            <TooltipContent>Undock chat</TooltipContent>
           </Tooltip>
         )}
-        {!builderDraft && onClose && !docked && (
+        {!viewDraft && onClose && !docked && (
           <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close chat">
             <IconX stroke={2} />
           </Button>
@@ -199,6 +229,12 @@ export function ChatPanel({
           className="flex scrollbar-thin flex-1 scroll-fade flex-col overflow-y-auto overscroll-contain px-5 pt-4 pb-8 [--scroll-fade-reveal:8px]"
         >
           <div className="mx-auto flex w-full max-w-(--chat-max-container) flex-1 flex-col gap-6">
+            {forkedFromSessionId && (
+              <div role="note" className="flex flex-col gap-1 text-sm text-muted-foreground">
+                <span className="font-medium">View chat started</span>
+                <span>Context inherited from {sourceName || 'another chat'}</span>
+              </div>
+            )}
             {showEmptyState && (
               <ChatEmptyState
                 agent={agent}
@@ -268,19 +304,11 @@ export function ChatPanel({
             sessionId={effectiveSessionId}
             modelSessionId={modelSessionId}
             availability={agentAvailability}
-            annotation={builderDraft ? undefined : annotation}
-            onRemoveDrawing={builderDraft?.onRemoveDrawing ?? annotation?.onRemove}
-            allowFiles={!builderDraft}
-            placeholder={builderDraft ? 'Drop in the details' : undefined}
-            draft={
-              builderDraft
-                ? {
-                    id: builderDraft.builderId,
-                    initialValue: builderDraft.initialValue,
-                    onChange: builderDraft.onChange
-                  }
-                : undefined
-            }
+            chatReady={chatReady}
+            annotation={viewDraft ? undefined : annotation}
+            onRemoveDrawing={viewDraft?.onRemoveDrawing ?? annotation?.onRemove}
+            allowFiles={!viewDraft}
+            placeholder={viewDraft ? 'Drop in the details' : undefined}
           />
         </div>
       </div>

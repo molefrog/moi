@@ -44,9 +44,8 @@ import { generateCodexSessionTitle, renameCodexSessionIfUnchanged } from './sess
 import { agentStore } from '../../agent'
 import { debug } from '../../debug'
 import { broadcast } from '../../state'
-import { renameSelectedSession } from '../../selected-session'
-import { hasSessionConfig, renameSessionConfig, saveSessionConfig } from '../../session-config'
-import { renameViewBuilderSession } from '../../view-builders'
+import { hasSessionConfig, saveSessionConfig } from '../../session-config'
+import { renameSessionReferences } from '../../session-lifecycle'
 
 type CodexUserInputItem = { type: 'text'; text: string } | { type: 'image'; url: string }
 
@@ -952,20 +951,12 @@ async function sendMessage(
       if (realId !== input.sessionId) {
         aliases.set(recKey(input.workspaceId, input.sessionId), realId)
         sendLanes.set(recKey(input.workspaceId, realId), lane)
-        await renameSessionConfig(input.workspacePath, input.sessionId, realId)
-        await renameSelectedSession(input.workspacePath, input.sessionId, realId)
-        // Builder tabs follow the same temporary-to-real session rename.
-        await renameViewBuilderSession(
+        await renameSessionReferences(
           input.workspaceId,
           input.workspacePath,
           input.sessionId,
           realId
         )
-        broadcast(input.workspaceId, {
-          type: 'session_renamed',
-          from: input.sessionId,
-          to: realId
-        })
       }
       rec = createRecord({
         workspaceId: input.workspaceId,
@@ -1002,7 +993,7 @@ async function sendMessage(
       content: err instanceof Error ? err.message : 'failed to start codex session'
     })
     refreshAvailability(input.workspaceId, input.workspacePath)
-    return
+    throw err
   }
 
   if (lane.generation !== generation) return
@@ -1029,7 +1020,7 @@ async function sendMessage(
         terminal: !rec.activeTurnId
       })
       if (!rec.activeTurnId) setProcessing(rec, false, null)
-      return
+      throw error
     }
     if (lane.generation !== generation) return
   }
@@ -1129,6 +1120,7 @@ async function sendMessage(
       terminal: !rec.activeTurnId
     })
     refreshAvailability(rec.workspaceId, rec.workspacePath)
+    throw err
   }
 }
 

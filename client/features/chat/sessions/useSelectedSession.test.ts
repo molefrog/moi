@@ -7,51 +7,109 @@ import {
   optimisticallySetSelectedSession,
   settleSelectedSessionSave
 } from '@/client/features/chat/sessions/useSelectedSession'
-import type { SelectedSessionState } from '@/lib/types'
+import type { WorkspaceSessionSelection } from '@/lib/types'
 
 const WORKSPACE_ID = 'workspace-1'
 
 function selectedSessionId(queryClient: QueryClient): string | null | undefined {
-  return queryClient.getQueryData<SelectedSessionState>(appUiKeys.selectedSession(WORKSPACE_ID))
-    ?.sessionId
+  return queryClient.getQueryData<WorkspaceSessionSelection>(
+    appUiKeys.sessionSelection(WORKSPACE_ID)
+  )?.selected.overview
 }
 
 describe('selected session cache', () => {
+  test('settling one tab preserves other tab selections and the workspace pin', () => {
+    const queryClient = new QueryClient()
+    const key = appUiKeys.sessionSelection(WORKSPACE_ID)
+    queryClient.setQueryData<WorkspaceSessionSelection>(key, {
+      selected: { overview: 'old' },
+      pinned: 'pin'
+    })
+    const input = optimisticallySetSelectedSession(queryClient, WORKSPACE_ID, 'next', 'overview')!
+    optimisticallySetSelectedSession(queryClient, WORKSPACE_ID, 'notes', 'scratchpad')
+    settleSelectedSessionSave(queryClient, WORKSPACE_ID, { sessionId: 'next' }, input)
+    expect(queryClient.getQueryData<WorkspaceSessionSelection>(key)).toEqual({
+      selected: { overview: 'next', scratchpad: 'notes' },
+      pinned: 'pin'
+    })
+  })
+  test('workspace prefix invalidates every tab without affecting another workspace', async () => {
+    const queryClient = new QueryClient()
+    const keys = [appUiKeys.sessionSelection(WORKSPACE_ID)]
+    const other = appUiKeys.sessionSelection('other-workspace')
+    for (const key of [...keys, other])
+      queryClient.setQueryData(key, { selected: {}, pinned: null })
+
+    await queryClient.invalidateQueries({ queryKey: appUiKeys.sessionSelection(WORKSPACE_ID) })
+
+    for (const key of keys) expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true)
+    expect(queryClient.getQueryState(other)?.isInvalidated).toBe(false)
+  })
+
   test('uses an app UI key outside the workspace resource cache', () => {
-    expect(appUiKeys.selectedSession(WORKSPACE_ID)).toEqual([
+    expect(appUiKeys.sessionSelection(WORKSPACE_ID)).toEqual([
       'app-ui',
-      'selected-session',
+      'session-selection',
       WORKSPACE_ID
     ])
   })
 
   test('updates a chat selection and New chat optimistically', () => {
     const queryClient = new QueryClient()
-    queryClient.setQueryData<SelectedSessionState>(appUiKeys.selectedSession(WORKSPACE_ID), {
-      sessionId: 'session-1'
+    queryClient.setQueryData<WorkspaceSessionSelection>(appUiKeys.sessionSelection(WORKSPACE_ID), {
+      selected: { overview: 'session-1' },
+      pinned: null
     })
 
-    expect(optimisticallySetSelectedSession(queryClient, WORKSPACE_ID, 'session-2')).toEqual({
+    expect(
+      optimisticallySetSelectedSession(queryClient, WORKSPACE_ID, 'session-2', 'overview')
+    ).toEqual({
       sessionId: 'session-2',
+      tabId: 'overview',
       previousSessionId: 'session-1'
     })
     expect(selectedSessionId(queryClient)).toBe('session-2')
 
-    expect(optimisticallySetSelectedSession(queryClient, WORKSPACE_ID, null)).toEqual({
+    expect(optimisticallySetSelectedSession(queryClient, WORKSPACE_ID, null, 'overview')).toEqual({
       sessionId: null,
+      tabId: 'overview',
       previousSessionId: 'session-2'
     })
-    expect(selectedSessionId(queryClient)).toBeNull()
+    expect(selectedSessionId(queryClient)).toBeUndefined()
+    expect(
+      settleSelectedSessionSave(
+        queryClient,
+        WORKSPACE_ID,
+        { sessionId: null },
+        {
+          sessionId: null,
+          previousSessionId: 'session-2',
+          tabId: 'overview'
+        }
+      )
+    ).toBe('applied')
+    expect(selectedSessionId(queryClient)).toBeUndefined()
   })
 
   test('keeps the latest optimistic selection while serialized saves settle', () => {
     const queryClient = new QueryClient()
-    queryClient.setQueryData<SelectedSessionState>(appUiKeys.selectedSession(WORKSPACE_ID), {
-      sessionId: 'session-1'
+    queryClient.setQueryData<WorkspaceSessionSelection>(appUiKeys.sessionSelection(WORKSPACE_ID), {
+      selected: { overview: 'session-1' },
+      pinned: null
     })
 
-    const first = optimisticallySetSelectedSession(queryClient, WORKSPACE_ID, 'session-2')
-    const second = optimisticallySetSelectedSession(queryClient, WORKSPACE_ID, 'session-3')
+    const first = optimisticallySetSelectedSession(
+      queryClient,
+      WORKSPACE_ID,
+      'session-2',
+      'overview'
+    )
+    const second = optimisticallySetSelectedSession(
+      queryClient,
+      WORKSPACE_ID,
+      'session-3',
+      'overview'
+    )
     if (!first || !second) throw new Error('Expected optimistic updates')
 
     expect(
@@ -67,10 +125,16 @@ describe('selected session cache', () => {
 
   test('detects a rejected conditional save without replacing the optimistic value', () => {
     const queryClient = new QueryClient()
-    queryClient.setQueryData<SelectedSessionState>(appUiKeys.selectedSession(WORKSPACE_ID), {
-      sessionId: 'session-1'
+    queryClient.setQueryData<WorkspaceSessionSelection>(appUiKeys.sessionSelection(WORKSPACE_ID), {
+      selected: { overview: 'session-1' },
+      pinned: null
     })
-    const input = optimisticallySetSelectedSession(queryClient, WORKSPACE_ID, 'session-2')
+    const input = optimisticallySetSelectedSession(
+      queryClient,
+      WORKSPACE_ID,
+      'session-2',
+      'overview'
+    )
     if (!input) throw new Error('Expected optimistic update')
 
     expect(
@@ -81,14 +145,21 @@ describe('selected session cache', () => {
 
   test('applies cross-client events only when no local save is pending', () => {
     const queryClient = new QueryClient()
-    queryClient.setQueryData<SelectedSessionState>(appUiKeys.selectedSession(WORKSPACE_ID), {
-      sessionId: 'local-session'
+    queryClient.setQueryData<WorkspaceSessionSelection>(appUiKeys.sessionSelection(WORKSPACE_ID), {
+      selected: { overview: 'local-session' },
+      pinned: null
     })
 
-    applySelectedSessionEvent(queryClient, WORKSPACE_ID, 'server-session', true)
+    applySelectedSessionEvent(queryClient, WORKSPACE_ID, true)
     expect(selectedSessionId(queryClient)).toBe('local-session')
+    expect(queryClient.getQueryState(appUiKeys.sessionSelection(WORKSPACE_ID))?.isInvalidated).toBe(
+      false
+    )
 
-    applySelectedSessionEvent(queryClient, WORKSPACE_ID, 'server-session', false)
-    expect(selectedSessionId(queryClient)).toBe('server-session')
+    applySelectedSessionEvent(queryClient, WORKSPACE_ID, false)
+    expect(queryClient.getQueryState(appUiKeys.sessionSelection(WORKSPACE_ID))?.isInvalidated).toBe(
+      true
+    )
+    expect(selectedSessionId(queryClient)).toBe('local-session')
   })
 })

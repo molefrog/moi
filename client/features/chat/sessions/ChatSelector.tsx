@@ -4,7 +4,11 @@ import { IconArchive, IconChevronDown, IconEdit } from '@tabler/icons-react'
 import { useArchiveWorkspaceSession, useWorkspaceSessions } from './api'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
-import { useSelectedSession } from '@/client/features/chat/sessions/useSelectedSession'
+import {
+  useSelectedSession,
+  useCurrentTabId,
+  usePinnedSession
+} from '@/client/features/chat/sessions/useSelectedSession'
 import { cn } from '@/client/lib/cn'
 import {
   hasRunningBackgroundSession,
@@ -12,7 +16,7 @@ import {
   liveStore,
   useLive
 } from '@/client/features/chat/chat-store'
-import type { SessionInfo } from '@/lib/types'
+import type { SessionInfo, WorkspaceTabId } from '@/lib/types'
 
 import { Button } from '@/client/components/ui/button'
 import { toast } from '@/client/components/ui/toast'
@@ -29,7 +33,7 @@ import {
 import { Spinner } from '@/client/components/ui/spinner'
 
 type ChatSelectorProps = {
-  isViewBuilder?: boolean
+  isViewDraft?: boolean
 }
 
 type ChatHeaderLabelProps = {
@@ -239,8 +243,23 @@ export function groupSessionsByDate(sessions: SessionInfo[], now = new Date()): 
   return [...groups.values()]
 }
 
-export function ChatSelector({ isViewBuilder = false }: ChatSelectorProps) {
-  if (isViewBuilder) {
+export function groupSessionsForTab(
+  sessions: SessionInfo[],
+  tabId: WorkspaceTabId,
+  now = new Date()
+): ChatSessionGroup[] {
+  return groupSessionsByDate(
+    sessions.filter(session =>
+      tabId === 'overview' ? !session.tabId?.startsWith('views/') : session.tabId === tabId
+    ),
+    now
+  )
+}
+
+export function ChatSelector({ isViewDraft = false }: ChatSelectorProps) {
+  const { pinnedSessionId } = usePinnedSession()
+  if (pinnedSessionId) return <ChatHeaderLabel label="Pinned chat" />
+  if (isViewDraft) {
     return <ChatHeaderLabel label="Build a new view" />
   }
 
@@ -249,23 +268,20 @@ export function ChatSelector({ isViewBuilder = false }: ChatSelectorProps) {
 
 function SessionSelector() {
   const workspaceId = useWorkspaceId()
-  const [selectedSession, selectSession] = useSelectedSession()
-  const selectedSessionId = selectedSession ?? null
+  const tabId = useCurrentTabId()
+  const [selectedSessionId, selectSession] = useSelectedSession()
   const [confirmingSessionId, setConfirmingSessionId] = useState<string | null>(null)
   const { data: sessions = [] } = useWorkspaceSessions(workspaceId)
   const canArchive = useWorkspaceAgent(workspaceId).data?.supportsArchiving === true
   const archiveSession = useArchiveWorkspaceSession(workspaceId)
   const hasRunningBackgroundChat = useLive(state =>
-    hasRunningBackgroundSession(state.activity, workspaceId, selectedSessionId)
+    hasRunningBackgroundSession(state.activity, workspaceId, selectedSessionId ?? null)
   )
-
-  if (sessions.length === 0) {
-    return <ChatHeaderLabel label="New chat" />
-  }
 
   const active = sessions.find(s => s.sessionId === selectedSessionId)
   const label = active?.summary ?? 'New chat'
-  const sessionGroups = groupSessionsByDate(sessions)
+  const sessionGroups = groupSessionsForTab(sessions, tabId)
+  if (sessionGroups.length === 0) return <ChatHeaderLabel label="New chat" />
 
   function handleMenuOpenChange(open: boolean) {
     if (!open) setConfirmingSessionId(null)

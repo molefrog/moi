@@ -178,7 +178,7 @@ describe('drawing attachment staging', () => {
     revokeSpy.mockRestore()
   })
 
-  test('uses sketch copy and purpose for a builder drawing', async () => {
+  test('uses sketch copy and purpose for a pending-view drawing', async () => {
     globalThis.fetch = mock(() =>
       Promise.resolve(
         Response.json([{ id: 'upload-sketch', kind: 'image', mediaType: 'image/png' }])
@@ -190,7 +190,7 @@ describe('drawing attachment staging', () => {
       sessionId,
       localId: 'sketch-1',
       purpose: 'sketch',
-      source: 'view-builders/draft-1',
+      source: 'views/draft-1',
       blob: new Blob(['drawing'], { type: 'image/png' }),
       isCurrent: () => true
     })

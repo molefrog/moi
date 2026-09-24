@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 
 import { viewTabId } from '@/lib/workspace-tabs'
-import type { ViewConfig, ViewInfo } from '@/lib/types'
+import type { CompiledView, ViewConfig, ViewInfo } from '@/lib/types'
 
 import { syncAppletLogAfterBuild } from './applet-log'
 import {
@@ -15,7 +15,7 @@ import {
 import { serializeWorkspaceBundle } from './bundle-queue'
 import { reloadModules } from './functions'
 import { loadLayout, saveLayout } from './layout'
-import { deleteViewBuilderForView, markViewBuilderReady } from './view-builders'
+import { clearViewSessions, completeViewBuild, listPendingViews } from './pending-views'
 import { setViewSourceTitle } from './applets/config'
 import { deleteViewSourceFiles, readViewSource, ViewSourceInUseError } from './applets/view-source'
 
@@ -118,7 +118,7 @@ function listBuiltViews(workspacePath: string): Promise<string[]> {
 }
 
 // Built views in manifest order, with `title` resolved (falls back to the id).
-export async function getViewList(workspacePath: string): Promise<ViewInfo[]> {
+export async function listCompiledViews(workspacePath: string): Promise<CompiledView[]> {
   const [built, manifest] = await Promise.all([
     listBuiltViews(workspacePath),
     readManifest(workspacePath)
@@ -137,12 +137,11 @@ export async function getViewList(workspacePath: string): Promise<ViewInfo[]> {
     const revision = getAppletRevision(workspacePath, 'view', id)
     return {
       id,
+      status: 'compiled',
       ...(revision ? { revision } : {}),
-      config: {
-        title: raw.title || id,
-        ...(icon ? { icon } : {}),
-        ...(requiredEnv ? { requiredEnv } : {})
-      }
+      title: raw.title || id,
+      ...(icon ? { icon } : {}),
+      ...(requiredEnv ? { requiredEnv } : {})
     }
   })
 }
@@ -172,8 +171,15 @@ export async function collectViewRequiredEnv(
   return out
 }
 
+export async function getWorkspaceViews(workspacePath: string): Promise<ViewInfo[]> {
+  const compiled = await listCompiledViews(workspacePath)
+  const ids = new Set(compiled.map(view => view.id))
+  const pending = (await listPendingViews(workspacePath)).filter(view => !ids.has(view.id))
+  return [...compiled, ...pending]
+}
+
 export async function listViews(workspacePath: string): Promise<Response> {
-  return Response.json({ views: await getViewList(workspacePath) })
+  return Response.json({ views: await getWorkspaceViews(workspacePath) })
 }
 
 export async function handleBundleViews(
@@ -181,9 +187,6 @@ export async function handleBundleViews(
   workspaceId: string,
   workspacePath: string,
   force = false,
-  // When set, compile without advancing any view builder to `ready` (the
-  // `moi bundle --no-status` opt-out). The build still publishes `view:updated`.
-  skipStatus = false,
   target?: string
 ) {
   const before = await readManifest(workspacePath)
@@ -212,15 +215,7 @@ export async function handleBundleViews(
   for (const r of results) {
     if (r.status === 'built') {
       publish({ type: 'view:updated', name: r.name, config: r.config ?? null })
-      if (!skipStatus) {
-        await markViewBuilderReady(
-          workspaceId,
-          workspacePath,
-          r.name,
-          r.config?.title || r.name,
-          r.config?.icon
-        )
-      }
+      await completeViewBuild(workspaceId, workspacePath, r.name)
       for (const m of r.serverModules ?? []) changedServerModules.add(m)
     }
   }
@@ -229,7 +224,7 @@ export async function handleBundleViews(
     reloadModules([...changedServerModules], workspacePath)
   }
 
-  const views = await getViewList(workspacePath)
+  const views = await listCompiledViews(workspacePath)
   if (identityChanged || orderChanged || membershipChanged) {
     publish({ type: 'view-layout:updated', views })
   }
@@ -243,11 +238,11 @@ export async function updateViewTitle(
   workspacePath: string,
   viewId: string,
   title: string
-): Promise<ViewInfo> {
+): Promise<CompiledView> {
   return serializeWorkspaceBundle(workspacePath, async () => {
-    const current = (await getViewList(workspacePath)).find(view => view.id === viewId)
+    const current = (await listCompiledViews(workspacePath)).find(view => view.id === viewId)
     if (!current) throw new ViewMutationError('View not found', 404)
-    if (current.config.title === title) return current
+    if (current.title === title) return current
 
     const source = await readViewSource(workspacePath, viewId)
     if (!source) throw new ViewMutationError('View source not found', 409)
@@ -265,21 +260,14 @@ export async function updateViewTitle(
 
     await Bun.write(source.path, updated)
     try {
-      // A rename changed this entry; rebuild only it and preserve builder status.
-      const results = await handleBundleViews(
-        publish,
-        workspaceId,
-        workspacePath,
-        true,
-        true,
-        viewId
-      )
+      // A rename changed this entry; rebuild only it and leave pending views alone.
+      const results = await handleBundleViews(publish, workspaceId, workspacePath, true, viewId)
       const result = results.find(candidate => candidate.name === viewId)
       if (result?.status !== 'built') {
         throw new ViewMutationError(result?.error ?? 'Could not rebuild the renamed view', 422)
       }
 
-      const renamed = (await getViewList(workspacePath)).find(view => view.id === viewId)
+      const renamed = (await listCompiledViews(workspacePath)).find(view => view.id === viewId)
       if (!renamed) {
         throw new ViewMutationError('Renamed view was not found after rebuilding', 422)
       }
@@ -305,7 +293,7 @@ export async function deleteView(
   viewId: string
 ): Promise<void> {
   await serializeWorkspaceBundle(workspacePath, async () => {
-    const current = (await getViewList(workspacePath)).some(view => view.id === viewId)
+    const current = (await listCompiledViews(workspacePath)).some(view => view.id === viewId)
     if (!current) throw new ViewMutationError('View not found', 404)
 
     try {
@@ -315,7 +303,8 @@ export async function deleteView(
       throw error
     }
     reloadModules([`views/${viewId}`], workspacePath)
-    await deleteViewBuilderForView(workspaceId, workspacePath, viewId)
+    await completeViewBuild(workspaceId, workspacePath, viewId)
+    await clearViewSessions(workspaceId, workspacePath, viewId)
     const layout = await loadLayout(workspacePath)
     const tab = viewTabId(viewId)
     await saveLayout(
@@ -331,7 +320,7 @@ export async function deleteView(
 
     publish({ type: 'view:deleted', workspaceId, name: viewId })
     publish({ type: 'workspace:updated' })
-    await handleBundleViews(publish, workspaceId, workspacePath, false, false, viewId)
+    await handleBundleViews(publish, workspaceId, workspacePath, false, viewId)
   })
 }
 

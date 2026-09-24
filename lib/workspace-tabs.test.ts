@@ -1,13 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import {
-  isParamsRecord,
-  isWorkspaceTabId,
-  viewBuilderIdFromTab,
-  viewBuilderTabId,
-  viewIdFromTab,
-  viewTabId
-} from './workspace-tabs'
+import { isParamsRecord, isWorkspaceTabId, viewIdFromTab, viewTabId } from './workspace-tabs'
 
 describe('isWorkspaceTabId', () => {
   test('accepts the static tabs', () => {
@@ -16,9 +9,8 @@ describe('isWorkspaceTabId', () => {
     expect(isWorkspaceTabId('scratchpad')).toBe(true)
   })
 
-  test('accepts view and view-builder tabs with a non-empty id', () => {
+  test('accepts view tabs with a non-empty id', () => {
     expect(isWorkspaceTabId('views/roadmap')).toBe(true)
-    expect(isWorkspaceTabId('view-builders/abc123')).toBe(true)
     expect(isWorkspaceTabId('views/')).toBe(false)
     expect(isWorkspaceTabId('view-builders/')).toBe(false)
   })
@@ -48,13 +40,7 @@ describe('tab id round-trips', () => {
     expect(viewTabId('orders')).toBe('views/orders')
     expect(viewIdFromTab('views/orders')).toBe('orders')
     expect(viewIdFromTab('overview')).toBeNull()
-    expect(viewIdFromTab('view-builders/x')).toBeNull()
-  })
-
-  test('view-builder tabs', () => {
-    expect(viewBuilderTabId('abc')).toBe('view-builders/abc')
-    expect(viewBuilderIdFromTab('view-builders/abc')).toBe('abc')
-    expect(viewBuilderIdFromTab('views/abc')).toBeNull()
+    expect(viewIdFromTab('scratchpad')).toBeNull()
   })
 })
 

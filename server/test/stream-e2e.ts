@@ -31,7 +31,7 @@ import {
 } from '../harness/claude-code/session'
 import { getWorkspace, registerWorkspace, setRegistryPath } from '../registry'
 import { addClient, removeClient } from '../state'
-import { setSessionConfigPath } from '../session-config'
+import { setSessionStorePath } from '../session-store'
 import { setSelectedSessionPath } from '../selected-session'
 
 // ---------------------------------------------------------------------------
@@ -39,7 +39,7 @@ import { setSelectedSessionPath } from '../selected-session'
 // ---------------------------------------------------------------------------
 const tmp = mkdtempSync(join(tmpdir(), 'moi-e2e-'))
 setRegistryPath(join(tmp, 'workspaces.json'))
-setSessionConfigPath(join(tmp, 'session-config.json'))
+setSessionStorePath(join(tmp, 'sessions.json'))
 setSelectedSessionPath(join(tmp, 'selected-sessions.json'))
 const wsDir = mkdtempSync(join(tmpdir(), 'moi-ws-'))
 const workspace = await registerWorkspace(wsDir, { type: 'claude-code' })

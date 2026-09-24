@@ -12,8 +12,8 @@ import { DATA_DIR } from './data-dir'
 import { setEventServer } from './events'
 import { loadLayout, saveLayout } from './layout'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from './registry'
-import { listViewBuilders, setBuilder, setViewBuilderStorePath } from './view-builders'
-import { buildAllViews, updateViewTitle } from './views'
+import { listPendingViews, createPendingView, setPendingViewStorePath } from './pending-views'
+import { buildAllViews, handleBundleViews, updateViewTitle } from './views'
 import { silenceConsole } from './test/quiet'
 
 silenceConsole('log')
@@ -55,22 +55,17 @@ beforeEach(async () => {
   ])
 
   setRegistryPath(join(tempDir, 'workspaces.json'))
-  setViewBuilderStorePath(join(tempDir, 'view-builders.json'))
+  setPendingViewStorePath(join(tempDir, 'pending-views.json'))
   workspaceId = (await registerWorkspace(workspaceDir, { type: 'codex' })).id
   published = []
   setEventServer({ publish: (_topic, data) => published.push(JSON.parse(data)) })
   await buildAllViews(workspaceDir)
-  await setBuilder(workspaceId, workspaceDir, 'cards', {
-    kind: 'view',
-    status: 'building',
-    title: 'Cards'
-  })
   published = []
 })
 
 afterEach(async () => {
   setRegistryPath(DEFAULT_REGISTRY_PATH)
-  setViewBuilderStorePath(join(DATA_DIR, 'view-builders.json'))
+  setPendingViewStorePath(join(DATA_DIR, 'pending-views.json'))
   await rm(tempDir, { recursive: true, force: true })
 })
 
@@ -83,7 +78,7 @@ test('renames a view through its source-backed config', async () => {
   const view = (await response.json()) as ViewInfo
 
   expect(response.status).toBe(200)
-  expect(view).toMatchObject({ id: 'cards', config: { title: 'Study cards' } })
+  expect(view).toMatchObject({ id: 'cards', status: 'compiled', title: 'Study cards' })
   expect(await Bun.file(sourcePath).text()).toContain('title: "Study cards"')
   expect(published).toContainEqual(expect.objectContaining({ type: 'view-layout:updated' }))
 })
@@ -99,17 +94,12 @@ test('restores the source when the renamed view does not build', async () => {
   expect(await Bun.file(sourcePath).text()).toBe(broken)
 })
 
-test('renaming rebuilds only the selected view and preserves builder status', async () => {
+test('renaming rebuilds only the selected view and preserves pending views', async () => {
   await Bun.write(
     join(workspaceDir, '.moi', 'views', 'draft.tsx'),
     'export default function Draft() { return <div>Draft</div> }'
   )
-  await setBuilder(workspaceId, workspaceDir, 'draft', {
-    kind: 'view',
-    status: 'building',
-    title: 'Draft'
-  })
-  const buildersBefore = await listViewBuilders(workspaceDir)
+  const pendingViewsBefore = await listPendingViews(workspaceDir)
   const tabsBefore = (await loadLayout(workspaceDir)).tabs
 
   const response = await api.request(`/api/workspaces/${workspaceId}/views/cards`, {
@@ -119,11 +109,15 @@ test('renaming rebuilds only the selected view and preserves builder status', as
   })
 
   expect(response.status).toBe(200)
-  expect(await response.json()).toMatchObject({ id: 'cards', config: { title: 'Study cards' } })
+  expect(await response.json()).toMatchObject({
+    id: 'cards',
+    status: 'compiled',
+    title: 'Study cards'
+  })
   expect(
     await Bun.file(join(workspaceDir, '.moi', '.build', 'views', 'draft', 'index.js')).exists()
   ).toBe(false)
-  expect(await listViewBuilders(workspaceDir)).toEqual(buildersBefore)
+  expect(await listPendingViews(workspaceDir)).toEqual(pendingViewsBefore)
   expect((await loadLayout(workspaceDir)).tabs).toEqual(tabsBefore)
   expect(published).not.toContainEqual(
     expect.objectContaining({ type: 'view:updated', name: 'draft' })
@@ -143,7 +137,11 @@ test('renames a view whose config uses title shorthand', async () => {
   })
 
   expect(response.status).toBe(200)
-  expect(await response.json()).toMatchObject({ id: 'cards', config: { title: 'Study cards' } })
+  expect(await response.json()).toMatchObject({
+    id: 'cards',
+    status: 'compiled',
+    title: 'Study cards'
+  })
   expect(await Bun.file(sourcePath).text()).toContain('title: "Study cards"')
 })
 
@@ -208,7 +206,7 @@ test('deletes a view and its owned state while preserving shared files and data'
   expect(await Bun.file(serverPath).exists()).toBe(false)
   expect(await Bun.file(sharedPath).exists()).toBe(true)
   expect(await Bun.file(dataPath).exists()).toBe(true)
-  expect(await listViewBuilders(workspaceDir)).toEqual([])
+  expect(await listPendingViews(workspaceDir)).toEqual([])
   expect((await loadLayout(workspaceDir)).tabs).toEqual({
     open: ['overview'],
     active: 'overview'
@@ -246,13 +244,9 @@ test('deleting a view keeps a shared server module callable and the remaining vi
 })
 
 test('deleting a view does not build or complete an unfinished sibling', async () => {
-  const draftPath = join(workspaceDir, '.moi', 'views', 'draft.tsx')
+  const draft = await createPendingView(workspaceId, workspaceDir, { status: 'submitted' })
+  const draftPath = join(workspaceDir, '.moi', 'views', `${draft.id}.tsx`)
   await Bun.write(draftPath, 'export default function Draft() { return <div>Draft</div> }')
-  await setBuilder(workspaceId, workspaceDir, 'draft', {
-    kind: 'view',
-    status: 'building',
-    title: 'Draft'
-  })
 
   const response = await api.request(`/api/workspaces/${workspaceId}/views/cards`, {
     method: 'DELETE'
@@ -260,13 +254,16 @@ test('deleting a view does not build or complete an unfinished sibling', async (
 
   expect(response.status).toBe(204)
   expect(
-    await Bun.file(join(workspaceDir, '.moi', '.build', 'views', 'draft', 'index.js')).exists()
+    await Bun.file(join(workspaceDir, '.moi', '.build', 'views', draft.id, 'index.js')).exists()
   ).toBe(false)
-  expect(await listViewBuilders(workspaceDir)).toEqual([
-    expect.objectContaining({ viewId: 'draft', status: 'building' })
+  expect(await listPendingViews(workspaceDir)).toEqual([
+    expect.objectContaining({
+      id: draft.id,
+      status: 'submitted'
+    })
   ])
   expect(published).not.toContainEqual(
-    expect.objectContaining({ type: 'view:updated', name: 'draft' })
+    expect.objectContaining({ type: 'view:updated', name: draft.id })
   )
 })
 
@@ -283,4 +280,24 @@ test('rejects deleting a source imported by another applet before removing any f
   expect(response.status).toBe(409)
   expect(await Bun.file(sourcePath).exists()).toBe(true)
   expect(await Bun.file(serverPath).exists()).toBe(true)
+})
+
+test('one view list keeps the same identity when a pending view is bundled', async () => {
+  const view = await createPendingView(workspaceId, workspaceDir)
+  const list = async () =>
+    (await (await api.request(`/api/workspaces/${workspaceId}/views`)).json()) as {
+      views: ViewInfo[]
+    }
+  expect((await list()).views.map(view => view.id)).toEqual(['cards', view.id])
+  expect((await list()).views.find(item => item.id === view.id)?.status).toBe('draft')
+  await writeFile(
+    join(workspaceDir, '.moi', 'views', `${view.id}.tsx`),
+    "export const config = { title: 'Finished', icon: 'book' }; export default function View() { return <div>Finished</div> }"
+  )
+  await handleBundleViews(event => published.push(event), workspaceId, workspaceDir, false, view.id)
+  const result = (await list()).views.filter(item => item.id === view.id)
+  expect(result).toHaveLength(1)
+  expect(result[0].status).toBe('compiled')
+  expect(result[0]).toMatchObject({ title: 'Finished', icon: 'book' })
+  expect(await listPendingViews(workspaceDir)).toEqual([])
 })

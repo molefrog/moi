@@ -247,6 +247,16 @@ export const liveStore = createStore<LiveStore>()(set => ({
     set(s => {
       const fromKey = attachmentKey(workspaceId, from)
       const toKey = key(workspaceId, to)
+      if (fromKey === toKey) return s
+      if (
+        !(fromKey in s.activity) &&
+        !(fromKey in s.errors) &&
+        !(fromKey in s.attachments) &&
+        !Object.values(s.previews).some(
+          preview => preview.workspaceId === workspaceId && preview.sessionId === from
+        )
+      )
+        return s
       const activity = { ...s.activity }
       const errors = { ...s.errors }
       if (fromKey in activity) {

@@ -4,7 +4,7 @@ import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { sessionViewOptions } from '@/client/features/chat/sessions/session-view'
-import type { SessionConfig, SessionInfo } from '@/lib/types'
+import type { SessionConfig, SessionInfo, SessionRecord } from '@/lib/types'
 
 export function useWorkspaceSessions(workspaceId: string) {
   return useQuery<SessionInfo[]>({
@@ -35,7 +35,7 @@ export function useArchiveWorkspaceSession(workspaceId: string) {
         removeArchivedSession(current, sessionId)
       )
       queryClient.removeQueries({ queryKey: workspaceKeys.events(workspaceId, sessionId) })
-      queryClient.removeQueries({ queryKey: workspaceKeys.sessionConfig(workspaceId, sessionId) })
+      queryClient.removeQueries({ queryKey: workspaceKeys.session(workspaceId, sessionId) })
       queryClient.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })
     }
   })
@@ -48,10 +48,10 @@ export function useSessionView(workspaceId: string, sessionId: string | null) {
   })
 }
 
-export function useSessionConfig(workspaceId: string, sessionId: string | null) {
-  return useQuery<SessionConfig>({
-    queryKey: workspaceKeys.sessionConfig(workspaceId, sessionId ?? ''),
-    queryFn: () => requestJson(`/api/workspaces/${workspaceId}/sessions/${sessionId}/config`),
+export function useSession(workspaceId: string, sessionId: string | null) {
+  return useQuery<SessionRecord>({
+    queryKey: workspaceKeys.session(workspaceId, sessionId ?? ''),
+    queryFn: () => requestJson(`/api/workspaces/${workspaceId}/sessions/${sessionId}`),
     enabled: Boolean(sessionId),
     staleTime: Infinity,
     gcTime: 5 * 60_000,
@@ -62,7 +62,7 @@ export function useSessionConfig(workspaceId: string, sessionId: string | null) 
 
 export function useSaveSessionConfig(workspaceId: string) {
   const queryClient = useQueryClient()
-  return useMutation<SessionConfig, Error, { sessionId: string; patch: SessionConfig }>({
+  return useMutation<SessionRecord, Error, { sessionId: string; patch: SessionConfig }>({
     mutationFn: ({ patch, sessionId }) =>
       requestJson(
         `/api/workspaces/${workspaceId}/sessions/${sessionId}/config`,
@@ -70,10 +70,7 @@ export function useSaveSessionConfig(workspaceId: string) {
         'Failed to save chat settings'
       ),
     onSuccess: (next, { sessionId }) => {
-      queryClient.setQueryData<SessionConfig>(
-        workspaceKeys.sessionConfig(workspaceId, sessionId),
-        next
-      )
+      queryClient.setQueryData<SessionRecord>(workspaceKeys.session(workspaceId, sessionId), next)
     }
   })
 }

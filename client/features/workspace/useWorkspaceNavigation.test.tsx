@@ -11,7 +11,6 @@ function readNavigation(path: string, search: string, views: ViewInfo[], base = 
   function Probe() {
     const { activeTab, appletParams, isUnavailable } = useWorkspaceNavigation({
       views,
-      builders: [],
       split: false
     })
     return (
@@ -49,13 +48,13 @@ function readNavigation(path: string, search: string, views: ViewInfo[], base = 
 test('view params decode exactly once through the real router', () => {
   const params = { literal: '%20 %26 %2F', json: '{"value":"100%"}', plus: '+' }
   const result = readNavigation('views/events', new URLSearchParams(params).toString(), [
-    { id: 'events', config: {} }
+    { id: 'events', status: 'compiled', title: 'events' }
   ])
   expect(result.appletParams).toEqual(params)
 })
 
 test('encoded IDs resolve under a deployment base without decoding nested escapes', () => {
-  const views = [{ id: 'events', config: {} }]
+  const views: ViewInfo[] = [{ id: 'events', status: 'compiled', title: 'events' }]
   expect(readNavigation('views/%65vents', '', views, '/prefix').activeTab).toBe('views/events')
   expect(readNavigation('views/%2565vents', '', views, '/prefix').isUnavailable).toBe(true)
 })
@@ -68,7 +67,7 @@ test('missing views keep their destination without becoming the default tab', ()
 })
 
 test('legacy browser paths select the same view under a deployment base', () => {
-  const views = [{ id: 'events', config: {} }]
+  const views: ViewInfo[] = [{ id: 'events', status: 'compiled', title: 'events' }]
   const result = readNavigation('view:%65vents', 'eventId=123', views, '/prefix')
   expect(result.activeTab).toBe('views/events')
   expect(result.isUnavailable).toBe(false)

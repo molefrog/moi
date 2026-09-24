@@ -11,7 +11,7 @@ import type {
   PreviewFrame,
   ScratchOp,
   SessionActivity,
-  SessionConfig,
+  SessionRecord,
   SessionInfo,
   StreamEvent,
   ViewState
@@ -88,12 +88,12 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
       queryClient?.removeQueries({ queryKey: workspaceKeys.events(workspaceId, from) })
     }
 
-    const previousConfig = queryClient?.getQueryData<SessionConfig>(
-      workspaceKeys.sessionConfig(workspaceId, from)
+    const previousSession = queryClient?.getQueryData<SessionRecord>(
+      workspaceKeys.session(workspaceId, from)
     )
-    if (previousConfig !== undefined) {
-      queryClient?.setQueryData(workspaceKeys.sessionConfig(workspaceId, to), previousConfig)
-      queryClient?.removeQueries({ queryKey: workspaceKeys.sessionConfig(workspaceId, from) })
+    if (previousSession !== undefined) {
+      queryClient?.setQueryData(workspaceKeys.session(workspaceId, to), previousSession)
+      queryClient?.removeQueries({ queryKey: workspaceKeys.session(workspaceId, from) })
     }
     if (!cachedSession) {
       queryClient?.invalidateQueries({ queryKey: sessionsKey })
@@ -106,6 +106,10 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
     const sessionsKey = workspaceKeys.sessions(workspaceId)
     queryClient?.invalidateQueries({ queryKey: sessionsKey })
     queryClient?.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })
+    if (typeof data.sessionId === 'string')
+      queryClient?.invalidateQueries({
+        queryKey: workspaceKeys.session(workspaceId, data.sessionId)
+      })
     return
   }
   if (data.type === 'workspace:switch') {

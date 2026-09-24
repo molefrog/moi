@@ -11,7 +11,7 @@ import {
   useWorkspaceLayoutCtx
 } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { WorkspaceScreen } from '@/client/features/workspace/WorkspaceScreen'
-import { useViewBuilders, useViews } from '@/client/features/views/api'
+import { useViews } from '@/client/features/views/api'
 import { useWidgets } from '@/client/features/overview/api'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 
@@ -37,7 +37,6 @@ function WorkspaceLoader({ id }: WorkspaceRouteProps) {
   const { isLoading: layoutLoading } = useWorkspaceLayoutCtx()
   const widgets = useWidgets(id)
   const views = useViews(id)
-  const builders = useViewBuilders(id)
   useAppletCacheInvalidation()
 
   useWorkspaceEvent(event => {
@@ -55,11 +54,7 @@ function WorkspaceLoader({ id }: WorkspaceRouteProps) {
   })
 
   const fresh =
-    layoutLoading ||
-    selectedSessionId === undefined ||
-    widgets.isLoading ||
-    views.isLoading ||
-    builders.isLoading
+    layoutLoading || selectedSessionId === undefined || widgets.isLoading || views.isLoading
 
   return (
     <>
@@ -69,11 +64,7 @@ function WorkspaceLoader({ id }: WorkspaceRouteProps) {
             <LedLogo sprite="moi" effect="chaos" />
           </div>
         ) : (
-          <WorkspaceScreen
-            widgets={widgets.data}
-            views={views.data ?? []}
-            builders={builders.data ?? []}
-          />
+          <WorkspaceScreen widgets={widgets.data} views={views.data ?? []} />
         )}
       </SidebarLayout>
     </>

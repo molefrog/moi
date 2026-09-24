@@ -1,13 +1,12 @@
 import type { ReactNode } from 'react'
 
-import type { ViewBuilder, ViewInfo } from '@/lib/types'
+import type { CompiledView } from '@/lib/types'
 import { DEFAULT_VIEWS_WIDGET, isDefaultWidget, type DefaultWidgetId } from '@/lib/default-widgets'
 
 import { ViewsWidget } from './ViewsWidget'
 
 export type DefaultWidgetRenderContext = {
-  views: ViewInfo[]
-  builders: ViewBuilder[]
+  views: CompiledView[]
   onOpenView: (viewId: string) => void
   onCreateView: () => void
   showOnboarding: boolean
@@ -19,7 +18,6 @@ const DEFAULT_WIDGET_RENDERERS: Record<DefaultWidgetId, DefaultWidgetRenderer> =
   [DEFAULT_VIEWS_WIDGET.id]: context => (
     <ViewsWidget
       views={context.views}
-      builders={context.builders}
       onOpenView={context.onOpenView}
       onCreateView={context.onCreateView}
       showOnboarding={context.showOnboarding}

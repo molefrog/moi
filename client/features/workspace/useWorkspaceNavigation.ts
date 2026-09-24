@@ -10,7 +10,7 @@ import { normalizeTabsState, resolveActiveTab, tabAvailable } from './tab-resolu
 import { useWorkspaceLayoutCtx } from './WorkspaceLayoutContext'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import { useNavigationClient } from '@/client/runtime/useWorkspaceEvents'
-import type { ViewBuilder, ViewInfo, WorkspaceTabId, WorkspaceTabsState } from '@/lib/types'
+import type { ViewInfo, WorkspaceTabId, WorkspaceTabsState } from '@/lib/types'
 import {
   addressPath,
   canonicalSearch,
@@ -27,9 +27,9 @@ type NavigationOptions = { replace?: boolean }
 // Memory-only, and scoped by workspace so switching workspaces cannot leak params.
 const rememberedAddresses = new Map<string, Map<WorkspaceTabId, string>>()
 
-type UseWorkspaceNavigationOptions = { views: ViewInfo[]; builders: ViewBuilder[]; split: boolean }
+type UseWorkspaceNavigationOptions = { views: ViewInfo[]; split: boolean }
 
-export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceNavigationOptions) {
+export function useWorkspaceNavigation({ views, split }: UseWorkspaceNavigationOptions) {
   const { layout, setLayout, workspaceId } = useWorkspaceLayoutCtx()
   const [, navigate] = useLocation()
   const router = useRouter()
@@ -48,9 +48,9 @@ export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceN
   }, [workspaceId])
   const requestedTab = tabFromPath(path)
   const legacyTab = requestedTab ? null : legacyTabFromPath(path)
-  const activeTab = resolveActiveTab(requestedTab ?? legacyTab, tabsState, views, builders, split)
+  const activeTab = resolveActiveTab(requestedTab ?? legacyTab, tabsState, views, split)
   const isUnavailable =
-    Boolean(path) && !legacyTab && (!requestedTab || !tabAvailable(requestedTab, views, builders))
+    Boolean(path) && !legacyTab && (!requestedTab || !tabAvailable(requestedTab, views))
   const honored = requestedTab === activeTab && !isUnavailable
 
   const setTabs = useCallback(
@@ -85,11 +85,11 @@ export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceN
         return
       }
       const address = parseMoiHref(href)
-      if (!tabAvailable(address.tab, views, builders))
+      if (!tabAvailable(address.tab, views))
         throw new Error('This destination is unavailable in this workspace')
       go(addressPath(workspaceId, address))
     },
-    [base, builders, go, views, workspaceId]
+    [base, go, views, workspaceId]
   )
 
   const reportError = useCallback(
@@ -169,14 +169,14 @@ export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceN
       if (!tab) return
       event.preventDefault()
       try {
-        if (!tabAvailable(tab, views, builders))
+        if (!tabAvailable(tab, views))
           throw new Error('This destination is unavailable in this workspace')
         go(addressPath(workspaceId, { tab, search: canonicalSearch(url.search) }))
       } catch (error) {
         reportError(error)
       }
     },
-    [base, builders, go, reportError, views, workspaceId]
+    [base, go, reportError, views, workspaceId]
   )
 
   return {

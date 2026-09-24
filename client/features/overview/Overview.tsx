@@ -24,7 +24,7 @@ import { WidgetShell } from '@/client/features/applets/WidgetShell'
 import { Button } from '@/client/components/ui/button'
 import { cn } from '@/client/lib/cn'
 import { useUiStore } from '@/client/store/ui'
-import type { ViewBuilder, ViewInfo, WidgetInfo } from '@/lib/types'
+import type { CompiledView, WidgetInfo } from '@/lib/types'
 import { isDefaultWidget } from '@/lib/default-widgets'
 
 import { HiddenPanel } from './HiddenPanel'
@@ -177,8 +177,7 @@ type OverviewProps = {
   onCustomizingChange: (customizing: boolean) => void
   // Authoritative widget set from useWidgets; positions come from layout.
   widgets: WidgetInfo[]
-  views: ViewInfo[]
-  builders: ViewBuilder[]
+  views: CompiledView[]
 }
 
 export function Overview({
@@ -190,8 +189,7 @@ export function Overview({
   onThemingChange,
   onCustomizingChange,
   widgets,
-  views,
-  builders
+  views
 }: OverviewProps) {
   const { layout, setLayout } = useWorkspaceLayoutCtx()
   const hasSentMessageFromMoi = useUiStore(state => state.hasSentMessageFromMoi)
@@ -230,7 +228,6 @@ export function Overview({
   function renderItem(id: string) {
     const defaultWidget = renderDefaultWidget(id, {
       views,
-      builders,
       onOpenView,
       onCreateView,
       showOnboarding

@@ -5,8 +5,8 @@ import type { ViewInfo } from '@/lib/types'
 import { assembleTabRows, assertNavigableTab } from './tabs'
 
 const views: ViewInfo[] = [
-  { id: 'roadmap', config: { title: 'Roadmap' } },
-  { id: 'orders', config: { title: '' } }
+  { id: 'roadmap', status: 'compiled', title: 'Roadmap' },
+  { id: 'orders', status: 'compiled', title: '' }
 ]
 
 describe('assembleTabRows', () => {
@@ -28,9 +28,19 @@ describe('assembleTabRows', () => {
     expect(rows.find(r => r.id === 'views/roadmap')?.title).toBe('Roadmap')
   })
 
-  test('a default that maps to no row marks nothing', () => {
-    const rows = assembleTabRows(views, 'view-builders/abc')
-    expect(rows.every(r => !r.isDefault)).toBe(true)
+  test('pending views are ordinary navigable rows', () => {
+    const pending: ViewInfo = {
+      id: 'draft',
+      status: 'draft',
+      title: 'Draft view',
+      requirements: ''
+    }
+    const rows = assembleTabRows([...views, pending], 'views/draft')
+    expect(rows.find(row => row.id === 'views/draft')).toMatchObject({
+      title: 'Draft view',
+      isDefault: true,
+      href: 'moi:/views/draft'
+    })
   })
 })
 

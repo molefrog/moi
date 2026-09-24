@@ -7,7 +7,7 @@ import {
   pushChatDirective,
   takeChatDirectives
 } from './moi-context'
-import type { ViewBuilder, ViewInfo } from '@/lib/types'
+import type { ViewInfo } from '@/lib/types'
 
 describe('moi context assembly', () => {
   test('directives queue per workspace and drain once, in order', () => {
@@ -30,37 +30,28 @@ describe('moi context assembly', () => {
     expect(takeChatDirectives('ws-3')).toEqual([])
   })
 
-  test('activeTabTitle resolves view titles and claimed builder titles', () => {
+  test('activeTabTitle resolves compiled and provisional view titles', () => {
     const views: ViewInfo[] = [
-      { id: 'color-studio', config: { title: 'Grading review' } },
-      { id: 'untitled', config: {} }
-    ]
-    const builders: ViewBuilder[] = [
+      { id: 'color-studio', status: 'compiled', title: 'Grading review' },
       {
         id: 'b-42',
-        status: 'building',
-        input: { requirements: '' },
-        sessionId: 's-1',
+        status: 'submitted',
         title: 'Customer overview',
-        createdAt: 0,
-        updatedAt: 0
+        requirements: '',
+        executionSessionId: 's-1'
       },
       {
         id: 'b-draft',
         status: 'draft',
-        input: { requirements: '' },
-        sessionId: 's-2',
-        createdAt: 0,
-        updatedAt: 0
+        requirements: ''
       }
     ]
-    expect(activeTabTitle('views/color-studio', views, builders)).toBe('Grading review')
-    expect(activeTabTitle('views/untitled', views, builders)).toBeUndefined()
-    expect(activeTabTitle('views/missing', views, builders)).toBeUndefined()
-    expect(activeTabTitle('view-builders/b-42', views, builders)).toBe('Customer overview')
-    expect(activeTabTitle('view-builders/b-draft', views, builders)).toBeUndefined()
-    expect(activeTabTitle('scratchpad', views, builders)).toBeUndefined()
-    expect(activeTabTitle('views/color-studio', undefined, undefined)).toBeUndefined()
+    expect(activeTabTitle('views/color-studio', views)).toBe('Grading review')
+    expect(activeTabTitle('views/b-42', views)).toBe('Customer overview')
+    expect(activeTabTitle('views/b-draft', views)).toBeUndefined()
+    expect(activeTabTitle('views/missing', views)).toBeUndefined()
+    expect(activeTabTitle('scratchpad', views)).toBeUndefined()
+    expect(activeTabTitle('views/color-studio', undefined)).toBeUndefined()
   })
 })
 
@@ -81,6 +72,5 @@ describe('envelopeTabParams', () => {
     expect(envelopeTabParams('overview', params)).toBeUndefined()
     expect(envelopeTabParams('agent', params)).toBeUndefined()
     expect(envelopeTabParams('scratchpad', params)).toBeUndefined()
-    expect(envelopeTabParams('view-builders/b-42', params)).toBeUndefined()
   })
 })

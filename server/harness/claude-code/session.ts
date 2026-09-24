@@ -27,13 +27,8 @@ import { moiContextSystemReminder, renderMoiContext } from '@/lib/moi-context'
 import { debug } from '../../debug'
 import { tapWire } from '../debug'
 import { broadcast } from '../../state'
-import { renameSelectedSession } from '../../selected-session'
-import { hasSessionConfig, renameSessionConfig, saveSessionConfig } from '../../session-config'
-import {
-  markViewBuilderBuildingBySession,
-  markViewBuilderWaitingBySession,
-  renameViewBuilderSession
-} from '../../view-builders'
+import { hasSessionConfig, saveSessionConfig } from '../../session-config'
+import { renameSessionReferences } from '../../session-lifecycle'
 import { resolveWorkspaceEnv } from '../../workspace-env'
 import { requireHarnessExecutable } from '../executable'
 import type { SendMessageInput } from '../types'
@@ -139,8 +134,6 @@ type LiveSession = {
   staleCli: boolean
   idleTimer: ReturnType<typeof setTimeout> | null
   closed: boolean
-  // Passed to the view builder when the session becomes idle.
-  lastBuilderError: string | undefined
   // Introspection only (surfaced by /status) — not load-bearing.
   createdAt: number
   lastActivityAt: number
@@ -405,12 +398,6 @@ function renameSession(s: LiveSession, realId: string): string {
 async function onSessionIdle(s: LiveSession) {
   const active = s.messages.active
   if (s.messages.dispatching || (active && !s.turnEnded)) return
-  await markViewBuilderWaitingBySession(
-    s.workspaceId,
-    s.workspacePath,
-    s.sessionId,
-    s.lastBuilderError
-  )
   if (s.closed || s.messages.dispatching || s.messages.active !== active) return
   active?.complete()
   s.messages.active = null
@@ -429,15 +416,7 @@ async function consume(s: LiveSession) {
         const realId = msg.session_id
         if (realId && realId !== s.sessionId) {
           const from = renameSession(s, realId)
-          // Carry any config the picker wrote under the temp id to the real id.
-          await renameSessionConfig(s.workspacePath, from, s.sessionId)
-          await renameSelectedSession(s.workspacePath, from, s.sessionId)
-          await renameViewBuilderSession(s.workspaceId, s.workspacePath, from, s.sessionId)
-          broadcast(s.workspaceId, {
-            type: 'session_renamed',
-            from,
-            to: s.sessionId
-          })
+          await renameSessionReferences(s.workspaceId, s.workspacePath, from, s.sessionId)
         }
         startClaudeSessionTitleJob(s)
         // Seed explicit startup settings only when no saved picker choice exists.
@@ -531,12 +510,6 @@ async function consume(s: LiveSession) {
           !active || (!msg.queued_turn_count && (!consumed || consumed.includes(active.wireId)))
         if (turnFinished) s.turnEnded = true
         s.lastActivityAt = Date.now()
-        // Remembered for the idle transition — the view builder shows the last
-        // turn's error once the queue drains.
-        s.lastBuilderError =
-          msg.subtype === 'success'
-            ? undefined
-            : msg.errors.join('\n') || msg.subtype.replaceAll('_', ' ')
         debug(`cc result ws=${s.workspaceId} session=${s.sessionId} subtype=${msg.subtype}`)
         if (s.refreshSessionsOnResult) {
           s.refreshSessionsOnResult = false
@@ -560,7 +533,6 @@ async function consume(s: LiveSession) {
         sessionId: s.sessionId,
         content: message
       })
-      await markViewBuilderWaitingBySession(s.workspaceId, s.workspacePath, s.sessionId, message)
     }
   } finally {
     // An expected restart only replaces the subprocess. An unexpected exit
@@ -672,7 +644,6 @@ function createLiveSession(input: {
     staleCli: false,
     idleTimer: null,
     closed: false,
-    lastBuilderError: undefined,
     createdAt: Date.now(),
     lastActivityAt: Date.now(),
     lastUserText: undefined,
@@ -830,7 +801,6 @@ async function dispatchNextMessage(messages: SessionMessages): Promise<void> {
         if (s.closed) throw new Error('Agent session closed before the message was sent')
       }
     }
-    await markViewBuilderBuildingBySession(s.workspaceId, s.workspacePath, s.sessionId)
     if (cancelled()) return
     if (s.closed) throw new Error('Agent session closed before the message was sent')
     // A catalog refresh can arrive during any of the awaits above. Retry
@@ -926,7 +896,6 @@ export async function interruptCCSession(workspaceId: string, sessionId: string)
   }
   broadcast(s.workspaceId, { kind: 'stopped', sessionId: s.sessionId })
   if (!messages.active) setActivity(s, 'idle')
-  await markViewBuilderWaitingBySession(s.workspaceId, s.workspacePath, s.sessionId)
   if (!s.closed && !messages.active) armIdle(s)
   void dispatchNextMessage(messages)
 }

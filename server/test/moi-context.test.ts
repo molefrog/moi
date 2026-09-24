@@ -37,10 +37,10 @@ describe('moi context envelope', () => {
     ).toContain('The user is on the "Grading review" view tab (.moi/views/color-studio.tsx).')
   })
 
-  test('a claimed builder title lands in the view-builder line', () => {
-    expect(
-      renderMoiContext({ activeTab: 'view-builders/b-42', tabTitle: 'Customer overview' })
-    ).toContain('The user is building a new view "Customer overview". Builder id "b-42".')
+  test('a pending view uses the same view-tab description', () => {
+    expect(renderMoiContext({ activeTab: 'views/b-42', tabTitle: 'Customer overview' })).toContain(
+      'The user is on the "Customer overview" view tab (.moi/views/b-42.tsx).'
+    )
   })
 
   test('append + strip round-trips the user text', () => {
@@ -70,10 +70,10 @@ describe('moi context envelope', () => {
 
   test('renders directives under a this-message-only section', () => {
     const rendered = renderMoiContext({
-      activeTab: 'view-builders/builder-1',
+      activeTab: 'views/builder-1',
       directives: ['Do the thing first.', 'Then bundle.']
     })
-    expect(rendered).toContain('The user is building a new view. Builder id "builder-1".')
+    expect(rendered).toContain('The user is on the "builder-1" view tab')
     expect(rendered).toContain('# This message only\nDo the thing first.\nThen bundle.')
     expect(stripMoiContext(appendMoiContext('Build it', rendered))).toBe('Build it')
   })

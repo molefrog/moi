@@ -340,7 +340,7 @@ describe('composer attachments', () => {
       localId: 'sketch-1',
       label: 'Sketch.png',
       mediaType: 'image/png',
-      source: 'view-builders/draft-1',
+      source: 'views/draft-1',
       status: 'ready',
       upload: { id: 'up-sketch', kind: 'image' } as UploadInfo
     }
@@ -349,7 +349,7 @@ describe('composer attachments', () => {
       {
         type: 'upload',
         uploadId: 'up-sketch',
-        source: 'view-builders/draft-1',
+        source: 'views/draft-1',
         purpose: 'sketch'
       }
     ])

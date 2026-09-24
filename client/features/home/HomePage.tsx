@@ -198,7 +198,7 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
             <TooltipTrigger
               render={
                 <Link
-                  href={workspaceTabPath(workspace.id, 'agent')}
+                  href={workspaceTabPath(workspace.id, 'overview')}
                   aria-label={`Chat in ${name}`}
                   style={getWorkspaceThemeStyle(theme)}
                   className="absolute right-3 bottom-3 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"

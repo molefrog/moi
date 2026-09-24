@@ -23,13 +23,9 @@ import { broadcastAll } from './state'
 import { assembleTabRows, assertNavigableTab } from './tabs'
 import { applyThemeUpdate } from './theme'
 import { handleBundle } from './widgets'
-import { getViewList, handleBundleViews, hasViewId } from './views'
-import {
-  ViewBuilderError,
-  listViewBuilders,
-  reconcileViewBuilders,
-  setBuilder
-} from './view-builders'
+import { getWorkspaceViews, handleBundleViews } from './views'
+import { updatePendingView, PendingViewError } from './pending-views'
+import { createViewFromSession, ViewStartupError } from './view-sessions'
 import {
   getWorkspaceConfig,
   setWorkspaceConfig,
@@ -118,9 +114,6 @@ export const control = Bun.serve({
           if (!match) return
           const workspacePath = match.path
           const force = !!data.force
-          // `--no-status`: compile without advancing any view builder to `ready`
-          // (status stays whatever the agent last reported).
-          const skipStatus = data.noStatus === true
           const only = typeof data.only === 'string' ? parseAppletSelector(data.only) : undefined
           if (data.only && !only) {
             ws.send(JSON.stringify({ error: `Invalid applet selector "${data.only}"` }))
@@ -146,7 +139,6 @@ export const control = Bun.serve({
                 match.id,
                 workspacePath,
                 force,
-                skipStatus,
                 only?.id
               )) {
                 if (!only?.id || r.name === only.id) {
@@ -240,18 +232,39 @@ export const control = Bun.serve({
           return
         }
 
-        if (data.type === 'builder:set') {
+        if (data.type === 'view:create') {
+          const match = await resolveWorkspace(ws, data.path)
+          if (!match) return
+          try {
+            if (typeof data.sourceSessionId !== 'string' || typeof data.requirements !== 'string')
+              throw new Error('Source session and requirements are required')
+            ws.send(
+              JSON.stringify({
+                ok: true,
+                ...(await createViewFromSession(match, data.sourceSessionId, data.requirements))
+              })
+            )
+          } catch (error) {
+            ws.send(
+              JSON.stringify({
+                error: error instanceof Error ? error.message : 'Couldn’t start view',
+                ...(error instanceof ViewStartupError
+                  ? { sessionId: error.sessionId, viewId: error.viewId }
+                  : {})
+              })
+            )
+          }
+          return
+        }
+
+        if (data.type === 'view:set') {
           const match = await resolveWorkspace(ws, data.path)
           if (!match) return
           const appletId = typeof data.id === 'string' ? data.id.trim() : ''
-          const builderId = typeof data.builder === 'string' ? data.builder.trim() : ''
-          const kind = data.kind === 'widget' ? 'widget' : 'view'
-          const status =
-            data.status === 'building' || data.status === 'waiting' ? data.status : undefined
           const title = typeof data.title === 'string' ? data.title.trim() : undefined
           const icon = typeof data.icon === 'string' ? data.icon.trim() : undefined
           if (!appletId) {
-            ws.send(JSON.stringify({ error: 'A view or widget id is required' }))
+            ws.send(JSON.stringify({ error: 'A view id is required' }))
             return
           }
           if (!/^[a-z0-9][a-z0-9_-]*$/.test(appletId)) {
@@ -271,29 +284,15 @@ export const control = Bun.serve({
             return
           }
           try {
-            // A view can't claim an id that already exists on disk (unless this
-            // builder already owns it). Widgets live in a separate namespace.
-            if (kind === 'view') {
-              const current = (await listViewBuilders(match.path)).find(builder =>
-                builderId ? builder.id === builderId : builder.viewId === appletId
-              )
-              if (current?.viewId !== appletId && (await hasViewId(match.path, appletId))) {
-                ws.send(JSON.stringify({ error: `View id "${appletId}" already exists` }))
-                return
-              }
-            }
-            const builder = await setBuilder(match.id, match.path, appletId, {
-              builderId: builderId || undefined,
-              kind,
-              status,
+            const view = await updatePendingView(match.id, match.path, appletId, {
               title,
               icon
             })
-            ws.send(JSON.stringify({ ok: true, builder, workspacePath: match.path }))
+            ws.send(JSON.stringify({ ok: true, viewId: view.id }))
           } catch (err) {
             ws.send(
               JSON.stringify({
-                error: err instanceof ViewBuilderError ? err.message : 'Could not set builder'
+                error: err instanceof PendingViewError ? err.message : 'Couldn’t update view'
               })
             )
           }
@@ -306,7 +305,7 @@ export const control = Bun.serve({
           if (!match) return
           const [layout, views] = await Promise.all([
             loadLayout(match.path),
-            getViewList(match.path)
+            getWorkspaceViews(match.path)
           ])
           ws.send(JSON.stringify({ ok: true, tabs: assembleTabRows(views, layout.tabs.active) }))
           return
@@ -319,7 +318,7 @@ export const control = Bun.serve({
           try {
             const address = parseMoiHref(data.href)
             const href = moiHref(address.tab, address.search)
-            assertNavigableTab(address.tab, await getViewList(match.path))
+            assertNavigableTab(address.tab, await getWorkspaceViews(match.path))
             await navigationRelay.navigate(match.id, href)
             ws.send(JSON.stringify({ ok: true, href }))
           } catch (error) {
@@ -505,23 +504,3 @@ export const control = Bun.serve({
     }
   }
 })
-
-// On boot, correct any builder a previous process left mid-flight. With no live
-// sessions yet, a persisted `building` record is by definition stale, so
-// reconcile hands it back to `waiting` — or promotes it to `ready` if its view
-// actually reached disk. GET-time reconcile would eventually do this too, but
-// only once a client reopens the workspace; this makes the stored state correct
-// even if no one does.
-async function reconcileBuildersOnBoot(): Promise<void> {
-  const workspaces = await listWorkspaces()
-  await Promise.all(
-    workspaces.map(async entry => {
-      try {
-        await reconcileViewBuilders(entry.id, entry.path, await getViewList(entry.path), new Set())
-      } catch (err) {
-        console.error('[control] boot reconcile failed', entry.path, err)
-      }
-    })
-  )
-}
-void reconcileBuildersOnBoot()

@@ -367,7 +367,7 @@ describe('loadLayout/saveLayout round-trip with theme', () => {
       version: 1,
       widgetGrid: [],
       layoutMode: 'fullscreen',
-      tabs: { open: ['agent'], active: 'agent' },
+      tabs: { open: ['scratchpad'], active: 'scratchpad' },
       theme: {
         font: 'serif',
         color: 'paper',
@@ -385,7 +385,7 @@ describe('loadLayout/saveLayout round-trip with theme', () => {
       version: 1,
       widgetGrid: [],
       layoutMode: 'fullscreen',
-      tabs: { open: ['agent'], active: 'agent' },
+      tabs: { open: ['scratchpad'], active: 'scratchpad' },
       theme: DEFAULT_WORKSPACE_THEME
     }
     await saveLayout(layout, tmpDir)

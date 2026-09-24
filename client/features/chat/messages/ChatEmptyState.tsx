@@ -4,7 +4,6 @@ import {
   IconArticle,
   IconFileSearch,
   IconLayout2,
-  IconMessages,
   IconPiano,
   IconSketching,
   IconUmbrella2,
@@ -83,21 +82,21 @@ export const WORKSPACE_ANALYSIS_PROMPT = {
   icon: IconFileSearch
 } satisfies ChatPrompt
 
-export type ChatEmptyStateKind = 'view-builder' | 'welcome' | 'explore-workspace' | 'empty'
-export type WelcomeDestination = 'agent' | 'overview' | 'views' | 'scratchpad'
+export type ChatEmptyStateKind = 'view-draft' | 'welcome' | 'explore-workspace' | 'empty'
+export type WelcomeDestination = 'overview' | 'views' | 'scratchpad'
 
 type ResolveChatEmptyStateOptions = {
-  isViewBuilderDraft: boolean
+  isViewDraft: boolean
   hasSentMessageFromMoi: boolean
   isWorkspacePendingAnalysis: boolean
 }
 
 export function resolveChatEmptyState({
-  isViewBuilderDraft,
+  isViewDraft,
   hasSentMessageFromMoi,
   isWorkspacePendingAnalysis
 }: ResolveChatEmptyStateOptions): ChatEmptyStateKind {
-  if (isViewBuilderDraft) return 'view-builder'
+  if (isViewDraft) return 'view-draft'
   if (!hasSentMessageFromMoi) return 'welcome'
   if (isWorkspacePendingAnalysis) return 'explore-workspace'
   return 'empty'
@@ -121,8 +120,8 @@ export function ChatEmptyState({
   onNavigate
 }: ChatEmptyStateProps) {
   switch (kind) {
-    case 'view-builder':
-      return <ViewBuilderState agent={agent} />
+    case 'view-draft':
+      return <ViewDraftState agent={agent} />
     case 'welcome':
       return (
         <WelcomeState
@@ -162,7 +161,7 @@ type AgentStateProps = {
   agent: AgentTheme
 }
 
-function ViewBuilderState({ agent }: AgentStateProps) {
+function ViewDraftState({ agent }: AgentStateProps) {
   return (
     <EmptyStateFrame agent={agent} className="text-center text-muted-foreground">
       <p className="mx-auto max-w-xs px-8 text-sm">
@@ -199,11 +198,7 @@ function WelcomeState({
             needs.
           </p>
           <p>
-            Ask the{' '}
-            <WelcomeTerm Icon={IconMessages} destination="agent" onNavigate={onNavigate}>
-              Agent
-            </WelcomeTerm>{' '}
-            to build widgets on the{' '}
+            Ask the agent to build widgets on the{' '}
             <WelcomeTerm Icon={IconLayout2} destination="overview" onNavigate={onNavigate}>
               Overview
             </WelcomeTerm>{' '}

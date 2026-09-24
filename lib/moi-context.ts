@@ -7,7 +7,7 @@
 //
 // Flow: a structured `MoiContext` is assembled at send time — by the client
 // for chat sends (client/features/workspace/moi-context.ts, sent as the chat
-// frame's `context`), by the server for view-builder requests — and travels
+// frame's `context`), by the server for pending-view requests — and travels
 // structured all the way to the harness, which renders it with the transform
 // matching its conventions:
 //   - Claude Code  — `moiContextSystemReminder` as its own leading text block
@@ -42,16 +42,14 @@ export type MoiAppletMessage = {
 }
 
 // The structured form built at send time — by the client for chat sends, by
-// the server for programmatic sends (the view builder). Extend this (and
+// the server for programmatic pending-view sends. Extend this (and
 // `renderMoiContext`) when new ambient fields land.
 export type MoiContext = {
-  // The workspace tab the user is on when they hit send — for a view-builder
-  // request that's the builder's own tab (`view-builders/<id>`).
+  // The workspace tab the user is on when they hit send.
   activeTab: WorkspaceTabId
   // UI label of the active tab when it differs from the id — a view's
-  // configured title (e.g. "Grading review" for `views/color-studio`), or a
-  // view builder's claimed title while the build runs. The tab bar falls
-  // back to the id when unset; so does the envelope.
+  // configured title (e.g. "Grading review" for `views/color-studio`). The tab
+  // bar falls back to the id when unset; so does the envelope.
   tabTitle?: string
   // The params the active view is rendering with right now, straight from
   // URL query strings. The emitter side of the same contract (`navigate`) sets
@@ -60,8 +58,8 @@ export type MoiContext = {
   tabParams?: Record<string, unknown>
   // Set when this message came from applet UI instead of the composer.
   applet?: MoiAppletMessage
-  // One-shot imperative lines for this message only (e.g. the view-builder
-  // bootstrap instructions from lib/view-builder-directives.ts).
+  // One-shot imperative lines for this message only (e.g. pending-view build
+  // instructions from lib/view-build-directives.ts).
   directives?: string[]
 }
 
@@ -111,9 +109,8 @@ function describeAppletSource(source: string): string {
   return `"${escapeTags(source)}" applet`
 }
 
-// One sentence per tab, using the labels the user sees in the tab bar (except
-// view-builder tabs, which print the builder id — that's what `moi builder
-// set` needs). A view tab also names its backing file: the user speaks in
+// One sentence per tab, using the labels the user sees in the tab bar. A view
+// tab also names its backing file: the user speaks in
 // titles ("fix the Grading review page") while the agent edits
 // `.moi/views/<id>.tsx` — this line connects the two.
 function describeTab(tab: WorkspaceTabId, rawTitle?: string): string {
@@ -123,12 +120,6 @@ function describeTab(tab: WorkspaceTabId, rawTitle?: string): string {
   if (tab === 'agent') return 'The user is on the "Agent" tab (full page chat).'
   if (tab === 'overview') return 'The user is on the "Overview" tab.'
   if (tab === 'scratchpad') return 'The user is on the "Scratchpad" tab.'
-  if (tab.startsWith('view-builders/')) {
-    const id = tab.slice('view-builders/'.length)
-    return title
-      ? `The user is building a new view "${title}". Builder id "${id}".`
-      : `The user is building a new view. Builder id "${id}".`
-  }
   if (tab.startsWith('views/')) {
     const id = tab.slice('views/'.length)
     return `The user is on the "${title ?? id}" view tab (.moi/views/${id}.tsx).`

@@ -10,9 +10,9 @@ import type { WorkspaceTabId } from '@/lib/types'
 
 import { useDrawingLayer } from './useDrawingLayer'
 
-type UseViewBuilderSketchOptions = {
+type UseViewSketchOptions = {
   active: boolean
-  builderId: string
+  viewId: string
   sessionId: string
   source: WorkspaceTabId
   workspaceId: string
@@ -20,18 +20,18 @@ type UseViewBuilderSketchOptions = {
   onContinueInChat: () => void
 }
 
-export type ViewBuilderSketchController = ReturnType<typeof useViewBuilderSketch>
+export type ViewSketchController = ReturnType<typeof useViewSketch>
 
-export function useViewBuilderSketch({
+export function useViewSketch({
   active,
-  builderId,
+  viewId,
   sessionId,
   source,
   workspaceId,
   onEditingStart,
   onContinueInChat
-}: UseViewBuilderSketchOptions) {
-  const attachmentIdRef = useRef(`sketch:${builderId}`)
+}: UseViewSketchOptions) {
+  const attachmentIdRef = useRef(`sketch:${viewId}`)
   const uploadRevisionRef = useRef(0)
   const uploadedBlobRef = useRef<Blob | null>(null)
   const pendingStageRef = useRef<Promise<void> | null>(null)

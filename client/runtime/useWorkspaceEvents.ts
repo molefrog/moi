@@ -7,7 +7,6 @@ import type {
   AgentLoginState,
   AppSettings,
   HarnessAvailability,
-  ViewBuilder,
   ViewInfo,
   WidgetInfo
 } from '@/lib/types'
@@ -21,8 +20,7 @@ export type WorkspaceEvent =
   | { type: 'view:updated'; name: string }
   | { type: 'view-layout:updated'; views: ViewInfo[] }
   | { type: 'view:deleted'; workspaceId: string; name: string }
-  | { type: 'view-builder:updated'; workspaceId: string; builder: ViewBuilder }
-  | { type: 'view-builder:deleted'; workspaceId: string; builderId: string }
+  | { type: 'views:changed'; workspaceId: string }
   | { type: 'selected-session:updated'; workspaceId: string; sessionId: string | null }
   | { type: 'theme:updated' }
   | { type: 'workspace:updated' }

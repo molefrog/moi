@@ -23,10 +23,10 @@
 //   the field in `useMoiUserMessageContext`'s builder below.
 import { useCallback } from 'react'
 
-import { useViewBuilders, useViews } from '@/client/features/views/api'
+import { useViews } from '@/client/features/views/api'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import type { MoiAppletMessage, MoiContext } from '@/lib/moi-context'
-import type { ViewBuilder, ViewInfo, WorkspaceTabId } from '@/lib/types'
+import type { ViewInfo, WorkspaceTabId } from '@/lib/types'
 
 // One-shot directives queued per workspace, drained into the NEXT chat
 // message's `# This message only` section. Module-level (not React state):
@@ -79,18 +79,15 @@ export function envelopeTabParams(
 }
 
 // The UI label of the active tab when it has one beyond its id: a view's
-// configured title, or a builder's claimed title while the build runs.
+// configured or provisional title.
 // Undefined otherwise (the envelope then falls back to the id, like the tab
 // bar).
 export function activeTabTitle(
   tab: WorkspaceTabId,
-  views: ViewInfo[] | undefined,
-  builders: ViewBuilder[] | undefined
+  views: ViewInfo[] | undefined
 ): string | undefined {
   if (tab.startsWith('views/'))
-    return views?.find(v => v.id === tab.slice('views/'.length))?.config.title || undefined
-  if (tab.startsWith('view-builders/'))
-    return builders?.find(b => b.id === tab.slice('view-builders/'.length))?.title || undefined
+    return views?.find(v => v.id === tab.slice('views/'.length))?.title || undefined
   return undefined
 }
 
@@ -112,19 +109,18 @@ export function useMoiUserMessageContext({
 }: WorkspaceTabAddress): (options?: MoiUserMessageOptions) => MoiContext {
   const workspaceId = useWorkspaceId()
   const views = useViews(workspaceId).data
-  const builders = useViewBuilders(workspaceId).data
   return useCallback(
     (options: MoiUserMessageOptions = {}) => {
       const directives = takeChatDirectives(workspaceId, options.directives ?? [])
       const tabParams = envelopeTabParams(activeTab, appletParams)
       return {
         activeTab,
-        tabTitle: activeTabTitle(activeTab, views, builders),
+        tabTitle: activeTabTitle(activeTab, views),
         ...(tabParams ? { tabParams } : {}),
         ...(options.applet ? { applet: options.applet } : {}),
         ...(directives.length > 0 ? { directives } : {})
       }
     },
-    [workspaceId, activeTab, appletParams, views, builders]
+    [workspaceId, activeTab, appletParams, views]
   )
 }

@@ -28,7 +28,7 @@ import { WidgetErrorBoundary } from '@/client/features/applets/WidgetErrorBounda
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { cn } from '@/client/lib/cn'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
-import type { ViewInfo } from '@/lib/types'
+import type { CompiledView } from '@/lib/types'
 
 import {
   nextEvictionDelay,
@@ -38,7 +38,7 @@ import {
 } from './view-residency'
 
 type ViewManagerProps = {
-  views: ViewInfo[]
+  views: CompiledView[]
   // The view the active tab names, or null when another tab is on screen. The
   // manager stays mounted either way — that is what makes coming back from the
   // agent or Overview tab instant too.
@@ -82,7 +82,7 @@ export const ViewManager = memo(function ViewManager({
 
 // The views mounted right now: the active one, plus the recently-visited ones
 // parked offscreen. The policy (and its timing) lives in view-residency.ts.
-function useResidentViews(activeId: string | null, views: ViewInfo[]): ResidentView[] {
+function useResidentViews(activeId: string | null, views: CompiledView[]): ResidentView[] {
   const [residents, setResidents] = useState<ResidentView[]>([])
   // A workspace refetch hands us a new array on every event; residency only
   // cares whether a view appeared or disappeared. So the effect keys off the id
@@ -118,7 +118,7 @@ function useResidentViews(activeId: string | null, views: ViewInfo[]): ResidentV
 }
 
 type ViewSlotProps = {
-  view: ViewInfo
+  view: CompiledView
   active: boolean
   params: Record<string, string>
 }
@@ -190,8 +190,8 @@ function ViewSlot({ view, active, params }: ViewSlotProps) {
 }
 
 type ViewFrameProps = {
-  view: ViewInfo
-  build: ViewBuild
+  view: CompiledView
+  build: LoadedViewVersion
   params: Record<string, string>
   // Play the rebuild dissolve. Set on the incoming build only, and only while
   // the build it replaced is still rendered underneath it.
@@ -232,7 +232,7 @@ function ViewFrame({ view, build, params, entering, thumbnailTarget }: ViewFrame
   )
 }
 
-type ViewBuild = {
+type LoadedViewVersion = {
   Component: ComponentType<AppletComponentProps>
   version: number
 }
@@ -243,11 +243,11 @@ type LoadedBundle = {
   // spinner every time the agent edits it is worse than showing the previous
   // build for that moment. The splash is for a view with nothing to show yet —
   // the first time it is opened.
-  current: ViewBuild | null
+  current: LoadedViewVersion | null
   // The build `current` just replaced, kept underneath for the length of the
   // dissolve so the new one fades in over the view instead of over an empty
   // panel. Null except during a rebuild swap on screen.
-  outgoing: ViewBuild | null
+  outgoing: LoadedViewVersion | null
 }
 
 // How long the outgoing build stays underneath. Matches the `duration-200` the

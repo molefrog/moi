@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react'
 
 import { IconBolt, IconBoltFilled } from '@tabler/icons-react'
 
-import { useSaveSessionConfig, useSessionConfig } from '../sessions/api'
+import { useSaveSessionConfig, useSession } from '../sessions/api'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import {
   groupModels,
@@ -292,7 +292,7 @@ type ModelPickerProps = {
 // Model selector for composer surfaces. The workspace's available models come
 // from `/api/workspaces/:id/agent`; effort options follow the selected model.
 // A session id targets that chat's stored config. Null targets the workspace
-// defaults that seed new chats such as the view builder.
+// defaults that seed new chats such as the pending view.
 export const ModelPicker = memo(function ModelPicker({ sessionId }: ModelPickerProps) {
   const { workspaceId, layout, setLayout } = useWorkspaceLayoutCtx()
   const { data } = useWorkspaceAgent(workspaceId)
@@ -308,7 +308,7 @@ export const ModelPicker = memo(function ModelPicker({ sessionId }: ModelPickerP
       )
     : []
 
-  const sessionConfig = useSessionConfig(workspaceId, sessionId).data
+  const sessionConfig = useSession(workspaceId, sessionId).data?.config
   const saveSessionConfig = useSaveSessionConfig(workspaceId)
 
   const selectedModel = (sessionId ? sessionConfig?.model : undefined) ?? layout.selectedModel

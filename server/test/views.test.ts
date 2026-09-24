@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'path'
 
+import type { CompiledView } from '@/lib/types'
+
 import {
   buildAllViews,
   collectViewRequiredEnv,
@@ -38,13 +40,7 @@ function seed(jsNames: string[], manifest: object) {
   writeFileSync(join(dir, 'manifest.json'), JSON.stringify(manifest))
 }
 
-async function views(): Promise<
-  {
-    id: string
-    revision?: string
-    config: { title?: string; icon?: string; requiredEnv?: string[] }
-  }[]
-> {
+async function views(): Promise<CompiledView[]> {
   const res = await listViews(WS)
   return (await res.json()).views
 }
@@ -81,8 +77,8 @@ describe('listViews', () => {
       order: ['tasks', 'crm']
     })
     expect(await views()).toEqual([
-      { id: 'tasks', revision: expect.any(String), config: { title: 'tasks' } },
-      { id: 'crm', revision: expect.any(String), config: { title: 'CRM' } }
+      { id: 'tasks', status: 'compiled', revision: expect.any(String), title: 'tasks' },
+      { id: 'crm', status: 'compiled', revision: expect.any(String), title: 'CRM' }
     ])
   })
 
@@ -95,12 +91,12 @@ describe('listViews', () => {
 
   test('passes through requiredEnv', async () => {
     seed(['crm'], { config: { crm: { title: 'CRM', requiredEnv: ['K'] } }, order: ['crm'] })
-    expect((await views())[0].config).toEqual({ title: 'CRM', requiredEnv: ['K'] })
+    expect((await views())[0]).toMatchObject({ title: 'CRM', requiredEnv: ['K'] })
   })
 
   test('passes through the app icon id', async () => {
     seed(['crm'], { config: { crm: { title: 'CRM', icon: 'briefcase' } }, order: ['crm'] })
-    expect((await views())[0].config).toEqual({ title: 'CRM', icon: 'briefcase' })
+    expect((await views())[0]).toMatchObject({ title: 'CRM', icon: 'briefcase' })
   })
 
   test('appends a built view missing from order', async () => {
