@@ -84,6 +84,32 @@ describe('fx model configuration', () => {
     expect(models[2]?.supportedEffortLevels).toBeUndefined()
   })
 
+  test('lists gateway models by name under their vendor', () => {
+    const models = fxModels(
+      fxModelState({
+        configOptions: options(),
+        models: undefined
+      })
+    )
+    expect(models.map(({ value, displayName, group }) => ({ value, displayName, group }))).toEqual([
+      { value: 'default', displayName: 'Default (from fx)', group: undefined },
+      { value: 'openai/gpt-5', displayName: 'GPT-5', group: 'OpenAI' },
+      { value: 'anthropic/claude-sonnet-5', displayName: 'Sonnet 5', group: 'Anthropic' }
+    ])
+    const named = fxModels({
+      availableModels: [
+        { modelId: 'local', name: 'local' },
+        { modelId: 'acme/m-1', name: 'acme/m-1' },
+        { modelId: 'x/y', name: 'Friendly name' }
+      ]
+    })
+    expect(named.map(({ displayName, group }) => [displayName, group])).toEqual([
+      ['local', undefined],
+      ['m-1', 'acme'],
+      ['Friendly name', 'x']
+    ])
+  })
+
   test('does not invent effort support when the agent omits it', () => {
     const models = fxModels(
       fxModelState({ configOptions: options().filter(option => option.id !== 'effort') })

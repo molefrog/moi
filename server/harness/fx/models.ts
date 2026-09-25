@@ -39,6 +39,41 @@ export function fxModelState(
   }
 }
 
+// Gateway catalogs name each model `<vendor>/<model>`, a few hundred of them.
+// The picker lists the model name under a vendor heading instead.
+const VENDORS: Record<string, string> = {
+  alibaba: 'Alibaba',
+  amazon: 'Amazon',
+  anthropic: 'Anthropic',
+  cohere: 'Cohere',
+  deepseek: 'DeepSeek',
+  google: 'Google',
+  meta: 'Meta',
+  minimax: 'MiniMax',
+  mistral: 'Mistral',
+  moonshotai: 'Moonshot AI',
+  openai: 'OpenAI',
+  perplexity: 'Perplexity',
+  xai: 'xAI',
+  zai: 'Z.ai'
+}
+
+function modelLabel(info: {
+  modelId: string
+  name?: string
+}): Pick<Model, 'displayName' | 'group'> {
+  const slash = info.modelId.indexOf('/')
+  if (slash <= 0 || slash === info.modelId.length - 1)
+    return { displayName: info.name || info.modelId }
+  const vendor = info.modelId.slice(0, slash)
+  return {
+    // A name fx chose itself is kept as is.
+    displayName:
+      !info.name || info.name === info.modelId ? info.modelId.slice(slash + 1) : info.name,
+    group: VENDORS[vendor] ?? vendor
+  }
+}
+
 export function fxModels(state: AcpModelState): Model[] {
   const provider = selectOption(state.configOptions, 'provider')?.currentValue
   const models = (state.availableModels ?? []).map((info): Model => {
@@ -49,7 +84,7 @@ export function fxModels(state: AcpModelState): Model[] {
     const levels = values(effort).map(option => option.value)
     return {
       value: info.modelId,
-      displayName: info.name || info.modelId,
+      ...modelLabel(info),
       ...(info.description ? { description: info.description } : {}),
       ...(provider ? { providerId: provider } : {}),
       // Only expose choices this backend actually advertised for this model.
@@ -76,6 +111,7 @@ export function fxModels(state: AcpModelState): Model[] {
           ...defaultModel,
           value: 'default',
           displayName: 'Default (from fx)',
+          group: undefined,
           resolvedModel: defaultModel.value
         },
         ...models
