@@ -41,6 +41,7 @@ import type { Part, Turn, ViewState } from '@/lib/types'
 
 const EMPTY: ViewState = emptyViewState()
 const EMPTY_TURNS: Turn[] = []
+const MISSING_SELECTION_GRACE_MS = 3_000
 
 // Thin projection over app-level state: the selected session comes from
 // useSelectedSession, spinner/error come from the live store, and the
@@ -62,9 +63,20 @@ export function useChat(address: WorkspaceTabAddress) {
     !sessions.some(session => session.sessionId === selectedSession)
   const selectedSessionId = selectedSessionMissing ? null : (selectedSession ?? null)
 
+  // The selection is shared with other tabs, so a chat another tab just
+  // started can be selected before this tab's list knows it (the backend
+  // names new chats a moment later). Clear only a selection that is not
+  // running and stays unknown; clearing sooner would reset every tab.
+  const selectedSessionRunning = useLive(s =>
+    selectedSession
+      ? isRunningActivity(s.activity[`${workspaceId}:${selectedSession}`] ?? 'idle')
+      : false
+  )
   useEffect(() => {
-    if (selectedSessionMissing) selectSession(null)
-  }, [selectSession, selectedSessionMissing])
+    if (!selectedSessionMissing || selectedSessionRunning) return
+    const timer = setTimeout(() => selectSession(null), MISSING_SELECTION_GRACE_MS)
+    return () => clearTimeout(timer)
+  }, [selectSession, selectedSessionMissing, selectedSessionRunning])
   // Snapshot of the workspace's ambient UI state + queued one-shot
   // directives, taken when the message actually goes out.
   const buildMoiContext = useMoiUserMessageContext(address)
