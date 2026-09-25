@@ -54,8 +54,10 @@ full results from `fx session --id <id> --json`), `isOperationalMessage` and
 - Replayed turns are no longer broadcast. A cold load ends with one
   `session_reloaded` frame and open tabs refetch the rebuilt transcript,
   which fixes answers overwriting each other in a tab left open.
-- An idle-released fx chat keeps its live transcript and reuses it when the
-  replay has the same number of user turns.
+- An fx chat released when idle or by an environment change keeps its live
+  transcript and reuses it when the replay has the same number of user
+  turns. Replayed notices name the turn they follow, since replayed turns
+  carry no time.
 - Streaming tool updates are coalesced (120 ms). Status-only tool updates,
   the duplicate final-turn emit and the second `sessions_changed` per turn
   end are dropped. fx's chat list uses one warm process instead of one per

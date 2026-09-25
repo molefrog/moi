@@ -109,12 +109,31 @@ describe('fx tool history', () => {
   })
 
   test('maps saved results to row updates and keeps live background streams', () => {
-    const enrichments = fxToolEnrichments(parseFxToolHistory(history))
+    const shellRow = (toolCallId: string, output: string) => ({
+      toolCallId,
+      name: 'shell',
+      input: {},
+      caller: 'model' as const,
+      provider: 'fx' as const,
+      state: 'success' as const,
+      output
+    })
+    const enrichments = fxToolEnrichments(parseFxToolHistory(history), [
+      shellRow('sh', 'fx did not include command output in this history preview.'),
+      shellRow('bg', 'partial and newer\n')
+    ])
     expect(enrichments.get('sh')).toEqual({
       output: '1\n2\n3\n',
       sidecar: { fxShell: { exitCode: 0, signal: null } }
     })
+    // Still running: the live stream is newer than the saved copy.
     expect(enrichments.has('bg')).toBe(false)
+    // After a cold load it shows only a status line, so the saved output fills it.
+    expect(
+      fxToolEnrichments(parseFxToolHistory(history), [
+        shellRow('bg', 'Moved to the background as shell-1.')
+      ]).get('bg')
+    ).toEqual({ output: 'partial' })
     expect(enrichments.get('ed')?.sidecar?.fxFileChange).toBeDefined()
     // A failure keeps its row's output and replaces only the failure text.
     expect(enrichments.get('rd')).toEqual({ errorText: 'no such file' })
@@ -172,7 +191,7 @@ describe('fx tool history', () => {
       output
     })
     expect(fxToolEnrichments(results, [row(stdout)]).get('long')).toEqual({
-      sidecar: { fxShell: { exitCode: 3, signal: null } }
+      sidecar: { fxShell: { exitCode: 3, signal: null, durationMs: 12 } }
     })
     // A replayed row with only a status line gets what fx saved, marked cut.
     const replayed = fxToolEnrichments(results, [
@@ -180,6 +199,49 @@ describe('fx tool history', () => {
     ]).get('long')
     expect(replayed?.output).toStartWith('1\n2\n3\n')
     expect(replayed?.output).toEndWith('\n… (fx saved only part of this output)')
+  })
+
+  test('a replayed command that printed nothing reads as no output', () => {
+    const quiet = {
+      history: [
+        {
+          execution: {
+            tool_steps: [
+              {
+                tool_results: [
+                  {
+                    tool_call_id: 'q',
+                    tool_name: 'shell',
+                    status: 'success',
+                    output: JSON.stringify({
+                      session_id: null,
+                      state: 'completed',
+                      exit_code: 0,
+                      signal: null,
+                      duration_ms: 90,
+                      output_delta: ''
+                    })
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+    const row = {
+      toolCallId: 'q',
+      name: 'shell',
+      input: {},
+      caller: 'model' as const,
+      provider: 'fx' as const,
+      state: 'success' as const,
+      output: 'fx did not include command output in this history preview.'
+    }
+    expect(fxToolEnrichments(parseFxToolHistory(quiet), [row]).get('q')).toEqual({
+      output: 'Command produced no output.',
+      sidecar: { fxShell: { exitCode: 0, signal: null, durationMs: 90 } }
+    })
   })
 
   test('a failure envelope becomes its sentence', () => {

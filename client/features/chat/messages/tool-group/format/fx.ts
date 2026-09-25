@@ -123,7 +123,8 @@ function shellOutcome(call: ToolCall): string | undefined {
   const restored = record(call.sidecar?.fxShell)
   const exitCode = result?.exit_code ?? restored?.exitCode
   const signal = result?.signal ?? restored?.signal
-  const duration = typeof result?.duration_ms === 'number' ? seconds(result.duration_ms) : ''
+  const durationMs = result?.duration_ms ?? restored?.durationMs
+  const duration = typeof durationMs === 'number' ? seconds(durationMs) : ''
   const after = duration ? ` after ${duration}` : ''
   if (result?.timed_out === true) return `Timed out${after}`
   if (typeof signal === 'number') return `Stopped${after}`

@@ -116,6 +116,19 @@ describe('interleaveNotices', () => {
     expect(keys(items)).toEqual(['a', 'b', 'notice:n1'])
   })
 
+  test('a replayed notice follows the turn it names', () => {
+    const stopped: SystemNotice = {
+      id: 'stop',
+      kind: 'warning',
+      at: '2026-08-04T10:30:00Z',
+      message: 'This run was stopped before it finished.',
+      afterTurnId: 'a'
+    }
+    const missing = { ...stopped, id: 'gone', afterTurnId: 'nope' }
+    const items = interleaveNotices([turn('a'), turn('b')], [stopped, missing])
+    expect(keys(items)).toEqual(['a', 'notice:stop', 'b', 'notice:gone'])
+  })
+
   test('no turns → notices render alone', () => {
     const items = interleaveNotices([], [compact('n1', '2026-08-04T10:30:00Z')])
     expect(keys(items)).toEqual(['notice:n1'])

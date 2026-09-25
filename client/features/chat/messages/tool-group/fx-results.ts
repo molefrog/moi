@@ -176,7 +176,7 @@ function searchResult(output: string): FxResult | null {
   if (!match) return null
   const lines = rest.map(line => line.replace(/^\s*- /, '')).filter(line => line.trim())
   return {
-    summary: capitalize(match[1]!.trim()),
+    summary: capitalize(match[1]!.trim().replace(/^1 matches\b/, '1 match')),
     ...(lines.length ? { body: { kind: 'text', text: lines.join('\n'), label: 'results' } } : {})
   }
 }

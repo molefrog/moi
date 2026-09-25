@@ -153,7 +153,15 @@ export type SessionSnapshot = {
 }
 
 export type SystemNotice =
-  | { id: string; kind: 'warning'; at: string; message: string }
+  | {
+      id: string
+      kind: 'warning'
+      at: string
+      message: string
+      // A replayed notice has no time to compare with replayed turns, which
+      // carry none; it follows this turn instead.
+      afterTurnId?: string
+    }
   | {
       id: string
       kind: 'rate-limit'

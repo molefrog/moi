@@ -29,7 +29,7 @@ left unchanged.
   Checks are bounded and repeated so replacing the executable takes effect.
 - One owned ACP process per chat. Discovery uses a separate process: fx has
   only one active session per process, and creating/loading another replaces it.
-  Listing chats reuses one warm process per workspace, released 30 seconds
+  Listing chats reuses one warm process per workspace, released ten minutes
   after the last list: fx answers `session/list` from disk without touching
   an active session, and every chat end refreshes the list in each open tab.
 - `session/load` restores the actual model context and replays structured
@@ -304,9 +304,11 @@ short live thoughts, later warnings, thought-only completion, and cancellation.
   both `session/load` and `fx session --id <id> --json` omit it. Restoring
   thoughts needs an upstream replay change or a separate moi history cache;
   this integration does not read fx's private history format. Idle chats
-  release their process after ten minutes but keep moi's live transcript in
-  memory (up to 50 chats), so only a moi restart, an environment change or a
-  chat continued outside moi falls back to the lossy replay.
+  release their process after ten minutes, and an environment change
+  restarts it, but moi keeps its live transcript in memory (up to 50 chats).
+  Only a moi restart or a chat continued outside moi falls back to the
+  lossy replay, which also puts replayed notices after the turn they
+  follow rather than at their original time.
 - fx replays an interrupted turn without the tool call that was running;
   moi shows its `cancelled`/`failed` outcome as a notice. A tool cancelled
   before it ran (still waiting on review) gets no terminal update from fx;

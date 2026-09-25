@@ -28,9 +28,9 @@ async function discoveryClient(config: AcpProviderConfig, ctx: AcpSpawnContext) 
 }
 
 // `session/list` is stateless, so a single-session agent can serve it from one
-// shared process instead of a new one per call: a chat ending refreshes the
-// list from every open tab. The process stays warm briefly after the last call.
-const LIST_IDLE_MS = 30_000
+// shared process instead of a new one per call: every chat end refreshes the
+// list in each open tab. The process stays warm as long as an idle chat does.
+const LIST_IDLE_MS = 10 * 60_000
 const listIdleTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
 async function listClient(config: AcpProviderConfig, ctx: AcpSpawnContext) {

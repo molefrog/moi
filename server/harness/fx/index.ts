@@ -25,6 +25,7 @@ import {
   getAcpSessionModelState,
   getLiveAcpEvents,
   interruptAcpRun,
+  releaseAcpWorkspaceSessions,
   sendAcpMessage
 } from '../acp/session'
 import { findHarnessExecutable, pathHarnessAvailability } from '../executable'
@@ -179,7 +180,7 @@ export const fxHarness: Harness = {
   },
   onEnvChanged: workspacePath => {
     clearAcpModelCache(workspacePath, 'fx')
-    forgetAcpWorkspaceSessions(workspacePath, 'fx')
+    releaseAcpWorkspaceSessions(workspacePath, 'fx')
     killAcpWorkspace(workspacePath, 'fx')
   },
   stopWorkspace: workspacePath => {

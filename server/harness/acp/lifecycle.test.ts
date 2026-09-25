@@ -32,6 +32,7 @@ import {
   getAcpSessionModelState,
   getLiveAcpEvents,
   interruptAcpRun,
+  releaseAcpWorkspaceSessions,
   releaseIdleAcpSessions,
   sendAcpMessage
 } from './session'
@@ -1206,6 +1207,10 @@ describe('fx history and diagnostics', () => {
     const config = fxConfig(agent.config)
     const loaded = await ensureAcpSessionLive(config, { ...agent.ctx, sessionId: 'one' })
     expect(notices(loaded)).toEqual(['This run was stopped before it finished.'])
+    // Replayed turns carry no time, so the notice names the turn it follows.
+    const stopped = loaded.find(event => event.kind === 'notice')
+    const [asked] = turns(loaded)
+    expect(stopped?.kind === 'notice' && stopped.notice).toMatchObject({ afterTurnId: asked?.id })
     await sendAcpMessage(config, {
       ...agent.ctx,
       sessionId: 'one',
@@ -1378,6 +1383,27 @@ describe('fx history and diagnostics', () => {
     const changed = await ensureAcpSessionLive(config, ctx)
     expect(reasoning(changed)).toBe(false)
     expect(turns(changed).filter(turn => turn.role === 'user')).toHaveLength(3)
+  })
+
+  test('an environment change restarts an idle chat without losing its transcript', async () => {
+    const agent = await fixture({
+      persist: true,
+      promptUpdates: [
+        {
+          sessionUpdate: 'agent_thought_chunk',
+          content: { type: 'text', text: 'private reasoning' }
+        }
+      ]
+    })
+    const config = { ...fxConfig(agent.config), keepViewOnIdleRelease: true }
+    const ctx = { ...agent.ctx, sessionId: 'one' }
+    await sendAcpMessage(config, { ...ctx, isNew: false, content: 'first' })
+    const live = getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? []
+    releaseAcpWorkspaceSessions(agent.ctx.workspacePath, 'fx')
+    expect(getLiveAcpEvents(agent.ctx.workspaceId, 'one')).toEqual(live)
+    const loads = (await agent.calls()).filter(c => c.method === 'session/load').length
+    expect(await ensureAcpSessionLive(config, ctx)).toEqual(live)
+    expect((await agent.calls()).filter(c => c.method === 'session/load')).toHaveLength(loads + 1)
   })
 
   test('a reconnect stopped before it finishes keeps the retained transcript', async () => {

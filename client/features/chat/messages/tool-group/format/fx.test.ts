@@ -97,7 +97,8 @@ describe('fx tool rows', () => {
       undefined,
       'Timed out after 120 s'
     ],
-    [undefined, { exitCode: 2, signal: null }, 'Exit code 2']
+    [undefined, { exitCode: 2, signal: null }, 'Exit code 2'],
+    [undefined, { exitCode: 0, signal: null, durationMs: 5156 }, 'Exit code 0 · 5.2 s']
   ])('summarizes how a command ended', (rawOutput, fxShell, summary) => {
     const row = {
       ...call('shell', { request: { action: 'run', command: 'ls' } }),

@@ -51,9 +51,17 @@ export function interleaveNotices(turns: Turn[], notices: SystemNotice[]): ChatT
   const shown = notices.filter(notice => chatNoticeLabel(notice) !== null)
   if (shown.length === 0) return turns.map((turn): ChatTimelineItem => ({ kind: 'turn', turn }))
 
+  // Replayed notices name the turn they follow (see SystemNotice).
+  const turnIds = new Set(turns.map(turn => turn.id))
+  const following = new Map<string, SystemNotice[]>()
   const dated: { notice: SystemNotice; time: number }[] = []
   const anchorless: SystemNotice[] = []
   for (const notice of shown) {
+    const after = notice.kind === 'warning' ? notice.afterTurnId : undefined
+    if (after && turnIds.has(after)) {
+      following.set(after, [...(following.get(after) ?? []), notice])
+      continue
+    }
     const time = parseTime(notice.at)
     if (time === undefined) anchorless.push(notice)
     else dated.push({ notice, time })
@@ -73,6 +81,7 @@ export function interleaveNotices(turns: Turn[], notices: SystemNotice[]): ChatT
       next += 1
     }
     out.push({ kind: 'turn', turn })
+    for (const notice of following.get(turn.id) ?? []) out.push({ kind: 'notice', notice })
   }
   for (; next < dated.length; next += 1) out.push({ kind: 'notice', notice: dated[next].notice })
   for (const notice of anchorless) out.push({ kind: 'notice', notice })

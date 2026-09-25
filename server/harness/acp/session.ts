@@ -220,25 +220,43 @@ const releasedViews = new Map<string, ReleasedView>()
 
 // Opened fx histories each own a process. Release idle chats after ten minutes;
 // a later send cold-loads the same durable session. Never evict a busy run.
+// Close a chat's process. A provider whose replay is lossy keeps the live
+// transcript for the chat's next load.
+function releaseRecord(rec: SessionRecord) {
+  const key = recKey(rec.workspaceId, rec.sessionId)
+  const kept = rec.config.keepViewOnIdleRelease && rec.view.turns.length > 0
+  const released: ReleasedView = {
+    view: rec.view,
+    workspacePath: rec.workspacePath,
+    provider: rec.config.id
+  }
+  forgetAcpSession(rec.workspaceId, rec.sessionId)
+  if (!kept) return
+  releasedViews.set(key, released)
+  for (const oldest of releasedViews.keys()) {
+    if (releasedViews.size <= RELEASED_VIEW_LIMIT) break
+    releasedViews.delete(oldest)
+  }
+}
+
 export function releaseIdleAcpSessions(maxIdleMs = 10 * 60_000): void {
   for (const rec of sessions.values()) {
-    if (rec.ready && !rec.processing && Date.now() - rec.lastUsed >= maxIdleMs) {
-      const key = recKey(rec.workspaceId, rec.sessionId)
-      const kept = rec.config.keepViewOnIdleRelease && rec.view.turns.length > 0
-      const released: ReleasedView = {
-        view: rec.view,
-        workspacePath: rec.workspacePath,
-        provider: rec.config.id
-      }
-      forgetAcpSession(rec.workspaceId, rec.sessionId)
-      if (kept) {
-        releasedViews.set(key, released)
-        for (const oldest of releasedViews.keys()) {
-          if (releasedViews.size <= RELEASED_VIEW_LIMIT) break
-          releasedViews.delete(oldest)
-        }
-      }
-    }
+    if (rec.ready && !rec.processing && Date.now() - rec.lastUsed >= maxIdleMs) releaseRecord(rec)
+  }
+}
+
+// A workspace's environment changed: its processes must restart, but its
+// chats did not change, so idle ones keep their live transcripts. A chat
+// mid-run is forgotten, since its transcript has no outcome yet.
+export function releaseAcpWorkspaceSessions(workspacePath: string, provider?: WorkspaceType): void {
+  for (const pending of initializing.values()) {
+    if (pending.workspacePath === workspacePath && (!provider || pending.provider === provider))
+      pending.cancelled = true
+  }
+  for (const rec of sessions.values()) {
+    if (rec.workspacePath !== workspacePath || (provider && rec.config.id !== provider)) continue
+    if (rec.ready && !rec.processing) releaseRecord(rec)
+    else forgetAcpSession(rec.workspaceId, rec.sessionId)
   }
 }
 const idleCleanup = setInterval(() => releaseIdleAcpSessions(), 60_000)
@@ -378,7 +396,10 @@ function flushAssistant(
           id: turn.id,
           kind: 'warning',
           at: turn.timestamp ?? new Date().toISOString(),
-          message: rec.config.describeOperationalMessage?.(text) ?? text
+          message: rec.config.describeOperationalMessage?.(text) ?? text,
+          ...(rec.replaying && rec.view.turns.length
+            ? { afterTurnId: rec.view.turns.at(-1)!.id }
+            : {})
         }
       })
       // A provider can omit message ids on thought chunks, leaving genuine

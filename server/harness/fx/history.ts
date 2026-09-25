@@ -4,7 +4,7 @@
 // history interface. It keeps up to 4,096 bytes of each result, which covers
 // most results; a longer one arrives cut, a shell envelope mid-JSON.
 import type { ToolCall } from '@/lib/types'
-import { FX_STATUS_LINE } from '@/lib/fx-shell-status'
+import { FX_HISTORY_PREVIEW_ONLY, FX_NO_OUTPUT, FX_STATUS_LINE } from '@/lib/fx-shell-status'
 
 import { errorEnvelopeText } from './adapter'
 
@@ -21,6 +21,7 @@ export type FxToolHistory = {
     signal: number | null
     state?: string
     sessionId?: string | null
+    durationMs?: number
     partial?: boolean
   }
   // Committed write/edit results: fx's own line diff of the change.
@@ -85,6 +86,7 @@ function partialShellResult(output: string): FxToolHistory['shell'] {
     output: decodeCutString(raw),
     exitCode: field('exit_code'),
     signal: field('signal'),
+    ...(field('duration_ms') !== null ? { durationMs: field('duration_ms')! } : {}),
     state: prefix[2],
     sessionId: prefix[1] === 'null' ? null : prefix[1]!.slice(1, -1),
     partial: true
@@ -103,6 +105,9 @@ function shellResult(output: string): FxToolHistory['shell'] {
     output: typeof envelope.output_delta === 'string' ? envelope.output_delta : '',
     exitCode: integerOrNull(envelope.exit_code),
     signal: integerOrNull(envelope.signal),
+    ...(integerOrNull(envelope.duration_ms) !== null
+      ? { durationMs: integerOrNull(envelope.duration_ms)! }
+      : {}),
     state: envelope.state,
     sessionId: typeof envelope.session_id === 'string' ? envelope.session_id : null
   }
@@ -213,15 +218,15 @@ export type FxToolEnrichment = {
 }
 
 // What a row shows today, if it is more than an fx status sentence.
-function ownText(call: ToolCall | undefined): string {
+function rowText(call: ToolCall | undefined): string {
   const text = call?.state === 'error' ? (call.errorText ?? call.output) : call?.output
-  return typeof text === 'string' && !FX_STATUS_LINE.test(text) ? text : ''
+  return typeof text === 'string' ? text : ''
 }
 
-// Map saved results to changes for the rows in `calls`. A command still
-// running in the background keeps its live stream, which is newer than any
-// saved snapshot, and a saved copy fx cut short never replaces output that
-// streamed in full.
+// Map saved results to changes for the rows in `calls`. A shell row keeps
+// output it streamed live: that stream is complete and newer, while fx saves
+// at most 4,096 bytes and can interleave stdout and stderr mid-line. Saved
+// shell output fills only a row that has none of its own (a cold load).
 export function fxToolEnrichments(
   history: Map<string, FxToolHistory>,
   calls: readonly ToolCall[] = []
@@ -232,18 +237,30 @@ export function fxToolEnrichments(
     const row = rows.get(id)
     if (result.shell) {
       const shell = result.shell
-      if (shell.state === 'running') continue
-      const text = shell.partial
-        ? shell.output && `${shell.output}\n… (fx saved only part of this output)`
-        : shell.output
-      const replace = text !== '' && (!shell.partial || ownText(row) === '')
+      const shown = rowText(row)
+      const fill = shown === '' || FX_STATUS_LINE.test(shown)
+      const text = !fill
+        ? ''
+        : shell.partial && shell.output
+          ? `${shell.output}\n… (fx saved only part of this output)`
+          : shell.output ||
+            // fx saved the whole result and the command printed nothing.
+            (shown === FX_HISTORY_PREVIEW_ONLY && !shell.partial ? FX_NO_OUTPUT : '')
+      const output = text ? { output: capped(text) } : {}
+      const errorText = text && row?.state === 'error' ? { errorText: capped(text) } : {}
+      // A command still running in the background has no outcome yet.
+      if (shell.state === 'running') {
+        if (text) enrichments.set(id, { ...output, ...errorText })
+        continue
+      }
       enrichments.set(id, {
-        ...(replace ? { output: capped(text) } : {}),
-        ...(replace && row?.state === 'error' ? { errorText: capped(text) } : {}),
+        ...output,
+        ...errorText,
         sidecar: {
           fxShell: {
             exitCode: shell.exitCode,
             signal: shell.signal,
+            ...(shell.durationMs !== undefined ? { durationMs: shell.durationMs } : {}),
             ...(shell.sessionId ? { sessionId: shell.sessionId } : {})
           }
         }
