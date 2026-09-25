@@ -47,7 +47,13 @@ function parseTime(value: string | undefined): number | undefined {
 //
 // Entirely undated transcripts cannot anchor notices. Adapters must supply
 // native timestamps when available; otherwise dated notices follow all turns.
-export function interleaveNotices(turns: Turn[], notices: SystemNotice[]): ChatTimelineItem[] {
+// `groupOf` maps raw turn ids to grouped ones (groupedTurnIds): a replayed
+// notice names a raw turn, which grouping may have merged into its run.
+export function interleaveNotices(
+  turns: Turn[],
+  notices: SystemNotice[],
+  groupOf?: ReadonlyMap<string, string>
+): ChatTimelineItem[] {
   const shown = notices.filter(notice => chatNoticeLabel(notice) !== null)
   if (shown.length === 0) return turns.map((turn): ChatTimelineItem => ({ kind: 'turn', turn }))
 
@@ -57,7 +63,8 @@ export function interleaveNotices(turns: Turn[], notices: SystemNotice[]): ChatT
   const dated: { notice: SystemNotice; time: number }[] = []
   const anchorless: SystemNotice[] = []
   for (const notice of shown) {
-    const after = notice.kind === 'warning' ? notice.afterTurnId : undefined
+    const named = notice.kind === 'warning' ? notice.afterTurnId : undefined
+    const after = named && (groupOf?.get(named) ?? named)
     if (after && turnIds.has(after)) {
       following.set(after, [...(following.get(after) ?? []), notice])
       continue

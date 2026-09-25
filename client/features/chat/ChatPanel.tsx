@@ -5,7 +5,11 @@ import { IconChevronDown, IconChevronsRight, IconX } from '@tabler/icons-react'
 import { canSubmitComposerAction, focusComposer } from '@/client/components/shared/Composer'
 import { AgentBlobatar } from '@/client/components/shared/AgentBlobatar'
 import { useStickToBottom } from '@/client/features/chat/messages/useStickToBottom'
-import { appendPreviewTurn, groupTurns } from '@/client/features/chat/messages/group-turns'
+import {
+  appendPreviewTurn,
+  groupedTurnIds,
+  groupTurns
+} from '@/client/features/chat/messages/group-turns'
 import {
   chatNoticeLabel,
   interleaveNotices
@@ -128,7 +132,11 @@ export function ChatPanel({
   // Grouped turns plus the renderable notices (compaction, model changes)
   // woven in at the moment they happened. Interleaving runs AFTER grouping so
   // a notice never splits a tool-only run apart.
-  const timeline = useMemo(() => interleaveNotices(groupedTurns, notices), [groupedTurns, notices])
+  const groupOf = useMemo(() => groupedTurnIds(turns), [turns])
+  const timeline = useMemo(
+    () => interleaveNotices(groupedTurns, notices, groupOf),
+    [groupedTurns, notices, groupOf]
+  )
   const lastTurnId = groupedTurns.length > 0 ? groupedTurns[groupedTurns.length - 1].id : null
   const effectiveProcessing = builderDraft ? false : processing
   const showEmptyState =
