@@ -7,6 +7,8 @@ September 5/10 audit; the September 11 implementation supersedes the items
 listed in the addendum below.
 Addendum 2026-09-10: fx's lossy `session/load` (tracker #1) is fixed upstream
 and re-verified through moi's ACP layer; see §4 fx and `scripts/probe-fx-acp.ts`.
+Addendum 2026-09-25: fx 0.0.11 re-check and the resulting session changes are
+summarized in the September 25 addendum below.
 
 ## September 11 implementation addendum
 
@@ -30,6 +32,43 @@ there is no user-facing truncation indicator yet.
 Today's upstream build also adds validated, persisted session-local effort
 (`configId: effort`, category `thought_level`). Tracker #12 and the September
 10 observation of no effort option are historical, not current limitations.
+
+## September 25 addendum: fx 0.0.11
+
+fx `0.0.11` (`build_revision dc870f3a9174`) was re-checked with an independent
+JSON-RPC client against a scripted local model, then through moi with real
+Gateway runs of Kimi K3, GLM 5.3, Opus 5.5 and GPT-6 Sol. Unchanged since the
+audit: one active session per process, generic tool titles, unvalidated model
+values, operational text sent as `agent_message_chunk` (now also provider
+failures such as `HTTP 502: …` and the `[Response interrupted. Restarting.]`
+marker), and the 200-byte result clip, which now cuts the shell envelope
+mid-JSON. Replay omits thoughts and usage, issues fresh message ids on every
+load, and adds `cancelled`/`failed` outcome text and `[Image #N]` markers.
+
+The shared layer gained provider hooks for these: `enrichToolCalls` (fx reads
+full results from `fx session --id <id> --json`), `isOperationalMessage` and
+`describeOperationalMessage` (notices, including replayed outcomes),
+`probeModelOptions` (effort options for a model not used yet) and
+`keepViewOnIdleRelease`. Session behavior changed as follows:
+
+- Replayed turns are no longer broadcast. A cold load ends with one
+  `session_reloaded` frame and open tabs refetch the rebuilt transcript,
+  which fixes answers overwriting each other in a tab left open.
+- An idle-released fx chat keeps its live transcript and reuses it when the
+  replay has the same number of user turns.
+- Streaming tool updates are coalesced (120 ms). Status-only tool updates,
+  the duplicate final-turn emit and the second `sessions_changed` per turn
+  end are dropped. fx's chat list uses one warm process instead of one per
+  refresh.
+- A stopped run gets a notice live, matching its replay. Follow-ups queued
+  during a run render after the running reply (`queuesFollowUps`).
+- A replay labels only its latest run with the loaded model, never the model
+  picked for the send that resumed the chat.
+
+Upstream asks, not yet reported: a separate notification for operational
+text, replayed thoughts and per-run models, ACP usage field names with
+`totalTokens`, and a way to stop a backgrounded command over ACP. Details
+and evidence: [fx notes](../fx/NOTES.md).
 
 **Original implementation priority: fix lifecycle and mapping before adding providers.**
 The independent host probe exposed twelve failed behavior checks despite all

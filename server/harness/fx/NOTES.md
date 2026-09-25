@@ -29,12 +29,18 @@ left unchanged.
   Checks are bounded and repeated so replacing the executable takes effect.
 - One owned ACP process per chat. Discovery uses a separate process: fx has
   only one active session per process, and creating/loading another replaces it.
+  Listing chats reuses one warm process per workspace, released 30 seconds
+  after the last list: fx answers `session/list` from disk without touching
+  an active session, and every chat end refreshes the list in each open tab.
 - `session/load` restores the actual model context and replays structured
   tool cards. Load errors propagate rather than appearing as an empty chat.
 - `code` mode is reapplied after creation/load. It automatically reviews
   unresolved sensitive actions and can hold them; it is not full access.
 - Model selection uses `configId: model`, never the first `category: model`
-  option: fx gives its separate provider selector the same category.
+  option: fx gives its separate provider selector the same category. fx
+  names each of its few hundred Gateway models by its `vendor/model` id; the
+  picker lists them by model name under vendor headings (`claude-opus-5.5`
+  under Anthropic) and keeps the id as the value.
 - Reasoning effort uses `configId: effort`, category `thought_level`.
   Changes are validated against the returned options, confirmed, persisted
   with the session, and applied before the next prompt. No global settings
@@ -53,13 +59,22 @@ left unchanged.
   replaced with the tool and its action (`Wait for command shell-1`,
   `Read skill moi-workspace`, `Fetch webpage https://…`), live and replayed.
   Read results are unwrapped from fx's `<path>`/`<content>` envelope and
-  highlighted, writes show the written file, and edits render as a diff.
+  highlighted, writes show the written file, and edits render as a diff
+  with fx's line counts (`+2 −1`) in the summary.
+- Other model-facing envelopes are unwrapped as well, with a raw switch that
+  keeps the original: a subagent's report and `vision` image summaries render
+  as markdown (`Visible text: …` in the summary), a fetched page as its text
+  (`200 · text/html` in the summary), a skill as its highlighted `SKILL.md`,
+  saved command output with its `\xNN` escapes decoded (`Bytes 1–29 of 29`),
+  and file searches as bare paths under fx's `No matches for …` or count line.
 - Shell progress deltas accumulate. A final execution envelope keeps the
   streamed output; `command_result` drives a footer such as `Exit code 0 ·
 5.2 s`, `Stopped after 9.3 s` or `Timed out`. A command that outlives its
   `yield_time_ms` completes with a `running` envelope ("Moved to the
-  background as shell-1.") and fx then streams its late output onto that
-  finished call; moi appends it without reopening the row. Other tool
+  background as shell-1") and fx then streams its late output onto that
+  finished call; moi appends it without reopening the row. A row without
+  output of its own shows its status in the summary line instead of an
+  output box (`No output · Exit code 0 · 0.1 s`). Other tool
   outputs retain ACP's replacement semantics, including explicit empty
   content. fx's `{"error":{…}}` failures render as their message (with
   reviewer advice for a held action).
@@ -82,6 +97,9 @@ left unchanged.
 - Until fx names a chat (its generated title arrives at the end of the first
   run), the chat list and header use the first message instead of a generic
   placeholder.
+- A replay labels only its latest run with the model `session/load` reports;
+  fx's replay carries no per-run model, and a send that resumes a chat no
+  longer stamps its history with the newly picked model.
 - Live `agent_thought_chunk` updates become reasoning parts. fx can omit
   their `messageId` immediately after a diagnostic that has one; moi closes
   the diagnostic before accumulating reasoning so the warning cannot swallow
@@ -93,6 +111,35 @@ left unchanged.
   history remains in fx itself and can still appear in the fx CLI.
 
 ## Verification
+
+### September 25, version 0.0.11
+
+An independent JSON-RPC client drove `fx acp` against a scripted local model
+(no account) to re-check each ACP finding; the results are in the
+[ACP notes](../acp/NOTES.md#september-25-addendum-fx-0011). Real runs then
+used the Vercel AI Gateway with four models at High effort.
+
+The thinking probe (`PROBE_EFFORT=high bun scripts/probe-fx-thinking.ts`,
+same probability problem as before) confirmed High on every model:
+
+| Catalog model               | Effort levels advertised                  | Live thought chunks | Reasoning characters in moi | Cold reasoning characters |
+| --------------------------- | ----------------------------------------- | ------------------: | --------------------------: | ------------------------: |
+| `moonshotai/kimi-k3`        | auto, none, low, high, max                |                 574 |                       3,073 |                         0 |
+| `zai/glm-5.3`               | auto, low, high, max                      |                 398 |                       2,919 |                         0 |
+| `anthropic/claude-opus-5.5` | auto, low, medium, high, xhigh, max       |                   0 |                           0 |                         0 |
+| `openai/gpt-6-sol`          | auto, none, low, medium, high, xhigh, max |                   0 |                           0 |                         0 |
+
+All four answered `20/51` (GLM as `$\dfrac{20}{51}$`), with no harness errors
+or truncation, and every answer survived cold replay.
+
+A browser matrix then ran each model through the app: markdown, file
+writes/edits/reads, shell (streaming, failing, long output, a command that
+outlives `yield_time_ms`), stop, queued follow-ups, web fetch and subagents,
+image input, and cold reload. It found 22 distinct defects (4 high, 10
+medium, 8 low). Each was re-checked against the code and fx's source before
+fixing: 19 were moi defects and are fixed. The other three are fx behavior
+listed under remaining limits: Stop cannot end a backgrounded command, usage
+arrives under non-ACP field names, and replay omits thinking.
 
 ### September 12, version 0.0.9
 
@@ -237,6 +284,10 @@ short live thoughts, later warnings, thought-only completion, and cancellation.
   unavailable. A command still running in the background keeps its live
   stream instead. fx's history keeps command output, not interleaved
   stdout/stderr, and caps very large results with an output handle.
+- fx 0.0.11 reports prompt usage as `reasoningTokens`, `cacheReadTokens` and
+  `cacheWriteTokens` instead of ACP's `thoughtTokens`, `cachedReadTokens` and
+  `cachedWriteTokens`, and omits the required `totalTokens`; moi derives the
+  total. Context size and cost from `usage_update` are not shown yet.
 - ACP replay supplies no original message timestamps or per-turn token usage.
   moi restores its own measured run durations only when recorded and replayed
   run counts match; imported histories have no such measurements. Historical
@@ -258,7 +309,12 @@ short live thoughts, later warnings, thought-only completion, and cancellation.
   before it ran (still waiting on review) gets no terminal update from fx;
   the shared ACP layer marks it interrupted rather than inventing success.
 - Stopping a run does not stop a command fx already moved to the
-  background: its late output keeps arriving on the finished row.
+  background: its late output keeps arriving on the finished row. fx ties a
+  command to the turn's cancellation only for its first 30-second
+  observation window; after that it is an owned shell session that only
+  `shell.stop` or process exit ends, and ACP has no request for either.
+- A turn whose only work was thinking loses its "Worked for" label after a
+  cold replay, because the replay omits that thinking.
 - Probing a model's effort options creates an empty fx session, like model
   discovery; moi hides it, but it remains in fx's own history.
 - Workspace-wide effort defaults use `auto`; another chat's selected effort
