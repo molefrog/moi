@@ -377,7 +377,9 @@ function flushAssistant(
       if (parts.length) emitTurnEvent(rec, { kind: 'turn', turn: { ...turn, parts } })
     } else emitTurnEvent(rec, { kind: 'turn', turn })
   }
-  if (meta && rec.lastAssistantTurnId) {
+  // The flushed turn already carries `meta`; otherwise (the run ended on a tool
+  // call or a notice) attach it to the run's last assistant turn.
+  if (meta && rec.lastAssistantTurnId && rec.lastAssistantTurnId !== turn?.id) {
     const last = rec.view.turns.find(t => t.id === rec.lastAssistantTurnId)
     if (last)
       emitTurnEvent(rec, { kind: 'turn', turn: { ...last, meta: { ...last.meta, ...meta } } })
@@ -441,6 +443,9 @@ function ingestToolCall(
     previousState?.type === 'tool-call' &&
     state?.type === 'tool-call' &&
     previousState.call.state === state.call.state
+  // fx follows every `tool_call` with a status-only `in_progress` update that
+  // changes nothing moi shows.
+  if (previous && Bun.deepEquals(previous, turn)) return
   if (sameState && !rec.replaying && !isStart) emitToolProgress(rec, turn)
   else emitTurnEvent(rec, { kind: 'turn', turn })
 }
@@ -579,8 +584,9 @@ function handleSessionUpdate(rec: SessionRecord, update: SessionUpdate, provider
       return
     }
     case 'session_info_update': {
-      // The backend generated or refreshed a session title.
-      if (!rec.replaying) {
+      // The backend generated or refreshed a session title. During a prompt
+      // the turn-end broadcast below covers it.
+      if (!rec.replaying && !rec.processing) {
         broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
       }
       return
@@ -726,7 +732,8 @@ function initializeSession(
       if (init.cancelled) throw new Error('Chat was closed while connecting')
       // Install the receiver before load: it emits history before its response.
       if (!input.isNew) {
-        rec = createRecord({ ...input, client, config })
+        // Replayed history predates this send's model choice.
+        rec = createRecord({ ...input, model: undefined, client, config })
         rec.replaying = true
       }
       const result = await client.rpc<AcpNewSessionResult>(
@@ -749,6 +756,9 @@ function initializeSession(
       rec.modelState = state
       rec.model = state.currentModelId
       rec.defaultModel = state.defaultModelId ?? state.currentModelId
+      // The load result names only the chat's current model, which ran its
+      // latest run; runs closed earlier in the replay stay unlabelled.
+      rec.acc.setModel(rec.model)
       flushAssistant(rec)
       flushUserChunk(rec)
       closeOpenToolCalls(rec, 'No tool completion was recorded in this chat.')
@@ -764,7 +774,6 @@ function initializeSession(
         } else await attachReplayDurations(rec)
       }
       rec.replaying = false
-      rec.acc.setModel(rec.model)
       await applyNoPromptMode(client, config, realId)
       // Restored selectors describe the active chat, including its effort
       // options. Cache them only when the provider's actual default has been
@@ -969,6 +978,8 @@ async function runPrompt(
       sessionId: rec.sessionId,
       content: err instanceof Error ? err.message : 'send failed'
     })
+    // A title update that arrived during the failed prompt was not broadcast.
+    if (prompted) broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
     // A failed turn must not silently send queued requests in a replacement process.
     rec.queue.length = 0
     // A multi-step settings operation can change the model before a later

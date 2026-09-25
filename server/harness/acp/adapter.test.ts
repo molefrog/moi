@@ -12,6 +12,7 @@ import {
   AssistantTurnAccumulator,
   acpSessionToSessionInfo,
   acpToolCallToTurn,
+  acpUsageToTurnMeta,
   replayedUserParts,
   toolStatusToState
 } from './adapter'
@@ -409,5 +410,22 @@ describe('replayedUserParts', () => {
   test('keeps user text that merely quotes the tag', () => {
     const typed = 'what does <moi-context> mean in this codebase?'
     expect(replayedUserParts(typed)).toEqual([{ type: 'text', text: typed }])
+  })
+})
+
+describe('acpUsageToTurnMeta', () => {
+  test('derives the total when an agent omits it', () => {
+    // fx 0.0.11 sends its own field names and no totalTokens.
+    const usage = { inputTokens: 20588, outputTokens: 351, reasoningTokens: 195 }
+    expect(
+      acpUsageToTurnMeta(usage as unknown as Parameters<typeof acpUsageToTurnMeta>[0])
+    ).toEqual({
+      inputTokens: 20588,
+      outputTokens: 351,
+      totalTokens: 20939
+    })
+    expect(
+      acpUsageToTurnMeta({ inputTokens: 2, outputTokens: 3, totalTokens: 9 })?.totalTokens
+    ).toBe(9)
   })
 })

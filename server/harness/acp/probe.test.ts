@@ -115,4 +115,10 @@ test('fx learns an unseen model effort levels without changing the default', asy
     before
   )
   expect(await listAcpSessions(config, ctx)).toEqual([])
+
+  // Refreshing the chat list reuses one warm process instead of spawning per call.
+  const initializes = (await calls()).filter(call => call.method === 'initialize').length
+  await Promise.all([listAcpSessions(config, ctx), listAcpSessions(config, ctx)])
+  await listAcpSessions(config, ctx)
+  expect((await calls()).filter(call => call.method === 'initialize')).toHaveLength(initializes)
 })

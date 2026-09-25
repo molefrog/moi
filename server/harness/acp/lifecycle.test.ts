@@ -621,6 +621,39 @@ describe('ACP chat lifecycle', () => {
     expect(new Set(replay.map(turn => turn.id)).size).toBe(4)
   })
 
+  test('a replay labels only its latest run with the model the load reports', async () => {
+    const chunk = (sessionUpdate: string, messageId: string, text: string) => ({
+      sessionUpdate,
+      messageId,
+      content: { type: 'text', text }
+    })
+    const agent = await fixture({
+      loadedModel: 'model-b',
+      replayUpdates: [
+        chunk('user_message_chunk', 'u1', 'first'),
+        chunk('agent_message_chunk', 'a1', 'earlier answer'),
+        chunk('user_message_chunk', 'u2', 'second'),
+        chunk('agent_message_chunk', 'a2', 'latest answer')
+      ]
+    })
+    // A send that resumes the chat must not stamp history with its own model.
+    await agent.send('one', 'next', 'model-a')
+    const models = Object.fromEntries(
+      turns(getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? []).flatMap(turn =>
+        turn.role === 'assistant'
+          ? turn.parts.flatMap(part =>
+              part.type === 'text' ? [[part.text, turn.meta?.model]] : []
+            )
+          : []
+      )
+    )
+    expect(models).toEqual({
+      'earlier answer': undefined,
+      'latest answer': 'model-b',
+      'model-a:next': 'model-a'
+    })
+  })
+
   test('split diagnostics become notices without leaking a partial streaming preview', async () => {
     const chunks = ['[con', 'text] workspace instructions were omitted outside the home directory.']
     const agent = await fixture({ diagnosticChunks: chunks })
@@ -1113,6 +1146,52 @@ describe('fx history and diagnostics', () => {
     expect(call).toMatchObject({ state: 'success', output: lines.join('') })
     const last = frames.at(-1)?.turn?.parts.find(part => part.type === 'tool-call')
     expect(last?.type === 'tool-call' && last.call.output).toBe(lines.join(''))
+  })
+
+  test('a turn end broadcasts each settled turn and the chat list change once', async () => {
+    const agent = await fixture({
+      promptUpdates: [
+        {
+          sessionUpdate: 'tool_call',
+          toolCallId: 'ls',
+          name: 'shell',
+          title: 'Running',
+          kind: 'execute',
+          status: 'pending',
+          rawInput: { command: 'ls' }
+        },
+        { sessionUpdate: 'tool_call_update', toolCallId: 'ls', status: 'in_progress' },
+        {
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'ls',
+          status: 'completed',
+          content: [{ type: 'content', content: { type: 'text', text: clippedEnvelope } }]
+        },
+        { sessionUpdate: 'session_info_update', title: 'List files' }
+      ]
+    })
+    const before = getClientFrameLog(agent.ctx.workspaceId).length
+    await sendAcpMessage(fxConfig(agent.config), {
+      ...agent.ctx,
+      sessionId: 'one',
+      isNew: false,
+      content: 'ls'
+    })
+    const frames = getClientFrameLog(agent.ctx.workspaceId)
+      .slice(before)
+      .map(entry => entry.frame as { kind?: string; type?: string; turn?: Turn })
+    const turnFrames = (predicate: (turn: Turn) => boolean) =>
+      frames.filter(frame => frame.kind === 'turn' && frame.turn && predicate(frame.turn))
+    const toolFrames = turnFrames(turn => turn.parts.some(part => part.type === 'tool-call'))
+    // The fixture ends every prompt with a `<model>:<prompt>` reply.
+    const replies = turnFrames(turn =>
+      turn.parts.some(part => part.type === 'text' && part.text.endsWith(':ls'))
+    )
+    // pending, then settled: the status-only in_progress update adds nothing.
+    expect(toolFrames).toHaveLength(2)
+    expect(replies).toHaveLength(1)
+    expect(replies[0]?.turn?.meta).toMatchObject({ provider: 'fx', stopReason: 'end_turn' })
+    expect(frames.filter(frame => frame.type === 'sessions_changed')).toHaveLength(1)
   })
 
   test('a cold load tells clients to refetch instead of broadcasting replayed turns', async () => {

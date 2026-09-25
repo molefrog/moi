@@ -121,7 +121,13 @@ export function acpToolCallToTurn(input: {
 
 export function acpUsageToTurnMeta(usage: Usage | null | undefined): TurnMeta['usage'] | undefined {
   if (!usage) return undefined
-  const { inputTokens, outputTokens, totalTokens } = usage
+  const { inputTokens, outputTokens } = usage
+  // ACP requires `totalTokens`, but fx 0.0.11 omits it.
+  const totalTokens =
+    usage.totalTokens ??
+    (typeof inputTokens === 'number' && typeof outputTokens === 'number'
+      ? inputTokens + outputTokens
+      : undefined)
   if (inputTokens === undefined && outputTokens === undefined && totalTokens === undefined) {
     return undefined
   }

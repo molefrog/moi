@@ -6,7 +6,7 @@ import type { Model, SessionInfo } from '@/lib/types'
 import { type AcpProviderConfig, type AcpSpawnContext, liveAcpFirstUserText } from './session'
 import { acpSessionToSessionInfo } from './adapter'
 import { archiveAcpSession, archivedAcpSessions } from './archived'
-import { getAcpClient, peekAcpClient, releaseAcpClient } from './client'
+import { type AcpClient, getAcpClient, peekAcpClient, releaseAcpClient } from './client'
 import {
   cacheAcpModelState,
   clearAcpModelCache,
@@ -27,14 +27,46 @@ async function discoveryClient(config: AcpProviderConfig, ctx: AcpSpawnContext) 
   })
 }
 
+// `session/list` is stateless, so a single-session agent can serve it from one
+// shared process instead of a new one per call: a chat ending refreshes the
+// list from every open tab. The process stays warm briefly after the last call.
+const LIST_IDLE_MS = 30_000
+const listIdleTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+async function listClient(config: AcpProviderConfig, ctx: AcpSpawnContext) {
+  const spec = await config.spawn(ctx)
+  if (config.processScope !== 'session') return getAcpClient(spec)
+  const key = `${config.id}:${ctx.workspacePath}`
+  clearTimeout(listIdleTimers.get(key))
+  listIdleTimers.delete(key)
+  return getAcpClient({ ...spec, scope: 'discovery:list' })
+}
+
+function releaseListClientLater(
+  config: AcpProviderConfig,
+  ctx: AcpSpawnContext,
+  client: AcpClient
+) {
+  if (config.processScope !== 'session') return
+  const key = `${config.id}:${ctx.workspacePath}`
+  clearTimeout(listIdleTimers.get(key))
+  const timer = setTimeout(() => {
+    listIdleTimers.delete(key)
+    releaseAcpClient(client)
+  }, LIST_IDLE_MS)
+  timer.unref?.()
+  listIdleTimers.set(key, timer)
+}
+
 // Sessions whose recorded cwd is this workspace, newest first. `cwd` filtering
 // and cursor pagination are both server-side in ACP.
 export async function listAcpSessions(
   config: AcpProviderConfig,
   ctx: AcpSpawnContext
 ): Promise<SessionInfo[]> {
-  const client = await discoveryClient(config, ctx)
+  let client: AcpClient | undefined
   try {
+    client = await listClient(config, ctx)
     const cwd = await realpath(ctx.workspacePath).catch(() => ctx.workspacePath)
     // Archiving is moi-side (see ./archived.ts) — the backend still lists the
     // chat, so it is filtered here rather than by the agent.
@@ -75,7 +107,7 @@ export async function listAcpSessions(
     debug(`${config.id} session/list failed: ${err instanceof Error ? err.message : String(err)}`)
     return []
   } finally {
-    if (config.processScope === 'session') releaseAcpClient(client)
+    if (client) releaseListClientLater(config, ctx, client)
   }
 }
 
