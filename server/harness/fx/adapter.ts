@@ -1,4 +1,9 @@
 import type { Turn } from '@/lib/format'
+import {
+  FX_HISTORY_PREVIEW_ONLY as HISTORY_PREVIEW_ONLY,
+  FX_NO_OUTPUT as NO_OUTPUT,
+  FX_STATUS_LINE as STATUS_LINE
+} from '@/lib/fx-shell-status'
 import type { ToolCall } from '@/lib/types'
 
 import { STOPPED_NOTICE } from '../acp/adapter'
@@ -34,14 +39,9 @@ function commandEnvelope(text: string): Record<string, unknown> | undefined {
   }
 }
 
-// Status lines shown when a shell row has no streamed output of its own. They
-// are display text only: accumulation skips them, so a status line can never
+// The status line shown when a shell row has no streamed output of its own.
+// It is display text only: accumulation skips it, so a status line can never
 // become the prefix of later output.
-const HISTORY_PREVIEW_ONLY = 'fx did not include command output in this history preview.'
-const NO_OUTPUT = 'Command produced no output.'
-const STATUS_LINE =
-  /^(?:fx did not include command output in this history preview\.|Command produced no output\.|Moved to the background(?: as \S+)?\.|\S+ finished with exit code -?\d+\.)$/
-
 function shellStatusLine(
   envelope: Record<string, unknown>,
   commandResult: Record<string, unknown> | undefined,

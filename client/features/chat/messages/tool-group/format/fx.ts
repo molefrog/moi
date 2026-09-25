@@ -1,8 +1,10 @@
 // fx supplies native tool names; its generic ACP titles ("Running", "Reading",
 // "Waiting for") are not specific enough for the label and brief on a tool row.
 // Several fx tools wrap their arguments in `request` and switch on `action`.
+import { FX_HISTORY_PREVIEW_ONLY, FX_NO_OUTPUT } from '@/lib/fx-shell-status'
 import type { ToolCall } from '@/lib/types'
 
+import { parseFxResult } from '../fx-results'
 import { shellBrief } from './shell'
 import { getInputValue, toolInput, type Shorten, type ToolFormatter } from './shared'
 
@@ -114,7 +116,7 @@ function seconds(ms: number): string {
 
 // How a command ended, from fx's live `command_result` or the exit status
 // restored from its history. Nothing for a row that is still running.
-function shellSummary(call: ToolCall): string | undefined {
+function shellOutcome(call: ToolCall): string | undefined {
   if (call.state === 'running' || call.state === 'pending') return undefined
   const result = record(record(call.sidecar?.rawOutput)?.command_result)
   const restored = record(call.sidecar?.fxShell)
@@ -129,6 +131,44 @@ function shellSummary(call: ToolCall): string | undefined {
   return undefined
 }
 
+// The fx adapter's status sentence (see lib/fx-shell-status.ts), shortened
+// for the summary line. `outcome` already carries any exit code.
+function shellStatus(output: string, outcome: string | undefined): string | undefined {
+  if (output === FX_NO_OUTPUT) return 'No output'
+  if (output === FX_HISTORY_PREVIEW_ONLY) return 'Output unavailable'
+  const background = /^(Moved to the background(?: as \S+)?)\.$/.exec(output)
+  if (background) return background[1]
+  const finished = /^(\S+ finished)( with exit code -?\d+)\.$/.exec(output)
+  if (finished) return outcome?.startsWith('Exit code') ? finished[1] : finished[1]! + finished[2]!
+  return undefined
+}
+
+function shellSummary(call: ToolCall): string | undefined {
+  const outcome = shellOutcome(call)
+  const output = typeof call.output === 'string' ? call.output : ''
+  return [shellStatus(output, outcome), outcome].filter(Boolean).join(' · ') || undefined
+}
+
+// Line counts from fx's committed diff of a write or edit.
+function fileChangeSummary(call: ToolCall): string | undefined {
+  const change = record(call.sidecar?.fxFileChange)
+  if (!change) return undefined
+  const additions = typeof change.additions === 'number' ? change.additions : 0
+  const deletions = typeof change.deletions === 'number' ? change.deletions : 0
+  const counts =
+    change.kind === 'added'
+      ? `${additions} ${additions === 1 ? 'line' : 'lines'} added`
+      : `+${additions} −${deletions}`
+  return change.truncated === true ? `${counts} · Diff shortened by fx` : counts
+}
+
+function resultSummary(call: ToolCall): string | undefined {
+  if (call.name === 'shell') return shellSummary(call)
+  if (call.sidecar?.fxFileChange) return fileChangeSummary(call)
+  if (call.state !== 'success' || typeof call.output !== 'string') return undefined
+  return parseFxResult(call, call.output)?.summary
+}
+
 export const fxFormatter: ToolFormatter = {
   displayName: call => {
     const action = getInputValue(args(call), 'action')
@@ -139,5 +179,5 @@ export const fxFormatter: ToolFormatter = {
     return label.charAt(0).toUpperCase() + label.slice(1)
   },
   brief,
-  resultSummary: call => (call.name === 'shell' ? shellSummary(call) : undefined)
+  resultSummary
 }

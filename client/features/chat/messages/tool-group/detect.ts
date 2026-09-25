@@ -1,6 +1,9 @@
 // Detection heuristics for how to render a tool result. Pure, no React. The
 // highlighter (sugar-high) is language-agnostic, so `label` is display-only.
+import { FX_STATUS_LINE } from '@/lib/fx-shell-status'
 import type { ToolCall } from '@/lib/types'
+
+import { parseFxResult } from './fx-results'
 
 // File extension → a short language label for the code-block header.
 const EXT_LANG: Record<string, string> = {
@@ -72,11 +75,16 @@ function unwrapFxRead(text: string): string {
 
 export type DiffLine = { kind: 'addition' | 'deletion' | 'context'; text: string }
 
-// 'plain' → render the raw output as-is (no switch). 'highlight' → render a
-// raw ↔ <label> switch over a syntax-highlighted `code` block. 'diff' → the
-// same switch over added/removed lines.
+// 'plain' → render the raw output as-is (no switch). 'empty' → no output box:
+// the row's summary line says everything. The other views render a raw ↔
+// <label> switch over a syntax-highlighted `code` block ('highlight'),
+// added/removed lines ('diff'), or text unwrapped from an envelope ('text',
+// or 'markdown' for a report written in markdown).
 export type OutputView =
   | { kind: 'plain' }
+  | { kind: 'empty' }
+  | { kind: 'text'; code: string; label: string }
+  | { kind: 'markdown'; code: string; label: string }
   | { kind: 'highlight'; code: string; label: string }
   | { kind: 'diff'; lines: DiffLine[]; code: string; label: string }
 
@@ -123,6 +131,16 @@ function editDiff(call: ToolCall, input: Record<string, unknown>): OutputView | 
 // in the output, writes in the input); otherwise a JSON-looking output;
 // otherwise plain text.
 export function detectOutput(call: ToolCall, output: string): OutputView {
+  if (call.provider === 'fx') {
+    // moi's own status sentence stands in for missing output; the summary
+    // line carries it.
+    if (call.name === 'shell' && FX_STATUS_LINE.test(output)) return { kind: 'empty' }
+    // An envelope that only yields a summary gets no output box; one that
+    // yields neither renders as returned.
+    const fx = parseFxResult(call, output)
+    if (fx?.body) return { kind: fx.body.kind, code: fx.body.text, label: fx.body.label }
+    if (fx?.summary) return { kind: 'empty' }
+  }
   const input = (call.input as Record<string, unknown>) ?? {}
   const path =
     typeof input.file_path === 'string'

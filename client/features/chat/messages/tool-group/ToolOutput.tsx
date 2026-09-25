@@ -6,6 +6,7 @@ import { cn } from '@/client/lib/cn'
 import type { ToolCall } from '@/lib/types'
 
 import { Button } from '@/client/components/ui/button'
+import { MarkdownContent } from '@/client/features/chat/messages/MarkdownContent'
 import { CodeBlock } from './CodeBlock'
 import { type DiffLine, detectOutput } from './detect'
 
@@ -23,6 +24,8 @@ export function ToolOutput({ call, output, isError }: ToolOutputProps) {
     () => (isError ? ({ kind: 'plain' } as const) : detectOutput(call, output)),
     [call, output, isError]
   )
+
+  if (view.kind === 'empty') return null
 
   if (view.kind === 'plain') {
     return (
@@ -55,6 +58,14 @@ export function ToolOutput({ call, output, isError }: ToolOutputProps) {
         </pre>
       ) : view.kind === 'diff' ? (
         <DiffBlock lines={view.lines} />
+      ) : view.kind === 'text' ? (
+        <pre className={cn(PRE, 'wrap-break-word whitespace-pre-wrap text-muted-foreground')}>
+          {view.code}
+        </pre>
+      ) : view.kind === 'markdown' ? (
+        <div className="max-h-[280px] overflow-auto px-3 py-2.5 text-muted-foreground">
+          <MarkdownContent size="xs" content={view.code} />
+        </div>
       ) : (
         <CodeBlock code={view.code} className={cn(PRE, 'text-muted-foreground')} />
       )}
