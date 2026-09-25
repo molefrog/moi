@@ -280,12 +280,13 @@ short live thoughts, later warnings, thought-only completion, and cancellation.
 ## Remaining limits
 
 - Terminal tool updates are clipped upstream to a 200-byte preview in live
-  and replay streams. moi restores full results from
-  `fx session --id <id> --json` after each run and on load; until that read
-  finishes (or if it fails), a replayed shell row says its output is
-  unavailable. A command still running in the background keeps its live
-  stream instead. fx's history keeps command output, not interleaved
-  stdout/stderr, and caps very large results with an output handle.
+  and replay streams, and fx saves at most 4,096 bytes of each result. moi
+  restores results from `fx session --id <id> --json` after each run and on
+  load. A command whose saved envelope was cut keeps the output that
+  streamed live; after a cold load it shows the saved part, marked as cut,
+  with its exit status. Until the read finishes (or if it fails), a replayed
+  shell row says its output is unavailable. A command still running in the
+  background keeps its live stream instead.
 - fx 0.0.11 reports prompt usage as `reasoningTokens`, `cacheReadTokens` and
   `cacheWriteTokens` instead of ACP's `thoughtTokens`, `cachedReadTokens` and
   `cachedWriteTokens`, and omits the required `totalTokens`; moi derives the
