@@ -143,6 +143,22 @@ fixing: 19 were moi defects and are fixed. The other three are fx behavior
 listed under remaining limits: Stop cannot end a backgrounded command, usage
 arrives under non-ACP field names, and replay omits thinking.
 
+The fixed branch was then re-run with the same four models, 14 checks each:
+model menu, effort before first use, early title, file rows, shell, a
+backgrounded command, stop, queued follow-ups, web fetch with subagent and
+glob, two tabs, scroll following, cold reload, replay labels with listing
+reuse, and image input. Every live check passed on every model. Cold
+reload, skill rows, listing reuse and the backgrounded wait row did not,
+which led to the saved-result fixes above: fx's 4,096-byte cap, failure
+text, notices anchored to their turn and a ten-minute listing process.
+
+A final spot check after a moi restart passed all seven cold-reload checks
+on the Kimi and GLM chats. With Opus it kept a 2,000-line command's output
+intact after the run, started only two listing processes in nine minutes
+(12 `initialize` requests for 18 lists, one of them after an env change),
+and sent one list change per turn end. It also caught Hermes's env hook
+discarding fx chats' transcripts; that hook now acts only on Hermes chats.
+
 ### September 12, version 0.0.9
 
 The exact stable release artifact passed its official SHA-256 check. Real
