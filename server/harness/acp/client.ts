@@ -451,9 +451,14 @@ export function killAcpWorkspace(workspacePath: string, provider?: string): void
   }
 }
 
-// Server shutdown: kill every agent so nothing is orphaned.
-export function killAllAcpClients(provider?: string): void {
+// Server shutdown: kill every agent so nothing is orphaned. Resolves once the
+// killed processes have exited.
+export function killAllAcpClients(provider?: string): Promise<void> {
+  const exits: Promise<unknown>[] = []
   for (const entry of clients.values()) {
-    if (!provider || entry.spec.provider === provider) stopEntry(entry)
+    if (provider && entry.spec.provider !== provider) continue
+    if (entry.record) exits.push(entry.record.proc.exited)
+    stopEntry(entry)
   }
+  return Promise.all(exits).then(() => undefined)
 }

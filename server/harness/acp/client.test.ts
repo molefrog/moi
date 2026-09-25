@@ -172,6 +172,15 @@ describe('ACP process ownership', () => {
     expect(unrelated.isAlive()).toBe(false)
   })
 
+  test('global shutdown resolves once the killed processes have exited', async () => {
+    const base = await spec()
+    await start(base)
+    const { pid } = await getAcpProcessInfo(base.workspacePath, null)
+    expect(pid && processAlive(pid)).toBe(true)
+    await killAllAcpClients()
+    expect(processAlive(pid!)).toBe(false)
+  })
+
   test('workspace shutdown interrupts a handshake without orphaning its process', async () => {
     const base = await spec()
     const startedPath = join(base.workspacePath, 'started')

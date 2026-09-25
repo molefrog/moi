@@ -171,6 +171,20 @@ function summarize(events: StreamEvent[]): PartSummary[] {
   })
 }
 
+// A role's message text in order, whitespace-normalized: replay may split or
+// merge chunks differently from the live stream.
+function transcriptText(events: StreamEvent[], role: 'user' | 'assistant'): string {
+  return events
+    .flatMap(e =>
+      e.kind === 'turn' && e.turn.role === role
+        ? e.turn.parts.flatMap(p => (p.type === 'text' ? [p.text] : []))
+        : []
+    )
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 function isToolPart(p: PartSummary): p is Extract<PartSummary, { part: 'tool-call' }> {
   return 'part' in p && p.part === 'tool-call'
 }
@@ -189,6 +203,12 @@ const gatewayEnv: Record<string, string> = gateway
       ...(realKey ? { AI_GATEWAY_API_KEY: realKey } : {}),
       FX_MODEL: process.env.PROBE_MODEL ?? 'anthropic/claude-sonnet-5'
     }
+
+// A real run must reach the Vercel AI Gateway, not an endpoint left over in
+// the caller's environment.
+if (!gateway) {
+  for (const name of ['FX_GATEWAY_BASE_URL', 'FX_GATEWAY_CHAT_URL']) delete process.env[name]
+}
 
 const config: AcpProviderConfig = {
   ...fxConfig,
@@ -253,22 +273,26 @@ try {
   const errors = frames.filter(f => f.kind === 'error')
   if (errors.length) console.log('errors:', JSON.stringify(errors))
   console.log(`session ${realId}`)
-  const live = summarize(getLiveAcpEvents(workspaceId, realId) ?? [])
+  const liveEvents = getLiveAcpEvents(workspaceId, realId) ?? []
+  const live = summarize(liveEvents)
   console.log(JSON.stringify(live, null, 2))
 
   console.log('\n== 2. kill the fx process, cold-load via session/load')
   forgetAllAcpSessions()
-  killAllAcpClients()
-  await Bun.sleep(300)
+  // The cold load must not overlap the exiting process on the same fx store.
+  await killAllAcpClients()
   const listed = await listAcpSessions(config, { workspaceId, workspacePath })
   const discovered = listed.some(session => session.sessionId === realId)
   console.log(
     `session/list: ${listed.map(s => `${s.sessionId} "${s.summary}"`).join(', ') || '(none)'}`
   )
   const wireStart = getWireLog(workspacePath).at(-1)?.seq ?? 0
-  const replayed = summarize(
-    await ensureAcpSessionLive(config, { workspaceId, workspacePath, sessionId: realId })
-  )
+  const replayEvents = await ensureAcpSessionLive(config, {
+    workspaceId,
+    workspacePath,
+    sessionId: realId
+  })
+  const replayed = summarize(replayEvents)
   console.log(JSON.stringify(replayed, null, 2))
 
   console.log('\n== 3. raw session/update frames received during session/load')
@@ -286,9 +310,22 @@ try {
     p =>
       'part' in p && p.part === 'text' && 'text' in p && p.text.includes('Previous tool execution')
   )
+  // The rebuilt view must match what streamed live, not only its tool count.
+  const sameTools =
+    replayTools.length === liveTools.length &&
+    replayTools.every(
+      (tool, index) =>
+        tool.name === liveTools[index]?.name && Bun.deepEquals(tool.input, liveTools[index]?.input)
+    )
+  const sameMessages = (['user', 'assistant'] as const).every(role => {
+    const text = transcriptText(liveEvents, role)
+    return text !== '' && transcriptText(replayEvents, role) === text
+  })
   console.log(`live tool-call turns      ${liveTools.length}`)
   console.log(`replayed tool-call turns  ${replayTools.length}`)
   console.log(`flattened tool text       ${flattened}`)
+  console.log(`tool names/inputs match   ${sameTools}`)
+  console.log(`message text matches      ${sameMessages}`)
   console.log(`saved session discovered ${discovered}`)
   const requestedEffort = process.env.PROBE_EFFORT
   const loadedEffort = getWireLog(workspacePath, wireStart)
@@ -314,7 +351,8 @@ try {
   }
   lossy =
     liveTools.length === 0 ||
-    replayTools.length !== liveTools.length ||
+    !sameTools ||
+    !sameMessages ||
     flattened ||
     !discovered ||
     !effortSent ||
