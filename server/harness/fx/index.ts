@@ -46,6 +46,8 @@ export const fxConfig: AcpProviderConfig = {
   noPromptModeId: 'code',
   supportsImages: true,
   persistSessionModel: false,
+  // fx replays no thoughts and only clipped results; keep the live transcript.
+  keepViewOnIdleRelease: true,
   modelState: fxModelState,
   mapModels: fxModels,
   defaultModel: async (ctx, config) =>

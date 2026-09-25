@@ -114,11 +114,12 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
     return
   }
   if (data.type === 'session_reloaded') {
+    const workspaceId = data.workspaceId as string
+    const sessionId = data.sessionId as string
+    store.clearPreviewsForSession(workspaceId, sessionId)
     // Events that arrive while the refetch is in flight are buffered and
     // applied on top of it (see sessionViewOptions).
-    queryClient?.invalidateQueries({
-      queryKey: workspaceKeys.events(data.workspaceId as string, data.sessionId as string)
-    })
+    queryClient?.invalidateQueries({ queryKey: workspaceKeys.events(workspaceId, sessionId) })
     return
   }
   if (data.type === 'workspace:switch') {

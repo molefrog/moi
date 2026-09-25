@@ -229,6 +229,17 @@ export class AssistantTurnAccumulator {
     return turn
   }
 
+  // Continue numbering after runs already in a transcript this accumulator did
+  // not build (a retained live view), so new runs never reuse their ids.
+  continueAfter(turns: readonly Turn[]) {
+    const prefix = `${this.sessionId}:msg:`
+    for (const turn of turns) {
+      if (!turn.id.startsWith(prefix)) continue
+      const index = Number(turn.id.slice(prefix.length))
+      if (Number.isInteger(index) && index >= this.runIndex) this.runIndex = index + 1
+    }
+  }
+
   // Abandon the open run without emitting (used when a replay pass restarts).
   reset() {
     this.text = ''

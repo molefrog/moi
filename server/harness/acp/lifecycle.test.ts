@@ -32,6 +32,7 @@ import {
   getAcpSessionModelState,
   getLiveAcpEvents,
   interruptAcpRun,
+  releaseIdleAcpSessions,
   sendAcpMessage
 } from './session'
 
@@ -62,6 +63,15 @@ process.stdin.on('data', chunk => {
     else if(msg.method==='session/load') {
       active=msg.params.sessionId
       if(process.env.LOADED_MODEL) model=process.env.LOADED_MODEL
+      if(process.env.PERSIST) {
+        // Like fx: history keeps user text and replies, never thoughts.
+        const saved=existsSync(process.env.PERSIST)?readFileSync(process.env.PERSIST,'utf8').trim().split('\\n').filter(Boolean).map(l=>JSON.parse(l)):[]
+        saved.forEach((turn,i)=>{
+          update({sessionUpdate:'user_message_chunk',messageId:'u'+i,content:{type:'text',text:turn.text}})
+          update({sessionUpdate:'agent_message_chunk',messageId:'a'+i,content:{type:'text',text:turn.reply}})
+        })
+        result(state());continue
+      }
       if(process.env.REPLAY_UPDATES) {
         for(const event of JSON.parse(process.env.REPLAY_UPDATES)) update(event)
         result(state());continue
@@ -97,6 +107,7 @@ process.stdin.on('data', chunk => {
         for(const event of JSON.parse(process.env.PROMPT_UPDATES)) update(event)
         timer=setTimeout(()=>{
           if(text!=='unfinished') update({sessionUpdate:'agent_message_chunk',messageId:'reply-'+msg.id,content:{type:'text',text:model+':'+text}})
+          if(process.env.PERSIST) appendFileSync(process.env.PERSIST,JSON.stringify({text,reply:model+':'+text})+'\\n')
           result({stopReason:'end_turn',usage:{inputTokens:2,outputTokens:3,totalTokens:5}});prompt=undefined
         },100)
         continue
@@ -128,6 +139,7 @@ type FixtureOptions = {
   replayUpdates?: Record<string, unknown>[]
   promptUpdates?: Record<string, unknown>[]
   diagnosticChunks?: string[]
+  persist?: boolean
 }
 async function fixture(options: FixtureOptions = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'moi-acp-lifecycle-'))
@@ -155,7 +167,8 @@ async function fixture(options: FixtureOptions = {}) {
         ...(options.promptUpdates ? { PROMPT_UPDATES: JSON.stringify(options.promptUpdates) } : {}),
         ...(options.diagnosticChunks
           ? { DIAGNOSTIC_CHUNKS: JSON.stringify(options.diagnosticChunks) }
-          : {})
+          : {}),
+        ...(options.persist ? { PERSIST: join(dir, 'history.jsonl') } : {})
       }
     })
   }
@@ -1114,5 +1127,53 @@ describe('fx history and diagnostics', () => {
     expect(frames.filter(frame => frame.type === 'session_reloaded')).toEqual([
       expect.objectContaining({ type: 'session_reloaded', sessionId: 'one' })
     ])
+  })
+
+  test('an idle-released chat keeps its live transcript unless its history changed', async () => {
+    const agent = await fixture({
+      persist: true,
+      promptUpdates: [
+        {
+          sessionUpdate: 'agent_thought_chunk',
+          content: { type: 'text', text: 'private reasoning' }
+        }
+      ]
+    })
+    const config = { ...fxConfig(agent.config), keepViewOnIdleRelease: true }
+    const ctx = { ...agent.ctx, sessionId: 'one' }
+    const reasoning = (events: StreamEvent[]) =>
+      turns(events).some(turn => turn.parts.some(part => part.type === 'reasoning'))
+    await sendAcpMessage(config, { ...ctx, isNew: false, content: 'first' })
+    const live = getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? []
+    expect(reasoning(live)).toBe(true)
+
+    releaseIdleAcpSessions(0)
+    // Read without a process: the retained transcript, thoughts included.
+    expect(getLiveAcpEvents(agent.ctx.workspaceId, 'one')).toEqual(live)
+    const loadsBefore = (await agent.calls()).filter(c => c.method === 'session/load').length
+    const reloaded = await ensureAcpSessionLive(config, ctx)
+    expect((await agent.calls()).filter(c => c.method === 'session/load')).toHaveLength(
+      loadsBefore + 1
+    )
+    expect(reasoning(reloaded)).toBe(true)
+    // New runs continue after the retained ids instead of overwriting them.
+    await sendAcpMessage(config, { ...ctx, isNew: false, content: 'second' })
+    const ids = turns(getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? []).map(turn => turn.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(
+      turns(getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? []).filter(
+        turn => turn.role === 'assistant' && turn.parts.some(part => part.type === 'text')
+      )
+    ).toHaveLength(2)
+
+    // Continued elsewhere while released: the replay wins.
+    releaseIdleAcpSessions(0)
+    await Bun.write(
+      join(agent.dir, 'history.jsonl'),
+      `${await Bun.file(join(agent.dir, 'history.jsonl')).text()}${JSON.stringify({ text: 'from the CLI', reply: 'ok' })}\n`
+    )
+    const changed = await ensureAcpSessionLive(config, ctx)
+    expect(reasoning(changed)).toBe(false)
+    expect(turns(changed).filter(turn => turn.role === 'user')).toHaveLength(3)
   })
 })

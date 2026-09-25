@@ -94,6 +94,10 @@ export type AcpProviderConfig = {
     sessionId: string,
     modelId: string
   ) => Promise<AcpModelState | undefined>
+  // The provider's history replay loses what the live stream showed (fx: no
+  // thoughts, clipped results). Releasing an idle chat then keeps moi's live
+  // transcript for its next load instead of the lossy replay.
+  keepViewOnIdleRelease?: boolean
   // Replace clipped tool results with the provider's own saved copy, keyed by
   // wire toolCallId. Runs after a history load and after each prompt; best
   // effort, so a failure leaves the ACP preview in place.
@@ -197,16 +201,41 @@ type Initialization = {
 const initializing = new Map<string, Initialization>()
 const cancellations = new Map<string, number>()
 
+// Transcripts of idle-released chats whose provider replays lossily (see
+// keepViewOnIdleRelease), most recent last. Bounded; forgetting a chat drops it.
+type ReleasedView = { view: ViewState; workspacePath: string; provider: WorkspaceType }
+const RELEASED_VIEW_LIMIT = 50
+const releasedViews = new Map<string, ReleasedView>()
+
 // Opened fx histories each own a process. Release idle chats after ten minutes;
 // a later send cold-loads the same durable session. Never evict a busy run.
-const idleCleanup = setInterval(() => {
+export function releaseIdleAcpSessions(maxIdleMs = 10 * 60_000): void {
   for (const rec of sessions.values()) {
-    if (rec.ready && !rec.processing && Date.now() - rec.lastUsed > 10 * 60_000) {
+    if (rec.ready && !rec.processing && Date.now() - rec.lastUsed >= maxIdleMs) {
+      const key = recKey(rec.workspaceId, rec.sessionId)
+      const kept = rec.config.keepViewOnIdleRelease && rec.view.turns.length > 0
+      const released: ReleasedView = {
+        view: rec.view,
+        workspacePath: rec.workspacePath,
+        provider: rec.config.id
+      }
       forgetAcpSession(rec.workspaceId, rec.sessionId)
+      if (kept) {
+        releasedViews.set(key, released)
+        for (const oldest of releasedViews.keys()) {
+          if (releasedViews.size <= RELEASED_VIEW_LIMIT) break
+          releasedViews.delete(oldest)
+        }
+      }
     }
   }
-}, 60_000)
+}
+const idleCleanup = setInterval(() => releaseIdleAcpSessions(), 60_000)
 idleCleanup.unref()
+
+function userTurnCount(view: ViewState): number {
+  return view.turns.filter(turn => turn.role === 'user').length
+}
 
 function recKey(workspaceId: string, sessionId: string): string {
   return `${workspaceId}:${sessionId}`
@@ -723,9 +752,19 @@ function initializeSession(
       flushAssistant(rec)
       flushUserChunk(rec)
       closeOpenToolCalls(rec, 'No tool completion was recorded in this chat.')
+      if (!input.isNew) {
+        // An idle-released chat keeps the transcript moi saw live, unless the
+        // chat changed elsewhere since (a different number of user turns).
+        const releasedKey = recKey(input.workspaceId, realId)
+        const released = releasedViews.get(releasedKey)
+        releasedViews.delete(releasedKey)
+        if (released && userTurnCount(released.view) === userTurnCount(rec.view)) {
+          rec.view = released.view
+          rec.acc.continueAfter(rec.view.turns)
+        } else await attachReplayDurations(rec)
+      }
       rec.replaying = false
       rec.acc.setModel(rec.model)
-      if (!input.isNew) await attachReplayDurations(rec)
       await applyNoPromptMode(client, config, realId)
       // Restored selectors describe the active chat, including its effort
       // options. Cache them only when the provider's actual default has been
@@ -1074,15 +1113,13 @@ export async function interruptAcpRun(
   }
 }
 
-export function viewAsEvents(rec: SessionRecord): StreamEvent[] {
+export function viewAsEvents(rec: Pick<SessionRecord, 'view'>): StreamEvent[] {
   const evs: StreamEvent[] = []
   for (const turn of rec.view.turns) evs.push({ kind: 'turn', turn })
   for (const notice of rec.view.notices) evs.push({ kind: 'notice', notice })
   return evs
 }
 
-// Read-side hook for the REST events endpoint: return the live view when we
-// hold one so REST + WS stay in agreement.
 // First user message of a chat open in this server, used to title a chat the
 // agent has not named yet. Reading it does not count as using the chat.
 export function liveAcpFirstUserText(workspaceId: string, sessionId: string): string | undefined {
@@ -1092,10 +1129,15 @@ export function liveAcpFirstUserText(workspaceId: string, sessionId: string): st
   return text || undefined
 }
 
+// Read-side hook for the REST events endpoint: return the live view when we
+// hold one so REST + WS stay in agreement. An idle-released chat is read from
+// its retained transcript without starting a process.
 export function getLiveAcpEvents(workspaceId: string, sessionId: string): StreamEvent[] | null {
   const rec = sessions.get(liveKey(workspaceId, sessionId))
   if (rec) rec.lastUsed = Date.now()
-  return rec?.ready && !rec.disposed ? viewAsEvents(rec) : null
+  if (rec?.ready && !rec.disposed) return viewAsEvents(rec)
+  const released = releasedViews.get(recKey(workspaceId, sessionId))
+  return released ? viewAsEvents(released) : null
 }
 
 // Cold-load: resume the session (also subscribing it on our connection) and
@@ -1123,6 +1165,7 @@ export async function getAcpSessionModelState(
 // Drop one live session record — used when a chat is archived, so its view and
 // notification subscription go away instead of lingering for the process's life.
 export function forgetAcpSession(workspaceId: string, sessionId: string): void {
+  releasedViews.delete(recKey(workspaceId, sessionId))
   const key = liveKey(workspaceId, sessionId)
   const pending = initializing.get(key)
   if (pending) pending.cancelled = true
@@ -1135,6 +1178,10 @@ export function forgetAcpSession(workspaceId: string, sessionId: string): void {
 }
 
 export function forgetAcpWorkspaceSessions(workspacePath: string, provider?: WorkspaceType): void {
+  for (const [key, released] of releasedViews) {
+    if (released.workspacePath === workspacePath && (!provider || released.provider === provider))
+      releasedViews.delete(key)
+  }
   for (const pending of initializing.values()) {
     if (pending.workspacePath === workspacePath && (!provider || pending.provider === provider))
       pending.cancelled = true
@@ -1146,6 +1193,9 @@ export function forgetAcpWorkspaceSessions(workspacePath: string, provider?: Wor
 }
 
 export function forgetAllAcpSessions(provider?: WorkspaceType): void {
+  for (const [key, released] of releasedViews) {
+    if (!provider || released.provider === provider) releasedViews.delete(key)
+  }
   for (const pending of initializing.values()) {
     if (!provider || pending.provider === provider) pending.cancelled = true
   }
