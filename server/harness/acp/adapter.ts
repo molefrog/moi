@@ -130,8 +130,11 @@ export function acpUsageToTurnMeta(usage: Usage | null | undefined): TurnMeta['u
 
 // Replay collects text and image chunks before reconstructing attachments,
 // so inline images can be paired with their descriptions in message order.
+// Agents such as fx store a `[Image #1]` line per inline image; the image
+// itself is replayed as its own part, so the marker line is dropped.
 export function replayedUserParts(raw: string, images: readonly Part[] = []): Part[] {
-  return replayAttachmentParts([...images, { type: 'text', text: raw }])
+  const text = images.length ? raw.replace(/\n*^\[Image #\d+\][ \t]*$/gm, '').trimEnd() : raw
+  return replayAttachmentParts([...images, { type: 'text', text }])
 }
 
 // `firstMessage` titles a chat the agent has not named yet, the way the client

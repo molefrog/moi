@@ -228,3 +228,46 @@ describe('fx operational messages', () => {
     expect(describeFxOperationalMessage('[context] omitted rules')).toBe('[context] omitted rules')
   })
 })
+
+describe('fx tool failures', () => {
+  function failed(text: string): ToolCallUpdate {
+    return update(text, 'failed')
+  }
+
+  test('shows the message of a held action with the reviewer advice', () => {
+    const envelope =
+      '{"error":{"type":"tool_review_held","tool_name":"shell","message":"Action held after safety review","reason":"review_caution","held":true,"advice":"Do not delete the home directory"}}'
+    const normalized = normalizeFxToolUpdate(failed(envelope), previous('shell', ''))
+    expect(toolContentToText(normalized.content)).toBe(
+      'Action held after safety review.\n\nReviewer advice: Do not delete the home directory'
+    )
+    expect(normalized.rawOutput).toEqual(JSON.parse(envelope))
+  })
+
+  test('describes cancelled and coded failures', () => {
+    expect(
+      toolContentToText(
+        normalizeFxToolUpdate(
+          failed('{"error":{"tool":"shell","code":"Cancelled","retryable":false}}'),
+          previous('shell', '')
+        ).content
+      )
+    ).toBe('Stopped before it finished.')
+    expect(
+      toolContentToText(
+        normalizeFxToolUpdate(
+          failed('{"error":{"tool":"read_file","code":"FileNotFound"}}'),
+          previous('read_file', '')
+        ).content
+      )
+    ).toBe('File not found.')
+  })
+
+  test('leaves ordinary failure text alone', () => {
+    expect(
+      toolContentToText(
+        normalizeFxToolUpdate(failed('no such file'), previous('read_file')).content
+      )
+    ).toBe('no such file')
+  })
+})

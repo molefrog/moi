@@ -384,6 +384,26 @@ describe('replayedUserParts', () => {
     ])
   })
 
+  test("drops an agent's image marker lines when the image is replayed", () => {
+    const image = {
+      type: 'file-attachment' as const,
+      mediaType: 'image/png',
+      previewUrl: 'data:image/png;base64,AA'
+    }
+    const stored = `${appendMoiContext('What number is this?', envelope)}\n[Image #1]`
+    expect(replayedUserParts(stored, [image])).toEqual([
+      image,
+      { type: 'text', text: 'What number is this?' }
+    ])
+    expect(replayedUserParts('two\n[Image #1]\n[Image #2]', [image, image])).toEqual([
+      image,
+      image,
+      { type: 'text', text: 'two' }
+    ])
+    // Without a replayed image the text is the user's own words.
+    expect(replayedUserParts('see [Image #1]')).toEqual([{ type: 'text', text: 'see [Image #1]' }])
+  })
+
   // stripMoiContext is marker-guarded: quoting the bare tag without the
   // envelope's marker sentence keeps the user's text intact.
   test('keeps user text that merely quotes the tag', () => {

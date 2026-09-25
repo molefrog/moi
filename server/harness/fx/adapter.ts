@@ -68,6 +68,34 @@ function streamedOutput(previousCall: ToolCall | undefined): string {
   return PLACEHOLDERS.has(output) ? '' : output
 }
 
+// fx reports tool failures as `{"error":{…}}` JSON: a review hold or
+// permission denial carries `message` (and reviewer `advice`), a cancelled
+// call only a `code`. Show the sentence; keep the envelope as raw output.
+function errorEnvelopeText(text: string): { message: string; envelope: unknown } | undefined {
+  let parsed: Record<string, unknown> | undefined
+  try {
+    parsed = record(JSON.parse(text))
+  } catch {
+    return undefined
+  }
+  const error = record(parsed?.error)
+  if (!error) return undefined
+  const code = typeof error.code === 'string' ? error.code : ''
+  const message =
+    typeof error.message === 'string' && error.message
+      ? error.message
+      : code === 'Cancelled'
+        ? 'Stopped before it finished.'
+        : code.replace(/([a-z])([A-Z])/g, (_, a: string, b: string) => `${a} ${b.toLowerCase()}`)
+  if (!message) return undefined
+  const advice = typeof error.advice === 'string' && error.advice ? error.advice : ''
+  const sentence = /[.!?]$/.test(message) ? message : `${message}.`
+  return {
+    message: advice ? `${sentence}\n\nReviewer advice: ${advice}` : sentence,
+    envelope: parsed
+  }
+}
+
 function terminalStatus(state: ToolCall['state'] | undefined): ToolCallUpdate['status'] {
   return state === 'success' ? 'completed' : state === 'error' ? 'failed' : undefined
 }
@@ -88,6 +116,16 @@ export function normalizeFxToolUpdate(update: ToolCallUpdate, previous?: Turn): 
   }
   if (wire.command_result !== undefined) {
     normalized.rawOutput = { command_result: wire.command_result }
+  }
+  if (update.status === 'failed' && update.content?.length) {
+    const failure = errorEnvelopeText(toolContentToText(update.content))
+    if (failure) {
+      return {
+        ...normalized,
+        rawOutput: failure.envelope,
+        content: [{ type: 'content', content: { type: 'text', text: failure.message } }]
+      }
+    }
   }
   // Only shell text is incremental. Web-search progress and file output are
   // replacement snapshots and must retain the shared ACP semantics.

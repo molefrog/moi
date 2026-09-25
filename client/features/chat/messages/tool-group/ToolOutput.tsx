@@ -35,7 +35,7 @@ export function ToolOutput({ call, output, isError }: ToolOutputProps) {
         <pre
           className={cn(
             PRE,
-            'break-all whitespace-pre-wrap',
+            'wrap-break-word whitespace-pre-wrap',
             isError ? 'text-destructive' : 'text-muted-foreground'
           )}
         >
@@ -50,7 +50,7 @@ export function ToolOutput({ call, output, isError }: ToolOutputProps) {
       {/* Size is always the raw output; copy grabs whatever's currently shown. */}
       <Header raw={raw} onRaw={setRaw} label={view.label} copyText={raw ? output : view.code} />
       {raw ? (
-        <pre className={cn(PRE, 'break-all whitespace-pre-wrap text-muted-foreground')}>
+        <pre className={cn(PRE, 'wrap-break-word whitespace-pre-wrap text-muted-foreground')}>
           {output || '(empty)'}
         </pre>
       ) : view.kind === 'diff' ? (
@@ -73,7 +73,7 @@ function DiffBlock({ lines }: DiffBlockProps) {
         <div
           key={index}
           className={cn(
-            'flex px-3 break-all whitespace-pre-wrap',
+            'flex px-3 wrap-break-word whitespace-pre-wrap',
             line.kind === 'addition' && 'bg-success/10 text-success',
             line.kind === 'deletion' && 'bg-destructive/10 text-destructive',
             line.kind === 'context' && 'text-muted-foreground'
