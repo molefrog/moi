@@ -22,6 +22,7 @@ const LABELS: Record<string, string> = {
   install_skill: 'Install skill',
   read_tool_result: 'Read full result',
   ask_user_question: 'Ask a question',
+  vision: 'Look at image',
   mcp_select_tool: 'Load MCP tool',
   mcp_features: 'Use MCP server'
 }
@@ -87,6 +88,9 @@ function brief(call: ToolCall, shorten: Shorten): string {
       return getInputValue(input, 'skill') || getInputValue(input, 'source')
     case 'read_tool_result':
       return getInputValue(input, 'query')
+    // fx's image reader for models without native vision.
+    case 'vision':
+      return firstLine(getInputValue(input, 'focus'))
     case 'mcp_select_tool':
       return getInputValue(input, 'name')
     case 'mcp_features':

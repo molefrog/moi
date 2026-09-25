@@ -1,9 +1,11 @@
 # fx over ACP
 
-The minimum supported fx version is **0.0.9**. Verified on 2026-09-12 with
-the exact stable `0.0.9`, revision `e26e97ec4040827b86a1c70c62273e0a8546d3e5`,
-and official dev `0.0.9`, revision `50252617707bcd7ba961d938f82a0c3c85a60230`.
-Older builds, including the earlier dev `0.0.8` pin below, are unsupported.
+The minimum supported fx version is **0.0.9**. Verified on 2026-09-25 with
+stable `0.0.11` (revision `dc870f3a9174`) against real Gateway models, and on
+2026-09-12 with the exact stable `0.0.9`, revision
+`e26e97ec4040827b86a1c70c62273e0a8546d3e5`, and official dev `0.0.9`, revision
+`50252617707bcd7ba961d938f82a0c3c85a60230`. Older builds, including the
+earlier dev `0.0.8` pin below, are unsupported.
 
 ## Installation
 
@@ -36,20 +38,50 @@ left unchanged.
 - Reasoning effort uses `configId: effort`, category `thought_level`.
   Changes are validated against the returned options, confirmed, persisted
   with the session, and applied before the next prompt. No global settings
-  file is rewritten. The picker retains each model's advertised effort
-  options once discovered; switching models refreshes that knowledge.
+  file is rewritten. fx advertises effort only for a session's current model,
+  so when the picker selects a model moi has not seen, a throwaway discovery
+  session switches to it and the advertised options are cached
+  (`GET /agent?model=…`); its first chat can already choose effort. Models
+  known to have no effort report it and are not probed again.
 - Imported chats report their native model and effort to the composer.
   Explicit moi chat preferences take precedence; loading or sending with
   native defaults does not save new overrides. A native effort is not carried
   to a different pending model selection. Sending waits for settings to load,
   and failed loads expose the existing retry action.
 - Native tool names identify cards; wrapped inputs and file paths are kept.
-  fx's generic titles such as `Running` and `Reading` are replaced with the
-  native tool identity, so both live and replayed cards remain identifiable.
-  Shell progress deltas accumulate. A final execution envelope preserves
-  streamed output and execution metadata. Other tool outputs retain ACP's
-  replacement semantics, including explicit empty content.
-- Context/skill discovery warnings remain visible as operational notices.
+  fx's generic titles such as `Running`, `Reading` and `Waiting for` are
+  replaced with the tool and its action (`Wait for command shell-1`,
+  `Read skill moi-workspace`, `Fetch webpage https://…`), live and replayed.
+  Read results are unwrapped from fx's `<path>`/`<content>` envelope and
+  highlighted, writes show the written file, and edits render as a diff.
+- Shell progress deltas accumulate. A final execution envelope keeps the
+  streamed output; `command_result` drives a footer such as `Exit code 0 ·
+5.2 s`, `Stopped after 9.3 s` or `Timed out`. A command that outlives its
+  `yield_time_ms` completes with a `running` envelope ("Moved to the
+  background as shell-1.") and fx then streams its late output onto that
+  finished call; moi appends it without reopening the row. Other tool
+  outputs retain ACP's replacement semantics, including explicit empty
+  content. fx's `{"error":{…}}` failures render as their message (with
+  reviewer advice for a held action).
+- ACP clips every tool result to a 200-byte preview, live and on
+  `session/load`. After each run and on every history load, moi reads
+  `fx session --id <id> --json` and replaces the previews with fx's saved
+  results: full command output with its exit code, full tool text (capped at
+  64,000 characters), and fx's committed line diff for writes and edits.
+  The read takes a few milliseconds and works while the chat's process
+  holds the session.
+- Context/skill discovery warnings remain visible as operational notices, as
+  do fx's other operational messages: provider failures (`HTTP 502: …`,
+  `… authentication failed · HTTP 401`, after which the prompt ends
+  `refused`), the `[Response interrupted. Restarting.]` marker, and the
+  `cancelled`/`failed` outcome fx replays for an interrupted turn. A stopped
+  run gets the same "This run was stopped before it finished." notice live.
+- A message sent while a run is in progress waits in moi's per-chat queue
+  until that run ends. The chat shows it as a dimmed "Queued" bubble after
+  the running reply and places it in the transcript when it is dispatched.
+- Until fx names a chat (its generated title arrives at the end of the first
+  run), the chat list and header use the first message instead of a generic
+  placeholder.
 - Live `agent_thought_chunk` updates become reasoning parts. fx can omit
   their `messageId` immediately after a diagnostic that has one; moi closes
   the diagnostic before accumulating reasoning so the warning cannot swallow
@@ -199,13 +231,12 @@ short live thoughts, later warnings, thought-only completion, and cancellation.
 ## Remaining limits
 
 - Terminal tool updates are clipped upstream to a 200-byte preview in live
-  and replay streams. Live shell stdout arrives separately and is retained;
-  cold shell replay can contain only a clipped execution envelope, so moi
-  explicitly reports that command output is unavailable. Permission/review
-  failures preserve their text; binary
-  output becomes a notice. Full output/diffs remain accessible via
-  `fx session --id <id> --json`, but this integration does not enrich cards
-  from that command yet.
+  and replay streams. moi restores full results from
+  `fx session --id <id> --json` after each run and on load; until that read
+  finishes (or if it fails), a replayed shell row says its output is
+  unavailable. A command still running in the background keeps its live
+  stream instead. fx's history keeps command output, not interleaved
+  stdout/stderr, and caps very large results with an output handle.
 - ACP replay supplies no original message timestamps or per-turn token usage.
   moi restores its own measured run durations only when recorded and replayed
   run counts match; imported histories have no such measurements. Historical
@@ -218,20 +249,25 @@ short live thoughts, later warnings, thought-only completion, and cancellation.
   1,549-character reasoning part in its private provider replay events, but
   both `session/load` and `fx session --id <id> --json` omit it. Restoring
   thoughts needs an upstream replay change or a separate moi history cache;
-  this integration does not read fx's private history format.
-- Cancellation can leave a tool without a terminal update. The shared ACP
-  layer preserves an interrupted outcome rather than inventing success.
-- A model's effort choices become available after fx first advertises them
-  during creation, restoration, or a model switch. moi retains known choices
-  across chats but does not guess support for models that have not been used.
+  this integration does not read fx's private history format. Idle chats
+  release their process after ten minutes, so reopening one later reloads it
+  from fx and its thoughts are gone.
+- fx replays an interrupted turn without the tool call that was running;
+  moi shows its `cancelled`/`failed` outcome as a notice. A tool cancelled
+  before it ran (still waiting on review) gets no terminal update from fx;
+  the shared ACP layer marks it interrupted rather than inventing success.
+- Stopping a run does not stop a command fx already moved to the
+  background: its late output keeps arriving on the finished row.
+- Probing a model's effort options creates an empty fx session, like model
+  discovery; moi hides it, but it remains in fx's own history.
 - Workspace-wide effort defaults use `auto`; another chat's selected effort
   is not treated as a provider default. Imported chats use their own native
   model and effort unless explicitly overridden in moi.
 - fx 0.0.9 generates titles from the first prompt and moi reflects them.
   Older/imported chats can remain `Untitled session` when fx has no saved
-  title. Full-output enrichment, nested subagent views, a provider picker,
-  fast mode, and fork UI are v1
-  omissions, not claims that the protocol makes them impossible.
+  title and the chat is not open in this server. Nested subagent views, a
+  provider picker, fast mode, and fork UI are v1 omissions, not claims that
+  the protocol makes them impossible.
 - Native fx does not implement ACP `session/remove`: the parsed method is
   implemented only in its WASM runtime; native dispatch returns `-32601`.
   `session/close` flushes and releases the session without deleting it, and
@@ -240,8 +276,10 @@ short live thoughts, later warnings, thought-only completion, and cancellation.
 - moi queues follow-ups. No working ACP steering method was established;
   native interactive fx steering does not prove ACP support.
 - fx supports inline images up to 3.75 MiB each and embedded resources;
-  audio is unsupported. Inline vision and image replay were verified with
-  Sonnet 5; other models and MCP image results were not exercised.
+  audio is unsupported. Inline vision was verified with Sonnet 5, Kimi K3,
+  Opus 5.5 and GPT-6 Sol. `zai/glm-5.3` has no native vision: fx gave it its
+  `vision` tool, which read the image and answered correctly. MCP image
+  results were not exercised.
 - ACP excludes `~/.fx/mcp.json`. It accepts client-supplied servers and
   approved workspace `.mcp.json` servers; moi currently supplies no extra
   servers. Project MCP trust remains managed in fx.

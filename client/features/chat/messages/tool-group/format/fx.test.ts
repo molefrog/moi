@@ -62,6 +62,7 @@ describe('fx tool rows', () => {
     ['capability_search', { query: 'send email' }, 'Search capabilities', 'send email'],
     ['glob_files', { pattern: 'src/**/*.ts' }, 'Find files', 'src/**/*.ts'],
     ['grep_files', { pattern: 'TODO' }, 'Search files', 'TODO'],
+    ['vision', { image_ids: [1], focus: 'The digits shown' }, 'Look at image', 'The digits shown'],
     [
       'subagent',
       { request: { action: 'run', task: 'Count files\nthen report' } },
