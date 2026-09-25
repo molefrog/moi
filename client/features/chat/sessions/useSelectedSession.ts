@@ -201,6 +201,7 @@ export function usePinnedSession() {
   const queryClient = useQueryClient()
   const { data } = useWorkspaceSessionSelection()
   const mutation = useMutation({
+    scope: { id: `pinned-session:${workspaceId}` },
     mutationFn: (sessionId: string | null) =>
       requestJson<{ pinnedSessionId: string | null }>(
         `/api/workspaces/${workspaceId}/pinned-session`,
@@ -232,7 +233,6 @@ export function usePinnedSession() {
   })
   return {
     pinnedSessionId: data?.pinned ?? null,
-    pin: mutation.mutate,
-    pending: mutation.isPending
+    pin: mutation.mutate
   }
 }

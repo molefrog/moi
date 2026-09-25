@@ -30,18 +30,14 @@ type ChatSelectorProps = {
   className?: string
 }
 
-type ChatHeaderLabelProps = {
-  label: string
+type SessionSelectorProps = ChatSelectorProps & {
+  sessions: SessionInfo[]
 }
 
 type ChatSessionGroup = {
   key: string
   label: string
   sessions: SessionInfo[]
-}
-
-function ChatHeaderLabel({ label }: ChatHeaderLabelProps) {
-  return <div className="flex h-7 items-center px-2.5 text-sm font-medium">{label}</div>
 }
 
 // One tiny text badge per row at most: a cron/subagent flavor wins; otherwise
@@ -251,18 +247,26 @@ export function groupSessionsForTab(
 }
 
 export function ChatSelector({ className }: ChatSelectorProps) {
+  const workspaceId = useWorkspaceId()
   const { pinnedSessionId } = usePinnedSession()
-  if (pinnedSessionId) return <ChatHeaderLabel label="Pinned chat" />
+  const { data: sessions = [] } = useWorkspaceSessions(workspaceId)
+  if (pinnedSessionId)
+    return (
+      <div className="flex h-7 min-w-0 items-center px-2.5 text-sm font-medium">
+        <span className="truncate">
+          {sessions.find(session => session.sessionId === pinnedSessionId)?.summary || 'New chat'}
+        </span>
+      </div>
+    )
 
-  return <SessionSelector className={className} />
+  return <SessionSelector className={className} sessions={sessions} />
 }
 
-function SessionSelector({ className }: ChatSelectorProps) {
+function SessionSelector({ className, sessions }: SessionSelectorProps) {
   const workspaceId = useWorkspaceId()
   const tabId = useCurrentTabId()
   const [selectedSessionId, selectSession] = useSelectedSession()
   const [confirmingSessionId, setConfirmingSessionId] = useState<string | null>(null)
-  const { data: sessions = [] } = useWorkspaceSessions(workspaceId)
   const canArchive = useWorkspaceAgent(workspaceId).data?.supportsArchiving === true
   const archiveSession = useArchiveWorkspaceSession(workspaceId)
   const sessionGroups = groupSessionsForTab(sessions, tabId)

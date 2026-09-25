@@ -101,7 +101,7 @@ export function ChatPanel({
   const { data: sessions } = useWorkspaceSessions(workspaceId)
   const sourceName = sessions?.find(session => session.sessionId === forkedFromSessionId)?.summary
   const tabId = useCurrentTabId()
-  const { pinnedSessionId, pin, pending: pinPending } = usePinnedSession()
+  const { pinnedSessionId, pin } = usePinnedSession()
   const composerRef = useRef<HTMLTextAreaElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const effectiveSessionId = viewDraft?.sessionId ?? sessionId ?? draftSessionId(tabId)
@@ -192,7 +192,6 @@ export function ChatPanel({
                   variant="ghost"
                   size="icon-sm"
                   className={cn(docked && 'text-muted-foreground')}
-                  disabled={pinPending}
                   onClick={() => pin(pinnedSessionId ? null : sessionId)}
                   aria-label={pinnedSessionId ? 'Unpin chat' : 'Pin chat'}
                   aria-pressed={!!pinnedSessionId}
