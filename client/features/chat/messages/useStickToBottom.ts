@@ -17,6 +17,19 @@ import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useSta
 // sub-pixel rounding and lets a small overscroll keep the pin.
 const STICK_THRESHOLD_PX = 48
 
+// Only a scroll toward older content un-pins. Programmatic scrolls (send, jump
+// to latest, following growth) move down or stay put, so their events, which
+// can arrive after the content has already grown again, never un-pin.
+export function nextPinned(
+  pinned: boolean,
+  previousTop: number,
+  top: number,
+  distanceFromBottom: number
+): boolean {
+  if (distanceFromBottom <= STICK_THRESHOLD_PX) return true
+  return top < previousTop ? false : pinned
+}
+
 type StickToBottom = {
   // True when pinned to (near) the bottom — drives the jump-to-latest button.
   atBottom: boolean
@@ -58,14 +71,15 @@ export function useStickToBottom(
     el.scrollTo({ top: 0, behavior: 'auto' })
   }, [scrollRef, setPinned])
 
-  // Track whether the user is at the bottom. A programmatic scroll-to-bottom
-  // also fires this with distance ≈ 0, so pinned stays true — no fight.
+  // Track whether the user is at the bottom (see nextPinned).
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
+    let previousTop = el.scrollTop
     const onScroll = () => {
       const distance = el.scrollHeight - el.scrollTop - el.clientHeight
-      setPinned(distance <= STICK_THRESHOLD_PX)
+      setPinned(nextPinned(pinnedRef.current, previousTop, el.scrollTop, distance))
+      previousTop = el.scrollTop
     }
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => el.removeEventListener('scroll', onScroll)
