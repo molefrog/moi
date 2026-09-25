@@ -25,8 +25,7 @@ import {
   useSubmitView
 } from '@/client/features/views/api'
 import { recoverViewSubmission } from './view-submission'
-import type { SessionRecord } from '@/lib/types'
-import type { PendingView } from '@/lib/types'
+import type { PendingView, SessionRecord, ViewInfo } from '@/lib/types'
 import { viewTabId } from '@/lib/workspace-tabs'
 
 export function useViewActions() {
@@ -84,6 +83,14 @@ export function useViewActions() {
       config?.fastMode ?? layout.selectedFastMode
     )
 
+    queryClient.setQueryData<ViewInfo[]>(workspaceKeys.views(workspaceId), views =>
+      views?.map(view =>
+        view.id === pendingView.id && view.status === 'draft'
+          ? { ...view, status: 'starting', requirements: text, executionSessionId: sessionId }
+          : view
+      )
+    )
+
     try {
       const result = await submitMutation.mutateAsync({
         viewId: pendingView.id,
@@ -102,6 +109,13 @@ export function useViewActions() {
       })
       moveChatDraft(workspaceId, sessionId, result.sessionId)
       renameSelectedSessionInCache(queryClient, workspaceId, sessionId, result.sessionId)
+      if (!pinnedSessionId)
+        optimisticallySetSelectedSession(
+          queryClient,
+          workspaceId,
+          result.sessionId,
+          viewTabId(pendingView.id)
+        )
       finishComposerSend(workspaceId, attachments)
       const draftKey = composerDraftKey(workspaceId, result.sessionId)
       const ui = useUiStore.getState()
