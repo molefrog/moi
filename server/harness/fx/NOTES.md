@@ -250,8 +250,9 @@ short live thoughts, later warnings, thought-only completion, and cancellation.
   both `session/load` and `fx session --id <id> --json` omit it. Restoring
   thoughts needs an upstream replay change or a separate moi history cache;
   this integration does not read fx's private history format. Idle chats
-  release their process after ten minutes, so reopening one later reloads it
-  from fx and its thoughts are gone.
+  release their process after ten minutes but keep moi's live transcript in
+  memory (up to 50 chats), so only a moi restart, an environment change or a
+  chat continued outside moi falls back to the lossy replay.
 - fx replays an interrupted turn without the tool call that was running;
   moi shows its `cancelled`/`failed` outcome as a notice. A tool cancelled
   before it ran (still waiting on review) gets no terminal update from fx;
