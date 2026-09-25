@@ -54,8 +54,7 @@ describe('fx tool updates', () => {
     expect(normalized.rawOutput).toEqual({
       state: 'completed',
       exit_code: 0,
-      command_result: { kind: 'command', exit_code: 0 },
-      streamed: 'first\n'
+      command_result: { kind: 'command', exit_code: 0 }
     })
   })
 
@@ -77,7 +76,7 @@ describe('fx tool updates', () => {
       '{"session_id":null,"state":"completed","backend":"captured","persistence":"process","output_truncated":false,"output_incomplete":false,"output_terminal_safe":true,"full_output_handle":"fx-command-repl'
     const normalized = normalizeFxToolUpdate(update(preview, 'completed'), previous())
     expect(toolContentToText(normalized.content)).toBe('first\n')
-    expect(normalized.rawOutput).toEqual({ preview, state: 'completed', streamed: 'first\n' })
+    expect(normalized.rawOutput).toEqual({ preview, state: 'completed' })
     const replay = normalizeFxToolUpdate(update(preview, 'completed'), previous('shell', ''))
     expect(toolContentToText(replay.content)).toBe(
       'fx did not include command output in this history preview.'
@@ -109,7 +108,7 @@ describe('fx tool updates', () => {
   })
 })
 
-function settled(output: string, state: 'success' | 'error' = 'success', streamed?: string): Turn {
+function settled(output: string, state: 'success' | 'error' = 'success'): Turn {
   return {
     id: 't',
     role: 'assistant',
@@ -124,8 +123,7 @@ function settled(output: string, state: 'success' | 'error' = 'success', streame
           caller: 'model',
           state,
           input: { action: 'run', command: 'sleep 60' },
-          output,
-          ...(streamed !== undefined ? { sidecar: { rawOutput: { streamed } } } : {})
+          output
         }
       }
     ]
@@ -139,23 +137,20 @@ describe('fx backgrounded commands', () => {
   test('a yielded run reports that it moved to the background', () => {
     const normalized = normalizeFxToolUpdate(update(running, 'completed'), previous('shell', ''))
     expect(toolContentToText(normalized.content)).toBe('Moved to the background as shell-1.')
-    expect(normalized.rawOutput).toMatchObject({ state: 'running', streamed: '' })
+    expect(normalized.rawOutput).toMatchObject({ state: 'running', session_id: 'shell-1' })
   })
 
   test('late output replaces the status line instead of extending it', () => {
     const normalized = normalizeFxToolUpdate(
       update('late\n'),
-      settled('Moved to the background as shell-1.', 'success', '')
+      settled('Moved to the background as shell-1.')
     )
     expect(toolContentToText(normalized.content)).toBe('late\n')
-    expect(normalized.rawOutput).toMatchObject({ streamed: 'late\n' })
   })
 
   test('late output keeps the settled outcome of the invocation', () => {
-    expect(normalizeFxToolUpdate(update('late\n'), settled('', 'success', '')).status).toBe(
-      'completed'
-    )
-    expect(normalizeFxToolUpdate(update('late\n'), settled('', 'error', '')).status).toBe('failed')
+    expect(normalizeFxToolUpdate(update('late\n'), settled('')).status).toBe('completed')
+    expect(normalizeFxToolUpdate(update('late\n'), settled('', 'error')).status).toBe('failed')
     expect(normalizeFxToolUpdate(update('more\n'), previous()).status).toBe('in_progress')
   })
 

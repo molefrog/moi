@@ -33,12 +33,13 @@ function commandEnvelope(text: string): Record<string, unknown> | undefined {
   }
 }
 
-// Status lines shown when a shell row has no streamed output of its own.
-// They are display text only: accumulation reads `rawOutput.streamed`, so a
-// placeholder can never become the prefix of later output.
+// Status lines shown when a shell row has no streamed output of its own. They
+// are display text only: accumulation skips them, so a status line can never
+// become the prefix of later output.
 const HISTORY_PREVIEW_ONLY = 'fx did not include command output in this history preview.'
 const NO_OUTPUT = 'Command produced no output.'
-const PLACEHOLDERS = new Set([HISTORY_PREVIEW_ONLY, NO_OUTPUT])
+const STATUS_LINE =
+  /^(?:fx did not include command output in this history preview\.|Command produced no output\.|Moved to the background(?: as \S+)?\.|\S+ finished with exit code -?\d+\.)$/
 
 function shellStatusLine(
   envelope: Record<string, unknown>,
@@ -61,11 +62,10 @@ function shellStatusLine(
   return HISTORY_PREVIEW_ONLY
 }
 
+// Output streamed so far: the row's text unless it is only a status line.
 function streamedOutput(previousCall: ToolCall | undefined): string {
-  const raw = record(previousCall?.sidecar?.rawOutput)
-  if (typeof raw?.streamed === 'string') return raw.streamed
   const output = typeof previousCall?.output === 'string' ? previousCall.output : ''
-  return PLACEHOLDERS.has(output) ? '' : output
+  return STATUS_LINE.test(output) ? '' : output
 }
 
 // fx reports tool failures as `{"error":{…}}` JSON: a review hold or
@@ -132,7 +132,6 @@ export function normalizeFxToolUpdate(update: ToolCallUpdate, previous?: Turn): 
   if (name !== 'shell' || !update.content?.length) return normalized
   const text = toolContentToText(update.content)
   const streamed = streamedOutput(previousCall)
-  const previousRaw = record(previousCall?.sidecar?.rawOutput) ?? {}
   const envelope = commandEnvelope(text)
   const commandResult = record(wire.command_result)
   if (envelope) {
@@ -140,8 +139,7 @@ export function normalizeFxToolUpdate(update: ToolCallUpdate, previous?: Turn): 
       ...normalized,
       rawOutput: {
         ...envelope,
-        ...(wire.command_result !== undefined ? { command_result: wire.command_result } : {}),
-        streamed
+        ...(wire.command_result !== undefined ? { command_result: wire.command_result } : {})
       },
       content: [
         {
@@ -155,7 +153,6 @@ export function normalizeFxToolUpdate(update: ToolCallUpdate, previous?: Turn): 
     }
   } else if (update.status === 'in_progress' && text) {
     const next = streamed + text
-    normalized.rawOutput = { ...previousRaw, streamed: next }
     normalized.content = [{ type: 'content', content: { type: 'text', text: next } }]
     // A yielded command's late output arrives after its invocation settled.
     // Keep the settled outcome: moi would otherwise reopen the row and mark
