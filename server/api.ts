@@ -795,6 +795,14 @@ one.get('/agent', async c => {
   // A backend that can't answer (codex CLI missing, gateway down) degrades to
   // an empty catalog — the picker hides and chat surfaces the real problem via
   // the availability banner, instead of this endpoint 500ing on page load.
+  // `?model=` asks the backend to learn that model's selectors first, so the
+  // picker can offer its effort levels before any chat has used it.
+  const probe = c.req.query('model')
+  if (probe && harness.probeModel) {
+    await harness.probeModel(ws, probe).catch(err => {
+      console.error(`[api] probeModel failed for ${harness.id}`, err)
+    })
+  }
   const [availability, models] = await Promise.all([
     agentStore.getAvailability(ws),
     harness.listModels(ws).catch(err => {
@@ -810,7 +818,8 @@ one.get('/agent', async c => {
     models,
     supportsStreaming: harness.capabilities.supportsStreaming,
     supportsArchiving: Boolean(harness.archiveSession),
-    queuesFollowUps: harness.capabilities.queuesFollowUps
+    queuesFollowUps: harness.capabilities.queuesFollowUps,
+    probesModelOptions: Boolean(harness.probeModel)
   } satisfies WorkspaceAgent)
 })
 

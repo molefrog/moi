@@ -1,12 +1,19 @@
 import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
 
+import type { SetSessionConfigOptionResponse } from '@agentclientprotocol/sdk'
+
 import type { HarnessAvailability } from '@/lib/types'
 
 import { resolveWorkspaceEnv } from '../../workspace-env'
 import { archiveAcpSession } from '../acp/archived'
 import { getAcpProcessInfo, killAcpWorkspace, killAllAcpClients } from '../acp/client'
-import { acpWorkspacePreview, listAcpModels, listAcpSessions } from '../acp/discovery'
+import {
+  acpWorkspacePreview,
+  listAcpModels,
+  listAcpSessions,
+  probeAcpModel
+} from '../acp/discovery'
 import { clearAcpModelCache } from '../acp/model-state'
 import {
   type AcpProviderConfig,
@@ -44,6 +51,14 @@ export const fxConfig: AcpProviderConfig = {
   defaultModel: async (ctx, config) =>
     (await listAcpModels(config, ctx)).find(model => model.value === 'default')?.resolvedModel,
   applySettings: applyFxSettings,
+  async probeModelOptions(client, sessionId, modelId) {
+    const res = await client.rpc<SetSessionConfigOptionResponse>('session/set_config_option', {
+      sessionId,
+      configId: 'model',
+      value: modelId
+    })
+    return fxModelState({ configOptions: res.configOptions })
+  },
   normalizeToolUpdate: normalizeFxToolUpdate,
   isOperationalMessage: isFxOperationalMessage,
   describeOperationalMessage: describeFxOperationalMessage,
@@ -119,6 +134,7 @@ export const fxHarness: Harness = {
   sessionConfig: async (ws, sessionId) =>
     fxSessionConfig(await getAcpSessionModelState(fxConfig, { ...ctxOf(ws), sessionId })),
   listModels: ws => listAcpModels(fxConfig, ctxOf(ws)),
+  probeModel: (ws, modelId) => probeAcpModel(fxConfig, ctxOf(ws), modelId),
   async availability(ws): Promise<HarnessAvailability> {
     const runtime = await pathHarnessAvailability('fx')
     if (runtime.status !== 'available') return runtime

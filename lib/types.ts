@@ -756,4 +756,7 @@ export type WorkspaceAgent = {
   supportsArchiving?: boolean
   // A message sent mid-run waits for the current run instead of steering it.
   queuesFollowUps?: boolean
+  // The backend can learn an unseen model's effort levels on request
+  // (GET /agent?model=…); models it has not seen omit `supportsEffort`.
+  probesModelOptions?: boolean
 }

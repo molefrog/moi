@@ -250,9 +250,10 @@ describe('fx model configuration', () => {
         'fx'
       )
       const updated = await readModels()
+      // Known without effort (not merely unseen), so the picker never probes it.
       expect(
         updated.find(model => model.value === 'anthropic/claude-sonnet-5')?.supportsEffort
-      ).toBeUndefined()
+      ).toBe(false)
       expect(updated.find(model => model.value === 'openai/gpt-5')?.supportedEffortLevels).toEqual([
         'auto',
         'low'

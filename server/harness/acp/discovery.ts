@@ -7,7 +7,12 @@ import { type AcpProviderConfig, type AcpSpawnContext, liveAcpFirstUserText } fr
 import { acpSessionToSessionInfo } from './adapter'
 import { archiveAcpSession, archivedAcpSessions } from './archived'
 import { getAcpClient, peekAcpClient, releaseAcpClient } from './client'
-import { clearAcpModelCache, peekAcpModelState, storeAcpModelState } from './model-state'
+import {
+  cacheAcpModelState,
+  clearAcpModelCache,
+  peekAcpModelState,
+  storeAcpModelState
+} from './model-state'
 import type { ListSessionsResponse, AcpModelState, AcpNewSessionResult } from './wire'
 import type { WorkspaceActivityPreview } from '../types'
 import { debug } from '../../debug'
@@ -135,6 +140,69 @@ async function discoverAcpModelState(
   } finally {
     if (config.processScope === 'session') releaseAcpClient(client)
   }
+}
+
+const probes = new Map<string, Promise<void>>()
+
+// A provider may advertise a model's selectors (fx: its effort levels) only
+// once a session uses that model. Probe a catalog model the picker has not
+// seen yet on a throwaway discovery session, so its first chat can already
+// choose effort. Runs at most once at a time per workspace and model.
+export async function probeAcpModel(
+  config: AcpProviderConfig,
+  ctx: AcpSpawnContext,
+  modelId: string
+): Promise<void> {
+  const probeModelOptions = config.probeModelOptions
+  if (!probeModelOptions) return
+  const fingerprint = await config.modelStateFingerprint?.(ctx)
+  const known = async () => {
+    const pending = peekAcpModelState(ctx.workspacePath, fingerprint, config.id)
+    return pending ? await pending.catch(() => undefined) : undefined
+  }
+  let base = await known()
+  if (!base) {
+    await listAcpModels(config, ctx)
+    base = await known()
+  }
+  if (
+    !base?.availableModels?.some(model => model.modelId === modelId) ||
+    base.configOptionsByModel?.[modelId]
+  ) {
+    return
+  }
+  const key = `${config.id}:${ctx.workspacePath}:${modelId}`
+  let pending = probes.get(key)
+  if (!pending) {
+    pending = (async () => {
+      const client = await discoveryClient(config, ctx)
+      try {
+        const created = await client.rpc<AcpNewSessionResult>('session/new', {
+          cwd: ctx.workspacePath,
+          mcpServers: []
+        })
+        if (!created.sessionId) return
+        await archiveAcpSession(ctx.workspacePath, created.sessionId)
+        const observed = await probeModelOptions(client, created.sessionId, modelId)
+        const options = observed?.configOptionsByModel?.[modelId]
+        const latest = await known()
+        // Merge only this model's selectors; the workspace default and the
+        // other models' known choices stay as they were.
+        if (options && latest) {
+          cacheAcpModelState(
+            ctx.workspacePath,
+            { ...latest, configOptionsByModel: { [modelId]: options } },
+            fingerprint,
+            config.id
+          )
+        }
+      } finally {
+        if (config.processScope === 'session') releaseAcpClient(client)
+      }
+    })().finally(() => probes.delete(key))
+    probes.set(key, pending)
+  }
+  await pending
 }
 
 export async function listAcpModels(

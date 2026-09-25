@@ -63,6 +63,26 @@ export function useWorkspaceAgent(workspaceId: string) {
   })
 }
 
+// Some backends (fx) advertise a model's effort levels only once a chat uses
+// it. When the picker selects such an unseen model, ask the server to learn
+// its selectors and refresh the catalog in place. One request per model.
+export function useProbeModelOptions(workspaceId: string, modelId: string | null) {
+  const queryClient = useQueryClient()
+  const probe = useQuery<WorkspaceAgent>({
+    queryKey: workspaceKeys.agentProbe(workspaceId, modelId ?? ''),
+    queryFn: () =>
+      requestJson(
+        `/api/workspaces/${workspaceId}/agent?model=${encodeURIComponent(modelId ?? '')}`
+      ),
+    enabled: modelId !== null,
+    staleTime: Infinity,
+    retry: false
+  })
+  useEffect(() => {
+    if (probe.data) queryClient.setQueryData(workspaceKeys.agent(workspaceId), probe.data)
+  }, [probe.data, queryClient, workspaceId])
+}
+
 export function startWorkspaceLogin(workspaceId: string): Promise<HarnessLogin> {
   return requestJson(
     `/api/workspaces/${workspaceId}/auth/login`,

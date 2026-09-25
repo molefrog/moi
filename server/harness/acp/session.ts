@@ -85,6 +85,14 @@ export type AcpProviderConfig = {
     state: AcpModelState
   ) => Promise<AcpModelState>
   normalizeToolUpdate?: (update: ToolCallUpdate, previous?: Turn) => ToolCallUpdate
+  // Learn one model's selectors (such as its effort levels) before a chat uses
+  // it: switch a throwaway discovery session to the model and report what the
+  // provider advertises for it.
+  probeModelOptions?: (
+    client: AcpClient,
+    sessionId: string,
+    modelId: string
+  ) => Promise<AcpModelState | undefined>
   // Replace clipped tool results with the provider's own saved copy, keyed by
   // wire toolCallId. Runs after a history load and after each prompt; best
   // effort, so a failure leaves the ACP preview in place.

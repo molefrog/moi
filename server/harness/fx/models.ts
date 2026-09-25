@@ -61,7 +61,10 @@ export function fxModels(state: AcpModelState): Model[] {
             // present another chat's selected effort as a provider default.
             ...(levels.includes('auto') ? { defaultEffort: 'auto' } : {})
           }
-        : {})
+        : // Known selectors without effort: no picker, and nothing to probe.
+          options
+          ? { supportsEffort: false }
+          : {})
     }
   })
   const defaultModel = models.find(
