@@ -55,6 +55,9 @@ type ChatPanelProps = {
   // into the trailing assistant run so a thinking-only
   // preview folds into the current tool group. See client/lib/preview-turn.ts.
   previewTurn?: Turn | null
+  // Sends waiting for the running reply to finish (backends that queue).
+  // Shown after the live reply until the server dispatches them.
+  queuedTurns?: Turn[]
   // Selected session id — used only as the scroll reset key (jump to bottom on
   // session switch).
   sessionId?: string | null
@@ -82,6 +85,7 @@ export function ChatPanel({
   hasWorkspaceApplets,
   view,
   previewTurn,
+  queuedTurns = EMPTY_TURNS,
   sessionId,
   processing,
   composerBanner,
@@ -221,6 +225,14 @@ export function ChatPanel({
                   />
                 )
               )}
+            {showTranscript &&
+              !builderDraft &&
+              queuedTurns.map(turn => (
+                <div key={turn.id} className="flex flex-col items-end gap-1 opacity-60">
+                  <TurnView turn={turn} processing={false} />
+                  <span className="text-xs text-muted-foreground">Queued</span>
+                </div>
+              ))}
             {showTranscript && (
               <div className="mt-auto -ml-3 pt-2">
                 <AgentBlobatar

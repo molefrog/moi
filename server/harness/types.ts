@@ -59,6 +59,10 @@ export type HarnessCapabilities = {
   liveEffortSwitch: boolean
   // Does the backend echo the sent user message back (with our optimistic id)?
   nativeUserEcho: boolean
+  // Does a message sent mid-run wait for the current run to finish (moi's own
+  // queue) instead of steering it? The chat then shows it as queued until it
+  // is dispatched, so the running reply stays above it.
+  queuesFollowUps: boolean
 }
 
 // Home-page workspace card data beyond thumbnails: latest session activity

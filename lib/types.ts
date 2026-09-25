@@ -754,4 +754,6 @@ export type WorkspaceAgent = {
   supportsStreaming?: boolean
   // Whether the provider can archive chats from the chat selector.
   supportsArchiving?: boolean
+  // A message sent mid-run waits for the current run instead of steering it.
+  queuesFollowUps?: boolean
 }

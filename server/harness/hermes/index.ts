@@ -82,7 +82,8 @@ export const hermesHarness: Harness = {
     // servers (NOTES.md §3.10). Safe today because moi attaches none.
     liveModelSwitch: true,
     liveEffortSwitch: false, // Hermes does not expose a working session effort option
-    nativeUserEcho: false // ACP never echoes the send; moi synthesizes the turn
+    nativeUserEcho: false, // ACP never echoes the send; moi synthesizes the turn
+    queuesFollowUps: true // ACP sends wait in moi's per-chat queue
   },
 
   sendMessage: input => sendAcpMessage(config, input),

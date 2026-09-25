@@ -34,3 +34,7 @@ export function getToolDisplayName(call: ToolCall): string {
 export function formatInputBrief(call: ToolCall, cwd: string | null): string {
   return formatterFor(call).brief(call, makeShortenPaths(cwd))
 }
+
+export function formatResultSummary(call: ToolCall): string | undefined {
+  return formatterFor(call).resultSummary?.(call)
+}

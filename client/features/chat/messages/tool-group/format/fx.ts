@@ -98,6 +98,33 @@ function brief(call: ToolCall, shorten: Shorten): string {
   }
 }
 
+function record(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined
+}
+
+function seconds(ms: number): string {
+  return ms < 60_000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms / 1000)} s`
+}
+
+// How a command ended, from fx's live `command_result` or the exit status
+// restored from its history. Nothing for a row that is still running.
+function shellSummary(call: ToolCall): string | undefined {
+  if (call.state === 'running' || call.state === 'pending') return undefined
+  const result = record(record(call.sidecar?.rawOutput)?.command_result)
+  const restored = record(call.sidecar?.fxShell)
+  const exitCode = result?.exit_code ?? restored?.exitCode
+  const signal = result?.signal ?? restored?.signal
+  const duration = typeof result?.duration_ms === 'number' ? seconds(result.duration_ms) : ''
+  const after = duration ? ` after ${duration}` : ''
+  if (result?.timed_out === true) return `Timed out${after}`
+  if (typeof signal === 'number') return `Stopped${after}`
+  if (typeof exitCode === 'number')
+    return duration ? `Exit code ${exitCode} · ${duration}` : `Exit code ${exitCode}`
+  return undefined
+}
+
 export const fxFormatter: ToolFormatter = {
   displayName: call => {
     const action = getInputValue(args(call), 'action')
@@ -107,5 +134,6 @@ export const fxFormatter: ToolFormatter = {
     const label = call.name.replace(/_/g, ' ')
     return label.charAt(0).toUpperCase() + label.slice(1)
   },
-  brief
+  brief,
+  resultSummary: call => (call.name === 'shell' ? shellSummary(call) : undefined)
 }

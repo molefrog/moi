@@ -809,7 +809,8 @@ one.get('/agent', async c => {
     ...(login ? { login } : {}),
     models,
     supportsStreaming: harness.capabilities.supportsStreaming,
-    supportsArchiving: Boolean(harness.archiveSession)
+    supportsArchiving: Boolean(harness.archiveSession),
+    queuesFollowUps: harness.capabilities.queuesFollowUps
   } satisfies WorkspaceAgent)
 })
 

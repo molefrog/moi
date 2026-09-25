@@ -19,7 +19,7 @@ import { STREAM_RESPONSES } from '@/client/lib/flags'
 import { formatChatTitle } from '@/lib/chat-title'
 import { applyEvent, emptyViewState } from '@/lib/format'
 import { messageAttachmentLimitError } from '@/lib/message-attachments'
-import type { Part, SessionConfig, SessionInfo, ViewState, WorkspaceAgent } from '@/lib/types'
+import type { Part, SessionConfig, SessionInfo, Turn, ViewState, WorkspaceAgent } from '@/lib/types'
 
 // Explicit attachments belong to this send, independently of the user's draft.
 export type PreparedAttachments = {
@@ -134,27 +134,31 @@ type StartOptimisticTurnInput = {
   workspaceId: string
   sessionId: string
   parts: Part[]
+  // The backend will hold this send until the running reply finishes. Keep it
+  // out of the transcript until then; the server's echo places it in order.
+  queued?: boolean
 }
 
 export function startOptimisticTurn({
   queryClient,
   workspaceId,
   sessionId,
-  parts
+  parts,
+  queued = false
 }: StartOptimisticTurnInput): string {
   const optimisticId = `optimistic:${crypto.randomUUID()}`
-  queryClient.setQueryData<ViewState>(workspaceKeys.events(workspaceId, sessionId), current =>
-    applyEvent(current ?? emptyViewState(), {
-      kind: 'turn',
-      turn: {
-        id: optimisticId,
-        role: 'user',
-        origin: { kind: 'user-input' },
-        parts,
-        timestamp: new Date().toISOString()
-      }
-    })
-  )
+  const turn: Turn = {
+    id: optimisticId,
+    role: 'user',
+    origin: { kind: 'user-input' },
+    parts,
+    timestamp: new Date().toISOString()
+  }
+  if (queued) liveStore.getState().addQueued(workspaceId, sessionId, turn)
+  else
+    queryClient.setQueryData<ViewState>(workspaceKeys.events(workspaceId, sessionId), current =>
+      applyEvent(current ?? emptyViewState(), { kind: 'turn', turn })
+    )
   liveStore.getState().setActivity(workspaceId, sessionId, 'running')
   liveStore.getState().setError(workspaceId, sessionId, null)
   return optimisticId

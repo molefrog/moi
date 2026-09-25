@@ -37,9 +37,10 @@ import { useUiStore } from '@/client/store/ui'
 import { toast } from '@/client/components/ui/toast'
 import { emptyViewState } from '@/lib/format'
 import { messageAttachmentLimitError } from '@/lib/message-attachments'
-import type { Part, ViewState } from '@/lib/types'
+import type { Part, Turn, ViewState } from '@/lib/types'
 
 const EMPTY: ViewState = emptyViewState()
+const EMPTY_TURNS: Turn[] = []
 
 // Thin projection over app-level state: the selected session comes from
 // useSelectedSession, spinner/error come from the live store, and the
@@ -100,6 +101,31 @@ export function useChat(address: WorkspaceTabAddress) {
   // visible yet.
   const rootPreview = useLive(s => selectPreviews(s.previews, workspaceId, selectedSessionId).root)
   const previewTurn = useMemo(() => buildPreviewTurn(rootPreview), [rootPreview])
+
+  // Sends waiting behind the running reply. The server echoes each one with
+  // its optimistic id when it dispatches it; that turn then replaces the
+  // queued bubble in transcript order. A run that ends with sends still
+  // waiting dropped them (a failed run clears the backend queue).
+  const queuedAll = useLive(s =>
+    selectedSessionId ? s.queued[`${workspaceId}:${selectedSessionId}`] : undefined
+  )
+  const queuedTurns = useMemo(
+    () => (queuedAll ?? EMPTY_TURNS).filter(turn => !view.turns.some(t => t.id === turn.id)),
+    [queuedAll, view.turns]
+  )
+  useEffect(() => {
+    if (!selectedSessionId || !queuedAll?.length) return
+    const store = liveStore.getState()
+    if (!processing) store.removeQueued(workspaceId, selectedSessionId)
+    else if (queuedTurns.length !== queuedAll.length) {
+      const pending = new Set(queuedTurns.map(turn => turn.id))
+      store.removeQueued(
+        workspaceId,
+        selectedSessionId,
+        queuedAll.filter(turn => !pending.has(turn.id)).map(turn => turn.id)
+      )
+    }
+  }, [processing, queuedAll, queuedTurns, selectedSessionId, workspaceId])
 
   // Effective backend settings plus explicit moi choices. New chats inherit
   // the workspace; existing chats wait for their own settings before sending.
@@ -162,7 +188,8 @@ export function useChat(address: WorkspaceTabAddress) {
         queryClient: qc,
         workspaceId,
         sessionId: sid,
-        parts
+        parts,
+        queued: !isNew && processing && modelsData?.queuesFollowUps === true
       })
 
       // Resolve the session/workspace choice against the catalog. Codex sends
@@ -215,7 +242,8 @@ export function useChat(address: WorkspaceTabAddress) {
       buildMoiContext,
       sessionConfig,
       selectSession,
-      modelsData
+      modelsData,
+      processing
     ]
   )
 
@@ -233,6 +261,7 @@ export function useChat(address: WorkspaceTabAddress) {
     view,
     chatLoaded,
     previewTurn,
+    queuedTurns,
     sessionId: selectedSessionId,
     processing,
     error,

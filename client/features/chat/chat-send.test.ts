@@ -22,7 +22,7 @@ const workspaceId = 'workspace-1'
 const sessionId = 'session-1'
 
 afterEach(() => {
-  liveStore.setState({ activity: {}, errors: {}, attachments: {} })
+  liveStore.setState({ activity: {}, errors: {}, attachments: {}, queued: {} })
 })
 
 describe('startOptimisticTurn', () => {
@@ -39,6 +39,44 @@ describe('startOptimisticTurn', () => {
     expect(optimisticId).toStartWith('optimistic:')
     expect(view?.turns[0]?.parts).toEqual([{ type: 'text', text: 'Build a dashboard' }])
     expect(liveStore.getState().activity[`${workspaceId}:${sessionId}`]).toBe('running')
+  })
+
+  test('keeps a queued send out of the transcript until the backend dispatches it', () => {
+    const queryClient = new QueryClient()
+    const optimisticId = startOptimisticTurn({
+      queryClient,
+      workspaceId,
+      sessionId,
+      parts: [{ type: 'text', text: 'Also check the tests' }],
+      queued: true
+    })
+
+    expect(
+      queryClient.getQueryData<ViewState>(workspaceKeys.events(workspaceId, sessionId))
+    ).toBeUndefined()
+    const queued = liveStore.getState().queued[`${workspaceId}:${sessionId}`]
+    expect(queued?.map(turn => turn.id)).toEqual([optimisticId])
+    expect(queued?.[0]?.parts).toEqual([{ type: 'text', text: 'Also check the tests' }])
+
+    liveStore.getState().removeQueued(workspaceId, sessionId, [optimisticId])
+    expect(liveStore.getState().queued[`${workspaceId}:${sessionId}`]).toBeUndefined()
+  })
+
+  test('queued sends follow a new chat to its provider id and clear when dropped', () => {
+    const queryClient = new QueryClient()
+    for (const text of ['first', 'second']) {
+      startOptimisticTurn({
+        queryClient,
+        workspaceId,
+        sessionId,
+        parts: [{ type: 'text', text }],
+        queued: true
+      })
+    }
+    liveStore.getState().renameSession(workspaceId, sessionId, 'provider-id')
+    expect(liveStore.getState().queued[`${workspaceId}:provider-id`]).toHaveLength(2)
+    liveStore.getState().removeQueued(workspaceId, 'provider-id')
+    expect(liveStore.getState().queued).toEqual({})
   })
 })
 

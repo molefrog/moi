@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import type { ToolCall } from '@/lib/types'
 
-import { formatInputBrief, getToolDisplayName } from './index'
+import { formatInputBrief, formatResultSummary, getToolDisplayName } from './index'
 
 function call(name: string, input: unknown): ToolCall {
   return { toolCallId: 'fx-call', name, input, caller: 'model', provider: 'fx', state: 'success' }
@@ -78,5 +78,40 @@ describe('fx tool rows', () => {
     const row = call(name, input)
     expect(getToolDisplayName(row)).toBe(label)
     expect(formatInputBrief(row, '/repo')).toBe(detail)
+  })
+
+  test.each([
+    [
+      { command_result: { exit_code: 0, signal: null, duration_ms: 5156 } },
+      undefined,
+      'Exit code 0 · 5.2 s'
+    ],
+    [
+      { command_result: { exit_code: null, signal: 15, duration_ms: 9279 } },
+      undefined,
+      'Stopped after 9.3 s'
+    ],
+    [
+      { command_result: { exit_code: null, signal: 9, timed_out: true, duration_ms: 120000 } },
+      undefined,
+      'Timed out after 120 s'
+    ],
+    [undefined, { exitCode: 2, signal: null }, 'Exit code 2']
+  ])('summarizes how a command ended', (rawOutput, fxShell, summary) => {
+    const row = {
+      ...call('shell', { request: { action: 'run', command: 'ls' } }),
+      sidecar: { ...(rawOutput ? { rawOutput } : {}), ...(fxShell ? { fxShell } : {}) }
+    }
+    expect(formatResultSummary(row)).toBe(summary)
+  })
+
+  test('omits the summary while a command runs and for other tools', () => {
+    const running = {
+      ...call('shell', { command: 'sleep 9' }),
+      state: 'running' as const,
+      sidecar: { rawOutput: { command_result: { exit_code: 0 } } }
+    }
+    expect(formatResultSummary(running)).toBeUndefined()
+    expect(formatResultSummary(call('read_file', { path: 'a' }))).toBeUndefined()
   })
 })

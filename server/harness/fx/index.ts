@@ -100,7 +100,8 @@ export const fxHarness: Harness = {
     imagesInline: 'base64',
     liveModelSwitch: true,
     liveEffortSwitch: true,
-    nativeUserEcho: false
+    nativeUserEcho: false,
+    queuesFollowUps: true // ACP sends wait in moi's per-chat queue
   },
   sendMessage: input => sendAcpMessage(fxConfig, input),
   interrupt: (workspaceId, sessionId) => interruptAcpRun(fxConfig, { workspaceId, sessionId }),
