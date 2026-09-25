@@ -7,7 +7,7 @@ import type { ToolCall } from '@/lib/types'
 
 import { Button } from '@/client/components/ui/button'
 import { CodeBlock } from './CodeBlock'
-import { detectOutput } from './detect'
+import { type DiffLine, detectOutput } from './detect'
 
 type ToolOutputProps = { call: ToolCall; output: string; isError: boolean }
 
@@ -53,10 +53,39 @@ export function ToolOutput({ call, output, isError }: ToolOutputProps) {
         <pre className={cn(PRE, 'break-all whitespace-pre-wrap text-muted-foreground')}>
           {output || '(empty)'}
         </pre>
+      ) : view.kind === 'diff' ? (
+        <DiffBlock lines={view.lines} />
       ) : (
         <CodeBlock code={view.code} className={cn(PRE, 'text-muted-foreground')} />
       )}
     </div>
+  )
+}
+
+type DiffBlockProps = { lines: DiffLine[] }
+
+// Added and removed lines carry a sign column and the success/destructive
+// tint, so the change reads without relying on color alone.
+function DiffBlock({ lines }: DiffBlockProps) {
+  return (
+    <pre className="max-h-[280px] overflow-auto py-2.5 font-mono text-xs leading-relaxed">
+      {lines.map((line, index) => (
+        <div
+          key={index}
+          className={cn(
+            'flex px-3 break-all whitespace-pre-wrap',
+            line.kind === 'addition' && 'bg-success/10 text-success',
+            line.kind === 'deletion' && 'bg-destructive/10 text-destructive',
+            line.kind === 'context' && 'text-muted-foreground'
+          )}
+        >
+          <span className="w-4 shrink-0 select-none">
+            {line.kind === 'addition' ? '+' : line.kind === 'deletion' ? '-' : ' '}
+          </span>
+          <span className="min-w-0 flex-1">{line.text || ' '}</span>
+        </div>
+      ))}
+    </pre>
   )
 }
 

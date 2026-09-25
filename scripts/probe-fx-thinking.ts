@@ -3,7 +3,8 @@
 // gets an isolated workspace, a 180-second budget, and a cold history load.
 // Saves complete wire/client captures and report.json in ~/.cache/moi-fx-thinking-*/.
 // Usage: bun scripts/probe-fx-thinking.ts [model-id ...]
-// Env: FX_BIN (optional), PROBE_CATALOG (optional moi agent catalog JSON).
+// Env: FX_BIN (optional), PROBE_CATALOG (optional moi agent catalog JSON),
+// PROBE_EFFORT (optional effort for every model, e.g. high).
 import { mkdir, mkdtemp } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -155,7 +156,8 @@ async function runModel(model: string, index: number) {
   let liveWireLength = 0
   let advertised: ReturnType<typeof settings> | undefined
   let confirmed: ReturnType<typeof settings> | undefined
-  const requestedEffort = highEffortModels.has(model) ? 'high' : undefined
+  const requestedEffort =
+    process.env.PROBE_EFFORT ?? (highEffortModels.has(model) ? 'high' : undefined)
   const config: AcpProviderConfig = {
     ...fxConfig,
     modelStateFingerprint: undefined,
