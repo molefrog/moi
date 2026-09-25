@@ -81,8 +81,10 @@ left unchanged.
 - ACP clips every tool result to a 200-byte preview, live and on
   `session/load`. After each run and on every history load, moi reads
   `fx session --id <id> --json` and replaces the previews with fx's saved
-  results: full command output with its exit code, full tool text (capped at
-  64,000 characters), and fx's committed line diff for writes and edits.
+  results: full command output with its exit code, the tool text fx saved
+  (at most 4,096 bytes per result, so a long skill or page arrives cut; moi
+  caps any result at 64,000 characters), and fx's committed line diff for
+  writes and edits.
   The read takes a few milliseconds and works while the chat's process
   holds the session.
 - Context/skill discovery warnings remain visible as operational notices, as
