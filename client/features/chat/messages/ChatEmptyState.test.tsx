@@ -25,6 +25,7 @@ describe('resolveChatEmptyState', () => {
   test('gives the welcome state first priority', () => {
     expect(
       resolveChatEmptyState({
+        tabId: 'overview',
         isViewDraft: false,
         hasSentMessageFromMoi: false,
         isWorkspacePendingAnalysis: true
@@ -35,6 +36,7 @@ describe('resolveChatEmptyState', () => {
   test('shows the workspace exploration state for a pending imported workspace', () => {
     expect(
       resolveChatEmptyState({
+        tabId: 'overview',
         isViewDraft: false,
         hasSentMessageFromMoi: true,
         isWorkspacePendingAnalysis: true
@@ -42,19 +44,32 @@ describe('resolveChatEmptyState', () => {
     ).toBe('explore-workspace')
   })
 
-  test('uses the simple empty state without pending analysis', () => {
+  test('uses the overview empty state without pending analysis', () => {
     expect(
       resolveChatEmptyState({
+        tabId: 'overview',
         isViewDraft: false,
         hasSentMessageFromMoi: true,
         isWorkspacePendingAnalysis: false
       })
-    ).toBe('empty')
+    ).toBe('overview-empty')
+  })
+
+  test('uses a separate empty state on other tabs', () => {
+    expect(
+      resolveChatEmptyState({
+        tabId: 'scratchpad',
+        isViewDraft: false,
+        hasSentMessageFromMoi: true,
+        isWorkspacePendingAnalysis: false
+      })
+    ).toBe('tab-empty')
   })
 
   test('gives the pending view priority', () => {
     expect(
       resolveChatEmptyState({
+        tabId: 'views/example',
         isViewDraft: true,
         hasSentMessageFromMoi: false,
         isWorkspacePendingAnalysis: true
@@ -71,8 +86,9 @@ describe('ChatEmptyState', () => {
       'Your agent can explore this workspace and suggest useful widgets and views based on'
     )
     expect(renderState('explore-workspace')).toContain('Explore the workspace')
-    expect(renderState('empty')).toContain('Chat with your agent')
-    for (const kind of ['welcome', 'explore-workspace', 'empty'] as const) {
+    expect(renderState('overview-empty')).toContain('create widgets and views')
+    expect(renderState('tab-empty')).toContain('what you’re working on here')
+    for (const kind of ['welcome', 'explore-workspace', 'overview-empty', 'tab-empty'] as const) {
       const html = renderState(kind)
       expect(html).toContain('mo-root')
       expect(html).toContain('--mo-head:var(--accent)')
@@ -91,7 +107,7 @@ describe('ChatEmptyState', () => {
   })
 
   test('replaces the plain empty-state icon with the agent Blobatar', () => {
-    const html = renderState('empty')
+    const html = renderState('overview-empty')
 
     expect(html).toContain('mo-root')
     expect(html).not.toContain('tabler-icon-messages')

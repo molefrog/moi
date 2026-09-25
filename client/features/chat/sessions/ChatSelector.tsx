@@ -248,16 +248,18 @@ export function groupSessionsForTab(
 
 export function ChatSelector({ className }: ChatSelectorProps) {
   const workspaceId = useWorkspaceId()
-  const { pinnedSessionId } = usePinnedSession()
+  const { pinnedSessionId, loaded } = usePinnedSession()
   const { data: sessions = [] } = useWorkspaceSessions(workspaceId)
-  if (pinnedSessionId)
+  if (!loaded) return null
+  if (pinnedSessionId) {
+    const title = sessions.find(session => session.sessionId === pinnedSessionId)?.summary
+    if (!title) return null
     return (
       <div className="flex h-7 min-w-0 items-center px-2.5 text-sm font-medium">
-        <span className="truncate">
-          {sessions.find(session => session.sessionId === pinnedSessionId)?.summary || 'New chat'}
-        </span>
+        <span className="truncate">{title}</span>
       </div>
     )
+  }
 
   return <SessionSelector className={className} sessions={sessions} />
 }

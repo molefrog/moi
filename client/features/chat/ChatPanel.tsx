@@ -4,7 +4,7 @@ import {
   IconChevronDown,
   IconChevronsRight,
   IconPin,
-  IconPinnedFilled,
+  IconPinFilled,
   IconX
 } from '@tabler/icons-react'
 import { draftSessionId } from '@/lib/session-drafts'
@@ -142,6 +142,7 @@ export function ChatPanel({
     (!forkedFromSessionId && chatLoaded && timeline.length === 0 && !effectiveProcessing)
   const showTranscript = chatLoaded && !showEmptyState
   const emptyStateKind = resolveChatEmptyState({
+    tabId,
     isViewDraft: !!viewDraft,
     hasSentMessageFromMoi,
     isWorkspacePendingAnalysis
@@ -151,7 +152,8 @@ export function ChatPanel({
   const { atBottom, scrollToBottom, scrollToTop } = useStickToBottom(scrollRef, effectiveSessionId)
 
   useLayoutEffect(() => {
-    if (showEmptyState && emptyStateKind !== 'empty') scrollToTop()
+    if (showEmptyState && emptyStateKind !== 'overview-empty' && emptyStateKind !== 'tab-empty')
+      scrollToTop()
   }, [showEmptyState, emptyStateKind, scrollToTop])
 
   // The active chat surface owns initial focus. A monotonically increasing
@@ -196,7 +198,7 @@ export function ChatPanel({
                   aria-label={pinnedSessionId ? 'Unpin chat' : 'Pin chat'}
                   aria-pressed={!!pinnedSessionId}
                 >
-                  {pinnedSessionId ? <IconPinnedFilled stroke={1.75} /> : <IconPin stroke={1.75} />}
+                  {pinnedSessionId ? <IconPinFilled stroke={1.75} /> : <IconPin stroke={1.75} />}
                 </Button>
               }
             />

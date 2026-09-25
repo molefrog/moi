@@ -233,6 +233,7 @@ export function usePinnedSession() {
   })
   return {
     pinnedSessionId: data?.pinned ?? null,
+    loaded: data !== undefined,
     pin: mutation.mutate
   }
 }
