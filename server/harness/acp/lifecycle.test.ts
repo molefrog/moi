@@ -13,13 +13,18 @@ import {
   setSessionConfigPath
 } from '../../session-config'
 import { getClientFrameLog } from '../debug'
-import { isFxOperationalMessage } from '../fx/adapter'
+import {
+  describeFxOperationalMessage,
+  isFxOperationalMessage,
+  normalizeFxToolUpdate
+} from '../fx/adapter'
 import { fxModels, fxSessionConfig } from '../fx/models'
 import { getAcpClient, killAcpWorkspace, killAllAcpClients } from './client'
 import { listAcpModels } from './discovery'
 import { setRunDurationsPath } from './run-durations'
 import {
   type AcpProviderConfig,
+  type AcpToolEnrichment,
   ensureAcpSessionLive,
   forgetAcpSession,
   forgetAllAcpSessions,
@@ -836,5 +841,209 @@ describe('ACP chat lifecycle', () => {
     } finally {
       refresh.mockRestore()
     }
+  })
+})
+
+describe('fx history and diagnostics', () => {
+  const clippedEnvelope =
+    '{"session_id":null,"state":"completed","backend":"captured","persistence":"process","output_truncated":false,"output_incomplete":false,"output_terminal_safe":true,"full_output_handle":"fx-command-repl'
+  function fxConfig(
+    base: AcpProviderConfig,
+    history: Map<string, AcpToolEnrichment> = new Map()
+  ): AcpProviderConfig & { reads: number } {
+    const config = {
+      ...base,
+      reads: 0,
+      normalizeToolUpdate: normalizeFxToolUpdate,
+      isOperationalMessage: isFxOperationalMessage,
+      describeOperationalMessage: describeFxOperationalMessage,
+      enrichToolCalls: async () => {
+        config.reads++
+        return history
+      }
+    }
+    return config
+  }
+  function toolCalls(events: StreamEvent[]) {
+    return turns(events).flatMap(turn =>
+      turn.parts.flatMap(part => (part.type === 'tool-call' ? [part.call] : []))
+    )
+  }
+  function notices(events: StreamEvent[]) {
+    return events.flatMap(event =>
+      event.kind === 'notice' && event.notice.kind === 'warning' ? [event.notice.message] : []
+    )
+  }
+
+  test('a cold load replaces clipped tool previews with saved results before it resolves', async () => {
+    const agent = await fixture({
+      replayUpdates: [
+        {
+          sessionUpdate: 'user_message_chunk',
+          messageId: 'u',
+          content: { type: 'text', text: 'run it' }
+        },
+        {
+          sessionUpdate: 'tool_call',
+          toolCallId: 'sh',
+          name: 'shell',
+          title: 'Running',
+          kind: 'execute',
+          status: 'pending',
+          rawInput: { action: 'run', command: 'seq 3' }
+        },
+        {
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'sh',
+          status: 'completed',
+          content: [{ type: 'content', content: { type: 'text', text: clippedEnvelope } }]
+        }
+      ]
+    })
+    const config = fxConfig(
+      agent.config,
+      new Map([
+        ['sh', { output: '1\n2\n3\n', sidecar: { fxShell: { exitCode: 0, signal: null } } }]
+      ])
+    )
+    const events = await ensureAcpSessionLive(config, { ...agent.ctx, sessionId: 'one' })
+    const [call] = toolCalls(events)
+    expect(call).toMatchObject({ name: 'shell', state: 'success', output: '1\n2\n3\n' })
+    expect(call?.sidecar).toMatchObject({ fxShell: { exitCode: 0 } })
+    expect(config.reads).toBe(1)
+  })
+
+  test('a finished prompt enriches its tool rows from saved history', async () => {
+    const agent = await fixture({
+      promptUpdates: [
+        {
+          sessionUpdate: 'tool_call',
+          toolCallId: 'w',
+          name: 'edit_file',
+          title: 'Editing',
+          kind: 'edit',
+          status: 'pending',
+          rawInput: { path: 'a.txt', old_string: 'a', new_string: 'b' }
+        },
+        {
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'w',
+          status: 'completed',
+          content: [{ type: 'content', content: { type: 'text', text: 'edited a.txt (2 bytes)' } }]
+        }
+      ]
+    })
+    const change = {
+      path: 'a.txt',
+      kind: 'edited',
+      additions: 1,
+      deletions: 1,
+      truncated: false,
+      lines: [
+        { kind: 'deletion', text: 'a' },
+        { kind: 'addition', text: 'b' }
+      ]
+    }
+    const config = fxConfig(
+      agent.config,
+      new Map([['w', { output: 'edited a.txt (2 bytes)', sidecar: { fxFileChange: change } }]])
+    )
+    await sendAcpMessage(config, { ...agent.ctx, sessionId: 'one', isNew: false, content: 'edit' })
+    await until(() =>
+      toolCalls(getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? []).some(
+        call => call.sidecar?.fxFileChange !== undefined
+      )
+    )
+    const [call] = toolCalls(getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? [])
+    expect(call).toMatchObject({
+      name: 'edit_file',
+      state: 'success',
+      output: 'edited a.txt (2 bytes)'
+    })
+    expect(call?.sidecar?.fxFileChange).toEqual(change)
+  })
+
+  test('late output from a backgrounded command keeps the row successful', async () => {
+    const running =
+      '{"session_id":"shell-1","state":"running","backend":"captured","persistence":"process","output_truncated":false,"output_incomplete":false,"output_terminal_safe":true,"full_output_handle":null,"exit_co'
+    const agent = await fixture({
+      promptUpdates: [
+        {
+          sessionUpdate: 'tool_call',
+          toolCallId: 'bg',
+          name: 'shell',
+          title: 'Running',
+          kind: 'execute',
+          status: 'pending',
+          rawInput: {
+            request: { action: 'run', command: 'sleep 60; echo late', yield_time_ms: 30000 }
+          }
+        },
+        {
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'bg',
+          status: 'completed',
+          content: [{ type: 'content', content: { type: 'text', text: running } }]
+        },
+        {
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'bg',
+          status: 'in_progress',
+          content: [{ type: 'content', content: { type: 'text', text: 'late\n' } }]
+        }
+      ]
+    })
+    await sendAcpMessage(fxConfig(agent.config), {
+      ...agent.ctx,
+      sessionId: 'one',
+      isNew: false,
+      content: 'background'
+    })
+    const [call] = toolCalls(getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? [])
+    expect(call).toMatchObject({ name: 'shell', state: 'success', output: 'late\n' })
+    expect(call?.errorText).toBeUndefined()
+  })
+
+  test('provider failures and replayed interruptions become notices, not replies', async () => {
+    const agent = await fixture({
+      replayUpdates: [
+        {
+          sessionUpdate: 'user_message_chunk',
+          messageId: 'u',
+          content: { type: 'text', text: 'stop me' }
+        },
+        {
+          sessionUpdate: 'agent_message_chunk',
+          messageId: 'o',
+          content: { type: 'text', text: 'cancelled' }
+        }
+      ],
+      promptUpdates: [
+        {
+          sessionUpdate: 'agent_message_chunk',
+          messageId: 'op',
+          content: { type: 'text', text: 'HTTP 502: upstream unavailable' }
+        }
+      ]
+    })
+    const config = fxConfig(agent.config)
+    const loaded = await ensureAcpSessionLive(config, { ...agent.ctx, sessionId: 'one' })
+    expect(notices(loaded)).toEqual(['This run was stopped before it finished.'])
+    await sendAcpMessage(config, {
+      ...agent.ctx,
+      sessionId: 'one',
+      isNew: false,
+      content: 'failed'
+    })
+    const events = getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? []
+    expect(notices(events)).toContain('The model request failed: HTTP 502: upstream unavailable')
+    // A live reply that happens to say "failed" is still a reply.
+    expect(
+      turns(events).some(
+        turn =>
+          turn.role === 'assistant' &&
+          turn.parts.some(part => part.type === 'text' && part.text === 'model-a:failed')
+      )
+    ).toBe(true)
   })
 })

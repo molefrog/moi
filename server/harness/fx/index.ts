@@ -22,8 +22,13 @@ import {
 } from '../acp/session'
 import { findHarnessExecutable, pathHarnessAvailability } from '../executable'
 import type { Harness } from '../types'
-import { isFxOperationalMessage, normalizeFxToolUpdate } from './adapter'
+import {
+  describeFxOperationalMessage,
+  isFxOperationalMessage,
+  normalizeFxToolUpdate
+} from './adapter'
 import { checkFxVersion } from './compat'
+import { fxToolEnrichments, readFxToolHistory } from './history'
 import { applyFxSettings, fxModels, fxModelState, fxSessionConfig } from './models'
 
 export const fxConfig: AcpProviderConfig = {
@@ -41,6 +46,17 @@ export const fxConfig: AcpProviderConfig = {
   applySettings: applyFxSettings,
   normalizeToolUpdate: normalizeFxToolUpdate,
   isOperationalMessage: isFxOperationalMessage,
+  describeOperationalMessage: describeFxOperationalMessage,
+  async enrichToolCalls(ctx, sessionId) {
+    const command = findHarnessExecutable('fx')
+    if (!command) return new Map()
+    const history = await readFxToolHistory(command, sessionId, {
+      cwd: ctx.workspacePath,
+      env: await resolveWorkspaceEnv(ctx.workspacePath),
+      timeoutMs: 3_000
+    })
+    return fxToolEnrichments(history)
+  },
   async modelStateFingerprint(ctx) {
     const env = await resolveWorkspaceEnv(ctx.workspacePath)
     const home = env.HOME ?? process.env.HOME ?? ''

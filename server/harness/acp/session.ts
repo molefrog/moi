@@ -62,6 +62,12 @@ export type AcpSpawnContext = {
   agentId?: string
 }
 
+export type AcpToolEnrichment = {
+  output?: string
+  // Merged into the call's sidecar (structured details for renderers).
+  sidecar?: Record<string, unknown>
+}
+
 export type AcpProviderConfig = {
   id: WorkspaceType
   provider: AcpProviderId
@@ -79,7 +85,18 @@ export type AcpProviderConfig = {
     state: AcpModelState
   ) => Promise<AcpModelState>
   normalizeToolUpdate?: (update: ToolCallUpdate, previous?: Turn) => ToolCallUpdate
-  isOperationalMessage?: (text: string) => boolean
+  // Replace clipped tool results with the provider's own saved copy, keyed by
+  // wire toolCallId. Runs after a history load and after each prompt; best
+  // effort, so a failure leaves the ACP preview in place.
+  enrichToolCalls?: (
+    ctx: AcpSpawnContext,
+    sessionId: string
+  ) => Promise<Map<string, AcpToolEnrichment>>
+  // Classify provider diagnostics that arrive as agent text. `replaying` is
+  // true while `session/load` streams history.
+  isOperationalMessage?: (text: string, context: { replaying: boolean }) => boolean
+  // Notice text for a classified operational message (defaults to the text).
+  describeOperationalMessage?: (text: string) => string
   // Provider mode that handles approvals without an interactive moi prompt.
   // It may still review or hold actions. Applied to new and resumed sessions.
   noPromptModeId?: string
@@ -249,7 +266,7 @@ function forwardPreview(rec: SessionRecord) {
       .filter(b => b.kind === 'text')
       .map(b => b.text)
       .join('')
-    if (text.length < 24 || rec.config.isOperationalMessage(text)) {
+    if (text.length < 24 || rec.config.isOperationalMessage(text, { replaying: false })) {
       blocks = blocks.filter(b => b.kind !== 'text')
     }
   }
@@ -270,14 +287,14 @@ function flushAssistant(
   const turn = rec.acc.flush(meta)
   if (turn) {
     const text = turn.parts.flatMap(p => (p.type === 'text' ? [p.text] : [])).join('')
-    if (rec.config.isOperationalMessage?.(text)) {
+    if (rec.config.isOperationalMessage?.(text, { replaying: rec.replaying })) {
       emitTurnEvent(rec, {
         kind: 'notice',
         notice: {
           id: turn.id,
           kind: 'warning',
           at: turn.timestamp ?? new Date().toISOString(),
-          message: text
+          message: rec.config.describeOperationalMessage?.(text) ?? text
         }
       })
       // A provider can omit message ids on thought chunks, leaving genuine
@@ -382,6 +399,42 @@ function closeOpenToolCalls(
   rec.openToolCalls.clear()
 }
 
+async function enrichToolCalls(rec: SessionRecord): Promise<void> {
+  const enrich = rec.config.enrichToolCalls
+  if (!enrich || rec.disposed) return
+  let results: Map<string, AcpToolEnrichment>
+  try {
+    results = await enrich(
+      { workspaceId: rec.workspaceId, workspacePath: rec.workspacePath, agentId: rec.agentId },
+      rec.sessionId
+    )
+  } catch (error) {
+    debug(`${rec.config.id} tool history could not be read: ${String(error)}`)
+    return
+  }
+  if (rec.disposed || results.size === 0) return
+  for (const turn of rec.view.turns) {
+    const part = turn.parts.find(p => p.type === 'tool-call')
+    if (part?.type !== 'tool-call') continue
+    // Repeated wire ids are aliased (`id#2`); history cannot tell them apart.
+    const enrichment = results.get(part.call.toolCallId)
+    if (!enrichment) continue
+    const call = {
+      ...part.call,
+      ...(enrichment.output !== undefined ? { output: enrichment.output } : {}),
+      ...(enrichment.sidecar ? { sidecar: { ...part.call.sidecar, ...enrichment.sidecar } } : {})
+    }
+    if (call.state === 'error' && enrichment.output !== undefined && part.call.errorText) {
+      call.errorText = part.call.errorText
+    }
+    if (JSON.stringify(call) === JSON.stringify(part.call)) continue
+    emitTurnEvent(rec, {
+      kind: 'turn',
+      turn: { ...turn, parts: turn.parts.map(p => (p === part ? { ...part, call } : p)) }
+    })
+  }
+}
+
 function handleSessionUpdate(rec: SessionRecord, update: SessionUpdate, provider: AcpProviderId) {
   const messageId = (update as SessionUpdate & { messageId?: string }).messageId
   if (
@@ -410,7 +463,7 @@ function handleSessionUpdate(rec: SessionRecord, update: SessionUpdate, provider
           .filter(block => block.kind === 'text')
           .map(block => block.text)
           .join('')
-        if (rec.config.isOperationalMessage(text)) flushAssistant(rec)
+        if (rec.config.isOperationalMessage(text, { replaying: rec.replaying })) flushAssistant(rec)
       }
       const block = (update as { content?: { text?: string } }).content
       rec.acc.append('reasoning', block?.text ?? '')
@@ -646,6 +699,7 @@ function initializeSession(
       }
       if (init.cancelled || rec.disposed) throw new Error('Chat was closed while connecting')
       rec.ready = true
+      if (!input.isNew) await enrichToolCalls(rec)
       if (!input.isNew && cacheModelState) refreshAvailability(rec, config.id)
       return rec
     } catch (error) {
@@ -824,6 +878,8 @@ async function runPrompt(
           debug(`${config.id} run duration could not be saved: ${String(error)}`)
         }
       )
+      // The provider has saved this run; swap clipped previews for full results.
+      void enrichToolCalls(rec)
     }
     rec.lastUsed = Date.now()
     const next = !rec.disposed && rec.client.isAlive() ? rec.queue.shift() : undefined
