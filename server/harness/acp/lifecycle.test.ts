@@ -1046,4 +1046,52 @@ describe('fx history and diagnostics', () => {
       )
     ).toBe(true)
   })
+
+  test('streams a many-line command to clients in a few coalesced frames', async () => {
+    const lines = Array.from({ length: 200 }, (_, i) => `${i + 1}\n`)
+    const agent = await fixture({
+      promptUpdates: [
+        {
+          sessionUpdate: 'tool_call',
+          toolCallId: 'seq',
+          name: 'shell',
+          title: 'Running',
+          kind: 'execute',
+          status: 'pending',
+          rawInput: { command: 'seq 200' }
+        },
+        { sessionUpdate: 'tool_call_update', toolCallId: 'seq', status: 'in_progress' },
+        ...lines.map(text => ({
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'seq',
+          status: 'in_progress',
+          content: [{ type: 'content', content: { type: 'text', text } }]
+        })),
+        {
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'seq',
+          status: 'completed',
+          content: [{ type: 'content', content: { type: 'text', text: clippedEnvelope } }]
+        }
+      ]
+    })
+    const before = getClientFrameLog(agent.ctx.workspaceId).length
+    await sendAcpMessage(fxConfig(agent.config), {
+      ...agent.ctx,
+      sessionId: 'one',
+      isNew: false,
+      content: 'seq'
+    })
+    const frames = getClientFrameLog(agent.ctx.workspaceId)
+      .slice(before)
+      .map(entry => entry.frame as { kind?: string; turn?: Turn })
+      .filter(
+        frame => frame.kind === 'turn' && frame.turn?.parts.some(part => part.type === 'tool-call')
+      )
+    expect(frames.length).toBeLessThan(10)
+    const [call] = toolCalls(getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? [])
+    expect(call).toMatchObject({ state: 'success', output: lines.join('') })
+    const last = frames.at(-1)?.turn?.parts.find(part => part.type === 'tool-call')
+    expect(last?.type === 'tool-call' && last.call.output).toBe(lines.join(''))
+  })
 })

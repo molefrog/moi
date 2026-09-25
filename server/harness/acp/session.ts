@@ -170,6 +170,8 @@ type SessionRecord = {
   // at turn end so their cards don't hang (see ../hermes/NOTES.md §3.4).
   // Holds aliased ids (see toolCallSeq).
   openToolCalls: Set<string>
+  // Coalesced progress broadcasts per tool turn id (see emitToolProgress).
+  toolBroadcasts: Map<string, ReturnType<typeof setTimeout>>
   // How many times each wire toolCallId has STARTED. Hermes replay ids are
   // `functions.<tool>:<index>` with the index scoped to one assistant message
   // (NOTES.md §3.4), so a session calling the same tool from several messages
@@ -244,6 +246,29 @@ function setProcessing(rec: SessionRecord, processing: boolean) {
   })
 }
 
+// Streaming tool output arrives as many small updates (fx sends one per output
+// line), and every broadcast carries the whole accumulated turn, so traffic
+// would grow with the square of the output. Progress that keeps a tool in the
+// same state updates the view immediately but reaches clients at most every
+// TOOL_PROGRESS_MS; appearance and state changes still go out at once.
+const TOOL_PROGRESS_MS = 120
+
+function emitToolProgress(rec: SessionRecord, turn: Turn) {
+  if (rec.disposed) return
+  rec.view = applyEvent(rec.view, { kind: 'turn', turn })
+  if (rec.toolBroadcasts.has(turn.id)) return
+  rec.toolBroadcasts.set(
+    turn.id,
+    setTimeout(() => {
+      rec.toolBroadcasts.delete(turn.id)
+      const latest = rec.view.turns.find(t => t.id === turn.id)
+      if (latest && !rec.disposed) {
+        broadcast(rec.workspaceId, { kind: 'turn', turn: latest, sessionId: rec.sessionId })
+      }
+    }, TOOL_PROGRESS_MS)
+  )
+}
+
 function emitTurnEvent(rec: SessionRecord, ev: StreamEvent) {
   if (rec.disposed) return
   if (ev.kind === 'turn' && ev.turn.role === 'assistant') rec.lastAssistantTurnId = ev.turn.id
@@ -257,6 +282,14 @@ function emitTurnEvent(rec: SessionRecord, ev: StreamEvent) {
     const turn = { ...ev.turn }
     delete turn.timestamp
     ev = { kind: 'turn', turn }
+  }
+  if (ev.kind === 'turn') {
+    // This event carries the turn's latest state; a coalesced snapshot is stale.
+    const pending = rec.toolBroadcasts.get(ev.turn.id)
+    if (pending) {
+      clearTimeout(pending)
+      rec.toolBroadcasts.delete(ev.turn.id)
+    }
   }
   rec.view = applyEvent(rec.view, ev)
   broadcast(rec.workspaceId, { ...ev, sessionId: rec.sessionId })
@@ -371,7 +404,13 @@ function ingestToolCall(
     state?.type === 'tool-call' && (state.call.state === 'success' || state.call.state === 'error')
   if (settled) rec.openToolCalls.delete(aliasedId)
   else rec.openToolCalls.add(aliasedId)
-  emitTurnEvent(rec, { kind: 'turn', turn })
+  const previousState = previous?.parts.find(p => p.type === 'tool-call')
+  const sameState =
+    previousState?.type === 'tool-call' &&
+    state?.type === 'tool-call' &&
+    previousState.call.state === state.call.state
+  if (sameState && !rec.replaying && !isStart) emitToolProgress(rec, turn)
+  else emitTurnEvent(rec, { kind: 'turn', turn })
 }
 
 // Some backends omit terminal updates. Stop the spinner at turn end while
@@ -585,6 +624,7 @@ function createRecord(input: {
     userChunk: '',
     userImageParts: [],
     openToolCalls: new Set(),
+    toolBroadcasts: new Map(),
     toolCallSeq: new Map(),
     model: input.model,
     queue: []
@@ -604,6 +644,8 @@ async function applyNoPromptMode(client: AcpClient, config: AcpProviderConfig, s
 
 function disposeRecord(rec: SessionRecord) {
   if (rec.disposed) return
+  for (const timer of rec.toolBroadcasts.values()) clearTimeout(timer)
+  rec.toolBroadcasts.clear()
   rec.queue.length = 0
   rec.cancelled = true
   if (rec.processing && rec.client.isAlive()) {
