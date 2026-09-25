@@ -1,6 +1,7 @@
 import type { Turn } from '@/lib/format'
 import type { ToolCall } from '@/lib/types'
 
+import { STOPPED_NOTICE } from '../acp/adapter'
 import { type ToolCallUpdate, toolContentToText } from '../acp/wire'
 
 function record(value: unknown): Record<string, unknown> | undefined {
@@ -186,7 +187,7 @@ export function isFxOperationalMessage(text: string, context?: { replaying: bool
 
 export function describeFxOperationalMessage(text: string): string {
   const trimmed = text.trim()
-  if (trimmed === 'cancelled') return 'This run was stopped before it finished.'
+  if (trimmed === 'cancelled') return STOPPED_NOTICE
   if (trimmed === 'failed') return 'This run ended with an error before it finished.'
   if (/^\[Response interrupted/i.test(trimmed)) {
     return 'The response was interrupted. fx restarted it from the beginning.'

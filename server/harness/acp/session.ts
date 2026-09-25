@@ -34,6 +34,7 @@ import {
   acpToolCallToTurn,
   acpUsageToTurnMeta,
   replayedUserParts,
+  STOPPED_NOTICE,
   toolTurnId
 } from './adapter'
 import { type AcpClient, type AcpSpawnSpec, getAcpClient, releaseAcpClient } from './client'
@@ -901,6 +902,16 @@ async function runPrompt(
       ...(acpUsageToTurnMeta(res.usage) ? { usage: acpUsageToTurnMeta(res.usage) } : {})
     })
     if (res.stopReason === 'cancelled') {
+      // The same marker a reload shows for an interrupted turn.
+      emitTurnEvent(rec, {
+        kind: 'notice',
+        notice: {
+          id: `${rec.sessionId}:stopped:${send.turnId}`,
+          kind: 'warning',
+          at: new Date().toISOString(),
+          message: STOPPED_NOTICE
+        }
+      })
       broadcast(rec.workspaceId, { kind: 'stopped', sessionId: rec.sessionId })
     }
     broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })

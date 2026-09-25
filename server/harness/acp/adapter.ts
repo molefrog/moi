@@ -128,6 +128,9 @@ export function acpUsageToTurnMeta(usage: Usage | null | undefined): TurnMeta['u
   return { inputTokens, outputTokens, totalTokens }
 }
 
+// Marks a run the user stopped, live and when a reload replays it.
+export const STOPPED_NOTICE = 'This run was stopped before it finished.'
+
 // Replay collects text and image chunks before reconstructing attachments,
 // so inline images can be paired with their descriptions in message order.
 // Agents such as fx store a `[Image #1]` line per inline image; the image

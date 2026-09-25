@@ -411,6 +411,13 @@ describe('ACP chat lifecycle', () => {
     expect(calls).toHaveLength(1)
     const part = turns(agent.events('one')).at(-1)?.parts[0]
     expect(part?.type === 'tool-call' && part.call.state).toBe('error')
+    expect(
+      agent
+        .events('one')
+        .flatMap(event =>
+          event.kind === 'notice' && event.notice.kind === 'warning' ? [event.notice.message] : []
+        )
+    ).toEqual(['This run was stopped before it finished.'])
     expect(getAcpActiveSessions('fx')).toEqual([])
   })
 
