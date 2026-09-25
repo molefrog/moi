@@ -98,6 +98,15 @@ function visionResult(output: string): FxResult | null {
   }
 }
 
+// fx saves at most 4,096 bytes of a result, so a long page or skill loses
+// its closing tag. Returns the body and whether it was cut.
+function enclosed(text: string, tag: string): { body: string; complete: boolean } {
+  const close = new RegExp(`\\n?</${tag}>\\s*$`).exec(text)
+  return close
+    ? { body: text.slice(0, close.index), complete: true }
+    : { body: text, complete: false }
+}
+
 function tagValue(text: string, name: string): string | undefined {
   return new RegExp(`^<${name}>([^\\n]*)</${name}>$`, 'm').exec(text)?.[1]
 }
@@ -106,12 +115,16 @@ function tagValue(text: string, name: string): string | undefined {
 // (converted to markdown for HTML) inside `<content>`.
 function webFetchResult(output: string): FxResult | null {
   if (!output.startsWith('Web fetch result.')) return null
-  const content = /\n<content>\n?([\s\S]*?)\n?<\/content>\s*$/.exec(output)?.[1]
-  if (content === undefined) return null
+  const start = output.indexOf('\n<content>')
+  if (start < 0) return null
+  const { body, complete } = enclosed(output.slice(start + '\n<content>'.length), 'content')
+  const content = body.replace(/^\n/, '')
   const status = tagValue(output, 'status')
   const mime = tagValue(output, 'mime_type')
   const cached = tagValue(output, 'cache_hit') === 'true'
-  const summary = [status, mime, cached ? 'cached' : ''].filter(Boolean).join(' · ')
+  const summary = [status, mime, cached ? 'cached' : '', complete ? '' : 'shortened by fx']
+    .filter(Boolean)
+    .join(' · ')
   return {
     ...(content.trim() ? { body: { kind: 'text', text: content.trim(), label: 'content' } } : {}),
     ...(summary ? { summary } : {})
@@ -120,14 +133,15 @@ function webFetchResult(output: string): FxResult | null {
 
 // `<skill_content name="…" location="…" resource="SKILL.md" complete="true">…`
 function skillResult(output: string): FxResult | null {
-  const match = /^<skill_content\b([^>]*)>\n?([\s\S]*?)\n?<\/skill_content>\s*$/.exec(output)
+  const match = /^<skill_content\b([^>]*)>\n?([\s\S]*)$/.exec(output)
   if (!match) return null
   const attrs = attributes(match[1]!)
+  const { body, complete } = enclosed(match[2]!, 'skill_content')
   const resource = attrs.resource ?? ''
   const label = /\.mdx?$/i.test(resource) || !resource ? 'md' : 'text'
   return {
-    body: { kind: label === 'md' ? 'highlight' : 'text', text: match[2]!, label },
-    ...(attrs.complete === 'false' ? { summary: 'Shortened by fx' } : {})
+    body: { kind: label === 'md' ? 'highlight' : 'text', text: body, label },
+    ...(attrs.complete === 'false' || !complete ? { summary: 'Shortened by fx' } : {})
   }
 }
 
