@@ -388,6 +388,7 @@ export type ServerMessage =
   | StatusMessage
   | SessionRenamedMessage
   | SessionsChangedMessage
+  | SessionReloadedMessage
   | WorkspaceSwitchMessage
   | ErrorFrame
   | StoppedFrame
@@ -432,6 +433,7 @@ export type BroadcastFrame =
   | Omit<StatusMessage, 'workspaceId'>
   | Omit<SessionRenamedMessage, 'workspaceId'>
   | Omit<SessionsChangedMessage, 'workspaceId'>
+  | Omit<SessionReloadedMessage, 'workspaceId'>
   | Omit<ErrorFrame, 'workspaceId'>
   | Omit<StoppedFrame, 'workspaceId'>
 
@@ -450,7 +452,7 @@ export type WorkspaceSwitchMessage = {
   workspaceId: string
 }
 
-export type WorkspaceType = 'claude-code' | 'openclaw' | 'codex' | 'hermes'
+export type WorkspaceType = 'claude-code' | 'openclaw' | 'codex' | 'hermes' | 'fx'
 
 export type WorkspaceSkillStatus = {
   name: string
@@ -539,6 +541,15 @@ export type SessionRenamedMessage = {
 
 export type SessionsChangedMessage = {
   type: 'sessions_changed'
+  workspaceId: string
+  sessionId: string
+}
+
+// The server rebuilt a chat's transcript from the backend's history (a cold
+// load, e.g. after an idle release). Replayed turns carry new ids, so a client
+// holding the old transcript refetches it instead of patching it.
+export type SessionReloadedMessage = {
+  type: 'session_reloaded'
   workspaceId: string
   sessionId: string
 }
@@ -754,4 +765,9 @@ export type WorkspaceAgent = {
   supportsStreaming?: boolean
   // Whether the provider can archive chats from the chat selector.
   supportsArchiving?: boolean
+  // A message sent mid-run waits for the current run instead of steering it.
+  queuesFollowUps?: boolean
+  // The backend can learn an unseen model's effort levels on request
+  // (GET /agent?model=…); models it has not seen omit `supportsEffort`.
+  probesModelOptions?: boolean
 }

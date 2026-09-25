@@ -33,6 +33,7 @@ import type {
   RequestPermissionRequest,
   SessionInfo as AcpSessionInfoRow,
   SessionModeState,
+  SessionConfigOption,
   SessionNotification,
   SessionUpdate,
   StopReason,
@@ -55,6 +56,7 @@ export type {
   PromptResponse,
   RequestPermissionRequest,
   SessionModeState,
+  SessionConfigOption,
   SessionNotification,
   SessionUpdate,
   StopReason,
@@ -94,6 +96,12 @@ export type AcpModelInfo = {
 export type AcpModelState = {
   availableModels?: AcpModelInfo[]
   currentModelId?: string
+  defaultModelId?: string
+  configOptions?: SessionConfigOption[]
+  // Observed selector snapshots, scoped by a provider-defined backend identity.
+  // Keep these separate from the active session's mutable configOptions.
+  configOptionsByModel?: Record<string, SessionConfigOption[]>
+  configOptionsScope?: string
 }
 
 // `NewSessionResponse` plus the dropped `models` field.

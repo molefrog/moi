@@ -5,7 +5,11 @@ import { IconChevronDown, IconChevronsRight, IconX } from '@tabler/icons-react'
 import { canSubmitComposerAction, focusComposer } from '@/client/components/shared/Composer'
 import { AgentBlobatar } from '@/client/components/shared/AgentBlobatar'
 import { useStickToBottom } from '@/client/features/chat/messages/useStickToBottom'
-import { appendPreviewTurn, groupTurns } from '@/client/features/chat/messages/group-turns'
+import {
+  appendPreviewTurn,
+  groupedTurnIds,
+  groupTurns
+} from '@/client/features/chat/messages/group-turns'
 import {
   chatNoticeLabel,
   interleaveNotices
@@ -55,6 +59,9 @@ type ChatPanelProps = {
   // into the trailing assistant run so a thinking-only
   // preview folds into the current tool group. See client/lib/preview-turn.ts.
   previewTurn?: Turn | null
+  // Sends waiting for the running reply to finish (backends that queue).
+  // Shown after the live reply until the server dispatches them.
+  queuedTurns?: Turn[]
   // Selected session id — used only as the scroll reset key (jump to bottom on
   // session switch).
   sessionId?: string | null
@@ -82,6 +89,7 @@ export function ChatPanel({
   hasWorkspaceApplets,
   view,
   previewTurn,
+  queuedTurns = EMPTY_TURNS,
   sessionId,
   processing,
   composerBanner,
@@ -124,7 +132,11 @@ export function ChatPanel({
   // Grouped turns plus the renderable notices (compaction, model changes)
   // woven in at the moment they happened. Interleaving runs AFTER grouping so
   // a notice never splits a tool-only run apart.
-  const timeline = useMemo(() => interleaveNotices(groupedTurns, notices), [groupedTurns, notices])
+  const groupOf = useMemo(() => groupedTurnIds(turns), [turns])
+  const timeline = useMemo(
+    () => interleaveNotices(groupedTurns, notices, groupOf),
+    [groupedTurns, notices, groupOf]
+  )
   const lastTurnId = groupedTurns.length > 0 ? groupedTurns[groupedTurns.length - 1].id : null
   const effectiveProcessing = builderDraft ? false : processing
   const showEmptyState =
@@ -221,6 +233,14 @@ export function ChatPanel({
                   />
                 )
               )}
+            {showTranscript &&
+              !builderDraft &&
+              queuedTurns.map(turn => (
+                <div key={turn.id} className="flex flex-col items-end gap-1 opacity-60">
+                  <TurnView turn={turn} processing={false} />
+                  <span className="text-xs text-muted-foreground">Queued</span>
+                </div>
+              ))}
             {showTranscript && (
               <div className="mt-auto -ml-3 pt-2">
                 <AgentBlobatar

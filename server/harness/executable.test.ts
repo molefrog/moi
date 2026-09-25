@@ -29,19 +29,27 @@ async function addExecutable(command: string): Promise<string> {
 }
 
 describe('PATH harness executables', () => {
-  test('resolves Claude and Codex only from the supplied PATH', async () => {
+  test('resolves CLI executables only from the supplied PATH', async () => {
     const claude = await addExecutable('claude')
     const codex = await addExecutable('codex')
+    const fx = await addExecutable('fx')
 
     expect(findHarnessExecutable('claude-code', tempDir)).toBe(claude)
     expect(findHarnessExecutable('codex', tempDir)).toBe(codex)
     expect(requireHarnessExecutable('claude-code', tempDir)).toBe(claude)
     expect(requireHarnessExecutable('codex', tempDir)).toBe(codex)
+    expect(findHarnessExecutable('fx', tempDir)).toBe(fx)
+    expect(requireHarnessExecutable('fx', tempDir)).toBe(fx)
   })
 
   test('returns install instructions when an executable is missing', async () => {
     expect(findHarnessExecutable('claude-code', tempDir)).toBeNull()
     expect(findHarnessExecutable('codex', tempDir)).toBeNull()
+    expect(findHarnessExecutable('fx', tempDir)).toBeNull()
+    expect(await pathHarnessAvailability('fx', tempDir)).toEqual({
+      status: 'unavailable',
+      reason: 'Run curl -fsSL https://fx.sh/setup.sh | bash in your terminal to install fx'
+    })
     expect(await pathHarnessAvailability('claude-code', tempDir)).toEqual({
       status: 'unavailable',
       reason: 'Run curl -fsSL https://claude.ai/install.sh | sh in your terminal to install Claude'

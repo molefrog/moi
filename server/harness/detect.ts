@@ -23,14 +23,16 @@ export const HARNESS_TYPES: readonly WorkspaceType[] = [
   'claude-code',
   'codex',
   'hermes',
-  'openclaw'
+  'openclaw',
+  'fx'
 ]
 
 export const harnessLabel: Record<WorkspaceType, string> = {
   'claude-code': 'Claude Code',
   codex: 'Codex',
   hermes: 'Hermes',
-  openclaw: 'OpenClaw'
+  openclaw: 'OpenClaw',
+  fx: 'fx'
 }
 
 export function isHarnessName(value: string): value is WorkspaceType {

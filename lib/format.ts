@@ -38,7 +38,7 @@ export type ToolCall = {
   // for the same canonical action (`read` vs `Read`, `exec` vs `Bash`).
   // Adapters are responsible for setting it; UI defaults to a generic
   // rendering when absent.
-  provider?: 'claude-code' | 'openclaw' | 'codex' | 'hermes'
+  provider?: 'claude-code' | 'openclaw' | 'codex' | 'hermes' | 'fx'
   mcpServer?: string
   state: ToolState
   input: unknown
@@ -153,7 +153,15 @@ export type SessionSnapshot = {
 }
 
 export type SystemNotice =
-  | { id: string; kind: 'warning'; at: string; message: string }
+  | {
+      id: string
+      kind: 'warning'
+      at: string
+      message: string
+      // A replayed notice has no time to compare with replayed turns, which
+      // carry none; it follows this turn instead.
+      afterTurnId?: string
+    }
   | {
       id: string
       kind: 'rate-limit'

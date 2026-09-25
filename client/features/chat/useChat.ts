@@ -37,9 +37,11 @@ import { useUiStore } from '@/client/store/ui'
 import { toast } from '@/client/components/ui/toast'
 import { emptyViewState } from '@/lib/format'
 import { messageAttachmentLimitError } from '@/lib/message-attachments'
-import type { Part, ViewState } from '@/lib/types'
+import type { Part, Turn, ViewState } from '@/lib/types'
 
 const EMPTY: ViewState = emptyViewState()
+const EMPTY_TURNS: Turn[] = []
+const MISSING_SELECTION_GRACE_MS = 3_000
 
 // Thin projection over app-level state: the selected session comes from
 // useSelectedSession, spinner/error come from the live store, and the
@@ -61,9 +63,21 @@ export function useChat(address: WorkspaceTabAddress) {
     !sessions.some(session => session.sessionId === selectedSession)
   const selectedSessionId = selectedSessionMissing ? null : (selectedSession ?? null)
 
+  // The selection is shared with other tabs, so a chat another tab just
+  // started can be selected before this tab's list knows it (the backend
+  // names new chats a moment later). Clear only a selection that is not
+  // running and stays unknown; clearing sooner would reset every tab.
+  const selectedSessionRunning = useLive(s =>
+    selectedSession
+      ? isRunningActivity(s.activity[`${workspaceId}:${selectedSession}`] ?? 'idle')
+      : false
+  )
   useEffect(() => {
-    if (selectedSessionMissing) selectSession(null)
-  }, [selectSession, selectedSessionMissing])
+    if (!selectedSessionMissing || selectedSessionRunning) return
+    const timer = setTimeout(() => selectSession(null), MISSING_SELECTION_GRACE_MS)
+    return () => clearTimeout(timer)
+    // `selectedSession` restarts the grace period for each newly missing chat.
+  }, [selectSession, selectedSession, selectedSessionMissing, selectedSessionRunning])
   // Snapshot of the workspace's ambient UI state + queued one-shot
   // directives, taken when the message actually goes out.
   const buildMoiContext = useMoiUserMessageContext(address)
@@ -78,11 +92,17 @@ export function useChat(address: WorkspaceTabAddress) {
   )
 
   const viewQuery = useSessionView(workspaceId, selectedSessionId)
+  const configQuery = useSessionConfig(workspaceId, selectedSessionId)
   const { refetch } = viewQuery
-  const retryLoad = useCallback(() => void refetch(), [refetch])
+  const { refetch: refetchConfig } = configQuery
+  const retryLoad = useCallback(() => {
+    void refetch()
+    void refetchConfig()
+  }, [refetch, refetchConfig])
   const view = viewQuery.data ?? EMPTY
   const chatLoaded =
-    sessions !== undefined && (selectedSessionId === null || viewQuery.data !== undefined)
+    sessions !== undefined &&
+    (selectedSessionId === null || (viewQuery.data !== undefined && configQuery.data !== undefined))
 
   // The live streaming preview as a synthetic assistant turn, so the ChatPanel
   // can merge it into the trailing assistant run — a
@@ -95,9 +115,34 @@ export function useChat(address: WorkspaceTabAddress) {
   const rootPreview = useLive(s => selectPreviews(s.previews, workspaceId, selectedSessionId).root)
   const previewTurn = useMemo(() => buildPreviewTurn(rootPreview), [rootPreview])
 
-  // The selected session's persisted model/effort. For a brand-new chat (no
-  // session yet) this is empty and `send` falls back to workspace defaults.
-  const sessionConfig = useSessionConfig(workspaceId, selectedSessionId).data
+  // Sends waiting behind the running reply. The server echoes each one with
+  // its optimistic id when it dispatches it; that turn then replaces the
+  // queued bubble in transcript order. A run that ends with sends still
+  // waiting dropped them (a failed run clears the backend queue).
+  const queuedAll = useLive(s =>
+    selectedSessionId ? s.queued[`${workspaceId}:${selectedSessionId}`] : undefined
+  )
+  const queuedTurns = useMemo(
+    () => (queuedAll ?? EMPTY_TURNS).filter(turn => !view.turns.some(t => t.id === turn.id)),
+    [queuedAll, view.turns]
+  )
+  useEffect(() => {
+    if (!selectedSessionId || !queuedAll?.length) return
+    const store = liveStore.getState()
+    if (!processing) store.removeQueued(workspaceId, selectedSessionId)
+    else if (queuedTurns.length !== queuedAll.length) {
+      const pending = new Set(queuedTurns.map(turn => turn.id))
+      store.removeQueued(
+        workspaceId,
+        selectedSessionId,
+        queuedAll.filter(turn => !pending.has(turn.id)).map(turn => turn.id)
+      )
+    }
+  }, [processing, queuedAll, queuedTurns, selectedSessionId, workspaceId])
+
+  // Effective backend settings plus explicit moi choices. New chats inherit
+  // the workspace; existing chats wait for their own settings before sending.
+  const sessionConfig = configQuery.data
 
   // The composer owns the workspace draft in the persisted UI store and hands
   // the text in, so a keystroke re-renders only the composer.
@@ -112,6 +157,7 @@ export function useChat(address: WorkspaceTabAddress) {
       // No `processing` guard: sending while a turn is in flight QUEUES the
       // message into the same live server session (streaming-input mode).
       if (!text && ready.length === 0 && !options?.preparedAttachments?.attachments.length) return
+      if (selectedSessionId && sessionConfig === undefined) return
 
       const prepared = options?.preparedAttachments ?? prepareDraftAttachments(ready)
       const limitError = messageAttachmentLimitError(prepared.attachments)
@@ -135,6 +181,11 @@ export function useChat(address: WorkspaceTabAddress) {
           workspaceId,
           sessionId: sid,
           text,
+          config: {
+            model: layout.selectedModel,
+            effort: layout.selectedEffort,
+            fastMode: layout.selectedFastMode
+          },
           filenames: ready.map(attachment => attachment.label)
         })
       }
@@ -150,7 +201,8 @@ export function useChat(address: WorkspaceTabAddress) {
         queryClient: qc,
         workspaceId,
         sessionId: sid,
-        parts
+        parts,
+        queued: !isNew && processing && modelsData?.queuesFollowUps === true
       })
 
       // Resolve the session/workspace choice against the catalog. Codex sends
@@ -201,11 +253,10 @@ export function useChat(address: WorkspaceTabAddress) {
       layout.selectedEffort,
       layout.selectedFastMode,
       buildMoiContext,
-      sessionConfig?.model,
-      sessionConfig?.effort,
-      sessionConfig?.fastMode,
+      sessionConfig,
       selectSession,
-      modelsData
+      modelsData,
+      processing
     ]
   )
 
@@ -223,10 +274,11 @@ export function useChat(address: WorkspaceTabAddress) {
     view,
     chatLoaded,
     previewTurn,
+    queuedTurns,
     sessionId: selectedSessionId,
     processing,
     error,
-    loadError: viewQuery.error?.message ?? null,
+    loadError: viewQuery.error?.message ?? configQuery.error?.message ?? null,
     retryLoad,
     send,
     stop,

@@ -1,0 +1,201 @@
+import { stat } from 'node:fs/promises'
+import { join } from 'node:path'
+
+import type { SetSessionConfigOptionResponse } from '@agentclientprotocol/sdk'
+
+import type { HarnessAvailability } from '@/lib/types'
+
+import { resolveWorkspaceEnv } from '../../workspace-env'
+import { archiveAcpSession } from '../acp/archived'
+import { getAcpProcessInfo, killAcpWorkspace, killAllAcpClients } from '../acp/client'
+import {
+  acpWorkspacePreview,
+  listAcpModels,
+  listAcpSessions,
+  probeAcpModel
+} from '../acp/discovery'
+import { clearAcpModelCache } from '../acp/model-state'
+import {
+  type AcpProviderConfig,
+  ensureAcpSessionLive,
+  forgetAcpSession,
+  forgetAcpWorkspaceSessions,
+  forgetAllAcpSessions,
+  getAcpActiveSessions,
+  getAcpSessionModelState,
+  getLiveAcpEvents,
+  interruptAcpRun,
+  releaseAcpWorkspaceSessions,
+  sendAcpMessage
+} from '../acp/session'
+import { findHarnessExecutable, pathHarnessAvailability } from '../executable'
+import type { Harness } from '../types'
+import {
+  describeFxOperationalMessage,
+  isFxOperationalMessage,
+  normalizeFxToolUpdate
+} from './adapter'
+import { checkFxVersion } from './compat'
+import { fxToolEnrichments, readFxToolHistory } from './history'
+import { applyFxSettings, fxModels, fxModelState, fxSessionConfig } from './models'
+
+export const fxConfig: AcpProviderConfig = {
+  id: 'fx',
+  provider: 'fx',
+  processScope: 'session',
+  // `code` uses fx's automatic action review; it does not disable review.
+  noPromptModeId: 'code',
+  supportsImages: true,
+  persistSessionModel: false,
+  // fx replays no thoughts and only clipped results; keep the live transcript.
+  keepViewOnIdleRelease: true,
+  modelState: fxModelState,
+  mapModels: fxModels,
+  defaultModel: async (ctx, config) =>
+    (await listAcpModels(config, ctx)).find(model => model.value === 'default')?.resolvedModel,
+  applySettings: applyFxSettings,
+  async probeModelOptions(client, sessionId, modelId) {
+    const res = await client.rpc<SetSessionConfigOptionResponse>('session/set_config_option', {
+      sessionId,
+      configId: 'model',
+      value: modelId
+    })
+    return fxModelState({ configOptions: res.configOptions })
+  },
+  normalizeToolUpdate: normalizeFxToolUpdate,
+  isOperationalMessage: isFxOperationalMessage,
+  describeOperationalMessage: describeFxOperationalMessage,
+  async enrichToolCalls(ctx, sessionId, calls) {
+    const command = findHarnessExecutable('fx')
+    if (!command) return new Map()
+    const history = await readFxToolHistory(command, sessionId, {
+      cwd: ctx.workspacePath,
+      env: await resolveWorkspaceEnv(ctx.workspacePath),
+      timeoutMs: 3_000
+    })
+    return fxToolEnrichments(history, calls)
+  },
+  async modelStateFingerprint(ctx) {
+    const env = await resolveWorkspaceEnv(ctx.workspacePath)
+    const home = env.HOME ?? process.env.HOME ?? ''
+    const paths = [findHarnessExecutable('fx'), join(home, '.fx', 'settings.json')]
+    const stamps = await Promise.all(
+      paths.map(async path => {
+        if (!path) return ''
+        const entry = await stat(path).catch(() => undefined)
+        return `${path}:${entry?.mtimeMs ?? 0}:${entry?.size ?? 0}`
+      })
+    )
+    return stamps.join('|')
+  },
+  async spawn(ctx) {
+    const command = findHarnessExecutable('fx')
+    if (!command) throw new Error('fx executable not found')
+    const runtime = await checkFxVersion(command, {
+      cwd: ctx.workspacePath,
+      env: await resolveWorkspaceEnv(ctx.workspacePath)
+    })
+    if (runtime.status !== 'available') throw new Error(runtime.reason)
+    return {
+      provider: 'fx',
+      command,
+      args: ['acp'],
+      workspacePath: ctx.workspacePath,
+      // Preserve the installed binary during an owned process's lifetime.
+      env: { FX_AUTO_UPGRADE: '0' }
+    }
+  }
+}
+
+function ctxOf(ws: { id: string; path: string }) {
+  return { workspaceId: ws.id, workspacePath: ws.path }
+}
+
+export const fxHarness: Harness = {
+  id: 'fx',
+  capabilities: {
+    supportsStreaming: true,
+    imagesInline: 'base64',
+    liveModelSwitch: true,
+    liveEffortSwitch: true,
+    nativeUserEcho: false,
+    queuesFollowUps: true // ACP sends wait in moi's per-chat queue
+  },
+  sendMessage: input => sendAcpMessage(fxConfig, input),
+  interrupt: (workspaceId, sessionId) => interruptAcpRun(fxConfig, { workspaceId, sessionId }),
+  archiveSession: async (ws, sessionId) => {
+    await interruptAcpRun(fxConfig, { workspaceId: ws.id, sessionId })
+    await archiveAcpSession(ws.path, sessionId)
+    forgetAcpSession(ws.id, sessionId)
+  },
+  activeSessions: () => getAcpActiveSessions('fx'),
+  listSessions: ws => listAcpSessions(fxConfig, ctxOf(ws)),
+  workspacePreview: (ws, firstMessage) => acpWorkspacePreview(fxConfig, ctxOf(ws), firstMessage),
+  sessionEvents: async (ws, sessionId) =>
+    getLiveAcpEvents(ws.id, sessionId) ??
+    (await ensureAcpSessionLive(fxConfig, { ...ctxOf(ws), sessionId })),
+  sessionConfig: async (ws, sessionId) =>
+    fxSessionConfig(await getAcpSessionModelState(fxConfig, { ...ctxOf(ws), sessionId })),
+  listModels: ws => listAcpModels(fxConfig, ctxOf(ws)),
+  probeModel: (ws, modelId) => probeAcpModel(fxConfig, ctxOf(ws), modelId),
+  async availability(ws): Promise<HarnessAvailability> {
+    const runtime = await pathHarnessAvailability('fx')
+    if (runtime.status !== 'available') return runtime
+    const command = findHarnessExecutable('fx')
+    if (!command) return runtime
+    const workspaceEnv = ws ? await resolveWorkspaceEnv(ws.path) : {}
+    const version = await checkFxVersion(command, { cwd: ws?.path, env: workspaceEnv })
+    if (version.status !== 'available' || !ws) return version
+    const proc = Bun.spawn([command, 'status'], {
+      cwd: ws.path,
+      env: { ...process.env, ...workspaceEnv, FX_AUTO_UPGRADE: '0' },
+      stdout: 'pipe',
+      stderr: 'pipe'
+    })
+    const timeout = setTimeout(() => proc.kill(), 10_000)
+    try {
+      const [output, , code] = await Promise.all([
+        new Response(proc.stdout).text(),
+        new Response(proc.stderr).text(),
+        proc.exited
+      ])
+      if (code !== 0)
+        return {
+          status: 'unavailable',
+          reason: 'fx status failed. Run fx status in this workspace to check its setup.'
+        }
+      if (
+        /\bauth=(?:none|missing|not configured)\s*$/m.test(output) ||
+        (/auth_expired=true/.test(output) && !/auth_refreshable=true/.test(output))
+      ) {
+        return {
+          status: 'unavailable',
+          reason: 'Sign in with fx login in your terminal, then reopen this chat.'
+        }
+      }
+      return { status: 'available' }
+    } finally {
+      clearTimeout(timeout)
+    }
+  },
+  onEnvChanged: workspacePath => {
+    clearAcpModelCache(workspacePath, 'fx')
+    releaseAcpWorkspaceSessions(workspacePath, 'fx')
+    killAcpWorkspace(workspacePath, 'fx')
+  },
+  stopWorkspace: workspacePath => {
+    forgetAcpWorkspaceSessions(workspacePath, 'fx')
+    killAcpWorkspace(workspacePath, 'fx')
+  },
+  shutdown: () => {
+    forgetAllAcpSessions('fx')
+    killAllAcpClients('fx')
+  },
+  skillsDir: workspaceRoot => join(workspaceRoot, '.agents', 'skills'),
+  debugInfo: ws => getAcpProcessInfo(ws.path, findHarnessExecutable('fx'), 'fx'),
+  wireScope: ws => ws.path,
+  statusLines: () => [
+    `fx executable  ${findHarnessExecutable('fx') ?? '(not found)'}`,
+    `live fx runs  ${getAcpActiveSessions('fx').length}`
+  ]
+}

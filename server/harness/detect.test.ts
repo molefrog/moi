@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { type DetectionSources, agentBindingFor, detectHarness } from './detect'
+import { type DetectionSources, agentBindingFor, detectHarness, isHarnessName } from './detect'
 
 const WS = '/tmp/ws'
 
@@ -26,6 +26,9 @@ const profile = (path: string) => ({
 const agent = (path: string) => ({ path, agentId: 'ada', name: 'Ada', isDefault: false })
 
 describe('detectHarness', () => {
+  test('accepts fx as an explicit harness', () => {
+    expect(isHarnessName('fx')).toBe(true)
+  })
   test('returns null when nothing matches', async () => {
     expect(await detectHarness(WS, sources())).toBeNull()
   })
@@ -128,6 +131,7 @@ describe('agentBindingFor', () => {
     const src = sources({ hermesProfiles: async () => [profile(WS)] })
     expect(await agentBindingFor('claude-code', WS, src)).toBeNull()
     expect(await agentBindingFor('codex', WS, src)).toBeNull()
+    expect(await agentBindingFor('fx', WS, src)).toBeNull()
     expect(await agentBindingFor('hermes', '/tmp/other', src)).toBeNull()
   })
 })

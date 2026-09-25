@@ -38,7 +38,8 @@ const components = {
 }
 
 type MarkdownContentProps = {
-  size?: 'sm'
+  // 'xs' fits markdown inside compact surfaces such as tool output.
+  size?: 'sm' | 'xs'
   content: string
 }
 
@@ -53,7 +54,8 @@ export function MarkdownContent({ size = 'sm', content }: MarkdownContentProps) 
     <div
       className={cn(
         'prose max-w-full min-w-0 wrap-anywhere prose-inherit',
-        size === 'sm' && 'prose-sm'
+        size === 'sm' && 'prose-sm',
+        size === 'xs' && 'prose-sm text-xs leading-relaxed'
       )}
     >
       <ReactMarkdown

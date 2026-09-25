@@ -4,6 +4,7 @@ import {
   chatNoticeLabel,
   interleaveNotices
 } from '@/client/features/chat/messages/interleave-notices'
+import { groupedTurnIds, groupTurns } from '@/client/features/chat/messages/group-turns'
 import type { SystemNotice, Turn } from '@/lib/types'
 
 function turn(id: string, timestamp?: string): Turn {
@@ -114,6 +115,37 @@ describe('interleaveNotices', () => {
   test('all turns undated → notices go after the last turn', () => {
     const items = interleaveNotices([turn('a'), turn('b')], [compact('n1', '2026-08-04T10:30:00Z')])
     expect(keys(items)).toEqual(['a', 'b', 'notice:n1'])
+  })
+
+  test('a replayed notice follows the turn it names', () => {
+    const stopped: SystemNotice = {
+      id: 'stop',
+      kind: 'warning',
+      at: '2026-08-04T10:30:00Z',
+      message: 'This run was stopped before it finished.',
+      afterTurnId: 'a'
+    }
+    const missing = { ...stopped, id: 'gone', afterTurnId: 'nope' }
+    const items = interleaveNotices([turn('a'), turn('b')], [stopped, missing])
+    expect(keys(items)).toEqual(['a', 'notice:stop', 'b', 'notice:gone'])
+  })
+
+  test('a notice naming a turn merged into its run follows the whole run', () => {
+    // Replay: text, then a tool call, grouped into one run under the first id.
+    const raw = [turn('run'), turn('tool'), { ...turn('next'), role: 'user' as const }]
+    const grouped = groupTurns(raw)
+    const stopped: SystemNotice = {
+      id: 'stop',
+      kind: 'warning',
+      at: '2026-08-04T10:30:00Z',
+      message: 'This run was stopped before it finished.',
+      afterTurnId: 'tool'
+    }
+    expect(keys(interleaveNotices(grouped, [stopped], groupedTurnIds(raw)))).toEqual([
+      'run',
+      'notice:stop',
+      'next'
+    ])
   })
 
   test('no turns → notices render alone', () => {
