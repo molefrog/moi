@@ -4,7 +4,7 @@
 // history interface. It keeps up to 4,096 bytes of each result, which covers
 // most results; a longer one arrives cut, a shell envelope mid-JSON.
 import type { ToolCall } from '@/lib/types'
-import { FX_HISTORY_PREVIEW_ONLY, FX_NO_OUTPUT, FX_STATUS_LINE } from '@/lib/fx-shell-status'
+import { FX_HISTORY_PREVIEW_ONLY, FX_NO_OUTPUT } from '@/lib/fx-shell-status'
 
 import { errorEnvelopeText } from './adapter'
 
@@ -223,6 +223,12 @@ function rowText(call: ToolCall | undefined): string {
   return typeof text === 'string' ? text : ''
 }
 
+// A row whose status line stands in for output fx has not sent. A live wait
+// row's "shell-1 finished with exit code 0." is its result, not a gap.
+function awaitingOutput(text: string): boolean {
+  return text === '' || text === FX_HISTORY_PREVIEW_ONLY || /^Moved to the background\b/.test(text)
+}
+
 // Map saved results to changes for the rows in `calls`. A shell row keeps
 // output it streamed live: that stream is complete and newer, while fx saves
 // at most 4,096 bytes and can interleave stdout and stderr mid-line. Saved
@@ -238,7 +244,7 @@ export function fxToolEnrichments(
     if (result.shell) {
       const shell = result.shell
       const shown = rowText(row)
-      const fill = shown === '' || FX_STATUS_LINE.test(shown)
+      const fill = awaitingOutput(shown)
       const text = !fill
         ? ''
         : shell.partial && shell.output

@@ -201,6 +201,56 @@ describe('fx tool history', () => {
     expect(replayed?.output).toEndWith('\n… (fx saved only part of this output)')
   })
 
+  test('a live wait row keeps its outcome line', () => {
+    const waited = {
+      history: [
+        {
+          execution: {
+            tool_steps: [
+              {
+                tool_results: [
+                  {
+                    tool_call_id: 'wait',
+                    tool_name: 'shell',
+                    status: 'success',
+                    output: JSON.stringify({
+                      session_id: 'shell-1',
+                      state: 'completed',
+                      exit_code: 0,
+                      signal: null,
+                      output_delta: 'END\n'
+                    })
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+    const row = (output: string) => ({
+      toolCallId: 'wait',
+      name: 'shell',
+      input: { action: 'interact', session_id: 'shell-1' },
+      caller: 'model' as const,
+      provider: 'fx' as const,
+      state: 'success' as const,
+      output
+    })
+    // Live, its output went to the command's own row.
+    expect(
+      fxToolEnrichments(parseFxToolHistory(waited), [
+        row('shell-1 finished with exit code 0.')
+      ]).get('wait')?.output
+    ).toBeUndefined()
+    // After a cold load that row has no late output, so the wait row shows it.
+    expect(
+      fxToolEnrichments(parseFxToolHistory(waited), [
+        row('fx did not include command output in this history preview.')
+      ]).get('wait')?.output
+    ).toBe('END\n')
+  })
+
   test('a replayed command that printed nothing reads as no output', () => {
     const quiet = {
       history: [
