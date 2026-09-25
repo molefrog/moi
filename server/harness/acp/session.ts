@@ -293,7 +293,9 @@ function emitTurnEvent(rec: SessionRecord, ev: StreamEvent) {
     }
   }
   rec.view = applyEvent(rec.view, ev)
-  broadcast(rec.workspaceId, { ...ev, sessionId: rec.sessionId })
+  // Replayed turns get fresh ids that cannot patch a transcript a client
+  // already holds; `session_reloaded` makes clients refetch it once loaded.
+  if (!rec.replaying) broadcast(rec.workspaceId, { ...ev, sessionId: rec.sessionId })
 }
 
 function forwardPreview(rec: SessionRecord) {
@@ -750,7 +752,10 @@ function initializeSession(
       }
       if (init.cancelled || rec.disposed) throw new Error('Chat was closed while connecting')
       rec.ready = true
-      if (!input.isNew) await enrichToolCalls(rec)
+      if (!input.isNew) {
+        await enrichToolCalls(rec)
+        broadcast(rec.workspaceId, { type: 'session_reloaded', sessionId: rec.sessionId })
+      }
       if (!input.isNew && cacheModelState) refreshAvailability(rec, config.id)
       return rec
     } catch (error) {

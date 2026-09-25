@@ -1101,4 +1101,18 @@ describe('fx history and diagnostics', () => {
     const last = frames.at(-1)?.turn?.parts.find(part => part.type === 'tool-call')
     expect(last?.type === 'tool-call' && last.call.output).toBe(lines.join(''))
   })
+
+  test('a cold load tells clients to refetch instead of broadcasting replayed turns', async () => {
+    const agent = await fixture()
+    const before = getClientFrameLog(agent.ctx.workspaceId).length
+    const events = await agent.load('one')
+    expect(turns(events).map(turn => turn.role)).toEqual(['user', 'assistant'])
+    const frames = getClientFrameLog(agent.ctx.workspaceId)
+      .slice(before)
+      .map(entry => entry.frame as { kind?: string; type?: string; sessionId?: string })
+    expect(frames.filter(frame => frame.kind === 'turn')).toEqual([])
+    expect(frames.filter(frame => frame.type === 'session_reloaded')).toEqual([
+      expect.objectContaining({ type: 'session_reloaded', sessionId: 'one' })
+    ])
+  })
 })

@@ -388,6 +388,7 @@ export type ServerMessage =
   | StatusMessage
   | SessionRenamedMessage
   | SessionsChangedMessage
+  | SessionReloadedMessage
   | WorkspaceSwitchMessage
   | ErrorFrame
   | StoppedFrame
@@ -432,6 +433,7 @@ export type BroadcastFrame =
   | Omit<StatusMessage, 'workspaceId'>
   | Omit<SessionRenamedMessage, 'workspaceId'>
   | Omit<SessionsChangedMessage, 'workspaceId'>
+  | Omit<SessionReloadedMessage, 'workspaceId'>
   | Omit<ErrorFrame, 'workspaceId'>
   | Omit<StoppedFrame, 'workspaceId'>
 
@@ -539,6 +541,15 @@ export type SessionRenamedMessage = {
 
 export type SessionsChangedMessage = {
   type: 'sessions_changed'
+  workspaceId: string
+  sessionId: string
+}
+
+// The server rebuilt a chat's transcript from the backend's history (a cold
+// load, e.g. after an idle release). Replayed turns carry new ids, so a client
+// holding the old transcript refetches it instead of patching it.
+export type SessionReloadedMessage = {
+  type: 'session_reloaded'
   workspaceId: string
   sessionId: string
 }

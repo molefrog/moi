@@ -113,6 +113,14 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
     }
     return
   }
+  if (data.type === 'session_reloaded') {
+    // Events that arrive while the refetch is in flight are buffered and
+    // applied on top of it (see sessionViewOptions).
+    queryClient?.invalidateQueries({
+      queryKey: workspaceKeys.events(data.workspaceId as string, data.sessionId as string)
+    })
+    return
+  }
   if (data.type === 'workspace:switch') {
     onWorkspaceSwitch?.(data.workspaceId as string)
     return
