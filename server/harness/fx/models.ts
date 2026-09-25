@@ -42,20 +42,25 @@ export function fxModelState(
 // Gateway catalogs name each model `<vendor>/<model>`, a few hundred of them.
 // The picker lists the model name under a vendor heading instead.
 const VENDORS: Record<string, string> = {
-  alibaba: 'Alibaba',
-  amazon: 'Amazon',
-  anthropic: 'Anthropic',
-  cohere: 'Cohere',
+  'arcee-ai': 'Arcee AI',
+  bytedance: 'ByteDance',
   deepseek: 'DeepSeek',
-  google: 'Google',
-  meta: 'Meta',
   minimax: 'MiniMax',
-  mistral: 'Mistral',
   moonshotai: 'Moonshot AI',
+  nvidia: 'NVIDIA',
   openai: 'OpenAI',
-  perplexity: 'Perplexity',
+  stepfun: 'StepFun',
+  thinkingmachines: 'Thinking Machines',
   xai: 'xAI',
   zai: 'Z.ai'
+}
+
+// Other vendors: `inference-net` → "Inference net".
+function vendorLabel(slug: string): string {
+  const known = VENDORS[slug]
+  if (known) return known
+  const words = slug.replace(/-/g, ' ')
+  return words.charAt(0).toUpperCase() + words.slice(1)
 }
 
 function modelLabel(info: {
@@ -70,7 +75,7 @@ function modelLabel(info: {
     // A name fx chose itself is kept as is.
     displayName:
       !info.name || info.name === info.modelId ? info.modelId.slice(slash + 1) : info.name,
-    group: VENDORS[vendor] ?? vendor
+    group: vendorLabel(vendor)
   }
 }
 

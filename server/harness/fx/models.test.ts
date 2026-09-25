@@ -99,14 +99,14 @@ describe('fx model configuration', () => {
     const named = fxModels({
       availableModels: [
         { modelId: 'local', name: 'local' },
-        { modelId: 'acme/m-1', name: 'acme/m-1' },
+        { modelId: 'inference-net/m-1', name: 'inference-net/m-1' },
         { modelId: 'x/y', name: 'Friendly name' }
       ]
     })
     expect(named.map(({ displayName, group }) => [displayName, group])).toEqual([
       ['local', undefined],
-      ['m-1', 'acme'],
-      ['Friendly name', 'x']
+      ['m-1', 'Inference net'],
+      ['Friendly name', 'X']
     ])
   })
 
