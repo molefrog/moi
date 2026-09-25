@@ -3,7 +3,7 @@ import { realpath } from 'node:fs/promises'
 
 import type { Model, SessionInfo } from '@/lib/types'
 
-import { type AcpProviderConfig, type AcpSpawnContext } from './session'
+import { type AcpProviderConfig, type AcpSpawnContext, liveAcpFirstUserText } from './session'
 import { acpSessionToSessionInfo } from './adapter'
 import { archiveAcpSession, archivedAcpSessions } from './archived'
 import { getAcpClient, peekAcpClient, releaseAcpClient } from './client'
@@ -51,7 +51,14 @@ export async function listAcpSessions(
           (!entry.cwd || entry.cwd === ctx.workspacePath || entry.cwd === cwd)
         ) {
           ids.add(entry.sessionId)
-          out.push(acpSessionToSessionInfo(entry))
+          out.push(
+            acpSessionToSessionInfo(
+              entry,
+              entry.title?.trim()
+                ? undefined
+                : liveAcpFirstUserText(ctx.workspaceId, entry.sessionId)
+            )
+          )
         }
       }
       if (!res.nextCursor || cursors.has(res.nextCursor)) break

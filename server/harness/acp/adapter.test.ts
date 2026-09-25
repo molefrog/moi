@@ -300,6 +300,19 @@ describe('acpSessionToSessionInfo', () => {
     })
   })
 
+  test('titles an untitled chat from its first message instead of a placeholder', () => {
+    expect(
+      acpSessionToSessionInfo(
+        { sessionId: 's2', cwd: '/ws' },
+        'Build a  customer\ndashboard with charts'
+      ).summary
+    ).toBe('Build a customer dashboard with charts')
+    expect(
+      acpSessionToSessionInfo({ sessionId: 's2', cwd: '/ws', title: 'Named' }, 'first message')
+        .summary
+    ).toBe('Named')
+  })
+
   test('uses the attachment label for an attachment-only title', () => {
     expect(
       acpSessionToSessionInfo({

@@ -134,11 +134,19 @@ export function replayedUserParts(raw: string, images: readonly Part[] = []): Pa
   return replayAttachmentParts([...images, { type: 'text', text: raw }])
 }
 
-export function acpSessionToSessionInfo(entry: AcpSessionListEntry): SessionInfo {
+// `firstMessage` titles a chat the agent has not named yet, the way the client
+// titles it optimistically, instead of a generic placeholder.
+export function acpSessionToSessionInfo(
+  entry: AcpSessionListEntry,
+  firstMessage?: string
+): SessionInfo {
   const updated = entry.updatedAt ? Date.parse(entry.updatedAt) : NaN
   return {
     sessionId: entry.sessionId,
-    summary: formatChatTitle(entry.title?.trim() ?? '') || 'Untitled session',
+    summary:
+      formatChatTitle(entry.title?.trim() ?? '') ||
+      formatChatTitle(firstMessage ?? '') ||
+      'Untitled session',
     lastModified: Number.isNaN(updated) ? 0 : updated,
     ...(entry.cwd ? { cwd: entry.cwd } : {})
   }

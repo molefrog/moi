@@ -1017,6 +1017,15 @@ export function viewAsEvents(rec: SessionRecord): StreamEvent[] {
 
 // Read-side hook for the REST events endpoint: return the live view when we
 // hold one so REST + WS stay in agreement.
+// First user message of a chat open in this server, used to title a chat the
+// agent has not named yet. Reading it does not count as using the chat.
+export function liveAcpFirstUserText(workspaceId: string, sessionId: string): string | undefined {
+  const rec = sessions.get(liveKey(workspaceId, sessionId))
+  const turn = rec?.view.turns.find(t => t.role === 'user')
+  const text = turn?.parts.flatMap(p => (p.type === 'text' ? [p.text] : [])).join('\n')
+  return text || undefined
+}
+
 export function getLiveAcpEvents(workspaceId: string, sessionId: string): StreamEvent[] | null {
   const rec = sessions.get(liveKey(workspaceId, sessionId))
   if (rec) rec.lastUsed = Date.now()
