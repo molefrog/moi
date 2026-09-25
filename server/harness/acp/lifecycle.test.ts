@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import type { ServerMessage, StreamEvent, Turn } from '@/lib/types'
 
 import { agentStore } from '../../agent'
+import { applyEnvChanged } from '../../env-apply'
 import {
   DEFAULT_SESSION_CONFIG_PATH,
   getSessionConfig,
@@ -32,7 +33,6 @@ import {
   getAcpSessionModelState,
   getLiveAcpEvents,
   interruptAcpRun,
-  releaseAcpWorkspaceSessions,
   releaseIdleAcpSessions,
   sendAcpMessage
 } from './session'
@@ -1399,7 +1399,8 @@ describe('fx history and diagnostics', () => {
     const ctx = { ...agent.ctx, sessionId: 'one' }
     await sendAcpMessage(config, { ...ctx, isNew: false, content: 'first' })
     const live = getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? []
-    releaseAcpWorkspaceSessions(agent.ctx.workspacePath, 'fx')
+    // Every harness hears the change (Hermes first); only fx's chats are fx's.
+    applyEnvChanged({ id: agent.ctx.workspaceId, path: agent.ctx.workspacePath })
     expect(getLiveAcpEvents(agent.ctx.workspaceId, 'one')).toEqual(live)
     const loads = (await agent.calls()).filter(c => c.method === 'session/load').length
     expect(await ensureAcpSessionLive(config, ctx)).toEqual(live)

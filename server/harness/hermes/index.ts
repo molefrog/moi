@@ -135,17 +135,19 @@ export const hermesHarness: Harness = {
     }
   },
 
+  // Every harness hears about an env change, and other ACP harnesses (fx)
+  // share this session layer: act only on Hermes chats and processes.
   onEnvChanged: workspacePath => {
-    forgetAcpWorkspaceSessions(workspacePath)
-    killAcpWorkspace(workspacePath)
+    forgetAcpWorkspaceSessions(workspacePath, 'hermes')
+    killAcpWorkspace(workspacePath, 'hermes')
   },
   stopWorkspace: workspacePath => {
-    forgetAcpWorkspaceSessions(workspacePath)
-    killAcpWorkspace(workspacePath)
+    forgetAcpWorkspaceSessions(workspacePath, 'hermes')
+    killAcpWorkspace(workspacePath, 'hermes')
   },
   shutdown: () => {
-    forgetAllAcpSessions()
-    killAllAcpClients()
+    forgetAllAcpSessions('hermes')
+    killAllAcpClients('hermes')
   },
   // Hermes reads skills from the PROFILE home (`$HERMES_HOME/skills`) and has
   // no cwd-relative skill path, so installing into the workspace would leave
