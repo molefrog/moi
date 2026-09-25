@@ -309,7 +309,8 @@ short live thoughts, later warnings, thought-only completion, and cancellation.
   Only a moi restart or a chat continued outside moi falls back to the
   lossy replay, which also puts replayed notices after the turn they
   follow rather than at their original time.
-- fx replays an interrupted turn without the tool call that was running;
+- fx replays an interrupted turn without the tool call that was running,
+  and can repeat the text that preceded it;
   moi shows its `cancelled`/`failed` outcome as a notice. A tool cancelled
   before it ran (still waiting on review) gets no terminal update from fx;
   the shared ACP layer marks it interrupted rather than inventing success.
