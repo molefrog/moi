@@ -26,7 +26,14 @@ import {
 } from '../../attachment-message'
 import { type MoiContext, appendMoiContext, renderMoiContext } from '@/lib/moi-context'
 import { type Part, type Turn, applyEvent, emptyViewState } from '@/lib/format'
-import type { Model, SessionActivity, StreamEvent, ViewState, WorkspaceType } from '@/lib/types'
+import type {
+  Model,
+  SessionActivity,
+  StreamEvent,
+  ToolCall,
+  ViewState,
+  WorkspaceType
+} from '@/lib/types'
 
 import {
   type AcpProviderId,
@@ -65,6 +72,8 @@ export type AcpSpawnContext = {
 
 export type AcpToolEnrichment = {
   output?: string
+  // Replaces the failure text of a call that ended in error.
+  errorText?: string
   // Merged into the call's sidecar (structured details for renderers).
   sidecar?: Record<string, unknown>
 }
@@ -98,12 +107,14 @@ export type AcpProviderConfig = {
   // thoughts, clipped results). Releasing an idle chat then keeps moi's live
   // transcript for its next load instead of the lossy replay.
   keepViewOnIdleRelease?: boolean
-  // Replace clipped tool results with the provider's own saved copy, keyed by
-  // wire toolCallId. Runs after a history load and after each prompt; best
-  // effort, so a failure leaves the ACP preview in place.
+  // Replace clipped tool results with the provider's own saved copy. Given
+  // the chat's current tool calls, return changes keyed by wire toolCallId.
+  // Runs after a history load and after each prompt; best effort, so a
+  // failure leaves the ACP preview in place.
   enrichToolCalls?: (
     ctx: AcpSpawnContext,
-    sessionId: string
+    sessionId: string,
+    calls: readonly ToolCall[]
   ) => Promise<Map<string, AcpToolEnrichment>>
   // Classify provider diagnostics that arrive as agent text. `replaying` is
   // true while `session/load` streams history.
@@ -412,10 +423,6 @@ function ingestToolCall(
   provider: AcpProviderId,
   isStart: boolean
 ) {
-  // A tool call closes the open assistant run: text before it and text after
-  // it are separate turns, so the transcript reads in execution order.
-  flushAssistant(rec)
-  flushUserChunk(rec)
   // Repeated wire ids (see toolCallSeq) get a per-occurrence alias so each
   // start is its own turn; a `tool_call_update` reuses the latest one.
   if (isStart) {
@@ -434,15 +441,23 @@ function ingestToolCall(
     previous
   })
   const state = turn.parts.find(p => p.type === 'tool-call')
-  const settled =
-    state?.type === 'tool-call' && (state.call.state === 'success' || state.call.state === 'error')
-  if (settled) rec.openToolCalls.delete(aliasedId)
-  else rec.openToolCalls.add(aliasedId)
   const previousState = previous?.parts.find(p => p.type === 'tool-call')
   const sameState =
     previousState?.type === 'tool-call' &&
     state?.type === 'tool-call' &&
     previousState.call.state === state.call.state
+  // A tool call that starts or changes state closes the open assistant run:
+  // text before it and text after it are separate turns, so the transcript
+  // reads in execution order. Progress on a call already shown does not; a
+  // backgrounded command's late output can arrive while the model writes.
+  if (isStart || !sameState) {
+    flushAssistant(rec)
+    flushUserChunk(rec)
+  }
+  const settled =
+    state?.type === 'tool-call' && (state.call.state === 'success' || state.call.state === 'error')
+  if (settled) rec.openToolCalls.delete(aliasedId)
+  else rec.openToolCalls.add(aliasedId)
   // fx follows every `tool_call` with a status-only `in_progress` update that
   // changes nothing moi shows.
   if (previous && Bun.deepEquals(previous, turn)) return
@@ -490,7 +505,10 @@ async function enrichToolCalls(rec: SessionRecord): Promise<void> {
   try {
     results = await enrich(
       { workspaceId: rec.workspaceId, workspacePath: rec.workspacePath, agentId: rec.agentId },
-      rec.sessionId
+      rec.sessionId,
+      rec.view.turns.flatMap(turn =>
+        turn.parts.flatMap(part => (part.type === 'tool-call' ? [part.call] : []))
+      )
     )
   } catch (error) {
     debug(`${rec.config.id} tool history could not be read: ${String(error)}`)
@@ -506,10 +524,10 @@ async function enrichToolCalls(rec: SessionRecord): Promise<void> {
     const call = {
       ...part.call,
       ...(enrichment.output !== undefined ? { output: enrichment.output } : {}),
+      ...(enrichment.errorText !== undefined && part.call.state === 'error'
+        ? { errorText: enrichment.errorText }
+        : {}),
       ...(enrichment.sidecar ? { sidecar: { ...part.call.sidecar, ...enrichment.sidecar } } : {})
-    }
-    if (call.state === 'error' && enrichment.output !== undefined && part.call.errorText) {
-      call.errorText = part.call.errorText
     }
     if (JSON.stringify(call) === JSON.stringify(part.call)) continue
     emitTurnEvent(rec, {
@@ -728,6 +746,7 @@ function initializeSession(
       ...(config.processScope === 'session' ? { scope: `chat:${input.sessionId}` } : {})
     })
     let rec: SessionRecord | undefined
+    let released: ReleasedView | undefined
     try {
       if (init.cancelled) throw new Error('Chat was closed while connecting')
       // Install the receiver before load: it emits history before its response.
@@ -765,9 +784,7 @@ function initializeSession(
       if (!input.isNew) {
         // An idle-released chat keeps the transcript moi saw live, unless the
         // chat changed elsewhere since (a different number of user turns).
-        const releasedKey = recKey(input.workspaceId, realId)
-        const released = releasedViews.get(releasedKey)
-        releasedViews.delete(releasedKey)
+        released = releasedViews.get(recKey(input.workspaceId, realId))
         if (released && userTurnCount(released.view) === userTurnCount(rec.view)) {
           rec.view = released.view
           rec.acc.continueAfter(rec.view.turns)
@@ -800,6 +817,12 @@ function initializeSession(
       }
       if (init.cancelled || rec.disposed) throw new Error('Chat was closed while connecting')
       rec.ready = true
+      // Only now drop the retained transcript: a load that fails or is stopped
+      // keeps it for the next attempt. A forget during the load removed it.
+      const releasedKey = recKey(input.workspaceId, realId)
+      if (released && releasedViews.get(releasedKey) === released) {
+        releasedViews.delete(releasedKey)
+      }
       if (!input.isNew) {
         await enrichToolCalls(rec)
         broadcast(rec.workspaceId, { type: 'session_reloaded', sessionId: rec.sessionId })
@@ -1051,6 +1074,15 @@ export async function sendAcpMessage(
     broadcast(input.workspaceId, { type: 'status', sessionId: input.sessionId, activity: 'idle' })
     return
   }
+  // Starting an ACP agent takes seconds. Report the new chat as running now,
+  // as other harnesses do, so tabs sharing its selection keep it meanwhile.
+  if (input.isNew) {
+    broadcast(input.workspaceId, {
+      type: 'status',
+      sessionId: input.sessionId,
+      activity: 'running'
+    })
+  }
   let rec: SessionRecord
   try {
     rec = await initializeSession(config, input)
@@ -1065,6 +1097,11 @@ export async function sendAcpMessage(
       { workspaceId: input.workspaceId, workspacePath: input.workspacePath },
       config.id
     )
+    return
+  }
+  // A stop, or the chat closing, while it loaded cancels this send.
+  if ((cancellations.get(sendKey) ?? 0) !== cancellation || rec.disposed) {
+    broadcast(input.workspaceId, { type: 'status', sessionId: input.sessionId, activity: 'idle' })
     return
   }
 

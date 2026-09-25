@@ -67,10 +67,16 @@ function stripReadGutter(text: string): string {
 
 // fx wraps file reads as `<path>…</path>` + `<content>…</content>` around a
 // numbered listing. Unwrap to the listing so the gutter strip and highlighter
-// see plain source; any other shape passes through unchanged.
-function unwrapFxRead(text: string): string {
-  const match = /^<path>[^\n]*<\/path>\n<content>\n([\s\S]*?)\n?<\/content>\s*$/.exec(text)
-  return match ? match[1]! : text
+// see plain source; any other shape passes through unchanged. A read fx cut
+// short (its 200-byte live preview, or 4,096 saved bytes) has no closing tag.
+export function unwrapFxRead(text: string): { code: string; complete: boolean } | null {
+  const open = /^<path>[^\n]*<\/path>\n<content>\n/.exec(text)
+  if (!open) return null
+  const body = text.slice(open[0].length)
+  const close = /\n?<\/content>\s*$/.exec(body)
+  return close
+    ? { code: body.slice(0, close.index), complete: true }
+    : { code: body, complete: false }
 }
 
 export type DiffLine = { kind: 'addition' | 'deletion' | 'context'; text: string }
@@ -158,8 +164,10 @@ export function detectOutput(call: ToolCall, output: string): OutputView {
 
   const isRead = call.name === 'Read' || call.name === 'read' || call.name === 'read_file'
   const isWrite = call.name === 'Write' || call.name === 'write' || call.name === 'write_file'
+  const read = isRead && call.provider === 'fx' ? unwrapFxRead(output) : null
   if (lang && isRead && output)
-    return { kind: 'highlight', code: stripReadGutter(unwrapFxRead(output)), label: lang }
+    return { kind: 'highlight', code: stripReadGutter(read?.code ?? output), label: lang }
+  if (read) return { kind: 'text', code: stripReadGutter(read.code), label: 'text' }
   if (lang && isWrite && typeof input.content === 'string' && input.content)
     return { kind: 'highlight', code: input.content, label: lang }
 

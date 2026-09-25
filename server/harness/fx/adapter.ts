@@ -72,7 +72,9 @@ function streamedOutput(previousCall: ToolCall | undefined): string {
 // fx reports tool failures as `{"error":{…}}` JSON: a review hold or
 // permission denial carries `message` (and reviewer `advice`), a cancelled
 // call only a `code`. Show the sentence; keep the envelope as raw output.
-function errorEnvelopeText(text: string): { message: string; envelope: unknown } | undefined {
+export function errorEnvelopeText(
+  text: string
+): { message: string; envelope: unknown } | undefined {
   let parsed: Record<string, unknown> | undefined
   try {
     parsed = record(JSON.parse(text))

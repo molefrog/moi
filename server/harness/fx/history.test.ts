@@ -116,7 +116,98 @@ describe('fx tool history', () => {
     })
     expect(enrichments.has('bg')).toBe(false)
     expect(enrichments.get('ed')?.sidecar?.fxFileChange).toBeDefined()
-    expect(enrichments.get('rd')).toEqual({ output: 'no such file' })
+    // A failure keeps its row's output and replaces only the failure text.
+    expect(enrichments.get('rd')).toEqual({ errorText: 'no such file' })
+  })
+
+  // fx keeps 4,096 bytes of a result, which cuts a long shell envelope.
+  function cutShellHistory(stdout: string) {
+    const envelope = JSON.stringify({
+      session_id: null,
+      state: 'completed',
+      backend: 'captured',
+      persistence: 'process',
+      output_truncated: false,
+      exit_code: 3,
+      signal: null,
+      duration_ms: 12,
+      output_delta: stdout
+    })
+    const output = envelope.slice(0, 4096)
+    return {
+      history: [
+        {
+          execution: {
+            tool_steps: [
+              {
+                tool_results: [
+                  { tool_call_id: 'long', tool_name: 'shell', status: 'success', output }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+
+  test('recovers the outcome of a shell envelope cut short', () => {
+    const stdout = Array.from({ length: 1500 }, (_, i) => `line "${i + 1}"`).join('\n')
+    const saved = parseFxToolHistory(cutShellHistory(stdout)).get('long')?.shell
+    expect(saved).toMatchObject({ exitCode: 3, signal: null, state: 'completed', partial: true })
+    expect(saved?.output.length).toBeGreaterThan(3000)
+    expect(stdout.startsWith(saved!.output)).toBe(true)
+  })
+
+  test('a cut shell copy never replaces output that streamed in full', () => {
+    const stdout = Array.from({ length: 1500 }, (_, i) => `${i + 1}`).join('\n')
+    const results = parseFxToolHistory(cutShellHistory(stdout))
+    const row = (output: string) => ({
+      toolCallId: 'long',
+      name: 'shell',
+      input: {},
+      caller: 'model' as const,
+      provider: 'fx' as const,
+      state: 'success' as const,
+      output
+    })
+    expect(fxToolEnrichments(results, [row(stdout)]).get('long')).toEqual({
+      sidecar: { fxShell: { exitCode: 3, signal: null } }
+    })
+    // A replayed row with only a status line gets what fx saved, marked cut.
+    const replayed = fxToolEnrichments(results, [
+      row('fx did not include command output in this history preview.')
+    ]).get('long')
+    expect(replayed?.output).toStartWith('1\n2\n3\n')
+    expect(replayed?.output).toEndWith('\n… (fx saved only part of this output)')
+  })
+
+  test('a failure envelope becomes its sentence', () => {
+    const failed = {
+      history: [
+        {
+          execution: {
+            tool_steps: [
+              {
+                tool_results: [
+                  {
+                    tool_call_id: 'w',
+                    tool_name: 'write_file',
+                    status: 'failure',
+                    output: JSON.stringify({
+                      error: { code: 'PermissionDenied', message: 'Held for review' }
+                    })
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+    expect(fxToolEnrichments(parseFxToolHistory(failed)).get('w')).toEqual({
+      errorText: 'Held for review.'
+    })
   })
 
   test('renders a compact diff body', () => {

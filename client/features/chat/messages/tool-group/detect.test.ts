@@ -172,6 +172,21 @@ describe('fx tool output', () => {
     )
   })
 
+  test('unwraps reads fx cut before their closing tag', () => {
+    const cut = '<path>src/big.ts</path>\n<content>\n1\tconst a = 1\n2\tconst b'
+    const read = call('read_file', { path: 'src/big.ts' })
+    expect(detectOutput(read, cut)).toEqual({
+      kind: 'highlight',
+      code: 'const a = 1\nconst b',
+      label: 'ts'
+    })
+    expect(formatResultSummary({ ...read, output: cut })).toBe('Shortened by fx')
+    const notes = call('read_file', { path: 'notes.txt' })
+    const whole = '<path>notes.txt</path>\n<content>\n1\thello\n</content>'
+    expect(detectOutput(notes, whole)).toEqual({ kind: 'text', code: 'hello', label: 'text' })
+    expect(formatResultSummary({ ...notes, output: whole })).toBeUndefined()
+  })
+
   test('lists file search results without their header', () => {
     expect(detectOutput(call('glob_files', {}), '[glob] no matches for src/*')).toEqual({
       kind: 'empty'

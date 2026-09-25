@@ -64,7 +64,7 @@ export const fxConfig: AcpProviderConfig = {
   normalizeToolUpdate: normalizeFxToolUpdate,
   isOperationalMessage: isFxOperationalMessage,
   describeOperationalMessage: describeFxOperationalMessage,
-  async enrichToolCalls(ctx, sessionId) {
+  async enrichToolCalls(ctx, sessionId, calls) {
     const command = findHarnessExecutable('fx')
     if (!command) return new Map()
     const history = await readFxToolHistory(command, sessionId, {
@@ -72,7 +72,7 @@ export const fxConfig: AcpProviderConfig = {
       env: await resolveWorkspaceEnv(ctx.workspacePath),
       timeoutMs: 3_000
     })
-    return fxToolEnrichments(history)
+    return fxToolEnrichments(history, calls)
   },
   async modelStateFingerprint(ctx) {
     const env = await resolveWorkspaceEnv(ctx.workspacePath)

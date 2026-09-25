@@ -489,6 +489,25 @@ describe('ACP chat lifecycle', () => {
     expect((await agent.calls()).filter(call => call.method === 'session/load')).toHaveLength(0)
   })
 
+  test('a new chat reports running while its agent starts', async () => {
+    const agent = await fixture({ newDelay: 100 })
+    const before = getClientFrameLog(agent.ctx.workspaceId).length
+    const sending = sendAcpMessage(agent.config, {
+      ...agent.ctx,
+      sessionId: 'starting',
+      isNew: true,
+      content: 'first'
+    })
+    await until(async () => (await agent.calls()).some(call => call.method === 'session/new'))
+    // Other tabs keep a shared selection of a running chat they do not list yet.
+    const statuses = getClientFrameLog(agent.ctx.workspaceId)
+      .slice(before)
+      .map(entry => entry.frame as { type?: string; sessionId?: string; activity?: string })
+      .filter(frame => frame.type === 'status')
+    expect(statuses[0]).toMatchObject({ sessionId: 'starting', activity: 'running' })
+    await sending
+  })
+
   test('a temporary-id alias resumes its canonical session after process exit', async () => {
     const agent = await fixture()
     await sendAcpMessage(agent.config, {
@@ -1057,6 +1076,111 @@ describe('fx history and diagnostics', () => {
     expect(call?.errorText).toBeUndefined()
   })
 
+  test('late output from a backgrounded command does not split the reply around it', async () => {
+    const running =
+      '{"session_id":"shell-1","state":"running","backend":"captured","persistence":"process","output_truncated":false,"output_incomplete":false,"output_terminal_safe":true,"full_output_handle":null,"exit_co'
+    const text = (value: string) => ({
+      sessionUpdate: 'agent_message_chunk',
+      messageId: 'm',
+      content: { type: 'text', text: value }
+    })
+    const agent = await fixture({
+      promptUpdates: [
+        {
+          sessionUpdate: 'tool_call',
+          toolCallId: 'bg',
+          name: 'shell',
+          title: 'Running',
+          kind: 'execute',
+          status: 'pending',
+          rawInput: { request: { action: 'run', command: 'make', yield_time_ms: 30000 } }
+        },
+        {
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'bg',
+          status: 'completed',
+          content: [{ type: 'content', content: { type: 'text', text: running } }]
+        },
+        text('While it builds, '),
+        {
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'bg',
+          status: 'in_progress',
+          content: [{ type: 'content', content: { type: 'text', text: 'late\n' } }]
+        },
+        text('I will explain.')
+      ]
+    })
+    await sendAcpMessage(fxConfig(agent.config), {
+      ...agent.ctx,
+      sessionId: 'one',
+      isNew: false,
+      content: 'build'
+    })
+    const replies = turns(getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? []).flatMap(turn =>
+      turn.role === 'assistant'
+        ? turn.parts.flatMap(part => (part.type === 'text' ? [part.text] : []))
+        : []
+    )
+    expect(replies).toContain('While it builds, I will explain.')
+    expect(toolCalls(getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? [])[0]?.output).toBe(
+      'late\n'
+    )
+  })
+
+  test('a failed row takes its saved failure text on a cold load', async () => {
+    const agent = await fixture({
+      replayUpdates: [
+        {
+          sessionUpdate: 'tool_call',
+          toolCallId: 'sh',
+          name: 'shell',
+          title: 'Running',
+          kind: 'execute',
+          status: 'pending',
+          rawInput: { action: 'run', command: 'npm test' }
+        },
+        {
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'sh',
+          status: 'failed',
+          content: [{ type: 'content', content: { type: 'text', text: clippedEnvelope } }]
+        }
+      ]
+    })
+    const config = fxConfig(
+      agent.config,
+      new Map([['sh', { output: '1 failing', errorText: '1 failing' }]])
+    )
+    const [call] = toolCalls(await ensureAcpSessionLive(config, { ...agent.ctx, sessionId: 'one' }))
+    expect(call).toMatchObject({ state: 'error', output: '1 failing', errorText: '1 failing' })
+  })
+
+  test('a stop while a cold chat loads its saved history cancels the send', async () => {
+    const agent = await fixture()
+    const gate = Promise.withResolvers<void>()
+    let reading = false
+    const config = {
+      ...fxConfig(agent.config),
+      enrichToolCalls: async () => {
+        reading = true
+        await gate.promise
+        return new Map()
+      }
+    }
+    const sending = sendAcpMessage(config, {
+      ...agent.ctx,
+      sessionId: 'one',
+      isNew: false,
+      content: 'hello'
+    })
+    await until(() => reading)
+    await interruptAcpRun(config, { workspaceId: agent.ctx.workspaceId, sessionId: 'one' })
+    gate.resolve()
+    await sending
+    expect((await agent.calls()).filter(call => call.method === 'session/prompt')).toHaveLength(0)
+  })
+
   test('provider failures and replayed interruptions become notices, not replies', async () => {
     const agent = await fixture({
       replayUpdates: [
@@ -1254,5 +1378,31 @@ describe('fx history and diagnostics', () => {
     const changed = await ensureAcpSessionLive(config, ctx)
     expect(reasoning(changed)).toBe(false)
     expect(turns(changed).filter(turn => turn.role === 'user')).toHaveLength(3)
+  })
+
+  test('a reconnect stopped before it finishes keeps the retained transcript', async () => {
+    const agent = await fixture({
+      persist: true,
+      modeDelay: 200,
+      promptUpdates: [
+        {
+          sessionUpdate: 'agent_thought_chunk',
+          content: { type: 'text', text: 'private reasoning' }
+        }
+      ]
+    })
+    const config = { ...fxConfig(agent.config), keepViewOnIdleRelease: true }
+    const ctx = { ...agent.ctx, sessionId: 'one' }
+    await sendAcpMessage(config, { ...ctx, isNew: false, content: 'first' })
+    const live = getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? []
+    releaseIdleAcpSessions(0)
+    const modes = (await agent.calls()).filter(c => c.method === 'session/set_mode').length
+    const reconnect = ensureAcpSessionLive(config, ctx).catch(error => error)
+    await until(
+      async () => (await agent.calls()).filter(c => c.method === 'session/set_mode').length > modes
+    )
+    await interruptAcpRun(config, { workspaceId: agent.ctx.workspaceId, sessionId: 'one' })
+    expect(await reconnect).toBeInstanceOf(Error)
+    expect(getLiveAcpEvents(agent.ctx.workspaceId, 'one')).toEqual(live)
   })
 })

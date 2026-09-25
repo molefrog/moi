@@ -76,7 +76,8 @@ export function useChat(address: WorkspaceTabAddress) {
     if (!selectedSessionMissing || selectedSessionRunning) return
     const timer = setTimeout(() => selectSession(null), MISSING_SELECTION_GRACE_MS)
     return () => clearTimeout(timer)
-  }, [selectSession, selectedSessionMissing, selectedSessionRunning])
+    // `selectedSession` restarts the grace period for each newly missing chat.
+  }, [selectSession, selectedSession, selectedSessionMissing, selectedSessionRunning])
   // Snapshot of the workspace's ambient UI state + queued one-shot
   // directives, taken when the message actually goes out.
   const buildMoiContext = useMoiUserMessageContext(address)

@@ -4,6 +4,7 @@
 import { FX_HISTORY_PREVIEW_ONLY, FX_NO_OUTPUT } from '@/lib/fx-shell-status'
 import type { ToolCall } from '@/lib/types'
 
+import { unwrapFxRead } from '../detect'
 import { parseFxResult } from '../fx-results'
 import { shellBrief } from './shell'
 import { getInputValue, toolInput, type Shorten, type ToolFormatter } from './shared'
@@ -166,6 +167,9 @@ function resultSummary(call: ToolCall): string | undefined {
   if (call.name === 'shell') return shellSummary(call)
   if (call.sidecar?.fxFileChange) return fileChangeSummary(call)
   if (call.state !== 'success' || typeof call.output !== 'string') return undefined
+  if (call.name === 'read_file' || call.name === 'file_read') {
+    return unwrapFxRead(call.output)?.complete === false ? 'Shortened by fx' : undefined
+  }
   return parseFxResult(call, call.output)?.summary
 }
 
