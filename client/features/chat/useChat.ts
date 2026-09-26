@@ -6,6 +6,7 @@ import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useSessionConfig, useSessionView, useWorkspaceSessions } from '@/client/features/chat/api'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import { useSelectedSession } from '@/client/features/chat/useSelectedSession'
+import { useCollabIdentityEnabled } from '@/client/features/collab/entry'
 import {
   type WorkspaceTabAddress,
   useMoiUserMessageContext
@@ -48,6 +49,7 @@ export function useChat(address: WorkspaceTabAddress) {
   const qc = useQueryClient()
   const { layout } = useWorkspaceLayoutCtx()
   const [selectedSession, selectSession] = useSelectedSession()
+  const personalSelection = useCollabIdentityEnabled()
   const modelsData = useWorkspaceAgent(workspaceId).data
   const sessions = useWorkspaceSessions(workspaceId).data
   const selectedSessionMissing =
@@ -156,6 +158,7 @@ export function useChat(address: WorkspaceTabAddress) {
         content: text,
         sessionId: sid,
         isNew,
+        personalSelection,
         optimisticId,
         model,
         effort,
@@ -188,6 +191,7 @@ export function useChat(address: WorkspaceTabAddress) {
       sessionConfig?.effort,
       sessionConfig?.fastMode,
       selectSession,
+      personalSelection,
       modelsData
     ]
   )

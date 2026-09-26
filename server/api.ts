@@ -23,10 +23,12 @@ import type { MoiContext } from '@/lib/moi-context'
 import { viewBuilderDirectives } from '@/lib/view-builder-directives'
 
 import { getCollabReferencePath } from './collab/config'
+import { collabManager } from './collab/manager'
 import { agentStore } from './agent'
 import { clientAppConfig, getAppConfig } from './app-config'
 import { getAppSettings, pickAppSettingsPatch, saveAppSettings } from './app-settings'
 import { appletForModule, recordAppletError } from './applet-log'
+import { selectChatSession } from './chat-selection'
 import { apiBaseFor, parseAppletTail, serveWorkspaceFile } from './applets'
 import { applyEnvChanged } from './env-apply'
 import { publishEvent } from './events'
@@ -298,6 +300,7 @@ one.post('/view-builders/:builderId/submit', async c => {
   const body = await c.req.json<{
     input?: Partial<ViewBuilderInput>
     optimisticId?: string
+    personalSelection?: boolean
     model?: string
     effort?: string
     fastMode?: boolean
@@ -310,6 +313,9 @@ one.post('/view-builders/:builderId/submit', async c => {
   }
   if (body.optimisticId !== undefined && typeof body.optimisticId !== 'string') {
     return c.text('Invalid optimisticId', 400)
+  }
+  if (body.personalSelection !== undefined && typeof body.personalSelection !== 'boolean') {
+    return c.text('Invalid personalSelection', 400)
   }
   const availableIcons = parseAvailableViewIcons(body.availableIcons)
   if (!availableIcons) return c.text('Available view icons are required', 400)
@@ -349,7 +355,7 @@ one.post('/view-builders/:builderId/submit', async c => {
       ]
     }
     try {
-      publishSelectedSession(ws.id, await saveSelectedSession(ws.path, builder.sessionId))
+      await selectChatSession(ws, builder.sessionId, body.personalSelection)
       await harnessFor(ws).sendMessage({
         workspaceId: ws.id,
         workspacePath: ws.path,
@@ -966,6 +972,7 @@ one.delete('/', async c => {
   const ok = await removeWorkspace(ws.id)
   if (!ok) return c.text('Workspace not found', 404)
   harnessFor(ws).stopWorkspace?.(ws.path)
+  await collabManager.stopWorkspace(ws.path)
   return c.body(null, 204)
 })
 

@@ -3,10 +3,33 @@
 export const COLLAB_MODULE_SOURCE = `
 import { createElement } from 'react';
 import { __getBridge } from 'moi';
+const empty = () => [];
+const nothing = () => null;
+const fallback = {
+  useMe: nothing,
+  useUser: nothing,
+  usePeers: empty,
+  useWorkspaceUsers: empty,
+  usePresence: empty,
+  usePublishPresence() {},
+  Cursors: nothing,
+  Activity: nothing,
+  Selection: nothing,
+  User: nothing,
+  Facepile: nothing,
+  PresenceFrame: nothing,
+  PresenceGroup: nothing,
+  PresenceGutter: nothing,
+};
+let warned = false;
 function api() {
   const collab = __getBridge()?.collab;
-  if (!collab) throw new Error('This applet is not connected to moi. Reload it if its build was disposed.');
-  return collab;
+  if (collab) return collab;
+  if (!warned) {
+    warned = true;
+    console.warn('[moi/collab] Collaboration API is unavailable. Hooks return empty values and components render nothing.');
+  }
+  return fallback;
 }
 export function useMe(...args) { return api().useMe(...args); }
 export function usePeers(...args) { return api().usePeers(...args); }

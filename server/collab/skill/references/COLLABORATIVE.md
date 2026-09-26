@@ -171,3 +171,8 @@ workspace directory; the local live room's fallback profiles disappear after use
 The playground uses fixture users and an isolated fake room, not a live multi-browser workspace.
 
 Complete public types are installed in `.moi/collab-env.d.ts`. Use only the declared API.
+
+If the applet's host bridge is missing or disposed, the module logs one warning. User lookup
+returns `null`, list hooks return `[]`, publishing does nothing, and collaboration components
+render nothing, including their children. This is separate from disabling live presence in moi,
+where the bridge remains available and applets still render normally.

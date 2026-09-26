@@ -215,6 +215,9 @@ export type ClientMessage =
       content: string
       sessionId: string
       isNew: boolean
+      // The browser owns its selected session; creating this chat must not
+      // update the installation's shared selection or switch other tabs.
+      personalSelection?: boolean
       // Upload ids (from POST .../uploads) to attach to this turn. The server
       // resolves each from its upload store and turns it into a vision block
       // (image) or a temp-file path reference (other files). Order is preserved.

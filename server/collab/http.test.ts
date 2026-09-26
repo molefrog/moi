@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { mkdtemp, realpath, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 
@@ -12,7 +12,10 @@ import { DEFAULT_REGISTRY_PATH, setRegistryPath } from '../registry'
 import { collabManager, type CollabSocket } from './manager'
 import { collabSkillReferencePath } from './skill'
 
+let fixtureRoot: string
 let directory: string
+let canonicalPath: string
+let registryPath: string
 let workspace: WorkspaceEntry
 let savedEnv: Record<string, string | undefined>
 const envKeys = ['MOI_COLLAB', 'MOI_DEV']
@@ -29,21 +32,23 @@ beforeEach(async () => {
   savedEnv = Object.fromEntries(envKeys.map(key => [key, process.env[key]]))
   for (const key of envKeys) delete process.env[key]
   resetAppConfig()
-  directory = await mkdtemp(join(tmpdir(), 'moi-collab-http-'))
+  fixtureRoot = await mkdtemp(join(tmpdir(), 'moi-collab-http-'))
+  directory = join(fixtureRoot, 'workspace')
+  await mkdir(directory)
+  canonicalPath = await realpath(directory)
   workspace = {
     id: 'test-collab',
     path: directory,
     type: 'codex',
     addedAt: new Date().toISOString()
   }
-  const registryPath = join(directory, 'workspaces.json')
+  registryPath = join(fixtureRoot, 'workspaces.json')
   setRegistryPath(registryPath)
   await Bun.write(registryPath, JSON.stringify([workspace]))
 })
 
 afterEach(async () => {
-  const canonicalPath = await realpath(directory)
-  await collabManager.stopWorkspace(directory)
+  await collabManager.stopWorkspace(workspace.path)
   await until(
     () => !collabManager.debugSnapshot().some(slot => slot.workspacePath === canonicalPath)
   )
@@ -53,7 +58,7 @@ afterEach(async () => {
   }
   resetAppConfig()
   setRegistryPath(DEFAULT_REGISTRY_PATH)
-  await rm(directory, { recursive: true, force: true })
+  await rm(fixtureRoot, { recursive: true, force: true })
 })
 
 function post(path: string, body: unknown) {
@@ -140,6 +145,73 @@ describe('collab HTTP integration', () => {
     }
     expect(collabManager.debugSnapshot()).toEqual([])
     expect(await Bun.file(join(directory, '.moi', 'data', 'collab.sqlite')).exists()).toBe(false)
+  })
+
+  test.each(['existing', 'missing-directory', 'missing-symlink'])(
+    'removing a workspace closes joined sockets and stops its worker (%s)',
+    async state => {
+      enable()
+      if (state === 'missing-symlink') {
+        workspace.path = join(fixtureRoot, 'workspace-link')
+        await symlink(directory, workspace.path, 'dir')
+        await Bun.write(registryPath, JSON.stringify([workspace]))
+      }
+      const server = Bun.serve({
+        port: 0,
+        hostname: '127.0.0.1',
+        fetch(req, server) {
+          if (new URL(req.url).pathname.endsWith('/collab/ws') && server.upgrade(req)) return
+          return api.fetch(req)
+        },
+        websocket: {
+          open: socket => collabManager.open(socket, workspace.path),
+          message: (socket, message) => collabManager.message(socket, message),
+          close: socket => collabManager.close(socket)
+        }
+      })
+      const url = `http://127.0.0.1:${server.port}/api/workspaces/${workspace.id}`
+      const socket = new WebSocket(`${url.replace('http:', 'ws:')}/collab/ws`)
+      const messages: CollabServerMessage[] = []
+      socket.onmessage = event => {
+        messages.push(JSON.parse(String(event.data)) as CollabServerMessage)
+      }
+      try {
+        await until(() => socket.readyState === WebSocket.OPEN)
+        socket.send(
+          JSON.stringify({
+            type: 'join',
+            version: 2,
+            identity: { id: 'anna', name: 'Anna', color: 'blue' }
+          })
+        )
+        await until(() => messages.some(message => message.type === 'welcome'))
+        const room = collabManager
+          .debugSnapshot()
+          .find(slot => slot.workspacePath === canonicalPath)
+        if (!room) throw new Error('Missing collab worker')
+        expect(room.connections).toBe(1)
+        if (state === 'missing-directory') await rm(directory, { recursive: true })
+        if (state === 'missing-symlink') await rm(workspace.path)
+
+        expect((await fetch(url, { method: 'DELETE' })).status).toBe(204)
+        await until(() => socket.readyState === WebSocket.CLOSED)
+        expect(
+          collabManager.debugSnapshot().some(slot => slot.workspacePath === canonicalPath)
+        ).toBe(false)
+        expect(() => process.kill(room.pid, 0)).toThrow()
+        expect((await api.request(`/api/workspaces/${workspace.id}`)).status).toBe(404)
+      } finally {
+        socket.close()
+        server.stop(true)
+      }
+    }
+  )
+
+  test('removing a missing workspace without a presence room succeeds', async () => {
+    await rm(directory, { recursive: true })
+    expect(
+      (await api.request(`/api/workspaces/${workspace.id}`, { method: 'DELETE' })).status
+    ).toBe(204)
   })
 
   test('stopping presence preserves installed guides and any existing database file', async () => {

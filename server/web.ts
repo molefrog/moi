@@ -6,15 +6,15 @@ import { api } from './api'
 import { PORT } from './constants'
 import { control } from './control'
 import { getCollabReferencePath, isCollabEnabled } from './collab/config'
+import { selectChatSession } from './chat-selection'
 import { collabManager } from './collab/manager'
-import { EVENTS_TOPIC, publishEvent, setEventServer } from './events'
+import { EVENTS_TOPIC, setEventServer } from './events'
 import { killBuildWorkers } from './applets/build-worker'
 import { killAllWorkers } from './functions'
 import { startScratchpadSweeper } from './scratchpad'
 import { resolveScratchOp } from './scratchpad-relay'
 import { allHarnesses, harnessFor } from './harness/registry'
 import { getWorkspace } from './registry'
-import { saveSelectedSession } from './selected-session'
 import { addClient, broadcastAll, getClientCount, removeClient, sendToClient } from './state'
 import { startServiceLogMaintenance } from './service'
 import { distShell, prebuilt } from './static'
@@ -35,6 +35,7 @@ function isClientMessage(value: unknown): value is ClientMessage {
     sessionId?: unknown
     content?: unknown
     isNew?: unknown
+    personalSelection?: unknown
     optimisticId?: unknown
     model?: unknown
     effort?: unknown
@@ -50,6 +51,7 @@ function isClientMessage(value: unknown): value is ClientMessage {
       typeof v.content === 'string' &&
       typeof v.sessionId === 'string' &&
       typeof v.isNew === 'boolean' &&
+      (v.personalSelection === undefined || typeof v.personalSelection === 'boolean') &&
       (v.optimisticId === undefined || typeof v.optimisticId === 'string') &&
       (v.model === undefined || typeof v.model === 'string') &&
       (v.effort === undefined || typeof v.effort === 'string') &&
@@ -183,14 +185,7 @@ export const app = Bun.serve<WsData>({
                 }
               : undefined
           if (data.isNew) {
-            const selection = await saveSelectedSession(workspace.path, data.sessionId, null)
-            if (selection.changed) {
-              publishEvent({
-                type: 'selected-session:updated',
-                workspaceId: workspace.id,
-                sessionId: selection.sessionId
-              })
-            }
+            await selectChatSession(workspace, data.sessionId, data.personalSelection, null)
           }
           // Harnesses ignore fields they don't support (see SendMessageInput);
           // failures surface as error frames from inside the harness.

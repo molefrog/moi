@@ -1,6 +1,6 @@
 import { realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 
 import { COLLAB_MAX_MESSAGE_BYTES, isCollabClientMessage } from '@/lib/collab/protocol'
 import type { CollabServerMessage } from '@/lib/collab/types'
@@ -16,6 +16,7 @@ export type CollabSocket = {
 
 type Binding = {
   socket: CollabSocket
+  workspacePaths: Set<string>
   connectionId: string
   closed: boolean
   lastSeen: number
@@ -26,6 +27,7 @@ type Binding = {
 
 type Slot = {
   workspacePath: string
+  workspacePaths: Set<string>
   generation: string
   child: ReturnType<typeof Bun.spawn>
   ready: Promise<void>
@@ -85,29 +87,36 @@ export class CollabManager {
     slot.child.send(message)
   }
 
-  private async getSlot(workspacePath: string): Promise<Slot> {
-    if (this.closed) throw new CollabRuntimeError('unavailable', 'Collab is shutting down')
+  private async getSlot(workspacePath: string, binding: Binding): Promise<Slot> {
+    if (this.closed || binding.closed)
+      throw new CollabRuntimeError('unavailable', 'Collab connection closed')
     const canonicalPath = await realpath(workspacePath)
+    binding.workspacePaths.add(canonicalPath)
+    if (binding.closed) throw new CollabRuntimeError('unavailable', 'Collab connection closed')
     if (!(await (this.options.enabled ?? isCollabEnabled)(canonicalPath))) {
       throw new CollabRuntimeError('unavailable', 'Start moi with --experimental-collab')
     }
-    if (this.closed) throw new CollabRuntimeError('unavailable', 'Collab is shutting down')
+    if (this.closed || binding.closed)
+      throw new CollabRuntimeError('unavailable', 'Collab connection closed')
     const current = this.slots.get(canonicalPath)
     if (current) {
       if (current.stopping) {
         await current.child.exited
         if (this.slots.get(canonicalPath) === current) this.slots.delete(canonicalPath)
-        return this.getSlot(canonicalPath)
+        return this.getSlot(canonicalPath, binding)
       }
       if (current.idleTimer) clearTimeout(current.idleTimer)
       current.idleTimer = undefined
+      current.workspacePaths.add(resolve(workspacePath))
       return current
     }
     const failure = this.failures.get(canonicalPath)
     if (failure && failure.retryAfter > Date.now()) {
       throw new CollabRuntimeError('restarting', 'Collab is recovering; reconnect shortly')
     }
-    return this.spawn(canonicalPath)
+    const slot = this.spawn(canonicalPath)
+    slot.workspacePaths.add(resolve(workspacePath))
+    return slot
   }
 
   private spawn(workspacePath: string): Slot {
@@ -122,6 +131,7 @@ export class CollabManager {
     const generation = crypto.randomUUID()
     const slot: Slot = {
       workspacePath,
+      workspacePaths: new Set([workspacePath]),
       generation,
       child: undefined as never,
       ready,
@@ -226,6 +236,7 @@ export class CollabManager {
   open(socket: CollabSocket, workspacePath: string) {
     const binding: Binding = {
       socket,
+      workspacePaths: new Set([resolve(workspacePath)]),
       connectionId: crypto.randomUUID(),
       closed: false,
       lastSeen: Date.now(),
@@ -233,7 +244,7 @@ export class CollabManager {
       queue: Promise.resolve()
     }
     this.bindings.set(socket, binding)
-    binding.queue = this.getSlot(workspacePath)
+    binding.queue = this.getSlot(workspacePath, binding)
       .then(async slot => {
         if (binding.closed) {
           this.scheduleIdle(slot)
@@ -317,9 +328,36 @@ export class CollabManager {
   }
 
   async stopWorkspace(workspacePath: string) {
-    const canonicalPath = await realpath(workspacePath)
-    const slot = this.slots.get(canonicalPath)
-    if (slot) this.stopSlot(slot, 'Collab disabled for this workspace')
+    // Remember aliases so removing a missing directory or symlink can still stop its room.
+    const knownPath = resolve(workspacePath)
+    let slot = [...this.slots.values()].find(slot => slot.workspacePaths.has(knownPath))
+    const disconnectPending = (path: string) => {
+      for (const binding of this.bindings.values()) {
+        if (binding.workspacePaths.has(path)) {
+          this.disconnect(binding, 'Collab stopped for this workspace')
+        }
+      }
+    }
+    disconnectPending(knownPath)
+    if (slot) disconnectPending(slot.workspacePath)
+    if (!slot) {
+      try {
+        const canonicalPath = await realpath(workspacePath)
+        disconnectPending(canonicalPath)
+        slot = this.slots.get(canonicalPath)
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          'code' in error &&
+          (error.code === 'ENOENT' || error.code === 'ENOTDIR')
+        )
+          return
+        throw error
+      }
+    }
+    if (!slot) return
+    this.stopSlot(slot, 'Collab stopped for this workspace')
+    await slot.child.exited
   }
 
   async shutdown() {

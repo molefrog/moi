@@ -7,14 +7,21 @@ import type { ViewBuilder } from '@/lib/types'
 
 import { api } from './api'
 import { DATA_DIR } from './data-dir'
+import { setEventServer } from './events'
 import { codexHarness } from './harness/codex'
 import type { SendMessageInput } from './harness/types'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from './registry'
-import { DEFAULT_SELECTED_SESSION_PATH, setSelectedSessionPath } from './selected-session'
+import {
+  DEFAULT_SELECTED_SESSION_PATH,
+  getSelectedSession,
+  initializeSelectedSession,
+  setSelectedSessionPath
+} from './selected-session'
 import { addUpload } from './uploads'
 import { setViewBuilderStorePath } from './view-builders'
 
 let tempDir: string
+let events: { type: string; workspaceId?: string; sessionId?: string | null }[]
 const originalCodexAvailability = codexHarness.availability
 const originalCodexSendMessage = codexHarness.sendMessage
 
@@ -25,11 +32,14 @@ beforeEach(async () => {
   setViewBuilderStorePath(join(tempDir, 'view-builders.json'))
   codexHarness.availability = async () => ({ status: 'available' })
   codexHarness.sendMessage = async () => {}
+  events = []
+  setEventServer({ publish: (_topic, data) => events.push(JSON.parse(data)) })
 })
 
 afterEach(async () => {
   codexHarness.availability = originalCodexAvailability
   codexHarness.sendMessage = originalCodexSendMessage
+  setEventServer({ publish: () => {} })
   setRegistryPath(DEFAULT_REGISTRY_PATH)
   setSelectedSessionPath(DEFAULT_SELECTED_SESSION_PATH)
   setViewBuilderStorePath(join(DATA_DIR, 'view-builders.json'))
@@ -156,5 +166,83 @@ describe('view builder availability', () => {
     const { builders } = (await listResponse.json()) as { builders: ViewBuilder[] }
     expect(builders).toHaveLength(1)
     expect(builders[0].status).toBe('draft')
+  })
+})
+
+describe('view builder chat selection', () => {
+  test.each([
+    { personalSelection: true, previous: null },
+    { personalSelection: true, previous: 'other-chat' },
+    { personalSelection: false, previous: 'other-chat' },
+    { personalSelection: undefined, previous: 'other-chat' }
+  ])('respects selection ownership %j', async ({ personalSelection, previous }) => {
+    const workspace = await registerWorkspace(join(tempDir, 'workspace'), { type: 'codex' })
+    await initializeSelectedSession(workspace.path, previous)
+    const createResponse = await api.request(`/api/workspaces/${workspace.id}/view-builders`, {
+      method: 'POST'
+    })
+    const draft = (await createResponse.json()) as ViewBuilder
+    const sent: SendMessageInput[] = []
+    codexHarness.sendMessage = async input => {
+      sent.push(input)
+    }
+
+    const response = await api.request(
+      `/api/workspaces/${workspace.id}/view-builders/${draft.id}/submit`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          input: { requirements: 'Build a dashboard' },
+          availableIcons: ['chart'],
+          personalSelection
+        })
+      }
+    )
+
+    expect(response.status).toBe(200)
+    expect(sent).toHaveLength(1)
+    expect(sent[0]).toMatchObject({ sessionId: draft.sessionId, isNew: true })
+    expect(await getSelectedSession(workspace.path)).toBe(
+      personalSelection ? previous : draft.sessionId
+    )
+    expect(events.filter(event => event.type === 'selected-session:updated')).toEqual(
+      personalSelection
+        ? []
+        : [
+            {
+              type: 'selected-session:updated',
+              workspaceId: workspace.id,
+              sessionId: draft.sessionId
+            }
+          ]
+    )
+  })
+
+  test('rejects a malformed selection flag before starting a builder', async () => {
+    const workspace = await registerWorkspace(join(tempDir, 'workspace'), { type: 'codex' })
+    const createResponse = await api.request(`/api/workspaces/${workspace.id}/view-builders`, {
+      method: 'POST'
+    })
+    const draft = (await createResponse.json()) as ViewBuilder
+    const response = await api.request(
+      `/api/workspaces/${workspace.id}/view-builders/${draft.id}/submit`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          input: { requirements: 'Build a dashboard' },
+          availableIcons: ['chart'],
+          personalSelection: 'true'
+        })
+      }
+    )
+
+    expect(response.status).toBe(400)
+    expect(await response.text()).toBe('Invalid personalSelection')
+    const listResponse = await api.request(`/api/workspaces/${workspace.id}/view-builders`)
+    const { builders } = (await listResponse.json()) as { builders: ViewBuilder[] }
+    expect(builders[0].status).toBe('draft')
+    expect(events.filter(event => event.type === 'selected-session:updated')).toEqual([])
   })
 })

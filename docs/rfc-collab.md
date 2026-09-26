@@ -43,6 +43,11 @@ The API remains available with presence disabled: applets still render, user pro
 peer/presence lists are empty, and publication is inert. No presence socket is opened. A mounted
 applet gets the same context shape in either mode.
 
+If an applet has no host bridge, or its bridge has been disposed, `moi/collab` warns once per
+bundle. User lookup returns `null`, list hooks return `[]`, publication does nothing, and every
+collaboration component renders nothing, including wrapper children. A disabled runtime still
+provides a bridge and keeps ordinary applet rendering available.
+
 Identity starts as `null`. Local development uses an explicit profile from `/dev/collab`, stored
 in that browser tab's `sessionStorage`. An outer provider owns identity once injected, including
 when it signs out. Applets cannot set identity. Without an identity there is no presence connection.

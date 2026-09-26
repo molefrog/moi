@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, realpathSync, rmSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -323,6 +323,41 @@ describe('collab process and socket integration', () => {
     expect(runtime.debugSnapshot()).toEqual([])
     expect(client.messages[0]).toMatchObject({ type: 'error', code: 'unavailable' })
   })
+
+  test.each(['requested', 'canonical'])(
+    'stopping a workspace cancels a pending open through its %s path without preventing later opens',
+    async pathKind => {
+      const root = directory()
+      const alias = join(directory(), 'workspace-link')
+      symlinkSync(root, alias, 'dir')
+      const checking = Promise.withResolvers<void>()
+      const enabled = Promise.withResolvers<boolean>()
+      const runtime = manager({
+        enabled: () => {
+          checking.resolve()
+          return enabled.promise
+        }
+      })
+      const client = localSocket()
+      runtime.open(client.socket, alias)
+      joinLocal(runtime, client.socket)
+      await checking.promise
+      const stopping = runtime.stopWorkspace(pathKind === 'requested' ? alias : realpathSync(root))
+      expect(client.reason).toBe('Collab stopped for this workspace')
+      await stopping
+      enabled.resolve(true)
+      await Bun.sleep(20)
+      expect(runtime.debugSnapshot()).toEqual([])
+      expect(client.messages).toEqual([])
+
+      const replacement = localSocket()
+      runtime.open(replacement.socket, alias)
+      joinLocal(runtime, replacement.socket)
+      await until(() => replacement.messages.some(message => message.type === 'welcome'))
+      expect(runtime.debugSnapshot()).toHaveLength(1)
+      expect(runtime.debugSnapshot()[0]?.connections).toBe(1)
+    }
+  )
 
   test('parent process death does not leave an orphan collab worker', async () => {
     const root = directory()

@@ -113,6 +113,7 @@ export type SubmitViewBuilderInput = {
   builderId: string
   requirements: string
   optimisticId: string
+  personalSelection?: boolean
   attachments?: string[]
   model?: string
   effort?: string
