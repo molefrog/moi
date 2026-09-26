@@ -2,20 +2,8 @@ import { realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import {
-  COLLAB_MAX_MESSAGE_BYTES,
-  isCollabActor,
-  isCollabClientMessage,
-  isCollabCommand,
-  isCollabString,
-  isRecord
-} from '@/lib/collab/protocol'
-import type {
-  CollabActor,
-  CollabCommand,
-  CollabCommandResult,
-  CollabServerMessage
-} from '@/lib/collab/types'
+import { COLLAB_MAX_MESSAGE_BYTES, isCollabClientMessage } from '@/lib/collab/protocol'
+import type { CollabServerMessage } from '@/lib/collab/types'
 
 import { isCollabEnabled } from './config'
 import type { ParentMessage, WorkerMessage } from './ipc'
@@ -24,12 +12,6 @@ export type CollabSocket = {
   send: (message: string) => number
   close: (code?: number, reason?: string) => void
   getBufferedAmount?: () => number
-}
-
-type Pending = {
-  resolve: (result: CollabCommandResult) => void
-  reject: (error: Error) => void
-  timer: ReturnType<typeof setTimeout>
 }
 
 type Binding = {
@@ -52,7 +34,6 @@ type Slot = {
   readyTimer: ReturnType<typeof setTimeout>
   stopping: boolean
   clients: Map<string, Binding>
-  pending: Map<string, Pending>
   idleTimer?: ReturnType<typeof setTimeout>
 }
 
@@ -60,7 +41,6 @@ type ManagerOptions = {
   enabled?: (workspacePath: string) => Promise<boolean>
   workerPath?: string
   startupTimeoutMs?: number
-  requestTimeoutMs?: number
   idleTimeoutMs?: number
   livenessTimeoutMs?: number
 }
@@ -152,8 +132,7 @@ export class CollabManager {
         this.stopSlot(slot, 'Collab startup timed out')
       }, this.options.startupTimeoutMs ?? 10_000),
       stopping: false,
-      clients: new Map(),
-      pending: new Map()
+      clients: new Map()
     }
     try {
       slot.child = Bun.spawn(
@@ -192,14 +171,6 @@ export class CollabManager {
       if (binding) this.emit(binding, message.message)
       return
     }
-    const pending = slot.pending.get(message.requestId)
-    if (!pending) return
-    slot.pending.delete(message.requestId)
-    clearTimeout(pending.timer)
-    if (message.type === 'error')
-      pending.reject(new CollabRuntimeError(message.code, message.message))
-    else pending.resolve(message.result)
-    this.scheduleIdle(slot)
   }
 
   private exited(slot: Slot) {
@@ -209,14 +180,9 @@ export class CollabManager {
     if (slot.idleTimer) clearTimeout(slot.idleTimer)
     const error = new CollabRuntimeError(
       'worker_exited',
-      'Collab restarted; reconnect to check pending saves'
+      'Collab restarted; reconnect to restore presence'
     )
     slot.rejectReady(error)
-    for (const pending of slot.pending.values()) {
-      clearTimeout(pending.timer)
-      pending.reject(error)
-    }
-    slot.pending.clear()
     for (const binding of [...slot.clients.values()]) this.disconnect(binding, error.message)
     if (this.slots.get(slot.workspacePath) === slot) this.slots.delete(slot.workspacePath)
     if (!expected) {
@@ -229,7 +195,7 @@ export class CollabManager {
   }
 
   private scheduleIdle(slot: Slot) {
-    if (slot.stopping || slot.clients.size || slot.pending.size || slot.idleTimer) return
+    if (slot.stopping || slot.clients.size || slot.idleTimer) return
     slot.idleTimer = setTimeout(
       () => this.stopSlot(slot, 'Collab workspace is idle'),
       this.options.idleTimeoutMs ?? 60_000
@@ -311,16 +277,7 @@ export class CollabManager {
       this.emit(binding, {
         type: 'error',
         code: 'invalid_message',
-        message: 'Invalid collab message',
-        ...(isRecord(message) && isCollabString(message.operationId)
-          ? { operationId: message.operationId }
-          : {}),
-        ...(isRecord(message) && isCollabString(message.subscriptionId)
-          ? { subscriptionId: message.subscriptionId }
-          : {}),
-        ...(isRecord(message) && isCollabString(message.requestId)
-          ? { requestId: message.requestId }
-          : {})
+        message: 'Invalid collab message'
       })
       return
     }
@@ -359,45 +316,6 @@ export class CollabManager {
     this.scheduleIdle(slot)
   }
 
-  async call(
-    workspacePath: string,
-    actor: CollabActor,
-    command: CollabCommand
-  ): Promise<CollabCommandResult> {
-    if (!isCollabActor(actor) || !isCollabCommand(command)) {
-      throw new CollabRuntimeError('invalid_request', 'Invalid collab actor or command')
-    }
-    if (new TextEncoder().encode(JSON.stringify(command)).length > COLLAB_MAX_MESSAGE_BYTES) {
-      throw new CollabRuntimeError('too_large', 'Collab request is too large')
-    }
-    const slot = await this.getSlot(workspacePath)
-    const requestId = crypto.randomUUID()
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        slot.pending.delete(requestId)
-        reject(
-          new CollabRuntimeError(
-            'timeout',
-            'Collab request timed out; check its receipt before retrying'
-          )
-        )
-        this.scheduleIdle(slot)
-      }, this.options.requestTimeoutMs ?? 15_000)
-      slot.pending.set(requestId, { resolve, reject, timer })
-      void slot.ready
-        .then(() => {
-          if (!slot.pending.has(requestId)) return
-          this.send(slot, { type: 'call', requestId, actor, command })
-        })
-        .catch(error => {
-          clearTimeout(timer)
-          slot.pending.delete(requestId)
-          reject(error)
-          this.scheduleIdle(slot)
-        })
-    })
-  }
-
   async stopWorkspace(workspacePath: string) {
     const canonicalPath = await realpath(workspacePath)
     const slot = this.slots.get(canonicalPath)
@@ -419,12 +337,9 @@ export class CollabManager {
       pid: slot.child.pid,
       generation: slot.generation,
       connections: slot.clients.size,
-      pending: slot.pending.size,
       stopping: slot.stopping
     }))
   }
 }
 
 export const collabManager = new CollabManager()
-export const callCollab = (workspacePath: string, actor: CollabActor, command: CollabCommand) =>
-  collabManager.call(workspacePath, actor, command)

@@ -413,7 +413,7 @@ const init = defineCommand({
     if (args['experimental-collab']) {
       const { referencePath } = await installCollabSkill(target, type)
       console.log(pc.dim('  Collaboration guide installed to ' + referencePath))
-      console.log(pc.dim('  Shared state requires moi start --experimental-collab'))
+      console.log(pc.dim('  Live presence requires moi start --experimental-collab'))
     }
     if (scaffold !== 'exists') {
       if (scaffold === 'installing') {

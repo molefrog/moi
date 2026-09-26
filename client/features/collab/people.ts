@@ -1,60 +1,96 @@
-import type { CollabIdentity, CollabParticipant } from '@/lib/collab/types'
+import type { CollabIdentity, CollabLocation, CollabParticipant } from '@/lib/collab/types'
 
-// active: a visible tab. away: connected, every tab hidden. offline: not here.
-export type PersonStatus = 'active' | 'away' | 'offline'
-export type ResolvedPerson = { id: string; identity: CollabIdentity | null; status: PersonStatus }
-export type PeopleSource = {
-  participants: CollabParticipant[]
-  people: Readonly<Record<string, CollabIdentity>>
+export type UserStatus = 'active' | 'away' | 'offline'
+export type CollabUser = CollabIdentity & { status: UserStatus }
+export type UsersSource = {
+  participants: readonly CollabParticipant[]
+  users: readonly CollabIdentity[]
 }
 
-// A person is referred to by id everywhere. Live connections are freshest, then the directory, then the local profile
-// before it has reached the server.
-export function resolvePerson(
-  source: PeopleSource,
-  self: CollabIdentity | null,
-  id: string
-): ResolvedPerson {
-  const connections = source.participants.filter(participant => participant.identity.id === id)
-  const status: PersonStatus = connections.some(connection => connection.location !== null)
+export function userStatus(participants: readonly CollabParticipant[], id: string): UserStatus {
+  const connections = participants.filter(participant => participant.userId === id)
+  return connections.some(connection => connection.location !== null)
     ? 'active'
     : connections.length
       ? 'away'
       : 'offline'
-  const identity = connections[0]?.identity ?? source.people[id] ?? (self?.id === id ? self : null)
-  return { id, identity, status }
 }
 
-// One row per person for the people list: connections collapse by identity
-// id, the current user comes first, and `pages` lists the tabs their visible
-// browser tabs are on. No pages means every tab of theirs is hidden: away.
-export type PresentPerson = { identity: CollabIdentity; self: boolean; pages: string[] }
+// A supplied host directory is authoritative, including an empty list/removals.
+export function workspaceProfiles(
+  liveUsers: readonly CollabIdentity[],
+  self: CollabIdentity | null,
+  directory: readonly CollabIdentity[] | null
+): readonly CollabIdentity[] {
+  if (directory !== null) return directory
+  const users = new Map(liveUsers.map(user => [user.id, user]))
+  if (self) users.set(self.id, self)
+  return [...users.values()]
+}
 
+export function resolveUser(source: UsersSource, id: string): CollabUser | null {
+  const profile = source.users.find(user => user.id === id)
+  return profile ? { ...profile, status: userStatus(source.participants, id) } : null
+}
+
+export type PeersOptions = { scope?: 'page' | 'workspace'; status?: 'active' | 'away' }
+export function resolvePeers(
+  source: UsersSource,
+  selfId: string | null,
+  location: CollabLocation | null,
+  { scope = 'page', status }: PeersOptions = {}
+): CollabUser[] {
+  const peers: CollabUser[] = []
+  const ids = new Set(
+    source.participants
+      .filter(
+        participant =>
+          participant.userId !== selfId &&
+          (scope === 'workspace' ||
+            (location !== null && participant.location?.page === location.page))
+      )
+      .map(participant => participant.userId)
+  )
+  for (const id of ids) {
+    const user = resolveUser(source, id)
+    if (user && (!status || user.status === status)) peers.push(user)
+  }
+  return peers
+}
+
+export type PresentPerson = {
+  identity: CollabIdentity
+  self: boolean
+  pages: string[]
+  status: UserStatus
+}
 export type SelfConnection = {
   identity: CollabIdentity | null
   connectionId: string | null
   page: string | null
+  users: readonly CollabIdentity[]
 }
-
 export function groupPeople(
   participants: CollabParticipant[],
   self: SelfConnection
 ): PresentPerson[] {
-  const people = new Map<string, PresentPerson>()
-  if (self.identity) {
-    people.set(self.identity.id, {
-      identity: self.identity,
-      self: true,
-      pages: self.page ? [self.page] : []
-    })
-  }
-  for (const participant of participants) {
-    if (participant.connectionId === self.connectionId) continue
-    const id = participant.identity.id
-    const person = people.get(id) ?? { identity: participant.identity, self: false, pages: [] }
-    const page = participant.location?.page
-    if (page && !person.pages.includes(page)) person.pages.push(page)
-    people.set(id, person)
-  }
-  return [...people.values()]
+  const users = [...self.users].sort(
+    (a, b) => Number(b.id === self.identity?.id) - Number(a.id === self.identity?.id)
+  )
+  return users.map(identity => {
+    const pages = new Set<string>()
+    for (const participant of participants) {
+      if (participant.userId !== identity.id || participant.connectionId === self.connectionId)
+        continue
+      if (participant.location) pages.add(participant.location.page)
+    }
+    const isSelf = identity.id === self.identity?.id
+    if (isSelf && self.page) pages.add(self.page)
+    return {
+      identity,
+      self: isSelf,
+      pages: [...pages],
+      status: userStatus(participants, identity.id)
+    }
+  })
 }

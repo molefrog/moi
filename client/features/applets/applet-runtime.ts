@@ -127,7 +127,7 @@ function createRuntime(workspaceId: string) {
       const source = appletSource(identity)
       const bridge: AppletBridge = {
         get collab() {
-          return getAppletCollabApi()
+          return alive ? getAppletCollabApi() : undefined
         },
         focusTab(tab, params) {
           if (!alive) return

@@ -1,390 +1,152 @@
-# collab: experimental collaboration
+# collab: experimental presence
 
-Status: experimental implementation. Updated 2026-09-21 to describe the startup config,
-people directory, backend interface, and dev playground.
+Status: experimental implementation, updated 2026-09-25.
 
-## Scope and ownership
+## Scope
 
-collab adds workspace presence and small, persistent shared values for roughly ten people using
-**the same running moi workspace**. Each active workspace gets a dedicated Bun subprocess. It owns
-presence, subscriptions, write ordering, and SQLite; the main server owns browser sockets and
-supervision. Applets import `moi/collab` and share the host's connection and React context.
+collab supplies workspace users, live presence, cursors, focus, and selection to widgets and
+views through `moi/collab`. Everyone connects to the same running moi server. A workspace has
+one supervised presence subprocess; it keeps connections and presence in memory only.
 
-Identity is supplied by an **injected browser script**: `{ id, name, color, avatar? }`, or explicitly
-through the local dev profile page. The server validates its shape and limits, assigns a connection
-id, and remembers supplied profiles in a workspace people directory. This lets applets resolve
-names and avatars after someone leaves. The outer product owns identity authority, authentication,
-and workspace access policy. Names and ids are attribution, not access credentials.
+Persistent shared applet data and realtime query/mutation synchronization are outside this PR.
+There is no collaboration database, mutation endpoint, optimistic write queue, or receipt API.
+Existing experimental `.moi/data/collab.sqlite` files are left untouched and are no longer opened.
 
 ```mermaid
 flowchart TB
-  Identity["Injected identity / local dev profile"] --> Host
-  subgraph Browser["Each browser tab"]
-    Host["Host collab client and store"]
-    UI["Workspace people + Share"]
-    Applets["Views and widgets: moi/collab"]
-    UI <--> Host
-    Applets <--> Host
-  end
-  Host <-->|"Workspace WebSocket"| Main["moi server: sockets, validation, supervisor"]
-  Callers["Agents and server callers"] <-->|"HTTP command / callCollab"| Main
-  Main <-->|"Typed Bun IPC"| Worker["One workspace collab subprocess"]
-  Worker --- Presence["Participants and subscriptions in memory"]
-  Worker <-->|"Transactions + receipts"| SQLite[(".moi/data/collab.sqlite")]
+  Host["Batiok / outer host"] -->|"Current identity + workspace users"| Directory["Browser user directory"]
+  Applets["Widgets and views: moi/collab"] --> Hooks["Hooks and connected components"]
+  Directory --> Hooks
+  Hooks --> Backend["Workspace backend + presence store"]
+  Backend <-->|WebSocket| Main["moi server: validation and supervision"]
+  Main <-->|Typed IPC| Room["One temporary presence room per workspace"]
 ```
+
+The existing applet bridge passes the host's actual hook and component functions into each
+separately compiled bundle. Those functions read the host's workspace and applet React contexts.
+There is one client per mounted workspace, shared by its applets. `CollabBackend` is the seam
+between hooks and the live transport; the development playground supplies a fake backend.
 
 ## Enable and install
 
-Runtime availability and document installation are independent CLI choices:
+- `moi start --experimental-collab` enables live presence for this server process.
+- `moi start --dev --experimental-collab` enables it under the dev supervisor.
+- `moi start` disables live presence, even after a previously enabled start.
+- `moi init --experimental-collab` separately installs the optional applet guide and types.
 
-| Command                                 | Behavior                                                                                  |
-| --------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `moi start --experimental-collab`       | Enables the collab runtime for every workspace served by this process.                    |
-| `moi start --dev --experimental-collab` | Enables the same runtime under the dev supervisor.                                        |
-| `moi start`                             | Leaves the runtime disabled, including after a previous flagged start.                    |
-| `moi init --experimental-collab`        | Initializes the current workspace with the optional collaboration guide and applet types. |
+Startup configuration exposes `experimentalCollab` through `/api/config`. The app loads it before
+React mounts and refreshes it on workspace-event reconnect. Workers start lazily.
 
-The launcher passes its explicit choice to child processes. Dev mode does not enable collab
-automatically. Workers start lazily when a caller needs them. Restarting without the flag disables
-runtime and preserves shared data and documents.
+The API remains available with presence disabled: applets still render, user profiles can resolve,
+peer/presence lists are empty, and publication is inert. No presence socket is opened. A mounted
+applet gets the same context shape in either mode.
 
-### Startup configuration
+Identity starts as `null`. Local development uses an explicit profile from `/dev/collab`, stored
+in that browser tab's `sessionStorage`. An outer provider owns identity once injected, including
+when it signs out. Applets cannot set identity. Without an identity there is no presence connection.
 
-`experimentalCollab: boolean` is part of the existing client startup config from `GET /api/config`.
-The server resolves it from the CLI's process setting, alongside the other client-safe startup
-values. Both the server runtime gate and the browser read the same startup configuration.
+## Users and connections
 
-`client/index.tsx` loads this configuration in parallel with the main bundle and awaits it before
-mounting React. `useAppConfig()` exposes it synchronously from the first render and refreshes it
-when the workspace-event socket reconnects after a server restart. The collab gate reads it
-directly; it does not wait for the workspace layout query or make a separate config request.
+A user profile is `{ id, name, color, avatar?, email? }`. IDs are stable attribution identifiers;
+profiles and browser injection do not provide authentication or workspace access enforcement.
+Those policies remain the outer host's responsibility.
 
-The existing workspace response includes only an optional `collabReference` path, when the guide
-has been installed and the runtime is available. This is workspace metadata for agent context;
-it does not enable the runtime. `moi start --experimental-collab` is the only runtime opt-in.
+A connection is `{ connectionId, userId, location, presence }`. One user can have multiple browser
+tabs. The server assigns connection IDs. `location` is `{ page, title? } | null`, with `null` for
+hidden tabs. A page is the route segment within the workspace. Status is aggregated across a
+user's workspace connections:
 
-```mermaid
-flowchart LR
-  CLI["moi start --experimental-collab"] --> Config["Server startup config"]
-  Config --> Runtime["Collab runtime gate"]
-  Config --> API["GET /api/config"]
-  API --> Bootstrap["Load before React mounts"]
-  Bootstrap --> Hook["useAppConfig().experimentalCollab"]
-  Hook --> Gate["Workspace collab gate"]
-```
+- `active`: at least one visible connection.
+- `away`: connected, but all connections are hidden.
+- `offline`: no connection in this workspace.
 
-Installation adds:
+Being on a different page does not make someone offline. `usePeers()` defaults to the current
+page, deduplicates by user ID, and excludes the current user across all their connections.
+`scope: 'workspace'` includes other pages and hidden connections. Status filters are optional.
+Presence values remain per connection and exclude only the observing connection, so another tab
+of the same user can still have its own pointer.
 
-- `<workspace skill directory>/moi-workspace/references/COLLABORATIVE.md`.
-- `.moi/collab-env.d.ts`, declaring the `moi/collab` imports.
+Batiok's full workspace directory is authoritative when supplied. It allows resolving an offline
+user, including someone who has never opened the workspace. Profile replacement and removal take
+effect immediately; live connections cannot resurrect removed directory entries. With no host
+directory, current connection profiles and the local identity provide a development fallback.
+This fallback is transient and makes no promise of resolving users after they leave.
 
-The main `SKILL.md` stays unchanged. The uppercase reference ships in the package but lives outside
-the default templates; only explicit CLI init installs it. Ordinary init, UI provisioning and skill
-refreshes do not add it, and preserve a previously installed copy. `init --web --experimental-collab`
-installs the documents but does not implicitly enable runtime. Chat/view-builder context points to
-the installed reference when runtime is available.
-
-Starting the runtime does not set identity or show workspace Share/people controls. Identity starts
-as `null`. Shared-state hooks can connect anonymously: those connections are omitted from people
-lists and do not publish location or presence. Merely opening an ordinary workspace does not open
-a collab socket until an applet requests shared state or an identity is explicitly supplied.
-
-The combined `/dev/collab` page offers optional dev identity setup when no external identity
-provider is configured. Select **Use dev identity** to save a name, preset color, and facehash-style
-avatar rasterized to a PNG data URL of at most 8 KiB. The profile stays in that tab's
-`sessionStorage`; **Save identity** applies later edits. Opening the playground does not create an
-identity. Only a supplied identity activates workspace presence, host controls, and personal
-navigation.
-
-An injected outer getter or a call to the bridge's `setIdentity` claims external-provider ownership.
-This remains true when the provider returns `null` or signs out. Dev identity controls are hidden,
-and pending dev edits cannot overwrite the provider. The simulated playground remains available.
-
-## Browser identity and sharing bridge
-
-When collab loads it installs `window.moi.collab` with:
-
-```ts
-getIdentity(): Identity | null
-setIdentity(identity: Identity | null): void
-subscribeIdentity(listener: (identity: Identity | null) => void): () => void
-setShareHandler(handler: ((context: {
-  workspaceId: string
-  url: string
-}) => Promise<{ url: string }>) | null): void
-```
-
-Subscriptions receive the current identity immediately. The workspace provider dispatches
-`moi:collab-ready`; an outer script can also supply `getIdentity` before moi loads. Example script:
-
-```js
-const profile = { id: 'anna', name: 'Anna', color: '#7c3aed' }
-window.moi ??= {}
-window.moi.collab ??= { getIdentity: () => profile }
-
-let attached = false
-function attachCollab() {
-  const collab = window.moi.collab
-  if (attached || !collab.setIdentity) return
-  attached = true
-  collab.setIdentity(profile)
-  collab.subscribeIdentity(identity => {
-    console.log('Current participant:', identity?.name ?? 'Signed out')
-  })
-  // Replace this function with the outer product's share-link service.
-  collab.setShareHandler(async ({ url }) => ({ url }))
-}
-window.addEventListener('moi:collab-ready', attachCollab)
-attachCollab()
-```
-
-A same-id profile change updates its display information. A different id reconnects; `null`
-ends named presence while shared-state applets can continue anonymously. The host Share button
-calls the supplied handler and copies its returned HTTP(S) URL.
-Without a handler it copies the existing workspace URL. This does not publish the workspace,
-create invitations, or grant access; the recipient must already be able to reach the server.
+The complete host integration contract and bootstrap example are in
+[batiok-collab-bridge.md](batiok-collab-bridge.md).
 
 ## Applet API
 
-No applet-facing provider, socket, npm package, or identity setup is needed. The host passes its
-actual API/context objects through the existing applet bridge so separately bundled applets share
-one store. Applet scopes organize data; they do not isolate untrusted code.
+| Hook                                 | Contract                                                                                                    |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `useMe()`                            | Current user profile plus `status`, or `null`.                                                              |
+| `useUser(id)`                        | A profile plus `status`, including offline users; `null` for unknown IDs.                                   |
+| `usePeers({ scope?, status? })`      | Other connected users; `scope` is `page` or `workspace`, `status` is `active` or `away`.                    |
+| `usePresence(channel)`               | Read-only array of `{ connectionId, userId, value }` for other connections on this page and applet surface. |
+| `usePublishPresence(channel, value)` | Publish the current JSON value reactively while mounted and visible. Returns nothing.                       |
 
-| API                                              | Current contract                                                                                  |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| `useSelf()`                                      | Participant or `null`; fields: `identity`, `connectionId`, `location`, `presence`.                |
-| `useOthers({ scope? })`                          | Other connections on the current `page` by default; `workspace` includes all pages.               |
-| `usePerson(id)`                                  | `{ id, identity, status }`; status is `active`, `away`, or `offline`; unknown identity is `null`. |
-| `usePresence(channel, initialValue)`             | `{ value, setValue, others }`; set replaces the whole transient channel value.                    |
-| `useSharedState(key, { scope?, defaultValue? })` | `{ value, exists, loaded, canWrite, isSaving, error, setValue, deleteValue }`.                    |
-| `useSharedStore(prefix?, { scope? })`            | Prefix-relative `entries`, `set`, `delete`, `batch`, and the same loading/save status fields.     |
+Reading presence never creates a presence registration. Publication owns one registration per
+mounted hook and replaces that registration's whole value. Hidden views, browser tabs, outgoing
+builds, unmounts, and Strict Mode cleanup release registrations. Presence is restored after reconnect.
+Custom channel names are scoped by applet surface (`view:<name>` or `widget:<name>`); they are not
+a persistent key/value store. Channel values must be JSON and fit within 4 KiB.
 
-`location` is `{ page, title? } | null`; the host currently reports the route's page segment and
-uses `null` when the browser tab is hidden. One user may have multiple connections/locations.
-`Activity` deduplicates avatars by `identity.id`.
+| Component        | Contract                                                                            |
+| ---------------- | ----------------------------------------------------------------------------------- |
+| `User`           | Resolve a profile by `id`; name/avatar, sizes, optional status and detail.          |
+| `Facepile`       | Resolve `ids` and render stacked avatars with an overflow count.                    |
+| `Activity`       | Show current-page or workspace participants.                                        |
+| `Cursors`        | Wrap a cursor surface; optional stable `surface` name.                              |
+| `PresenceFrame`  | Wrap a control with `target`; publishes descendant focus and outlines remote focus. |
+| `PresenceGutter` | Same `target`/children contract, with a user marker beside the focused item.        |
+| `PresenceGroup`  | Optionally group gutter targets to constrain avatar layout animations.              |
+| `Selection`      | Wrap a `target` and supply a controlled `selected` boolean.                         |
 
-| Component       | Props                                                                          |
-| --------------- | ------------------------------------------------------------------------------ |
-| `Activity`      | Optional `scope="page"` or `"workspace"`, `className`.                         |
-| `Cursors`       | `children`, optional stable `surface` name and `className`.                    |
-| `PresenceField` | Stable `target`, `children`, optional `className`; advisory focus, no locking. |
-| `Selection`     | Stable `target`, local `selected` boolean, `children`, optional `className`.   |
+Frame and gutter do not accept user IDs. They discover focus through presence and share the same
+target channel. Nested focus belongs to the nearest target wrapper. Use semantic targets such as
+`todo:42:title`, never array positions or inferred DOM paths. Reusing a modal for another record
+must change its target. Scope animation groups to related list/form regions.
 
-People components take a person by id only, as `id` for one person and `ids` for several, and resolve
-the current name, face, and status through the workspace: `Person` (with `avatarOnly`), `Facepile`,
-`Cursor`, `PresenceFrame`, `PresenceGutter` (entries of `{ id, target }`), and the `usePerson` hook.
-Live connections answer first, then the people directory, then the local profile. An unknown id
-renders as "Unknown person".
-The green dot (`showStatus`, on for `Person`, off for `Facepile`) marks a person with the workspace open
-in a visible tab. `PresenceFrame`, and with it `PresenceField` and `Selection`, hugs the single element
-it wraps and copies its corner radius, so callers pass no size or rounding.
-There is no save-status component; applets render `isSaving` and `error` from the shared-state hooks.
+`Cursors` is the public cursor component; the singular cursor renderer is internal. Pointer updates
+are coalesced to 50 ms. Optional `data-collab-target` anchors allow pointers to follow an element
+when layouts or scroll positions differ; arbitrary canvas coordinate mapping is not implemented.
 
-The complete applet contract and examples live in
-[COLLABORATIVE.md](../server/collab/skill/references/COLLABORATIVE.md); the matching declarations
-live in [collab-env.d.ts](../server/collab/skill/collab-env.d.ts).
+Public declarations: [collab-env.d.ts](../server/collab/skill/collab-env.d.ts).
+Authoring guide: [COLLABORATIVE.md](../server/collab/skill/references/COLLABORATIVE.md).
 
-```tsx
-const title = useSharedState<string>('task/42/title', {
-  scope: 'shared:tasks',
-  defaultValue: ''
-})
-// Wait for title.loaded; disable editing while !title.canWrite.
-const outcome = await title.setValue('Ship demo')
-// outcome: { status: 'committed', revision }
-//       or { status: 'rejected' | 'unknown', message }
-```
+## Transport and lifecycle
 
-`defaultValue` is a read fallback after hydration, never an initialization write. Save methods
-return outcomes; an applet must show errors and preserve drafts on `unknown`. The default data
-scope is `applet:<kind>:<name>`, such as `applet:view:board`. Renaming changes that default; use a
-stable explicit scope when multiple applets or renamed views share data.
+Protocol version 2 accepts a named `join`, profile updates, location updates, presence registration
+updates/removals, and ping. It sends welcome, participant/profile snapshots, errors, and pong.
+Profiles in socket snapshots are only a fallback for current connections; the full host directory
+is never sent through this socket.
 
-Presence belongs to each mounted hook registration. Hidden views, outgoing builds, unmounts, and
-Strict Mode cleanup release their registrations/subscriptions. Cursor updates are coalesced to
-50 ms. Semantic `data-collab-target` anchors support differing layouts; arbitrary canvas coordinate
-mapping is not implemented.
+The main server owns sockets, validates messages, enforces payload limits, and supervises one
+subprocess per canonical workspace path. The process owns participants and temporary registrations.
+No persistent storage is opened. Slow sockets are disconnected when reliable delivery cannot be
+maintained; temporary participant broadcasts can be dropped under pressure.
 
-## Frontend backends and dev playground
+Worker failure closes its sockets. Clients reconnect with backoff, join afresh, and republish live
+presence. Shutdown and parent IPC loss terminate children. Applet rebuilds and function-worker
+restarts do not restart presence. Idle workers can exit; active rooms are preserved.
 
-Hooks and components consume the [CollabBackend](../client/features/collab/backend.ts) interface
-through context. It exposes connection and people snapshots, viewer identity, location, presence,
-and scoped shared state. `CollabWorkspaceProvider` supplies the live adapter around `CollabClient`.
-Host development pages and tests can supply another implementation through `CollabBackendProvider`.
-Applets receive their provider from the host.
+With runtime and identity enabled, selected chats and open/current tabs are browser-tab-local.
+Remote navigation broadcasts are ignored, while local applet navigation still works. Ordinary
+navigation behavior remains when no identity is supplied. Share invokes the outer host's handler,
+or copies the workspace URL if none exists; copying does not grant access or publish a workspace.
 
-```mermaid
-flowchart LR
-  Workspace["Workspace views and widgets"] --> Hooks["Collab hooks and components"]
-  Playground["/dev/collab playground"] --> Hooks
-  Hooks --> Backend["CollabBackend interface"]
-  Backend --> Live["Live adapter: CollabClient + CollabStore"]
-  Backend --> Fake["Fake adapter: isolated CollabStore + in-memory room"]
-  Live <-->|WebSocket| Server["moi server and workspace worker"]
-  Server <--> SQLite[("collab.sqlite")]
-```
+## Development and verification
 
-The single **Collab** entry on `/dev` opens `/dev/collab`. It combines optional dev identity
-controls with the component gallery and interactive hook playground. The old `/dev/collab-kit`
-URL redirects to this page. Production builds redirect `/dev` to the home page.
+`/dev/collab` combines explicit dev identity setup with an isolated presence playground. The
+playground works without enabling runtime, opening a workspace, or creating an identity. It uses
+the same hooks, components, and presence store with a fake room and fixture directory. Reopening
+it resets its state; other browser tabs have independent fake rooms.
 
-Run `bun run dev` to use the playground. It requires no workspace, installed collaboration guide,
-runtime flag, or real identity. Dev identity controls affect real workspace identity; the playground
-keeps its own sample people and room. To test a real workspace connection, start with
-`moi start --dev --experimental-collab` and supply identity when testing named presence.
+Use real workspace applets in two browsers to verify transport: joins/leaves, duplicate user tabs,
+profile updates/removals, read-only presence, focus/selection/cursors, hidden tabs, view switches,
+rebuild cleanup, reconnection, and workspace isolation. Disabled-mode applets must render without
+opening a socket. Unit/integration tests cover directory ownership, protocol validation, room
+cleanup, process supervision, store recovery, and public declarations.
 
-[DevCollabPage.tsx](../client/features/collab/DevCollabPage.tsx) composes the conditional
-[dev identity form](../client/features/collab/DevCollabIdentity.tsx) and the
-[playground](../client/features/collab/DevCollabKit.tsx):
-
-- People, facepiles, outlines around different controls, document gutters, and cursor examples.
-- Connected `Activity`, `Cursors`, `PresenceField`, and `Selection` examples with scripted people.
-- Live hook results for self, page/workspace participants, known and unknown people, and custom
-  presence. Shared note edits simulate another participant; task actions exercise atomic batches.
-- Simulated 400 ms saves make optimistic changes and saving status visible.
-
-[createFakeBackend](../client/features/collab/fake-backend.ts) uses the real `CollabStore` with an
-in-memory room. It supplies snapshots and updates, simulated participants, and remote mutations
-without opening a collab socket or writing SQLite. Each playground mount gets a new room, so
-edits reset on remount and separate browser tabs have independent rooms. This exercises component
-and client-store behavior; transport, worker recovery, receipts, and persistence have separate
-integration tests.
-
-## Storage and recovery
-
-The worker uses `bun:sqlite` with `scopes`, `entries`, `receipts`, and `people` tables, one synchronous
-connection, rollback journal mode, `synchronous=EXTRA`, and versioned migrations. Schema version 2
-adds the people table to version 1 databases while preserving existing shared values and receipts.
-
-- The people directory stores supplied profiles by identity id. The worker upserts profiles on join
-  and on changes, includes a directory snapshot in `welcome`, and announces changed profiles in
-  `people` messages. Disconnect removes live presence while retaining remembered profiles.
-- Directory snapshots include up to 500 profiles ordered by their last profile change. This is a
-  query limit; stored rows are not pruned. Rejoining with an unchanged profile does not change its
-  order. Profiles carry no version, so stale tabs sharing an identity can supply older information.
-- Values are plain JSON at `(scope, key)`. `set`, `delete`, and ordered atomic batches are supported.
-- Last **server-committed** write to the same key wins. Different field keys remain independent.
-- Whole scopes receive snapshots and ordered updates; prefix filtering happens in the client.
-- Each scope has a monotonic revision. Subscribing captures/registers synchronously before later writes.
-- A transaction writes values, advances the revision, and stores an actor/operation receipt together.
-- Receipts last 24 hours. Reusing an operation id with the same payload does not reapply it;
-  changed payloads fail. Missing/expired receipts mean unknown, not failed.
-- The client keeps optimistic edits separately, reconnects with fresh subscriptions/snapshots, and
-  looks up uncertain operation ids. It never automatically replays offline or unknown edits.
-
-Limits: 100 operations per mutation, 64 KiB per value, 256 KiB per request, and 10 MiB/10,000 entries
-per scope. Use a membership key such as `task/<id>/exists` plus separate title/done keys. Creation
-batches membership and fields; deletion removes membership. A late field write cannot then make
-the item visible again. Strings, arrays, and objects are replaced as whole values.
-
-```mermaid
-sequenceDiagram
-  participant C as Host client
-  participant M as moi server
-  participant W as Workspace worker
-  participant D as SQLite
-  C->>M: Mutate(scope, operationId, operations)
-  M->>W: Validated command + actor
-  W->>D: Commit values + revision + receipt
-  D-->>W: Committed
-  W-->>M: Ordered subscriber updates and acknowledgment
-  M-->>C: Apply committed update; settle pending edit
-  Note over C,D: Lost acknowledgment: reconnect, refresh snapshot, query receipt; never replay blindly.
-```
-
-The database is durable workspace content, not a cache. Do not edit it from applets/functions or
-copy a changing file for backup. Internal export creates a consistent copy without overwriting an
-existing destination. Git cannot merge independently edited SQLite files.
-
-## Agents and server callers
-
-`POST /api/workspaces/:id/collab/command` accepts supplied actor attribution and one command:
-
-```json
-{
-  "actor": { "kind": "agent", "id": "workspace-agent" },
-  "command": {
-    "type": "mutate",
-    "scope": "shared:tasks",
-    "operationId": "a-new-unique-operation-id",
-    "operations": [{ "type": "set", "key": "task/42/done", "value": true }]
-  }
-}
-```
-
-Other HTTP commands are `{ "type": "snapshot", "scope": "shared:tasks" }` and
-`{ "type": "receipts", "operationIds": ["..."] }`. Actors have `id` and `kind` (`user`, `agent`,
-`system`); receipts are isolated by actor kind/id. These operations use the same worker and
-broadcast to subscribed browsers. HTTP rejects filesystem export commands.
-
-Internal moi server code can use the same service directly:
-
-```ts
-import { callCollab } from './collab/manager'
-
-const actor = { id: 'workspace-agent', kind: 'agent' as const }
-await callCollab(workspacePath, actor, { type: 'snapshot', scope: 'shared:tasks' })
-await callCollab(workspacePath, actor, { type: 'export', path: destinationPath })
-```
-
-Applet server functions can call the HTTP endpoint; there is no dedicated server-side
-`moi/collab` import or automatic requesting-user propagation in this release. Never open the shared
-SQLite file as a second writer.
-
-## Lifecycle and personal UI
-
-The parent lazily starts one worker per canonical workspace path. Concurrent starts share one
-owner. Workers remain alive while connections/requests exist and stop after 60 seconds idle.
-Startup has a 10-second timeout; graceful shutdown has a 2-second forced-termination deadline.
-The server expires idle connections after 60 seconds; the client sends a heartbeat every 15 seconds.
-
-On worker failure the parent closes its collab sockets. Reconnection backs off, obtains fresh
-snapshots, and restores presence. Parent shutdown closes SQLite and children; parent IPC loss also
-terminates the child. Applet rebuilds and function-worker restarts leave collab running. Active
-workers are never evicted by an LRU limit. Only one moi server may own a workspace directory.
-
-With an explicitly supplied identity and an enabled runtime, current/open tabs and chat selection
-are browser-tab-local state. CLI/server `tab:focus` broadcasts are intentionally ignored;
-there is no targeted remote navigation command yet. Applet `focusTab` stays local and works.
-Without an explicit identity, navigation retains its existing behavior even when the runtime is
-available. Layout saves omit tabs unless navigation deliberately updates them, preserving authored
-defaults during unrelated grid/theme changes. Global startup config refreshes when the
-workspace-event connection reconnects after a server restart.
-
-The workspace header stacks the faces of up to three other people, a count for the rest, and you
-with a chevron. Hovering a face names the person and the tab they are on; selecting it opens that
-tab. The chevron opens the people list: you first, then in development a button to change your
-name or avatar, then everyone else with their tab named with the workspace's own labels and icons.
-A green dot marks a visible browser tab; a person whose tabs are all hidden is Away. Selecting a
-row opens the tab they are on.
-
-## Verification
-
-The dev kit is the maintained manual playground. Automated coverage is colocated with the code:
-
-| Area                                                                                                                                                                            | Coverage                                                                                                             |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| [Storage](../server/collab/storage.test.ts) and [service](../server/collab/service.test.ts)                                                                                     | Conflicts, atomic rollback, receipt recovery, snapshots, profile persistence, schema migration, and broadcasts.      |
-| [Client store](../client/features/collab/store.test.ts), [people](../client/features/collab/people.test.ts), and [fake backend](../client/features/collab/fake-backend.test.ts) | Optimistic edits, acknowledgment ordering, identity resolution, disconnect retention, presence, and simulated saves. |
-| [Client transport](../client/features/collab/client.test.ts) and [worker manager](../server/collab/manager.test.ts)                                                             | Connections, real WebSockets, workspace isolation, crashes, lost acknowledgments, and parent-death cleanup.          |
-| [Startup config](../server/app-config.test.ts), [HTTP](../server/collab/http.test.ts), and [CLI flags](../server/test/cli-collab.test.ts)                                       | Process opt-in, runtime gating, anonymous shared state, and optional document installation.                          |
-| [Applet declarations](../server/collab/skill/index.test.ts) and [personal navigation](../client/features/collab/personal-state.test.ts)                                         | Public API compatibility, guide installation, and browser-tab-local navigation.                                      |
-
-Use the dev kit for visual and hook behavior checks. Real multi-browser verification uses an
-explicitly enabled workspace and covers synchronization, reconnects, durable reloads, and Share
-behavior through the live backend.
-
-## Current boundaries
-
-Remaining boundaries: no cloud authentication/access enforcement, invitations, deployment service,
-per-field permissions, offline synchronization, independent replicas, collaborative text, atomic
-counters, activity history, follow mode, or comments/mentions. Existing host HTTP/chat/event surfaces
-still assume a trusted installation. Hosted access enforcement belongs to the outer product.
-
-## References
-
-- [Liveblocks presence](https://liveblocks.io/docs/products/sync/presence) and [React API](https://liveblocks.io/docs/api-reference/liveblocks-react): inspiration for separate identity/presence and applet hooks.
-- [Liveblocks storage](https://liveblocks.io/docs/guides/how-to-use-liveblocks-storage-with-react): stronger collaborative structures than this intentionally limited LWW store.
-- [Bun IPC](https://bun.sh/docs/runtime/child-process), [WebSockets](https://bun.sh/docs/runtime/http/websockets), and [SQLite](https://bun.sh/docs/runtime/sqlite): runtime primitives.
-- [SQLite transactions](https://www.sqlite.org/lang_transaction.html) and [durability settings](https://www.sqlite.org/pragma.html#pragma_synchronous): commit behavior.
-- [React Activity](https://react.dev/reference/react/Activity): hidden-view state and effect lifecycle.
+A later realtime-data proposal may build on server functions and query invalidation. No part of
+that design is implemented or exposed by this PR.

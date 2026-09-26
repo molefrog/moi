@@ -23,8 +23,8 @@ import type { WorkspaceTabId } from '@/lib/types'
 import { parseWorkspaceTab } from '@/lib/workspace-tabs'
 import { Avatar, AvatarFallback } from '@/ui-components/avatar'
 
-import { Person } from './primitives'
-import { pageFromPath, useConnection } from './hooks'
+import { User } from './primitives'
+import { pageFromPath, useConnection, useWorkspaceUsers } from './hooks'
 import { getIdentity, getIdentitySource, shareWorkspace, subscribeIdentityStore } from './identity'
 import { groupPeople } from './people'
 import type { PresentPerson } from './people'
@@ -47,12 +47,14 @@ export function WorkspaceCollabControls({
   onOpenTab
 }: WorkspaceCollabControlsProps) {
   const state = useConnection()
+  const users = useWorkspaceUsers()
   const identity = useSyncExternalStore(subscribeIdentityStore, getIdentity, getIdentity)
   const [path] = useLocation()
   const page = pageFromPath(path)
   const people = groupPeople(state.participants, {
     identity,
     connectionId: state.connectionId,
+    users,
     page
   })
   const self = people.find(person => person.self)
@@ -87,13 +89,13 @@ export function WorkspaceCollabControls({
               <Button
                 variant="ghost"
                 size="sm"
-                aria-label="People in this workspace"
+                aria-label="Users in this workspace"
                 className="gap-0.5 rounded-full pr-1 pl-0.5 data-[popup-open]:bg-accent"
               />
             }
           >
             {self && (
-              <Person
+              <User
                 avatarOnly
                 id={self.identity.id}
                 showStatus={false}
@@ -105,10 +107,10 @@ export function WorkspaceCollabControls({
           </PopoverTrigger>
         </span>
         <PopoverContent align="end" className="gap-2 p-2">
-          <PopoverTitle className="sr-only">People in this workspace</PopoverTitle>
+          <PopoverTitle className="sr-only">Users in this workspace</PopoverTitle>
           {self && (
             <div className="flex items-center gap-3 px-2 pt-1">
-              <Person avatarOnly id={self.identity.id} size="lg" showStatus={false} />
+              <User avatarOnly id={self.identity.id} size="lg" showStatus={false} />
               <span className="min-w-0 flex-1 truncate text-sm font-medium">
                 {self.identity.name}{' '}
                 <span className="font-normal text-muted-foreground">(you)</span>
@@ -159,7 +161,9 @@ function placeOf(person: PresentPerson, page: string, describeTab: DescribeTab):
   return {
     away,
     where: away
-      ? 'Away'
+      ? person.status === 'offline'
+        ? 'Offline'
+        : 'Away'
       : tabs.map(({ tab, info }) => info?.label ?? tab ?? 'Another tab').join(', '),
     Icon: tabs[0]?.info?.Icon,
     // The first tab of theirs that you are not already on.
@@ -173,7 +177,7 @@ type FaceProps = { person: PresentPerson; place: Place; onJump: (tab: WorkspaceT
 function Face({ person, place, onJump }: FaceProps) {
   const target = place.target
   const hint = place.away
-    ? 'Away'
+    ? place.where
     : target
       ? `Click to go to ${place.where}`
       : `Also on ${place.where}`
@@ -192,7 +196,7 @@ function Face({ person, place, onJump }: FaceProps) {
           )
         }
       >
-        <Person
+        <User
           avatarOnly
           id={person.identity.id}
           showStatus={false}
@@ -214,7 +218,7 @@ function PersonRow({ person, place, onJump }: PersonRowProps) {
   const { Icon, where, target } = place
   const content = (
     <>
-      <Person avatarOnly id={person.identity.id} size="md" />
+      <User avatarOnly id={person.identity.id} size="md" />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-sm">{person.identity.name}</span>
         <span className="flex items-center gap-1 text-xs text-muted-foreground">

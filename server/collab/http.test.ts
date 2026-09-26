@@ -1,22 +1,19 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { Hono } from 'hono'
 import { mkdtemp, realpath, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 
-import type { CollabCommand, CollabServerMessage } from '@/lib/collab/types'
+import type { CollabServerMessage } from '@/lib/collab/types'
 import type { WorkspaceEntry } from '@/lib/types'
 
 import { api } from '../api'
 import { clientAppConfig, resetAppConfig } from '../app-config'
 import { DEFAULT_REGISTRY_PATH, setRegistryPath } from '../registry'
-import { collabRoutes } from './http'
 import { collabManager, type CollabSocket } from './manager'
 import { collabSkillReferencePath } from './skill'
 
 let directory: string
 let workspace: WorkspaceEntry
-let app: Hono<{ Variables: { ws: WorkspaceEntry } }>
 let savedEnv: Record<string, string | undefined>
 const envKeys = ['MOI_EXPERIMENTAL_COLLAB', 'MOI_COLLAB', 'MOI_DEV']
 
@@ -42,12 +39,6 @@ beforeEach(async () => {
   const registryPath = join(directory, 'workspaces.json')
   setRegistryPath(registryPath)
   await Bun.write(registryPath, JSON.stringify([workspace]))
-  app = new Hono<{ Variables: { ws: WorkspaceEntry } }>()
-  app.use('*', async (c, next) => {
-    c.set('ws', workspace)
-    await next()
-  })
-  app.route('/collab', collabRoutes)
 })
 
 afterEach(async () => {
@@ -66,14 +57,14 @@ afterEach(async () => {
 })
 
 function post(path: string, body: unknown) {
-  return app.request(path, {
+  return api.request(`/api/workspaces/${workspace.id}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   })
 }
 
-function command(command: CollabCommand, id = 'agent') {
+function command(command: unknown, id = 'agent') {
   return post('/collab/command', { actor: { id, kind: 'agent' }, command })
 }
 
@@ -85,7 +76,7 @@ function enable() {
 
 describe('collab HTTP integration', () => {
   test('ordinary and dev starts remain disabled without creating data', async () => {
-    expect((await app.request('/collab')).status).toBe(404)
+    expect((await api.request(`/api/workspaces/${workspace.id}/collab`)).status).toBe(404)
     expect(clientAppConfig().experimentalCollab).toBe(false)
     expect((await post('/collab', { enabled: true })).status).toBe(404)
     expect((await command({ type: 'snapshot', scope: 'board' })).status).toBe(404)
@@ -103,7 +94,7 @@ describe('collab HTTP integration', () => {
     const defaultSkill = '# moi workspace\nExisting workspace instructions.\n'
     await Bun.write(defaultSkillPath, defaultSkill)
     enable()
-    expect((await app.request('/collab')).status).toBe(404)
+    expect((await api.request(`/api/workspaces/${workspace.id}/collab`)).status).toBe(404)
     expect((await post('/collab', { enabled: true })).status).toBe(404)
     expect(await Bun.file(join(directory, '.moi', '.workspace.json')).exists()).toBe(false)
     expect(await Bun.file(defaultSkillPath).text()).toBe(defaultSkill)
@@ -144,97 +135,22 @@ describe('collab HTTP integration', () => {
     expect(await (await api.request(workspaceUrl)).json()).not.toHaveProperty('collabReference')
   })
 
-  test('HTTP snapshots, mutations and recovery receipts use the same persistent worker', async () => {
+  test('persistent commands remain absent even when presence is enabled', async () => {
     enable()
-    expect(await (await command({ type: 'snapshot', scope: 'board' })).json()).toEqual({
-      scope: 'board',
-      revision: 0,
-      entries: {}
-    })
-    const edit: CollabCommand = {
-      type: 'mutate',
-      scope: 'board',
-      operationId: 'first',
-      operations: [{ type: 'set', key: 'task/title', value: 'First' }]
+    for (const commandType of ['snapshot', 'mutate', 'receipts', 'export']) {
+      expect((await command({ type: commandType, scope: 'board' })).status).toBe(404)
     }
-    expect(await (await command(edit)).json()).toMatchObject({ revision: 1, duplicate: false })
-    expect(
-      await (
-        await command(
-          {
-            type: 'mutate',
-            scope: 'board',
-            operationId: 'second',
-            operations: [{ type: 'set', key: 'task/done', value: true }]
-          },
-          'other-agent'
-        )
-      ).json()
-    ).toMatchObject({ revision: 2, duplicate: false })
-    expect(await (await command(edit)).json()).toMatchObject({ revision: 1, duplicate: true })
-    expect(await (await command({ type: 'snapshot', scope: 'board' })).json()).toEqual({
-      scope: 'board',
-      revision: 2,
-      entries: { 'task/title': 'First', 'task/done': true }
-    })
-    expect(
-      await (
-        await command({ type: 'receipts', operationIds: ['first', 'second', 'missing'] })
-      ).json()
-    ).toEqual([
-      { operationId: 'first', status: 'committed', scope: 'board', revision: 1 },
-      { operationId: 'second', status: 'unknown' },
-      { operationId: 'missing', status: 'unknown' }
-    ])
-    const mismatch = await command({
-      ...edit,
-      operations: [{ type: 'set', key: 'task/title', value: 'Changed payload' }]
-    })
-    expect(mismatch.status).toBe(409)
-    expect(await (await command({ type: 'snapshot', scope: 'board' })).json()).toMatchObject({
-      revision: 2
-    })
+    expect(collabManager.debugSnapshot()).toEqual([])
+    expect(await Bun.file(join(directory, '.moi', 'data', 'collab.sqlite')).exists()).toBe(false)
   })
 
-  test('rejects commands, actors and public filesystem export', async () => {
-    enable()
-    expect(
-      (
-        await post('/collab/command', {
-          actor: { id: 'user', kind: 'admin' },
-          command: { type: 'snapshot', scope: 'board' }
-        })
-      ).status
-    ).toBe(400)
-    expect((await command({ type: 'export', path: join(directory, 'leak.sqlite') })).status).toBe(
-      400
-    )
-    expect(
-      (
-        await post('/collab/command', {
-          actor: { id: 'agent', kind: 'agent' },
-          command: {
-            type: 'mutate',
-            scope: 'board',
-            operationId: 'invalid',
-            operations: [{ type: 'increment', key: 'value' }]
-          }
-        })
-      ).status
-    ).toBe(400)
-    expect(await Bun.file(join(directory, 'leak.sqlite')).exists()).toBe(false)
-  })
-
-  test('stopping runtime closes connections and preserves the guide and durable content', async () => {
+  test('stopping presence preserves installed guides and any existing database file', async () => {
     enable()
     const referencePath = collabSkillReferencePath(directory, workspace.type)
+    const databasePath = join(directory, '.moi', 'data', 'collab.sqlite')
+    const previousDatabase = new Uint8Array([83, 81, 76, 105, 116, 101, 0, 1, 2, 3])
     await Bun.write(referencePath, '# Manually installed guide')
-    await command({
-      type: 'mutate',
-      scope: 'board',
-      operationId: 'keep',
-      operations: [{ type: 'set', key: 'title', value: 'Keep me' }]
-    })
+    await Bun.write(databasePath, previousDatabase)
     const messages: CollabServerMessage[] = []
     let closed = false
     const socket: CollabSocket = {
@@ -251,7 +167,7 @@ describe('collab HTTP integration', () => {
       socket,
       JSON.stringify({
         type: 'join',
-        version: 1,
+        version: 2,
         identity: { id: 'anna', name: 'Anna', color: 'blue' }
       })
     )
@@ -261,12 +177,7 @@ describe('collab HTTP integration', () => {
     resetAppConfig()
     expect(closed).toBe(true)
     expect(await Bun.file(referencePath).text()).toBe('# Manually installed guide')
-    expect(await Bun.file(join(directory, '.moi', 'data', 'collab.sqlite')).exists()).toBe(true)
+    expect(new Uint8Array(await Bun.file(databasePath).arrayBuffer())).toEqual(previousDatabase)
     expect((await command({ type: 'snapshot', scope: 'board' })).status).toBe(404)
-    enable()
-    expect(await (await command({ type: 'snapshot', scope: 'board' })).json()).toMatchObject({
-      revision: 1,
-      entries: { title: 'Keep me' }
-    })
   })
 })

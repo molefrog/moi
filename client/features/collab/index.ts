@@ -1,15 +1,14 @@
 import {
   Activity,
-  Cursor,
   Cursors,
   Facepile,
-  Person,
-  PresenceField,
+  User,
   PresenceFrame,
+  PresenceGroup,
   PresenceGutter,
   Selection
 } from './components'
-import { useOthers, usePerson, usePresence, useSelf, useSharedState, useSharedStore } from './hooks'
+import { useMe, usePeers, usePresence, usePublishPresence, useUser } from './hooks'
 
 export { CollabWorkspaceProvider, AppletCollabProvider, CollabBackendProvider } from './hooks'
 export { WorkspaceCollabControls } from './WorkspaceCollabControls'
@@ -17,20 +16,18 @@ export { getIdentity, subscribeIdentityStore } from './identity'
 
 const appletApi = {
   Activity,
-  Cursor,
   Cursors,
   Facepile,
-  Person,
-  PresenceField,
+  User,
   PresenceFrame,
+  PresenceGroup,
   PresenceGutter,
   Selection,
-  useOthers,
-  usePerson,
+  useMe,
+  usePeers,
+  useUser,
   usePresence,
-  useSelf,
-  useSharedState,
-  useSharedStore
+  usePublishPresence
 }
 
 export function createAppletCollabApi() {

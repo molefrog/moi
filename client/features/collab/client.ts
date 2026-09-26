@@ -4,8 +4,7 @@ import type { CollabClientMessage, CollabServerMessage } from '@/lib/collab/type
 import { getIdentity, subscribeIdentityStore } from './identity'
 import { CollabStore } from './store'
 
-// One transport per mounted workspace. An explicit identity joins presence;
-// otherwise shared-state hooks acquire an anonymous connection only while used.
+// One presence connection per mounted workspace with an explicit identity.
 export class CollabClient {
   readonly store = new CollabStore()
   private socket: WebSocket | null = null
@@ -14,13 +13,10 @@ export class CollabClient {
   private unsubscribeIdentity: (() => void) | undefined
   private presenceTimer: ReturnType<typeof setTimeout> | undefined
   private queuedPresence = new Map<string, CollabClientMessage>()
-  private writeTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
   private stopped = true
   private attempts = 0
   private lastMessageAt = 0
   private userId = getIdentity()?.id ?? null
-  private readonly anonymousId = crypto.randomUUID()
-  private sharedStateUsers = 0
 
   constructor(readonly workspaceId: string) {
     this.store.setSender(message => this.send(message))
@@ -33,7 +29,7 @@ export class CollabClient {
       const identity = getIdentity()
       if ((identity?.id ?? null) !== this.userId) {
         this.userId = identity?.id ?? null
-        this.store.resetIdentity()
+        this.store.disconnect()
         clearTimeout(this.retry)
         if (this.socket) this.socket.close()
         else this.connect()
@@ -43,20 +39,8 @@ export class CollabClient {
     return () => this.stop()
   }
 
-  acquireSharedState(): () => void {
-    this.sharedStateUsers++
-    if (!this.socket) this.connect()
-    return () => {
-      this.sharedStateUsers = Math.max(0, this.sharedStateUsers - 1)
-      if (!this.wantsConnection()) {
-        clearTimeout(this.retry)
-        this.socket?.close()
-      }
-    }
-  }
-
   private wantsConnection(): boolean {
-    return !this.stopped && (getIdentity() !== null || this.sharedStateUsers > 0)
+    return !this.stopped && getIdentity() !== null
   }
 
   private connect(): void {
@@ -75,11 +59,11 @@ export class CollabClient {
       if (socket !== this.socket) return
       this.lastMessageAt = Date.now()
       const identity = getIdentity()
-      this.rawSend(
-        identity
-          ? { type: 'join', version: 1, identity, location: this.store.getLocation() }
-          : { type: 'join', version: 1, identity: null, anonymousId: this.anonymousId }
-      )
+      if (!identity) {
+        socket.close()
+        return
+      }
+      this.rawSend({ type: 'join', version: 2, identity, location: this.store.getLocation() })
       this.heartbeat = setInterval(() => {
         if (Date.now() - this.lastMessageAt > 45_000) socket.close()
         else this.rawSend({ type: 'ping' })
@@ -91,17 +75,6 @@ export class CollabClient {
       try {
         const message = JSON.parse(String(event.data)) as CollabServerMessage
         if (message.type === 'welcome') this.attempts = 0
-        if (
-          message.type === 'ack' ||
-          message.type === 'update' ||
-          (message.type === 'error' && message.operationId)
-        ) {
-          const operationId = message.operationId
-          if (operationId) {
-            clearTimeout(this.writeTimeouts.get(operationId))
-            this.writeTimeouts.delete(operationId)
-          }
-        }
         this.store.receive(message)
       } catch {
         this.store.disconnect('The collaboration connection returned an invalid message.')
@@ -115,8 +88,6 @@ export class CollabClient {
       clearTimeout(this.presenceTimer)
       this.presenceTimer = undefined
       this.queuedPresence.clear()
-      for (const timeout of this.writeTimeouts.values()) clearTimeout(timeout)
-      this.writeTimeouts.clear()
       this.socket = null
       this.store.disconnect()
       if (this.wantsConnection()) {
@@ -134,14 +105,6 @@ export class CollabClient {
         message.type === 'presence:delete')
     )
       return
-    if (message.type === 'mutate') {
-      // An open connection is not proof a save completed. Reconnect and ask
-      // for its receipt if an acknowledgement never arrives.
-      this.writeTimeouts.set(
-        message.operationId,
-        setTimeout(() => this.socket?.close(), 15_000)
-      )
-    }
     if (message.type === 'presence:set') {
       this.queuedPresence.set(message.registrationId, message)
       if (!this.presenceTimer) {
@@ -175,8 +138,6 @@ export class CollabClient {
     this.presenceTimer = undefined
     clearInterval(this.heartbeat)
     this.queuedPresence.clear()
-    for (const timeout of this.writeTimeouts.values()) clearTimeout(timeout)
-    this.writeTimeouts.clear()
     this.socket?.close()
     this.socket = null
     this.store.disconnect()

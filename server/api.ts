@@ -23,7 +23,6 @@ import type { MoiContext } from '@/lib/moi-context'
 import { viewBuilderDirectives } from '@/lib/view-builder-directives'
 
 import { getCollabReferencePath } from './collab/config'
-import { collabRoutes } from './collab/http'
 import { agentStore } from './agent'
 import { clientAppConfig, getAppConfig } from './app-config'
 import { getAppSettings, pickAppSettingsPatch, saveAppSettings } from './app-settings'
@@ -171,7 +170,6 @@ const withWorkspace = createMiddleware<ApiEnv>(async (c, next) => {
 // ---- single workspace: /api/workspaces/:id/* --------------------------------
 const one = new Hono<ApiEnv>()
 one.use('*', withWorkspace)
-one.route('/collab', collabRoutes)
 
 one.get('/preview', async c => {
   const ws = c.get('ws')

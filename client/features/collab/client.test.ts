@@ -3,7 +3,6 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { isCollabClientMessage } from '@/lib/collab/protocol'
 import type { CollabClientMessage } from '@/lib/collab/types'
 import { CollabService } from '@/server/collab/service'
-import { openCollabStorage } from '@/server/collab/storage'
 
 import { CollabClient } from './client'
 import { getIdentity, setIdentity } from './identity'
@@ -47,7 +46,7 @@ class TestSocket {
 beforeEach(() => {
   setIdentity(null)
   sockets = []
-  service = new CollabService(openCollabStorage(':memory:'), (connectionId, message) => {
+  service = new CollabService((connectionId, message) => {
     sockets
       .find(socket => socket.id === connectionId)
       ?.onmessage?.({ data: JSON.stringify(message) })
@@ -70,11 +69,9 @@ afterEach(() => {
   else Reflect.deleteProperty(globalThis, 'WebSocket')
 })
 
-test('runtime starts idle without assigning an identity; a shared-state applet connects anonymously', async () => {
+test('runtime without an identity stays idle and never joins anonymously', () => {
   const client = new CollabClient('workspace')
   stop = client.start()
-  expect(sockets).toHaveLength(0)
-  expect(getIdentity()).toBeNull()
   client.store.setLocation({ page: 'view:board' })
   client.store.setPresence({
     registrationId: 'field',
@@ -82,26 +79,9 @@ test('runtime starts idle without assigning an identity; a shared-state applet c
     channel: 'focus',
     value: 'title'
   })
-  const releaseScope = client.store.acquireScope('board')
-  const releaseConnection = client.acquireSharedState()
-  expect(sockets).toHaveLength(1)
-  const socket = sockets[0]!
-  socket.open()
-  expect(socket.sent[0]).toMatchObject({ type: 'join', identity: null })
-  expect(client.store.getSnapshot()).toMatchObject({ status: 'connected', participants: [] })
-  expect(client.store.getScopeSnapshot('board').loaded).toBe(true)
-  expect(
-    socket.sent.some(message => message.type === 'presence:set' || message.type === 'location')
-  ).toBe(false)
-  const outcome = await client.store.mutate('board', [
-    { type: 'set', key: 'title', value: 'Anonymous storage' }
-  ])
-  expect(outcome.status).toBe('committed')
-  expect(client.store.getScopeSnapshot('board').entries.title).toBe('Anonymous storage')
+  expect(sockets).toHaveLength(0)
   expect(getIdentity()).toBeNull()
-  releaseScope()
-  releaseConnection()
-  expect(socket.readyState).toBe(3)
+  expect(client.store.getSnapshot().status).toBe('disconnected')
 })
 
 test('explicit identity enables workspace presence without an applet and clearing it disconnects', () => {
@@ -113,11 +93,58 @@ test('explicit identity enables workspace presence without an applet and clearin
   const socket = sockets[0]!
   socket.open()
   expect(socket.sent[0]).toMatchObject({ type: 'join', identity })
-  expect(client.store.getSnapshot().participants[0]?.identity).toEqual(identity)
+  expect(client.store.getSnapshot().participants[0]?.userId).toEqual(identity.id)
   setIdentity({ ...identity, name: 'Alicia' })
   expect(socket.sent.at(-1)).toMatchObject({ type: 'identity', identity: { name: 'Alicia' } })
   expect(sockets).toHaveLength(1)
   setIdentity(null)
   expect(socket.readyState).toBe(3)
   expect(client.store.getSnapshot().status).toBe('disconnected')
+})
+
+test('reconnecting restores current presence and removed registrations stay gone', async () => {
+  setIdentity({ id: 'alice', name: 'Alice', color: '#0f766e' })
+  const client = new CollabClient('workspace')
+  stop = client.start()
+  sockets[0]!.open()
+  client.store.setPresence({
+    registrationId: 'kept',
+    surface: 'board',
+    channel: 'focus',
+    value: true
+  })
+  client.store.setPresence({
+    registrationId: 'removed',
+    surface: 'board',
+    channel: 'focus',
+    value: true
+  })
+  client.store.deletePresence('removed')
+  sockets[0]!.close()
+  await Bun.sleep(550)
+  sockets[1]!.open()
+  await Bun.sleep(70)
+  expect(sockets[1]!.sent.filter(message => message.type === 'presence:set')).toEqual([
+    {
+      type: 'presence:set',
+      registrationId: 'kept',
+      surface: 'board',
+      channel: 'focus',
+      value: true
+    }
+  ])
+  expect(sockets[1]!.sent[0]).toMatchObject({ type: 'join', version: 2 })
+})
+
+test('changing user reconnects and never sends the host directory over the socket', async () => {
+  setIdentity({ id: 'alice', name: 'Alice', color: '#0f766e' })
+  const client = new CollabClient('workspace')
+  stop = client.start()
+  sockets[0]!.open()
+  setIdentity({ id: 'bob', name: 'Bob', color: '#2563eb' })
+  expect(sockets[0]!.readyState).toBe(3)
+  await Bun.sleep(550)
+  sockets[1]!.open()
+  expect(sockets[1]!.sent[0]).toMatchObject({ type: 'join', identity: { id: 'bob' } })
+  expect(sockets[1]!.sent.every(message => !('users' in message))).toBe(true)
 })

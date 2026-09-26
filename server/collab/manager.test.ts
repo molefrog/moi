@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import { COLLAB_MAX_MESSAGE_BYTES } from '@/lib/collab/protocol'
 import type { CollabClientMessage, CollabServerMessage } from '@/lib/collab/types'
 
 import { CollabManager, type CollabSocket } from './manager'
@@ -39,7 +40,7 @@ async function until(predicate: () => boolean, timeout = 5000) {
   }
 }
 
-function serve(runtime: CollabManager, workspacePath: string, dropAcknowledgments = false) {
+function serve(runtime: CollabManager, workspacePath: string) {
   const connections = new Map<Bun.ServerWebSocket<{ workspacePath: string }>, CollabSocket>()
   const server = Bun.serve<{ workspacePath: string }>({
     port: 0,
@@ -52,12 +53,7 @@ function serve(runtime: CollabManager, workspacePath: string, dropAcknowledgment
     websocket: {
       open(socket) {
         const connection: CollabSocket = {
-          send(message) {
-            // Simulate a lost acknowledgment after the worker has committed its transaction.
-            if (dropAcknowledgments && (JSON.parse(message) as CollabServerMessage).type === 'ack')
-              return 0
-            return socket.send(message)
-          },
+          send: message => socket.send(message),
           close: (code, reason) => socket.close(code, reason),
           getBufferedAmount: () => socket.getBufferedAmount()
         }
@@ -86,134 +82,246 @@ async function connect(url: string, id: string) {
   socket.onmessage = event => messages.push(JSON.parse(String(event.data)) as CollabServerMessage)
   const send = (message: CollabClientMessage) => socket.send(JSON.stringify(message))
   await until(() => socket.readyState === WebSocket.OPEN)
-  send({ type: 'join', version: 1, identity: { id, name: id, color: 'blue' } })
+  send({ type: 'join', version: 2, identity: { id, name: id, color: 'blue' } })
   await until(() => messages.some(message => message.type === 'welcome'))
   return { socket, messages, send }
 }
 
+function latestParticipants(messages: CollabServerMessage[]) {
+  const message = messages.findLast(item => item.type === 'participants' || item.type === 'welcome')
+  if (message?.type !== 'participants' && message?.type !== 'welcome')
+    throw new Error('Missing participants')
+  return message
+}
+
+function localSocket() {
+  const messages: CollabServerMessage[] = []
+  let reason: string | undefined
+  let buffered = 0
+  const socket: CollabSocket = {
+    send(message) {
+      messages.push(JSON.parse(message) as CollabServerMessage)
+      return message.length
+    },
+    close(_code, value) {
+      reason = value
+    },
+    getBufferedAmount: () => buffered
+  }
+  return {
+    socket,
+    messages,
+    get reason() {
+      return reason
+    },
+    set buffered(value: number) {
+      buffered = value
+    }
+  }
+}
+
+function joinLocal(runtime: CollabManager, socket: CollabSocket) {
+  runtime.message(
+    socket,
+    JSON.stringify({
+      type: 'join',
+      version: 2,
+      identity: { id: 'anna', name: 'Anna', color: 'blue' }
+    })
+  )
+}
+
 describe('collab process and socket integration', () => {
-  test('simultaneous requests start one worker and different workspaces keep separate databases', async () => {
+  test('simultaneous connections share one worker and workspaces isolate presence and users', async () => {
     const runtime = manager()
     const first = directory()
     const second = directory()
-    const actor = { id: 'agent', kind: 'agent' as const }
-    await Promise.all(
-      ['title', 'done'].map(key =>
-        runtime.call(first, actor, {
-          type: 'mutate',
-          scope: 'board',
-          operationId: key,
-          operations: [{ type: 'set', key, value: key }]
-        })
-      )
-    )
+    const firstUrl = serve(runtime, first)
+    const [a, b] = await Promise.all([connect(firstUrl, 'anna'), connect(firstUrl, 'boris')])
+    await until(() => latestParticipants(a.messages).participants.length === 2)
     expect(runtime.debugSnapshot()).toHaveLength(1)
-    expect(await runtime.call(first, actor, { type: 'snapshot', scope: 'board' })).toMatchObject({
-      revision: 2,
-      entries: { title: 'title', done: 'done' }
-    })
-    expect(await runtime.call(second, actor, { type: 'snapshot', scope: 'board' })).toEqual({
-      scope: 'board',
-      revision: 0,
-      entries: {}
-    })
+    expect(
+      latestParticipants(a.messages)
+        .users.map(user => user.id)
+        .sort()
+    ).toEqual(['anna', 'boris'])
+    const c = await connect(serve(runtime, second), 'carla')
+    expect(latestParticipants(c.messages).participants.map(user => user.userId)).toEqual(['carla'])
+    expect(
+      latestParticipants(b.messages)
+        .users.map(user => user.id)
+        .sort()
+    ).toEqual(['anna', 'boris'])
     expect(runtime.debugSnapshot()).toHaveLength(2)
+    for (const path of [first, second]) {
+      expect(await Bun.file(join(path, '.moi', 'data', 'collab.sqlite')).exists()).toBe(false)
+    }
   })
 
-  test('real sockets converge and closing a tab removes presence', async () => {
+  test('real sockets share presence and closing a tab removes its presence and user profile', async () => {
     const runtime = manager()
-    const path = directory()
-    const url = serve(runtime, path)
+    const url = serve(runtime, directory())
     const a = await connect(url, 'anna')
     const b = await connect(url, 'boris')
-    for (const [client, subscriptionId] of [
-      [a, 'a'],
-      [b, 'b']
-    ] as const) {
-      client.send({ type: 'subscribe', scope: 'board', subscriptionId })
-      await until(() => client.messages.some(message => message.type === 'snapshot'))
-    }
     a.send({
-      type: 'mutate',
-      scope: 'board',
-      operationId: 'edit',
-      operations: [{ type: 'set', key: 'done', value: true }]
+      type: 'presence:set',
+      registrationId: 'focus',
+      surface: 'view:board',
+      channel: 'focus',
+      value: { target: 'todo:42' }
     })
-    await until(() => a.messages.some(message => message.type === 'ack'))
     await until(() =>
-      b.messages.some(message => message.type === 'update' && message.revision === 1)
+      latestParticipants(b.messages).participants.some(
+        item => item.userId === 'anna' && item.presence.length === 1
+      )
+    )
+    a.send({ type: 'location', location: null })
+    await until(() =>
+      latestParticipants(b.messages).participants.some(
+        item => item.userId === 'anna' && item.location === null
+      )
     )
     expect(runtime.debugSnapshot()[0]?.connections).toBe(2)
     a.socket.close()
-    await until(() =>
-      b.messages.some(
-        message => message.type === 'participants' && message.participants.length === 1
-      )
-    )
+    await until(() => latestParticipants(b.messages).participants.length === 1)
+    expect(latestParticipants(b.messages).users.map(user => user.id)).toEqual(['boris'])
     expect(runtime.debugSnapshot()[0]?.connections).toBe(1)
   })
 
-  test('a lost acknowledgment and worker death recover committed content through receipts', async () => {
+  test('worker death closes sockets and reconnect starts an empty ephemeral room', async () => {
     const runtime = manager()
-    const path = directory()
-    const url = serve(runtime, path, true)
+    const url = serve(runtime, directory())
     const client = await connect(url, 'anna')
     client.send({
-      type: 'mutate',
-      scope: 'board',
-      operationId: 'committed',
-      operations: [{ type: 'set', key: 'title', value: 'Survives' }]
+      type: 'presence:set',
+      registrationId: 'cursor',
+      surface: 'view:board',
+      channel: 'cursor',
+      value: { x: 12 }
     })
-    await until(() => client.socket.readyState === WebSocket.CLOSED)
-    expect(client.messages.some(message => message.type === 'ack')).toBe(false)
-    const pid = runtime.debugSnapshot()[0]?.pid
-    if (!pid) throw new Error('Missing worker process')
-    process.kill(pid, 'SIGKILL')
-    await until(() => client.socket.readyState === WebSocket.CLOSED)
-    await until(() => runtime.debugSnapshot().length === 0)
+    await until(() => latestParticipants(client.messages).participants[0]?.presence.length === 1)
+    const previous = runtime.debugSnapshot()[0]
+    if (!previous) throw new Error('Missing worker process')
+    process.kill(previous.pid, 'SIGKILL')
+    await until(
+      () => client.socket.readyState === WebSocket.CLOSED && runtime.debugSnapshot().length === 0
+    )
     await Bun.sleep(300)
-    const replacement = await connect(url, 'anna')
-    replacement.send({ type: 'subscribe', scope: 'board', subscriptionId: 'fresh' })
-    replacement.send({
-      type: 'receipts',
-      requestId: 'recover',
-      operationIds: ['committed', 'not-sent']
-    })
-    await until(() => replacement.messages.some(message => message.type === 'receipts'))
-    expect(replacement.messages.find(message => message.type === 'snapshot')).toMatchObject({
-      revision: 1,
-      entries: { title: 'Survives' }
-    })
-    expect(replacement.messages.find(message => message.type === 'receipts')).toMatchObject({
-      receipts: [
-        { operationId: 'committed', status: 'committed', scope: 'board', revision: 1 },
-        { operationId: 'not-sent', status: 'unknown' }
-      ]
-    })
+    const replacement = await connect(url, 'boris')
+    expect(runtime.debugSnapshot()[0]?.generation).not.toBe(previous.generation)
+    expect(latestParticipants(replacement.messages).users.map(user => user.id)).toEqual(['boris'])
+    expect(latestParticipants(replacement.messages).participants[0]?.presence).toEqual([])
   })
 
   test('idle workers stop but a connected browser keeps its worker alive', async () => {
     const runtime = manager({ idleTimeoutMs: 30 })
-    const path = directory()
-    const client = await connect(serve(runtime, path), 'anna')
+    const client = await connect(serve(runtime, directory()), 'anna')
     await Bun.sleep(80)
     expect(runtime.debugSnapshot()).toHaveLength(1)
     client.socket.close()
     await until(() => runtime.debugSnapshot().length === 0)
   })
 
-  test('a child that never becomes ready rejects startup and is reaped', async () => {
+  test('malformed, old-version and removed storage messages fail without reaching the room', async () => {
+    const runtime = manager()
+    const client = await connect(serve(runtime, directory()), 'anna')
+    const invalid = [
+      '{',
+      JSON.stringify({
+        type: 'join',
+        version: 1,
+        identity: { id: 'old', name: 'Old', color: 'red' }
+      }),
+      JSON.stringify({
+        type: 'mutate',
+        scope: 'board',
+        operationId: 'edit',
+        operations: [{ type: 'set', key: 'title', value: 'Hello' }]
+      })
+    ]
+    for (const raw of invalid) client.socket.send(raw)
+    await until(
+      () => client.messages.filter(item => item.type === 'error').length === invalid.length
+    )
+    expect(
+      client.messages
+        .filter(item => item.type === 'error')
+        .every(item => item.code === 'invalid_message')
+    ).toBe(true)
+    expect(latestParticipants(client.messages).participants.map(item => item.userId)).toEqual([
+      'anna'
+    ])
+    client.send({ type: 'ping' })
+    await until(() => client.messages.some(item => item.type === 'pong'))
+  })
+
+  test('oversized input disconnects the sender and clears its presence', async () => {
+    const runtime = manager()
+    const url = serve(runtime, directory())
+    const a = await connect(url, 'anna')
+    const b = await connect(url, 'boris')
+    a.socket.send('x'.repeat(COLLAB_MAX_MESSAGE_BYTES + 1))
+    await until(() => a.socket.readyState === WebSocket.CLOSED)
+    await until(() => latestParticipants(b.messages).users.length === 1)
+    expect(latestParticipants(b.messages).users[0]?.id).toBe('boris')
+  })
+
+  test('backpressure drops transient snapshots and disconnects when heartbeat cannot be delivered', async () => {
+    const runtime = manager()
+    const client = localSocket()
+    runtime.open(client.socket, directory())
+    joinLocal(runtime, client.socket)
+    await until(() => client.messages.some(item => item.type === 'welcome'))
+    const count = client.messages.length
+    client.buffered = 1024 * 1024 + 1
+    runtime.message(
+      client.socket,
+      JSON.stringify({ type: 'location', location: { page: 'view:board' } })
+    )
+    await Bun.sleep(100)
+    expect(client.messages).toHaveLength(count)
+    expect(client.reason).toBeUndefined()
+    runtime.message(client.socket, JSON.stringify({ type: 'ping' }))
+    await until(() => client.reason !== undefined)
+    expect(client.reason).toContain('fresh connection')
+    expect(runtime.debugSnapshot()[0]?.connections).toBe(0)
+  })
+
+  test('heartbeats keep active sockets live and silent peers time out', async () => {
+    const runtime = manager({ livenessTimeoutMs: 500 })
+    const url = serve(runtime, directory())
+    const active = await connect(url, 'anna')
+    const silent = await connect(url, 'boris')
+    const heartbeat = setInterval(() => active.send({ type: 'ping' }), 100)
+    try {
+      await until(() => silent.socket.readyState === WebSocket.CLOSED, 6500)
+      expect(active.socket.readyState).toBe(WebSocket.OPEN)
+      await until(() => latestParticipants(active.messages).users.length === 1)
+      expect(latestParticipants(active.messages).users[0]?.id).toBe('anna')
+    } finally {
+      clearInterval(heartbeat)
+    }
+  }, 10_000)
+
+  test('a child that never becomes ready closes its clients and is reaped', async () => {
     const workerPath = join(directory(), 'stalled.ts')
     await Bun.write(workerPath, 'process.on("message", () => {}); setInterval(() => {}, 1000)')
     const runtime = manager({ workerPath, startupTimeoutMs: 30 })
-    await expect(
-      runtime.call(
-        directory(),
-        { id: 'test', kind: 'system' },
-        { type: 'snapshot', scope: 'board' }
-      )
-    ).rejects.toThrow('did not start')
+    const client = localSocket()
+    runtime.open(client.socket, directory())
+    joinLocal(runtime, client.socket)
+    await until(() => client.reason !== undefined)
+    expect(client.reason).toContain('startup timed out')
     await until(() => runtime.debugSnapshot().length === 0)
+  })
+
+  test('disabled runtime rejects connections without creating a worker', async () => {
+    const runtime = manager({ enabled: async () => false })
+    const client = localSocket()
+    runtime.open(client.socket, directory())
+    await until(() => client.reason !== undefined)
+    expect(runtime.debugSnapshot()).toEqual([])
+    expect(client.messages[0]).toMatchObject({ type: 'error', code: 'unavailable' })
   })
 
   test('parent process death does not leave an orphan collab worker', async () => {
@@ -224,9 +332,15 @@ describe('collab process and socket integration', () => {
       `
       import { CollabManager } from ${JSON.stringify(join(import.meta.dir, 'manager.ts'))};
       const runtime = new CollabManager({ enabled: async () => true });
-      await runtime.call(${JSON.stringify(root)}, { id: 'test', kind: 'system' }, { type: 'snapshot', scope: 'board' });
-      console.log(runtime.debugSnapshot()[0].pid);
-      process.exit(0);
+      const socket = { send(message) {
+        if (JSON.parse(message).type === 'welcome') {
+          console.log(runtime.debugSnapshot()[0].pid);
+          process.exit(0);
+        }
+        return message.length;
+      }, close() {} };
+      runtime.open(socket, ${JSON.stringify(root)});
+      runtime.message(socket, JSON.stringify({ type: 'join', version: 2, identity: { id: 'test', name: 'Test', color: 'blue' } }));
     `
     )
     const parent = Bun.spawn([process.execPath, parentPath], { stdout: 'pipe', stderr: 'inherit' })

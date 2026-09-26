@@ -1,26 +1,17 @@
-// The ordinary app imports only this small boundary. Collaboration code and its
-// transport load only when the server runtime is enabled.
-import { Component, Suspense, createContext, lazy, useContext, useSyncExternalStore } from 'react'
+// The API remains available when presence is disabled, so the same applet can
+// render in either mode. The provider starts its transport only when enabled.
+import { Component, createContext, useContext, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import type { AppletKind, WorkspaceTabId } from '@/lib/types'
-import type * as CollabModuleNamespace from './index'
+import { AppletCollabProvider, CollabWorkspaceProvider, createAppletCollabApi } from './index'
+import { getIdentity, subscribeIdentityStore } from './identity'
+import { WorkspaceCollabControls } from './WorkspaceCollabControls'
 import type { CollabTabInfo } from './WorkspaceCollabControls'
 
 export type { CollabTabInfo } from './WorkspaceCollabControls'
 
-type CollabModule = typeof CollabModuleNamespace
-let loaded: CollabModule | undefined
 const EnabledContext = createContext(false)
-const LazyWorkspace = lazy(async () => {
-  loaded = await import('./index')
-  return { default: loaded.CollabWorkspaceProvider }
-})
-
-export function getAppletCollabApi():
-  | ReturnType<CollabModule['createAppletCollabApi']>
-  | undefined {
-  return loaded?.createAppletCollabApi()
-}
+export const getAppletCollabApi = createAppletCollabApi
 
 type CollabErrorBoundaryProps = { children: ReactNode }
 type CollabErrorBoundaryState = { error: boolean }
@@ -46,32 +37,21 @@ export type CollabGateProps = {
   children: ReactNode
 }
 export function CollabGate({ workspaceId, enabled, children }: CollabGateProps) {
-  if (!enabled) return <EnabledContext value={false}>{children}</EnabledContext>
   return (
     <CollabErrorBoundary key={workspaceId}>
-      <Suspense
-        fallback={
-          <p role="status" className="p-4 text-sm text-muted-foreground">
-            Loading collaboration…
-          </p>
-        }
-      >
-        <LazyWorkspace key={workspaceId} workspaceId={workspaceId}>
-          <EnabledContext value>{children}</EnabledContext>
-        </LazyWorkspace>
-      </Suspense>
+      <CollabWorkspaceProvider key={workspaceId} workspaceId={workspaceId} enabled={enabled}>
+        <EnabledContext value={enabled}>{children}</EnabledContext>
+      </CollabWorkspaceProvider>
     </CollabErrorBoundary>
   )
 }
 
-const subscribeIdentity = (listener: () => void) =>
-  loaded?.subscribeIdentityStore(listener) ?? (() => {})
-const hasIdentity = () => loaded?.getIdentity() != null
+const hasIdentity = () => getIdentity() != null
 
 // Identity controls personal navigation and host UI independently of storage.
 export function useCollabIdentityEnabled(): boolean {
   const enabled = useContext(EnabledContext)
-  const identity = useSyncExternalStore(subscribeIdentity, hasIdentity, hasIdentity)
+  const identity = useSyncExternalStore(subscribeIdentityStore, hasIdentity, hasIdentity)
   return enabled && identity
 }
 
@@ -83,8 +63,7 @@ export type AppletCollabMountProps = {
 }
 export function AppletCollabMount(props: AppletCollabMountProps) {
   const enabled = useContext(EnabledContext)
-  if (!loaded || !enabled) return props.children
-  return <loaded.AppletCollabProvider {...props} />
+  return <AppletCollabProvider {...props} active={enabled && props.active !== false} />
 }
 
 export type CollabControlsProps = {
@@ -95,5 +74,5 @@ export type CollabControlsProps = {
 }
 export function CollabControls(props: CollabControlsProps) {
   const enabled = useCollabIdentityEnabled()
-  return loaded && enabled ? <loaded.WorkspaceCollabControls {...props} /> : null
+  return enabled ? <WorkspaceCollabControls {...props} /> : null
 }

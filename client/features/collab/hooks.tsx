@@ -13,53 +13,54 @@ import type { ReactNode } from 'react'
 import { useLocation } from 'wouter'
 
 import type { AppletKind } from '@/lib/types'
-import type { CollabJsonValue, CollabOperation, CollabParticipant } from '@/lib/collab/types'
+import type { CollabJsonValue } from '@/lib/collab/types'
 
-import { createLiveBackend, NO_BACKEND_STATE } from './backend'
+import { createLiveBackend, NO_BACKEND } from './backend'
 import type { CollabBackend } from './backend'
 import { CollabClient } from './client'
-import { getIdentity, installIdentityApi, subscribeIdentityStore } from './identity'
-import { resolvePerson } from './people'
-import type { ResolvedPerson } from './people'
-import { participantForSelf } from './store'
-import type { MutationOutcome } from './store'
+import { installIdentityApi } from './identity'
+import { resolvePeers, resolveUser, workspaceProfiles } from './people'
+import type { CollabUser, PeersOptions } from './people'
+import { createPresencePublisher } from './presence-publisher'
 
+export type { CollabUser, PeersOptions } from './people'
 type AppletIdentity = { kind: AppletKind; name: string }
 type Mount = { applet: AppletIdentity; active: boolean; surface: string }
-// Every hook below talks to this contract and never to a socket or a store,
-// so a dev page can swap in the in-memory backend from fake-backend.ts.
-const BackendContext = createContext<CollabBackend | null>(null)
+const BackendContext = createContext<CollabBackend>(NO_BACKEND)
 const MountContext = createContext<Mount | null>(null)
-const noSubscription = () => () => {}
-const noBackendState = () => NO_BACKEND_STATE
-
 installIdentityApi()
 
-// The route segment after `/workspace/:id/`, which is the workspace tab id.
 export function pageFromPath(path: string): string {
   return path.split('/').slice(3).join('/') || 'overview'
 }
 
 export type CollabWorkspaceProviderProps = {
   workspaceId: string
+  enabled?: boolean
   children: ReactNode
 }
-export function CollabWorkspaceProvider({ workspaceId, children }: CollabWorkspaceProviderProps) {
-  const [client] = useState(() => new CollabClient(workspaceId))
-  const backend = useMemo(() => createLiveBackend(client), [client])
+export function CollabWorkspaceProvider({
+  workspaceId,
+  enabled = true,
+  children
+}: CollabWorkspaceProviderProps) {
+  const client = useMemo(() => new CollabClient(workspaceId), [workspaceId])
+  const backend = useMemo(() => createLiveBackend(client, enabled), [client, enabled])
   const [path] = useLocation()
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('moi:collab-ready'))
-    return client.start()
-  }, [client])
+    if (enabled) return client.start()
+  }, [client, enabled])
   useEffect(() => {
-    client.store.setLocation({ page: pageFromPath(path) })
+    client.store.setLocation(
+      document.visibilityState === 'hidden' ? null : { page: pageFromPath(path) }
+    )
   }, [client, path])
   useEffect(() => {
-    const update = () => {
-      if (document.visibilityState === 'hidden') client.store.setLocation(null)
-      else client.store.setLocation({ page: pageFromPath(location.pathname) })
-    }
+    const update = () =>
+      client.store.setLocation(
+        document.visibilityState === 'hidden' ? null : { page: pageFromPath(location.pathname) }
+      )
     document.addEventListener('visibilitychange', update)
     return () => document.removeEventListener('visibilitychange', update)
   }, [client])
@@ -67,12 +68,9 @@ export function CollabWorkspaceProvider({ workspaceId, children }: CollabWorkspa
 }
 
 export type CollabBackendProviderProps = { backend: CollabBackend; children: ReactNode }
-// Host-only: runs the hooks and components against any backend, such as the
-// in-memory one on dev pages.
 export function CollabBackendProvider({ backend, children }: CollabBackendProviderProps) {
   return <BackendContext value={backend}>{children}</BackendContext>
 }
-
 export type AppletCollabProviderProps = {
   workspaceId: string
   applet: AppletIdentity
@@ -93,237 +91,153 @@ export function AppletCollabProvider({
 }
 
 function useBackend(): CollabBackend {
-  const backend = useContext(BackendContext)
-  if (!backend) throw new Error('Start moi with --experimental-collab to use collaboration.')
-  return backend
+  return useContext(BackendContext)
 }
-
 export function useConnection() {
   const backend = useBackend()
   return useSyncExternalStore(backend.subscribe, backend.getSnapshot, backend.getSnapshot)
 }
-
-// Person components render anywhere: ids resolve through the backend, and to
-// "Unknown person" on a page that has none.
-function usePeopleSource() {
-  const backend = useContext(BackendContext)
-  const state = useSyncExternalStore(
-    backend?.subscribe ?? noSubscription,
-    backend?.getSnapshot ?? noBackendState,
-    backend?.getSnapshot ?? noBackendState
-  )
-  const self = useSyncExternalStore(
-    backend?.subscribeIdentity ?? subscribeIdentityStore,
-    backend?.getIdentity ?? getIdentity,
-    backend?.getIdentity ?? getIdentity
-  )
-  return { state, self }
-}
-
-export function usePerson(id: string): ResolvedPerson {
-  const { state, self } = usePeopleSource()
-  return useMemo(() => resolvePerson(state, self, id), [state, self, id])
-}
-
-export function usePeople(ids: readonly string[]): ResolvedPerson[] {
-  const { state, self } = usePeopleSource()
-  return ids.map(id => resolvePerson(state, self, id))
-}
-
-export function useSelf(): CollabParticipant | null {
+function useUsersSource() {
   const backend = useBackend()
   const state = useConnection()
-  const identity = useSyncExternalStore(
+  const self = useSyncExternalStore(
     backend.subscribeIdentity,
     backend.getIdentity,
     backend.getIdentity
   )
-  return useMemo(() => (identity ? participantForSelf(state, identity) : null), [state, identity])
+  const directory = useSyncExternalStore(
+    backend.subscribeWorkspaceUsers,
+    backend.getWorkspaceUsers,
+    backend.getWorkspaceUsers
+  )
+  const users = useMemo(
+    () => workspaceProfiles(state.users, self, directory),
+    [state.users, self, directory]
+  )
+  return { state, self, users, backend }
 }
-
-export type OthersOptions = { scope?: 'page' | 'workspace' }
-export function useOthers({ scope = 'page' }: OthersOptions = {}): CollabParticipant[] {
-  const state = useConnection()
-  const backend = useBackend()
+export function useUser(id: string): CollabUser | null {
+  const { state, users } = useUsersSource()
+  return useMemo(() => resolveUser({ ...state, users }, id), [state, users, id])
+}
+export function useUsers(ids: readonly string[]): (CollabUser | null)[] {
+  const { state, users } = useUsersSource()
+  return ids.map(id => resolveUser({ ...state, users }, id))
+}
+export function useWorkspaceUsers(): CollabUser[] {
+  const { state, users } = useUsersSource()
   return useMemo(
-    () =>
-      state.participants.filter(
-        participant =>
-          participant.connectionId !== state.connectionId &&
-          (scope === 'workspace' ||
-            (backend.getLocation() !== null &&
-              participant.location?.page === backend.getLocation()?.page))
-      ),
-    [state, backend, scope]
+    () => users.map(user => resolveUser({ ...state, users }, user.id)!),
+    [state, users]
   )
 }
-
-export function useMount(): Mount {
-  const mount = useContext(MountContext)
-  if (!mount) throw new Error('This collaboration hook must be used inside an applet.')
-  return mount
+export function useMe(): CollabUser | null {
+  const { state, self, users } = useUsersSource()
+  return useMemo(
+    () => (self ? resolveUser({ ...state, users }, self.id) : null),
+    [state, self, users]
+  )
+}
+export function usePeers(options: PeersOptions = {}): CollabUser[] {
+  const { state, self, users, backend } = useUsersSource()
+  const { scope, status } = options
+  return useMemo(
+    () =>
+      resolvePeers({ ...state, users }, self?.id ?? null, backend.getLocation(), { scope, status }),
+    [state, self, users, backend, scope, status]
+  )
+}
+export function useMount(): Mount | null {
+  return useContext(MountContext)
 }
 
-// Presence channel names as they travel, by what registers them. A fake
-// backend uses the same names to put made-up people on a surface.
 export const presenceChannels = {
   custom: (channel: string) => `custom:${channel}`,
   cursor: (surface: string) => `cursor:${surface}`,
   field: (target: string) => `field:${target}`,
   selection: (target: string) => `selection:${target}`
 }
+export type PresenceValue<T> = { connectionId: string; userId: string; value: T }
 
-export type PresenceValue<T> = { participant: CollabParticipant; value: T }
-export function usePresence<T extends CollabJsonValue>(channel: string, initialValue: T) {
-  return usePresenceChannel(presenceChannels.custom(channel), initialValue)
+// Observation never allocates a registration or publishes a value.
+export function usePresence<T extends CollabJsonValue>(channel: string): PresenceValue<T>[] {
+  return usePresenceChannel<T>(presenceChannels.custom(channel))
+}
+export function usePresenceChannel<T extends CollabJsonValue>(channel: string): PresenceValue<T>[] {
+  const { state, users, backend } = useUsersSource()
+  const mount = useMount()
+  return useMemo(() => {
+    const location = backend.getLocation()
+    if (!mount?.active || !location) return []
+    const known = new Set(users.map(user => user.id))
+    return state.participants.flatMap(participant =>
+      participant.connectionId === state.connectionId ||
+      participant.location?.page !== location.page ||
+      !known.has(participant.userId)
+        ? []
+        : participant.presence
+            .filter(
+              registration =>
+                registration.surface === mount.surface && registration.channel === channel
+            )
+            .map(registration => ({
+              connectionId: participant.connectionId,
+              userId: participant.userId,
+              value: registration.value as T
+            }))
+    )
+  }, [state, users, backend, mount, channel])
 }
 
-export function usePresenceChannel<T extends CollabJsonValue>(channel: string, initialValue: T) {
-  const store = useBackend()
+// Internal imperative publisher for pointer/focus events. Ownership is per mount.
+export function usePresencePublisher<T extends CollabJsonValue>(
+  channel: string,
+  initialValue: T,
+  isPresent?: (value: T) => boolean
+): (value: T) => void {
+  const backend = useBackend()
   const mount = useMount()
-  const others = useOthers()
-  const [value, setValue] = useState(initialValue)
   const [registrationId] = useState(() => crypto.randomUUID())
+  const valueRef = useRef(initialValue)
   const live = useRef(false)
-  const valueRef = useRef(value)
-
+  const surface = mount?.surface ?? ''
+  const registration = useMemo(
+    () => createPresencePublisher<T>(backend, { registrationId, surface, channel }, isPresent),
+    [backend, registrationId, surface, channel, isPresent]
+  )
+  const publish = useCallback(() => {
+    registration.publish(
+      valueRef.current,
+      mount?.active === true && document.visibilityState !== 'hidden'
+    )
+  }, [mount, registration])
   useLayoutEffect(() => {
-    if (!mount.active) return
+    if (!mount?.active) return
     live.current = true
-    const publish = () => {
-      if (document.visibilityState === 'hidden') store.deletePresence(registrationId)
-      else
-        store.setPresence({
-          registrationId,
-          surface: mount.surface,
-          channel,
-          value: valueRef.current
-        })
-    }
     publish()
     document.addEventListener('visibilitychange', publish)
     return () => {
       live.current = false
       document.removeEventListener('visibilitychange', publish)
-      store.deletePresence(registrationId)
+      registration.clear()
     }
-  }, [store, mount.active, mount.surface, channel, registrationId])
-
-  const update = useCallback(
-    (next: T) => {
-      if (!live.current) return
-      valueRef.current = next
-      setValue(next)
-      if (mount.active && document.visibilityState !== 'hidden') {
-        store.setPresence({ registrationId, surface: mount.surface, channel, value: next })
-      }
+  }, [mount, publish, registration])
+  return useCallback(
+    (value: T) => {
+      valueRef.current = value
+      if (live.current) publish()
     },
-    [store, mount.active, mount.surface, channel, registrationId]
+    [publish]
   )
-
-  const otherValues = useMemo(
-    () =>
-      others.flatMap(participant =>
-        participant.presence
-          .filter(
-            registration =>
-              registration.surface === mount.surface && registration.channel === channel
-          )
-          .map(registration => ({ participant, value: registration.value as T }))
-      ),
-    [others, mount.surface, channel]
-  )
-  return { value, setValue: update, others: otherValues }
 }
-
-export type SharedOptions = { scope?: string }
-export type SharedStateOptions<T> = SharedOptions & { defaultValue?: T }
-
-function useScope(explicitScope?: string) {
-  const store = useBackend()
-  const mount = useMount()
-  const scope = explicitScope ?? `applet:${mount.surface}`
-  const subscribe = useCallback(
-    (listener: () => void) => store.subscribeScope(scope, listener),
-    [store, scope]
-  )
-  const getSnapshot = useCallback(() => store.getScopeSnapshot(scope), [store, scope])
-  const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
-  const connection = useConnection()
-  const live = useRef(false)
-  useLayoutEffect(() => {
-    if (!mount.active) return
-    live.current = true
-    const release = store.acquireScope(scope)
-    return () => {
-      live.current = false
-      release()
-    }
-  }, [store, scope, mount.active])
-  const mutate = useCallback(
-    (operations: CollabOperation[]): Promise<MutationOutcome> => {
-      if (!live.current)
-        return Promise.resolve({ status: 'rejected', message: 'This applet is no longer active.' })
-      return store.mutate(scope, operations)
-    },
-    [store, scope]
-  )
-  return {
-    mutate,
-    state,
-    canWrite: mount.active && state.synced && connection.status === 'connected'
-  }
+export function usePublishPresenceChannel<T extends CollabJsonValue>(
+  channel: string,
+  value: T,
+  isPresent?: (value: T) => boolean
+): void {
+  const publish = usePresencePublisher(channel, value, isPresent)
+  useLayoutEffect(() => publish(value), [publish, value])
 }
-
-export function useSharedState<T extends CollabJsonValue>(
-  key: string,
-  options: SharedStateOptions<T> = {}
-) {
-  const { mutate, state, canWrite } = useScope(options.scope)
-  const setValue = useCallback((value: T) => mutate([{ type: 'set', key, value }]), [mutate, key])
-  const deleteValue = useCallback(() => mutate([{ type: 'delete', key }]), [mutate, key])
-  const exists = Object.hasOwn(state.entries, key)
-  return {
-    value: state.loaded ? (exists ? (state.entries[key] as T) : options.defaultValue) : undefined,
-    exists: state.loaded && exists,
-    loaded: state.loaded,
-    canWrite,
-    isSaving: state.isSaving,
-    error: state.error,
-    setValue,
-    deleteValue
-  }
-}
-
-export function useSharedStore(prefix = '', options: SharedOptions = {}) {
-  const { mutate, state, canWrite } = useScope(options.scope)
-  const entries = useMemo(
-    () =>
-      Object.fromEntries(
-        Object.entries(state.entries)
-          .filter(([key]) => key.startsWith(prefix))
-          .map(([key, value]) => [key.slice(prefix.length), value])
-      ),
-    [state.entries, prefix]
-  )
-  const batch = useCallback(
-    (operations: CollabOperation[]) =>
-      mutate(operations.map(operation => ({ ...operation, key: prefix + operation.key }))),
-    [mutate, prefix]
-  )
-  const set = useCallback(
-    (key: string, value: CollabJsonValue) => batch([{ type: 'set', key, value }]),
-    [batch]
-  )
-  const remove = useCallback((key: string) => batch([{ type: 'delete', key }]), [batch])
-  return {
-    entries,
-    loaded: state.loaded,
-    canWrite,
-    isSaving: state.isSaving,
-    error: state.error,
-    set,
-    delete: remove,
-    batch
-  }
+export function usePublishPresence<T extends CollabJsonValue>(channel: string, value: T): void {
+  usePublishPresenceChannel(presenceChannels.custom(channel), value)
 }

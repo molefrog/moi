@@ -23,10 +23,19 @@ afterEach(() => {
   }
 })
 
-async function setup(getIdentity?: () => CollabIdentity | null, profile?: CollabIdentity) {
+async function setup(
+  getIdentity?: () => CollabIdentity | null,
+  profile?: CollabIdentity,
+  getWorkspaceUsers?: (workspaceId: string) => readonly CollabIdentity[] | null
+) {
   const host: { moi?: { collab?: Partial<CollabIdentityApi> } } = getIdentity
     ? { moi: { collab: { getIdentity } } }
     : {}
+  if (getWorkspaceUsers) {
+    host.moi ??= {}
+    host.moi.collab ??= {}
+    host.moi.collab.getWorkspaceUsers = getWorkspaceUsers
+  }
   const saved = new Map<string, string>([
     ['moi:collab:dev-identity', JSON.stringify(alice)],
     ...(profile ? [[PROFILE_KEY, JSON.stringify(profile)] as [string, string]] : [])
@@ -163,4 +172,64 @@ test('the outer share bridge uses its URL and rejects unsafe destinations', asyn
   api.setShareHandler(async () => ({ url: 'javascript:alert(1)' }))
   await expect(identity.shareWorkspace('board')).rejects.toThrow('invalid URL')
   expect(copied).toHaveLength(2)
+})
+
+test('preloaded workspace directories remain available for later visits and snapshots are stable', async () => {
+  const reads: string[] = []
+  const identity = await setup(undefined, undefined, workspace => {
+    reads.push(workspace)
+    return workspace === 'a' ? [alice] : [bob]
+  })
+  const first = identity.getWorkspaceUsers('a')
+  expect(first).toEqual([alice])
+  expect(identity.getWorkspaceUsers('a')).toBe(first)
+  expect(identity.host.moi?.collab?.getWorkspaceUsers?.('b')).toEqual([bob])
+  expect(reads).toEqual(['a', 'b'])
+})
+
+test('post-bootstrap directories replace, remove, release, and notify only their workspace', async () => {
+  const identity = await setup()
+  const a: Array<readonly CollabIdentity[] | null> = []
+  const b: Array<readonly CollabIdentity[] | null> = []
+  const stop = identity.subscribeWorkspaceUsers('a', users => a.push(users))
+  identity.subscribeWorkspaceUsers('b', users => b.push(users))
+  identity.host.moi?.collab?.setWorkspaceUsers?.('a', [alice, bob])
+  identity.setWorkspaceUsers('a', [bob])
+  identity.setWorkspaceUsers('a', [])
+  identity.setWorkspaceUsers('a', null)
+  expect(a).toEqual([null, [alice, bob], [bob], [], null])
+  expect(b).toEqual([null])
+  stop()
+  identity.setWorkspaceUsers('a', [alice])
+  expect(a).toHaveLength(5)
+})
+
+test('user snapshots are immutable copied data; invalid replacements are atomic', async () => {
+  const identity = await setup()
+  const input = [{ ...alice, email: 'alice@example.test' }]
+  identity.setWorkspaceUsers('__proto__', input)
+  const snapshot = identity.getWorkspaceUsers('__proto__')
+  input[0]!.name = 'Changed externally'
+  expect(snapshot?.[0]?.name).toBe('Alice')
+  expect(Object.isFrozen(snapshot)).toBe(true)
+  expect(Object.isFrozen(snapshot?.[0])).toBe(true)
+  for (const users of [
+    [alice, { ...bob, name: '' }],
+    [alice, alice],
+    [{ ...alice, email: 'x'.repeat(321) }]
+  ]) {
+    expect(() => identity.setWorkspaceUsers('__proto__', users)).toThrow()
+    expect(identity.getWorkspaceUsers('__proto__')).toBe(snapshot)
+  }
+  identity.setWorkspaceUsers('constructor', [{ ...alice, id: '__proto__' }])
+  expect(identity.getWorkspaceUsers('constructor')?.[0]?.id).toBe('__proto__')
+})
+
+test('unavailable preloaded directory remains authoritative empty until replaced', async () => {
+  const identity = await setup(undefined, undefined, () => {
+    throw new Error('Unavailable')
+  })
+  expect(identity.getWorkspaceUsers('a')).toEqual([])
+  identity.setWorkspaceUsers('a', [bob])
+  expect(identity.getWorkspaceUsers('a')).toEqual([bob])
 })

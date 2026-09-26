@@ -10,69 +10,41 @@ declare module 'moi/collab' {
     | CollabJsonValue[]
     | { [key: string]: CollabJsonValue }
 
-  export type CollabIdentity = { id: string; name: string; avatar?: string; color: string }
-  export type CollabLocation = { page: string; title?: string }
-  export type CollabPresenceRegistration = {
-    registrationId: string
-    surface: string
-    channel: string
-    value: CollabJsonValue
+  export type CollabIdentity = {
+    id: string
+    name: string
+    color: string
+    avatar?: string
+    email?: string
   }
-  export type CollabParticipant = {
-    connectionId: string
-    identity: CollabIdentity
-    location: CollabLocation | null
-    presence: CollabPresenceRegistration[]
-  }
-  export type CollabOperation =
-    | { type: 'set'; key: string; value: CollabJsonValue }
-    | { type: 'delete'; key: string }
-  export type MutationOutcome =
-    | { status: 'committed'; revision: number }
-    | { status: 'rejected' | 'unknown'; message: string }
+  export type UserStatus = 'active' | 'away' | 'offline'
+  export type CollabUser = CollabIdentity & { status: UserStatus }
+  export type PeersOptions = { scope?: 'page' | 'workspace'; status?: 'active' | 'away' }
 
-  export type OthersOptions = { scope?: 'page' | 'workspace' }
-  export function useSelf(): CollabParticipant | null
-  export function useOthers(options?: OthersOptions): CollabParticipant[]
-  export type PresenceValue<T> = { participant: CollabParticipant; value: T }
-  export function usePresence<T extends CollabJsonValue>(
-    channel: string,
-    initialValue: T
-  ): { value: T; setValue: (value: T) => void; others: PresenceValue<T>[] }
+  // Peers are connected users, deduplicated across tabs, excluding your own user.
+  export function useMe(): CollabUser | null
+  export function useUser(id: string): CollabUser | null
+  export function usePeers(options?: PeersOptions): CollabUser[]
 
-  export type SharedOptions = { scope?: string }
-  export type SharedStateOptions<T> = SharedOptions & { defaultValue?: T }
-  export type SharedStatus = {
-    loaded: boolean
-    canWrite: boolean
-    isSaving: boolean
-    error: string | null
-  }
-  export function useSharedState<T extends CollabJsonValue>(
-    key: string,
-    options?: SharedStateOptions<T>
-  ): SharedStatus & {
-    value: T | undefined
-    exists: boolean
-    setValue: (value: T) => Promise<MutationOutcome>
-    deleteValue: () => Promise<MutationOutcome>
-  }
-  export function useSharedStore(
-    prefix?: string,
-    options?: SharedOptions
-  ): SharedStatus & {
-    entries: Readonly<Record<string, CollabJsonValue>>
-    set: (key: string, value: CollabJsonValue) => Promise<MutationOutcome>
-    delete: (key: string) => Promise<MutationOutcome>
-    batch: (operations: CollabOperation[]) => Promise<MutationOutcome>
-  }
+  export type PresenceValue<T> = { connectionId: string; userId: string; value: T }
+  // Reading never registers or publishes presence. Values belong to connections.
+  export function usePresence<T extends CollabJsonValue>(channel: string): PresenceValue<T>[]
+  // Publishes the current value reactively, releasing it on hide or unmount.
+  export function usePublishPresence<T extends CollabJsonValue>(channel: string, value: T): void
 
   export type ActivityProps = { scope?: 'page' | 'workspace'; className?: string }
   export function Activity(props: ActivityProps): ReactElement
   export type CursorsProps = { surface?: string; children: ReactNode; className?: string }
   export function Cursors(props: CursorsProps): ReactElement
-  export type PresenceFieldProps = { target: string; children: ReactNode; className?: string }
-  export function PresenceField(props: PresenceFieldProps): ReactElement
+
+  // Targets identify controls across browsers, reordered lists, and record modals.
+  // Both components handle focus presence internally.
+  export type PresenceFrameProps = { target: string; children: ReactNode; className?: string }
+  export function PresenceFrame(props: PresenceFrameProps): ReactElement
+  export type PresenceGutterProps = { target: string; children: ReactNode; className?: string }
+  export function PresenceGutter(props: PresenceGutterProps): ReactElement
+  export type PresenceGroupProps = { children: ReactNode }
+  export function PresenceGroup(props: PresenceGroupProps): ReactElement
   export type SelectionProps = {
     target: string
     selected: boolean
@@ -81,57 +53,24 @@ declare module 'moi/collab' {
   }
   export function Selection(props: SelectionProps): ReactElement
 
-  // People components. Store ids in shared data, not profiles: a person is
-  // always given by id (`id`, or `ids` for several) and resolves to the current
-  // name, face, and status through the workspace, including people who have left.
-  export type PersonStatus = 'active' | 'away' | 'offline'
-  export function usePerson(id: string): {
+  export type UserSize = 'xs' | 'sm' | 'md' | 'lg'
+  export type UserProps = {
     id: string
-    identity: CollabIdentity | null
-    status: PersonStatus
-  }
-  export type PersonSize = 'xs' | 'sm' | 'md' | 'lg'
-  export type PersonProps = {
-    id: string
-    size?: PersonSize
+    size?: UserSize
     avatarOnly?: boolean
     you?: boolean
     detail?: ReactNode
-    // The green dot: this person has the workspace open in a visible tab now.
     showStatus?: boolean
     label?: string
     className?: string
   }
-  export function Person(props: PersonProps): ReactElement
+  export function User(props: UserProps): ReactElement
   export type FacepileProps = {
-    ids: string[]
+    ids: readonly string[]
     max?: number
     size?: 'xs' | 'sm' | 'md'
     showStatus?: boolean
     className?: string
   }
   export function Facepile(props: FacepileProps): ReactElement
-  export type CursorProps = {
-    id: string
-    x?: number
-    y?: number
-    label?: boolean
-    className?: string
-  }
-  export function Cursor(props: CursorProps): ReactElement
-  // Wraps anything: the frame hugs a single child element and takes its radius.
-  export type PresenceFrameProps = {
-    ids: string[]
-    icon?: ReactNode
-    children: ReactNode
-    className?: string
-  }
-  export function PresenceFrame(props: PresenceFrameProps): ReactElement
-  export type GutterPerson = { id: string; target: string }
-  export type PresenceGutterProps = {
-    people: GutterPerson[]
-    children: ReactNode
-    className?: string
-  }
-  export function PresenceGutter(props: PresenceGutterProps): ReactElement
 }

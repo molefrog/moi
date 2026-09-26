@@ -13,17 +13,16 @@ import { COLLAB_REFERENCE_SOURCE_PATH, installCollabSkill, removeCollabSkill } f
 
 type ActualHooks = Pick<
   typeof Hooks,
-  'useSelf' | 'useOthers' | 'usePerson' | 'usePresence' | 'useSharedState' | 'useSharedStore'
+  'useMe' | 'usePeers' | 'useUser' | 'usePresence' | 'usePublishPresence'
 >
 type ActualComponents = Pick<
   typeof Components,
   | 'Activity'
-  | 'Cursor'
   | 'Cursors'
   | 'Facepile'
-  | 'Person'
-  | 'PresenceField'
+  | 'User'
   | 'PresenceFrame'
+  | 'PresenceGroup'
   | 'PresenceGutter'
   | 'Selection'
 >

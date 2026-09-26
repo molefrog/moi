@@ -1,3 +1,4 @@
+import { isCollabIdentity } from '@/lib/collab/protocol'
 import type { CollabIdentity } from '@/lib/collab/types'
 
 export type CollabShareContext = { workspaceId: string; url: string }
@@ -7,6 +8,12 @@ export type CollabIdentityApi = {
   setIdentity: (identity: CollabIdentity | null) => void
   subscribeIdentity: (listener: (identity: CollabIdentity | null) => void) => () => void
   setShareHandler: (handler: CollabShareHandler | null) => void
+  getWorkspaceUsers: (workspaceId: string) => readonly CollabIdentity[] | null
+  setWorkspaceUsers: (workspaceId: string, users: readonly CollabIdentity[] | null) => void
+  subscribeWorkspaceUsers: (
+    workspaceId: string,
+    listener: (users: readonly CollabIdentity[] | null) => void
+  ) => () => void
 }
 
 // Earlier development builds generated dev-identity automatically. Only this
@@ -17,17 +24,98 @@ let installed = false
 let shareHandler: CollabShareHandler | null = null
 let identitySource: 'dev' | 'external' | null = null
 const listeners = new Set<() => void>()
+const workspaceUsers = new Map<string, readonly CollabIdentity[] | null>()
+const workspaceListeners = new Map<string, Set<() => void>>()
+let initialWorkspaceUsers: CollabIdentityApi['getWorkspaceUsers'] | undefined
 
-function normalizeIdentity(value: CollabIdentity): CollabIdentity {
-  if (!value || !value.id?.trim() || !value.name?.trim()) {
+export function normalizeIdentity(value: CollabIdentity): CollabIdentity {
+  if (
+    !value ||
+    typeof value.id !== 'string' ||
+    typeof value.name !== 'string' ||
+    !value.id.trim() ||
+    !value.name.trim()
+  ) {
     throw new Error('An identity needs an id and name.')
   }
-  return {
+  const normalized: CollabIdentity = {
     id: value.id.trim(),
     name: value.name.trim(),
     color: /^#[0-9a-f]{6}$/i.test(value.color) ? value.color : '#0f766e',
-    ...(value.avatar ? { avatar: value.avatar } : {})
+    ...(value.avatar !== undefined ? { avatar: value.avatar } : {}),
+    ...(value.email !== undefined ? { email: value.email } : {})
   }
+  if (!isCollabIdentity(normalized)) throw new Error('Invalid user profile.')
+  return Object.freeze(normalized)
+}
+
+export function normalizeWorkspaceUsers(
+  users: readonly CollabIdentity[]
+): readonly CollabIdentity[] {
+  if (!Array.isArray(users)) throw new Error('Workspace users must be an array.')
+  const ids = new Set<string>()
+  const snapshot = users.map(user => {
+    const normalized = normalizeIdentity(user)
+    if (ids.has(normalized.id)) throw new Error('Workspace users must have unique ids.')
+    ids.add(normalized.id)
+    return normalized
+  })
+  return Object.freeze(snapshot)
+}
+
+// A null snapshot releases the override. An empty snapshot is authoritative.
+// Cache the preload getter once per workspace so React reads a stable snapshot.
+export function getWorkspaceUsers(workspaceId: string): readonly CollabIdentity[] | null {
+  if (!workspaceUsers.has(workspaceId)) {
+    let snapshot: readonly CollabIdentity[] | null = null
+    if (initialWorkspaceUsers) {
+      try {
+        const initial = initialWorkspaceUsers(workspaceId)
+        snapshot = initial === null ? null : normalizeWorkspaceUsers(initial)
+      } catch {
+        // A configured but unavailable directory must not expose fallback profiles.
+        snapshot = Object.freeze([])
+      }
+    }
+    workspaceUsers.set(workspaceId, snapshot)
+  }
+  return workspaceUsers.get(workspaceId) ?? null
+}
+
+export function setWorkspaceUsers(
+  workspaceId: string,
+  users: readonly CollabIdentity[] | null
+): void {
+  const snapshot = users === null ? null : normalizeWorkspaceUsers(users)
+  workspaceUsers.set(workspaceId, snapshot)
+  workspaceListeners.get(workspaceId)?.forEach(listener => listener())
+}
+
+export function subscribeWorkspaceUsersStore(
+  workspaceId: string,
+  listener: () => void
+): () => void {
+  let subscriptions = workspaceListeners.get(workspaceId)
+  if (!subscriptions) {
+    subscriptions = new Set()
+    workspaceListeners.set(workspaceId, subscriptions)
+  }
+  subscriptions.add(listener)
+  return () => {
+    subscriptions.delete(listener)
+    if (!subscriptions.size) workspaceListeners.delete(workspaceId)
+  }
+}
+
+export function subscribeWorkspaceUsers(
+  workspaceId: string,
+  listener: (users: readonly CollabIdentity[] | null) => void
+): () => void {
+  const unsubscribe = subscribeWorkspaceUsersStore(workspaceId, () =>
+    listener(getWorkspaceUsers(workspaceId))
+  )
+  listener(getWorkspaceUsers(workspaceId))
+  return unsubscribe
 }
 
 export function getIdentity(): CollabIdentity | null {
@@ -99,6 +187,7 @@ export function installIdentityApi(): void {
     moi?: { collab?: Partial<CollabIdentityApi>; [key: string]: unknown }
   }
   const previous = host.moi?.collab
+  initialWorkspaceUsers = previous?.getWorkspaceUsers?.bind(previous)
   if (previous?.getIdentity) {
     identitySource = 'external'
     identity = null
@@ -124,8 +213,14 @@ export function installIdentityApi(): void {
     getIdentity,
     setIdentity,
     subscribeIdentity,
+    getWorkspaceUsers,
+    setWorkspaceUsers,
+    subscribeWorkspaceUsers,
     setShareHandler(handler) {
       shareHandler = handler
     }
+  }
+  if (typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new CustomEvent('moi:collab-ready'))
   }
 }

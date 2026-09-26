@@ -9,15 +9,16 @@ import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from '@/ui-component
 import { Badge } from '@/ui-components/badge'
 
 import { facehashDataUrl } from './facehash-avatar'
-import { usePeople, usePerson } from './hooks'
+import { useUser, useUsers } from './hooks'
+import { motion } from 'motion/react'
 
-// Person components. A person is always an id (`id`, or `ids` for several),
+// User components resolve IDs through the current workspace directory,
 // which resolves to the current name, face, and status through the workspace.
 
-export type PersonSize = 'xs' | 'sm' | 'md' | 'lg'
+export type UserSize = 'xs' | 'sm' | 'md' | 'lg'
 const AVATAR_SIZE = { xs: 'xs', sm: 'sm', md: 'default', lg: 'lg' } as const
 // Shown for an id nobody in this workspace has ever used.
-const UNKNOWN_NAME = 'Unknown person'
+const UNKNOWN_NAME = 'Unknown user'
 
 // Black or white, whichever reads on the person's color.
 export function readableOn(color: string): string {
@@ -27,7 +28,7 @@ export function readableOn(color: string): string {
 // Identity colors are data. They land on the node as custom properties
 // instead of stylesheet rules; classes read `--collab-color` and
 // `--collab-contrast` from there. An unknown person gets quiet theme tones.
-export function usePersonColor(color: string | undefined) {
+export function useUserColor(color: string | undefined) {
   return useCallback(
     (node: HTMLElement | null) => {
       if (!node) return
@@ -38,9 +39,9 @@ export function usePersonColor(color: string | undefined) {
   )
 }
 
-export type PersonProps = {
+export type UserProps = {
   id: string
-  size?: PersonSize
+  size?: UserSize
   // Only the face, for stacks, gutters, and tight rows.
   avatarOnly?: boolean
   you?: boolean
@@ -53,7 +54,7 @@ export type PersonProps = {
   label?: string
   className?: string
 }
-export function Person({
+export function User({
   id,
   size = 'md',
   avatarOnly = false,
@@ -62,9 +63,8 @@ export function Person({
   showStatus = true,
   label,
   className
-}: PersonProps) {
-  const resolved = usePerson(id)
-  const identity = resolved.identity
+}: UserProps) {
+  const identity = useUser(id)
   const name = identity?.name ?? UNKNOWN_NAME
   // A profile without a picture gets the same generated face on every client,
   // so nobody shows up as bare initials.
@@ -91,7 +91,7 @@ export function Person({
           <IconUser size={size === 'xs' || size === 'sm' ? 12 : 16} stroke={1.75} />
         )}
       </AvatarFallback>
-      {showStatus && resolved.status === 'active' && <AvatarBadge className="bg-success" />}
+      {showStatus && identity?.status === 'active' && <AvatarBadge className="bg-success" />}
     </Avatar>
   )
   if (avatarOnly) return avatar
@@ -154,7 +154,7 @@ export function Facepile({
       aria-label={`${unique.length} people`}
     >
       {shown.map(id => (
-        <Person
+        <User
           key={id}
           id={id}
           avatarOnly
@@ -176,17 +176,17 @@ export function Facepile({
   )
 }
 
-type PersonTagProps = {
+type UserTagProps = {
   name: string
   color: string | undefined
   icon?: ReactNode
   className?: string
 }
 // The kit's badge in the person's color, wherever a name marks a place.
-function PersonTag({ name, color, icon, className }: PersonTagProps) {
+function UserTag({ name, color, icon, className }: UserTagProps) {
   return (
     <Badge
-      ref={usePersonColor(color)}
+      ref={useUserColor(color)}
       className={cn('bg-(--collab-color) text-(--collab-contrast)', className)}
     >
       {icon}
@@ -206,9 +206,9 @@ export type CursorProps = {
   ref?: Ref<HTMLSpanElement>
 }
 export function Cursor({ id, x, y, label = true, className, ref }: CursorProps) {
-  const { identity } = usePerson(id)
+  const identity = useUser(id)
   const node = useRef<HTMLSpanElement | null>(null)
-  const setColor = usePersonColor(identity?.color)
+  const setColor = useUserColor(identity?.color)
   const attach = useCallback(
     (element: HTMLSpanElement | null) => {
       node.current = element
@@ -236,7 +236,7 @@ export function Cursor({ id, x, y, label = true, className, ref }: CursorProps) 
           <path d="M1 1 17.5 10.5 9.8 12.2 6 19.5Z" />
         </svg>
         {label && (
-          <PersonTag
+          <UserTag
             name={identity?.name ?? 'Someone'}
             color={identity?.color}
             className="absolute top-4 left-3.5"
@@ -247,7 +247,8 @@ export function Cursor({ id, x, y, label = true, className, ref }: CursorProps) 
   )
 }
 
-export type PresenceFrameProps = HTMLAttributes<HTMLDivElement> & {
+export type PresenceFramePrimitiveProps = HTMLAttributes<HTMLDivElement> & {
+  ref?: Ref<HTMLDivElement>
   // Everyone at this element; the first person's color draws the frame.
   ids: readonly string[]
   icon?: ReactNode
@@ -256,16 +257,22 @@ export type PresenceFrameProps = HTMLAttributes<HTMLDivElement> & {
 // Wraps anything. With one element inside, the frame hugs that element and
 // takes its corner radius, so a field, a card, a button, and a round avatar
 // each get a frame of their own shape with no styling from the caller.
-export function PresenceFrame({ ids, icon, children, className, ...rest }: PresenceFrameProps) {
-  const resolved = usePeople(ids)
+export function PresenceFramePrimitive({
+  ids,
+  icon,
+  children,
+  className,
+  ...rest
+}: PresenceFramePrimitiveProps) {
+  const resolved = useUsers(ids).filter(user => user !== null)
   const lead = resolved[0]
   return (
     <div className={cn('relative', className)} {...rest}>
       {children}
       {lead && (
         <FrameOutline
-          names={resolved.map(person => person.identity?.name ?? 'Someone').join(', ')}
-          color={lead.identity?.color}
+          names={resolved.map(person => person.name).join(', ')}
+          color={lead.color}
           icon={icon}
         />
       )}
@@ -286,7 +293,7 @@ const CORNERS = [
 type FrameOutlineProps = { names: string; color: string | undefined; icon?: ReactNode }
 function FrameOutline({ names, color, icon }: FrameOutlineProps) {
   const node = useRef<HTMLDivElement | null>(null)
-  const setColor = usePersonColor(color)
+  const setColor = useUserColor(color)
   const attach = useCallback(
     (element: HTMLDivElement | null) => {
       node.current = element
@@ -343,7 +350,7 @@ function FrameOutline({ names, color, icon }: FrameOutlineProps) {
       ref={attach}
       className="group/frame pointer-events-none absolute inset-0 animate-in rounded-sm outline-2 outline-(--collab-color) duration-150 fade-in data-[shape=rounded]:outline-offset-2 data-[shape=square]:outline-offset-4"
     >
-      <PersonTag
+      <UserTag
         name={names}
         color={color}
         icon={icon}
@@ -353,79 +360,38 @@ function FrameOutline({ names, color, icon }: FrameOutlineProps) {
   )
 }
 
-export type GutterPerson = { id: string; target: string }
-export type PresenceGutterProps = HTMLAttributes<HTMLDivElement> & {
-  // Who is at which block. Blocks among the children carry `data-collab-target`.
-  people: readonly GutterPerson[]
+export type PresenceGutterPrimitiveProps = HTMLAttributes<HTMLDivElement> & {
+  ref?: Ref<HTMLDivElement>
+  users: readonly { id: string; connectionId: string }[]
   children: ReactNode
-}
-// Reserves a gutter beside the children and floats a small face next to the
-// block each person is on. A face glides to the next block instead of
-// reappearing there, the way it does in a shared document.
-export function PresenceGutter({ people, children, className, ...rest }: PresenceGutterProps) {
-  const stacked = new Map<string, number>()
-  return (
-    <div data-presence-gutter="" className={cn('relative pl-8', className)} {...rest}>
-      {children}
-      <div className="pointer-events-none absolute inset-y-0 left-0 w-8" aria-hidden="true">
-        {people.map(entry => {
-          const stack = stacked.get(entry.target) ?? 0
-          stacked.set(entry.target, stack + 1)
-          return <GutterMark key={entry.id} entry={entry} stack={stack} />
-        })}
-      </div>
-    </div>
-  )
+  animate?: boolean
 }
 
-type GutterMarkProps = { entry: GutterPerson; stack: number }
-function GutterMark({ entry, stack }: GutterMarkProps) {
-  const node = useRef<HTMLSpanElement>(null)
-  useLayoutEffect(() => {
-    const mark = node.current
-    // The gutter is already in the DOM here, while a ref on it would not be
-    // attached yet on the first render.
-    const element = mark?.closest<HTMLElement>('[data-presence-gutter]')
-    if (!element || !mark) return
-    const place = () => {
-      const target = [...element.querySelectorAll<HTMLElement>('[data-collab-target]')].find(
-        candidate => candidate.dataset.collabTarget === entry.target
-      )
-      if (!target) {
-        mark.hidden = true
-        return
-      }
-      const bounds = element.getBoundingClientRect()
-      const rect = target.getBoundingClientRect()
-      // Centered on the block's first line; later people on the same block
-      // overlap toward the content like a facepile.
-      const y = rect.top - bounds.top + Math.max(0, (Math.min(rect.height, 24) - 20) / 2)
-      mark.hidden = false
-      mark.style.transform = `translate(${stack * 8}px, ${y}px)`
-    }
-    place()
-    const observer = new ResizeObserver(place)
-    observer.observe(element)
-    element.addEventListener('scroll', place, true)
-    window.addEventListener('resize', place)
-    return () => {
-      observer.disconnect()
-      element.removeEventListener('scroll', place, true)
-      window.removeEventListener('resize', place)
-    }
-  }, [entry.target, stack])
+// A target owns its own gutter. Optional group-scoped layout IDs let the same
+// user's face glide between targets without searching or guessing DOM order.
+export function PresenceGutterPrimitive({
+  users,
+  children,
+  animate = false,
+  className,
+  ...rest
+}: PresenceGutterPrimitiveProps) {
   return (
-    <span
-      ref={node}
-      className="absolute top-0 left-0 transition-transform duration-300 ease-out motion-reduce:transition-none"
-    >
-      <Person
-        id={entry.id}
-        avatarOnly
-        size="xs"
-        showStatus={false}
-        className="animate-in ring-2 ring-background duration-200 zoom-in-75 fade-in"
-      />
-    </span>
+    <div className={cn('relative pl-8', className)} {...rest}>
+      {children}
+      <div className="pointer-events-none absolute top-0 left-0 flex -space-x-3" aria-hidden="true">
+        {users.map(({ id, connectionId }) => (
+          <motion.span key={id} layoutId={animate ? `presence:${connectionId}` : undefined}>
+            <User
+              id={id}
+              avatarOnly
+              size="xs"
+              showStatus={false}
+              className="animate-in ring-2 ring-background duration-200 zoom-in-75 fade-in"
+            />
+          </motion.span>
+        ))}
+      </div>
+    </div>
   )
 }
