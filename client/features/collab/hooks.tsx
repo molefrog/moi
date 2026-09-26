@@ -20,10 +20,10 @@ import type { CollabBackend } from './backend'
 import { CollabClient } from './client'
 import { installIdentityApi } from './identity'
 import { resolvePeers, resolveUser, workspaceProfiles } from './people'
-import type { CollabUser, PeersOptions } from './people'
+import type { CollabUser, PeersOptions, WorkspaceUsersOptions } from './people'
 import { createPresencePublisher } from './presence-publisher'
 
-export type { CollabUser, PeersOptions } from './people'
+export type { CollabUser, PeersOptions, WorkspaceUsersOptions } from './people'
 type AppletIdentity = { kind: AppletKind; name: string }
 type Mount = { applet: AppletIdentity; active: boolean; surface: string }
 const BackendContext = createContext<CollabBackend>(NO_BACKEND)
@@ -124,11 +124,14 @@ export function useUsers(ids: readonly string[]): (CollabUser | null)[] {
   const { state, users } = useUsersSource()
   return ids.map(id => resolveUser({ ...state, users }, id))
 }
-export function useWorkspaceUsers(): CollabUser[] {
+export function useWorkspaceUsers({ status }: WorkspaceUsersOptions = {}): CollabUser[] {
   const { state, users } = useUsersSource()
   return useMemo(
-    () => users.map(user => resolveUser({ ...state, users }, user.id)!),
-    [state, users]
+    () =>
+      users
+        .map(user => resolveUser({ ...state, users }, user.id)!)
+        .filter(user => !status || user.status === status),
+    [state, users, status]
   )
 }
 export function useMe(): CollabUser | null {

@@ -13,7 +13,7 @@ import { COLLAB_REFERENCE_SOURCE_PATH, installCollabSkill, removeCollabSkill } f
 
 type ActualHooks = Pick<
   typeof Hooks,
-  'useMe' | 'usePeers' | 'useUser' | 'usePresence' | 'usePublishPresence'
+  'useMe' | 'usePeers' | 'useUser' | 'useWorkspaceUsers' | 'usePresence' | 'usePublishPresence'
 >
 type ActualComponents = Pick<
   typeof Components,

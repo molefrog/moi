@@ -16,8 +16,10 @@ import {
   usePublishPresenceChannel
 } from './hooks'
 import { Cursor, Facepile, PresenceFramePrimitive, PresenceGutterPrimitive } from './primitives'
+import { presenceChildren } from './presence-children'
 
 export { Facepile, User } from './primitives'
+export { presenceChildTarget } from './presence-children'
 
 // Built-in indicators have no registration while unfocused, unselected, or absent.
 const hasPresence = (value: CollabJsonValue) => value !== false && value !== null
@@ -205,8 +207,33 @@ function useTargetPresence(target: string) {
   }
 }
 
-export type PresenceFrameProps = { target: string; children: ReactNode; className?: string }
-export function PresenceFrame({ target, children, className }: PresenceFrameProps) {
+export type PresenceFrameProps = {
+  target: string
+  children: ReactNode
+  className?: string
+  each?: boolean
+}
+export function PresenceFrame({ target, children, className, each = false }: PresenceFrameProps) {
+  if (each) {
+    return (
+      <div className={className}>
+        {presenceChildren(target, children).map(({ key, target: childTarget, child }) => (
+          <PresenceFrameTarget key={key} target={childTarget}>
+            {child}
+          </PresenceFrameTarget>
+        ))}
+      </div>
+    )
+  }
+  return (
+    <PresenceFrameTarget target={target} className={className}>
+      {children}
+    </PresenceFrameTarget>
+  )
+}
+
+type PresenceFrameTargetProps = Omit<PresenceFrameProps, 'each'>
+function PresenceFrameTarget({ target, children, className }: PresenceFrameTargetProps) {
   const presence = useTargetPresence(target)
   return (
     <PresenceFramePrimitive
@@ -220,8 +247,35 @@ export function PresenceFrame({ target, children, className }: PresenceFrameProp
   )
 }
 
-export type PresenceGutterProps = { target: string; children: ReactNode; className?: string }
-export function PresenceGutter({ target, children, className }: PresenceGutterProps) {
+export type PresenceGutterProps = {
+  target: string
+  children: ReactNode
+  className?: string
+  each?: boolean
+}
+export function PresenceGutter({ target, children, className, each = false }: PresenceGutterProps) {
+  if (each) {
+    return (
+      <PresenceGroup>
+        <div className={className}>
+          {presenceChildren(target, children).map(({ key, target: childTarget, child }) => (
+            <PresenceGutterTarget key={key} target={childTarget}>
+              {child}
+            </PresenceGutterTarget>
+          ))}
+        </div>
+      </PresenceGroup>
+    )
+  }
+  return (
+    <PresenceGutterTarget target={target} className={className}>
+      {children}
+    </PresenceGutterTarget>
+  )
+}
+
+type PresenceGutterTargetProps = Omit<PresenceGutterProps, 'each'>
+function PresenceGutterTarget({ target, children, className }: PresenceGutterTargetProps) {
   const presence = useTargetPresence(target)
   const grouped = useContext(PresenceGroupContext)
   return (

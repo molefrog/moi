@@ -10,8 +10,10 @@ import {
   usePeers,
   usePresence,
   usePublishPresence,
-  useUser
+  useUser,
+  useWorkspaceUsers
 } from './hooks'
+import type { CollabUser } from './hooks'
 
 const alice = { id: 'alice', name: 'Alice', color: '#0f766e' }
 const bob = { id: 'bob', name: 'Bob', color: '#2563eb' }
@@ -21,6 +23,7 @@ function Observer() {
       {JSON.stringify({
         me: useMe(),
         peers: usePeers(),
+        users: useWorkspaceUsers(),
         user: useUser('bob'),
         presence: usePresence('editing')
       })}
@@ -80,4 +83,66 @@ test('hooks are safe without a backend or applet and resolve missing users to nu
   const html = renderToStaticMarkup(<Disabled />)
   expect(html).toContain('null')
   expect(html).toContain('[]')
+})
+
+test('workspace users include self and offline members with workspace-wide status filters', () => {
+  const carol = { id: 'carol', name: 'Carol', color: '#2563eb' }
+  const david = { id: 'david', name: 'David', color: '#0f766e' }
+  const room = createFakeBackend({
+    self: alice,
+    page: 'board',
+    users: [alice, bob, carol, david],
+    others: [
+      { connectionId: 'b1', userId: 'bob', location: { page: 'other-page' }, presence: [] },
+      { connectionId: 'b2', userId: 'bob', location: null, presence: [] },
+      { connectionId: 'c', userId: 'carol', location: null, presence: [] }
+    ]
+  })
+  function Directory() {
+    // Encode the readout so React's HTML escaping does not alter the JSON.
+    return encodeURIComponent(
+      JSON.stringify({
+        all: useWorkspaceUsers(),
+        active: useWorkspaceUsers({ status: 'active' }),
+        away: useWorkspaceUsers({ status: 'away' }),
+        offline: useWorkspaceUsers({ status: 'offline' })
+      })
+    )
+  }
+  const render = () =>
+    JSON.parse(
+      decodeURIComponent(
+        renderToStaticMarkup(
+          <CollabBackendProvider backend={room}>
+            <Directory />
+          </CollabBackendProvider>
+        )
+      )
+    ) as Record<string, CollabUser[]>
+
+  const snapshot = render()
+  expect(snapshot.all).toEqual([
+    { ...alice, status: 'active' },
+    { ...bob, status: 'active' },
+    { ...carol, status: 'away' },
+    { ...david, status: 'offline' }
+  ])
+  expect(snapshot.active).toEqual([
+    { ...alice, status: 'active' },
+    { ...bob, status: 'active' }
+  ])
+  expect(snapshot.away).toEqual([{ ...carol, status: 'away' }])
+  expect(snapshot.offline).toEqual([{ ...david, status: 'offline' }])
+
+  // A host directory replacement removes even connected members and updates profiles.
+  room.setUsers([alice, { ...david, name: 'David updated' }])
+  const updated = render()
+  expect(updated.all).toEqual([
+    { ...alice, status: 'active' },
+    { ...david, name: 'David updated', status: 'offline' }
+  ])
+  expect(updated.away).toEqual([])
+
+  room.setUsers([])
+  expect(render().all).toEqual([])
 })

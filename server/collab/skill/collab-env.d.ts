@@ -20,11 +20,14 @@ declare module 'moi/collab' {
   export type UserStatus = 'active' | 'away' | 'offline'
   export type CollabUser = CollabIdentity & { status: UserStatus }
   export type PeersOptions = { scope?: 'page' | 'workspace'; status?: 'active' | 'away' }
+  export type WorkspaceUsersOptions = { status?: UserStatus }
 
   // Peers are connected users, deduplicated across tabs, excluding your own user.
   export function useMe(): CollabUser | null
   export function useUser(id: string): CollabUser | null
   export function usePeers(options?: PeersOptions): CollabUser[]
+  // Full workspace directory, including your own user and offline members.
+  export function useWorkspaceUsers(options?: WorkspaceUsersOptions): CollabUser[]
 
   export type PresenceValue<T> = { connectionId: string; userId: string; value: T }
   // Reading never registers or publishes presence. Values belong to connections.
@@ -39,9 +42,20 @@ declare module 'moi/collab' {
 
   // Targets identify controls across browsers, reordered lists, and record modals.
   // Both components handle focus presence internally.
-  export type PresenceFrameProps = { target: string; children: ReactNode; className?: string }
+  // With each, target is a group namespace; direct children need explicit stable React keys.
+  export type PresenceFrameProps = {
+    target: string
+    each?: boolean
+    children: ReactNode
+    className?: string
+  }
   export function PresenceFrame(props: PresenceFrameProps): ReactElement
-  export type PresenceGutterProps = { target: string; children: ReactNode; className?: string }
+  export type PresenceGutterProps = {
+    target: string
+    each?: boolean
+    children: ReactNode
+    className?: string
+  }
   export function PresenceGutter(props: PresenceGutterProps): ReactElement
   export type PresenceGroupProps = { children: ReactNode }
   export function PresenceGroup(props: PresenceGroupProps): ReactElement

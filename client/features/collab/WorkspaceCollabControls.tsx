@@ -59,7 +59,8 @@ export function WorkspaceCollabControls({
   })
   const self = people.find(person => person.self)
   const others = people.filter(person => !person.self)
-  const hidden = Math.max(0, others.length - MAX_FACES)
+  const connected = others.filter(person => person.status !== 'offline')
+  const hidden = Math.max(0, connected.length - MAX_FACES)
   const [open, setOpen] = useState(false)
   const jump = (tab: WorkspaceTabId) => {
     setOpen(false)
@@ -71,7 +72,7 @@ export function WorkspaceCollabControls({
     <div className="flex items-center gap-1">
       <Popover open={open} onOpenChange={setOpen}>
         <span className="flex items-center -space-x-2">
-          {others.slice(0, MAX_FACES).map(person => (
+          {connected.slice(0, MAX_FACES).map(person => (
             <Face
               key={person.identity.id}
               person={person}

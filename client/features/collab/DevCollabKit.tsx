@@ -29,10 +29,10 @@ import {
   Cursors,
   Facepile,
   PresenceFrame,
-  PresenceGroup,
   PresenceGutter,
   Selection,
-  User
+  User,
+  presenceChildTarget
 } from './components'
 import { createFakeBackend } from './fake-backend'
 import type { FakeCollabBackend } from './fake-backend'
@@ -44,7 +44,8 @@ import {
   usePeers,
   usePresence,
   usePublishPresence,
-  useUser
+  useUser,
+  useWorkspaceUsers
 } from './hooks'
 
 const YOU: CollabIdentity = { id: 'you', name: 'You', color: '#8b5cf6' }
@@ -60,9 +61,9 @@ const PAGE = 'kit'
 const APPLET = { kind: 'view', name: 'kit' } as const
 const SURFACE = 'view:kit'
 const TARGETS = [
-  ['First task', 'todo:launch:title'],
-  ['Second task', 'todo:notes:title'],
-  ['Nested form', 'project:launch:name'],
+  ['First task', presenceChildTarget('tasks', 'launch')],
+  ['Second task', presenceChildTarget('tasks', 'notes')],
+  ['Nested form', presenceChildTarget('project:launch:fields', 'name')],
   ['Launch dialog', 'todo:launch:dialog:title']
 ] as const
 
@@ -165,9 +166,9 @@ function EditableList() {
   return (
     <Section
       title="Editable list"
-      hint="Reorder or remove rows: Fig stays with the task ID. Alex has the announcement selected. These text edits are local; only presence is shared."
+      hint="One gutter wraps the list. Reorder or remove rows: Fig stays with the task key. Alex has the announcement selected. Text edits stay local."
       code={
-        '<PresenceGroup>\n  {tasks.map(task => (\n    <PresenceGutter key={task.id} target={`todo:${task.id}:title`}>\n      <Input value={task.title} onChange={...} />\n    </PresenceGutter>\n  ))}\n</PresenceGroup>'
+        '<PresenceGutter target="tasks" each className="space-y-4">\n  {tasks.map(task => (\n    <Input key={task.id} value={task.title} onChange={...} />\n  ))}\n</PresenceGutter>'
       }
     >
       <div className="flex flex-wrap gap-2">
@@ -191,41 +192,38 @@ function EditableList() {
           Reset list
         </Button>
       </div>
-      <PresenceGroup>
-        <div className="flex flex-col gap-8 py-3">
-          {tasks.map(task => (
-            <Selection key={task.id} target={`todo:${task.id}`} selected={selected === task.id}>
-              <div className="flex items-center gap-2">
-                <PresenceGutter target={`todo:${task.id}:title`} className="min-w-0 flex-1">
-                  <Input
-                    aria-label={`Title for ${task.id}`}
-                    value={task.title}
-                    onFocus={() => setSelected(task.id)}
-                    onChange={event =>
-                      setTasks(current =>
-                        current.map(item =>
-                          item.id === task.id ? { ...item, title: event.target.value } : item
-                        )
-                      )
-                    }
-                  />
-                </PresenceGutter>
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  aria-label={`Remove ${task.title}`}
-                  onClick={() => setTasks(current => current.filter(item => item.id !== task.id))}
-                >
-                  <IconTrash stroke={1.75} />
-                </Button>
-              </div>
-            </Selection>
-          ))}
-          {!tasks.length && (
-            <p className="text-sm text-muted-foreground">No tasks. Add a task or reset the list.</p>
-          )}
-        </div>
-      </PresenceGroup>
+      <PresenceGutter target="tasks" each className="flex flex-col gap-8 py-3">
+        {tasks.map(task => (
+          <Selection key={task.id} target={`todo:${task.id}`} selected={selected === task.id}>
+            <div className="flex items-center gap-2">
+              <Input
+                className="min-w-0 flex-1"
+                aria-label={`Title for ${task.id}`}
+                value={task.title}
+                onFocus={() => setSelected(task.id)}
+                onChange={event =>
+                  setTasks(current =>
+                    current.map(item =>
+                      item.id === task.id ? { ...item, title: event.target.value } : item
+                    )
+                  )
+                }
+              />
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                aria-label={`Remove ${task.title}`}
+                onClick={() => setTasks(current => current.filter(item => item.id !== task.id))}
+              >
+                <IconTrash stroke={1.75} />
+              </Button>
+            </div>
+          </Selection>
+        ))}
+      </PresenceGutter>
+      {!tasks.length && (
+        <p className="text-sm text-muted-foreground">No tasks. Add a task or reset the list.</p>
+      )}
     </Section>
   )
 }
@@ -236,24 +234,27 @@ function NestedForm() {
   return (
     <Section
       title="Nested controls"
-      hint="The nearest target owns focus. Moving between controls in the same target keeps presence; entering a nested target moves it."
+      hint="One frame tracks each keyed field, including the controls inside its label. The nearest target owns focus, so the outer frame stays quiet."
       code={
-        '<PresenceFrame target="project:launch">\n  <PresenceFrame target="project:launch:name">\n    <Input />\n  </PresenceFrame>\n  <Textarea />\n</PresenceFrame>'
+        '<PresenceFrame target="project:launch:fields" each className="space-y-6">\n  <label key="name">Project name <Input /></label>\n  <label key="notes">Project notes <Textarea /></label>\n</PresenceFrame>'
       }
     >
       <PresenceFrame target="project:launch">
-        <div className="flex flex-col gap-6 rounded-lg bg-muted p-4">
-          <PresenceFrame target="project:launch:name">
-            <label className="flex flex-col gap-2 text-sm">
-              Project name
-              <Input value={name} onChange={event => setName(event.target.value)} />
-            </label>
-          </PresenceFrame>
-          <label className="flex flex-col gap-2 text-sm">
+        <PresenceFrame
+          target="project:launch:fields"
+          each
+          className="flex flex-col gap-6 rounded-lg bg-muted p-4"
+        >
+          <label key="name" className="flex flex-col gap-2 text-sm">
+            Project name
+            <Input value={name} onChange={event => setName(event.target.value)} />
+          </label>
+          <label key="notes" className="flex flex-col gap-2 text-sm">
             Project notes
             <Textarea value={notes} onChange={event => setNotes(event.target.value)} />
           </label>
           <Button
+            key="reset"
             size="sm"
             variant="secondary"
             className="self-start"
@@ -261,7 +262,7 @@ function NestedForm() {
           >
             Reset notes
           </Button>
-        </div>
+        </PresenceFrame>
       </PresenceFrame>
     </Section>
   )
@@ -329,6 +330,8 @@ function Output({ value }: OutputProps) {
 function HooksDemo() {
   const me = useMe()
   const peers = usePeers({ scope: 'workspace' })
+  const members = useWorkspaceUsers()
+  const offline = useWorkspaceUsers({ status: 'offline' })
   const user = useUser('david')
   const [mood, setMood] = useState('Exploring')
   usePublishPresence('mood', mood)
@@ -338,7 +341,7 @@ function HooksDemo() {
       title="Hooks"
       hint="Profiles and connection status are separate from ephemeral channel values. Reading a channel does not publish to it."
       code={
-        "const me = useMe()\nconst peers = usePeers({ scope: 'workspace', status: 'active' })\nconst user = useUser(assigneeId) // Includes offline users; unknown returns null\nusePublishPresence('mood', mood)\nconst others = usePresence<string>('mood')"
+        "const me = useMe()\nconst peers = usePeers({ scope: 'workspace', status: 'active' })\nconst members = useWorkspaceUsers() // Includes you and offline members\nconst offline = useWorkspaceUsers({ status: 'offline' })\nconst user = useUser(assigneeId)\nusePublishPresence('mood', mood)\nconst others = usePresence<string>('mood')"
       }
     >
       <div className="grid gap-4 sm:grid-cols-2">
@@ -349,6 +352,14 @@ function HooksDemo() {
         <div className="flex flex-col gap-2">
           <code className="font-mono text-xs">usePeers({'{ scope: "workspace" }'})</code>
           <Output value={peers} />
+        </div>
+        <div className="flex flex-col gap-2">
+          <code className="font-mono text-xs">useWorkspaceUsers()</code>
+          <Output value={members} />
+        </div>
+        <div className="flex flex-col gap-2">
+          <code className="font-mono text-xs">useWorkspaceUsers({'{ status: "offline" }'})</code>
+          <Output value={offline} />
         </div>
         <div className="flex flex-col gap-2">
           <code className="font-mono text-xs">useUser('david')</code>

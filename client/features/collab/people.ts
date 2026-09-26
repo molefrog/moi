@@ -2,6 +2,7 @@ import type { CollabIdentity, CollabLocation, CollabParticipant } from '@/lib/co
 
 export type UserStatus = 'active' | 'away' | 'offline'
 export type CollabUser = CollabIdentity & { status: UserStatus }
+export type WorkspaceUsersOptions = { status?: UserStatus }
 export type UsersSource = {
   participants: readonly CollabParticipant[]
   users: readonly CollabIdentity[]

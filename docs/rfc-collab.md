@@ -77,13 +77,14 @@ The complete host integration contract and bootstrap example are in
 
 ## Applet API
 
-| Hook                                 | Contract                                                                                                    |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| `useMe()`                            | Current user profile plus `status`, or `null`.                                                              |
-| `useUser(id)`                        | A profile plus `status`, including offline users; `null` for unknown IDs.                                   |
-| `usePeers({ scope?, status? })`      | Other connected users; `scope` is `page` or `workspace`, `status` is `active` or `away`.                    |
-| `usePresence(channel)`               | Read-only array of `{ connectionId, userId, value }` for other connections on this page and applet surface. |
-| `usePublishPresence(channel, value)` | Publish the current JSON value reactively while mounted and visible. Returns nothing.                       |
+| Hook                                 | Contract                                                                                                          |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `useMe()`                            | Current user profile plus `status`, or `null`.                                                                    |
+| `useUser(id)`                        | A profile plus `status`, including offline users; `null` for unknown IDs.                                         |
+| `useWorkspaceUsers({ status? })`     | Complete workspace directory, including self and offline members; optional `active`, `away`, or `offline` filter. |
+| `usePeers({ scope?, status? })`      | Other connected users; `scope` is `page` or `workspace`, `status` is `active` or `away`.                          |
+| `usePresence(channel)`               | Read-only array of `{ connectionId, userId, value }` for other connections on this page and applet surface.       |
+| `usePublishPresence(channel, value)` | Publish the current JSON value reactively while mounted and visible. Returns nothing.                             |
 
 Reading presence never creates a presence registration. Publication owns one registration per
 mounted hook and replaces that registration's whole value. Hidden views, browser tabs, outgoing
@@ -91,21 +92,34 @@ builds, unmounts, and Strict Mode cleanup release registrations. Presence is res
 Custom channel names are scoped by applet surface (`view:<name>` or `widget:<name>`); they are not
 a persistent key/value store. Channel values must be JSON and fit within 4 KiB.
 
-| Component        | Contract                                                                            |
-| ---------------- | ----------------------------------------------------------------------------------- |
-| `User`           | Resolve a profile by `id`; name/avatar, sizes, optional status and detail.          |
-| `Facepile`       | Resolve `ids` and render stacked avatars with an overflow count.                    |
-| `Activity`       | Show current-page or workspace participants.                                        |
-| `Cursors`        | Wrap a cursor surface; optional stable `surface` name.                              |
-| `PresenceFrame`  | Wrap a control with `target`; publishes descendant focus and outlines remote focus. |
-| `PresenceGutter` | Same `target`/children contract, with a user marker beside the focused item.        |
-| `PresenceGroup`  | Optionally group gutter targets to constrain avatar layout animations.              |
-| `Selection`      | Wrap a `target` and supply a controlled `selected` boolean.                         |
+| Component        | Contract                                                                                       |
+| ---------------- | ---------------------------------------------------------------------------------------------- |
+| `User`           | Resolve a profile by `id`; name/avatar, sizes, optional status and detail.                     |
+| `Facepile`       | Resolve `ids` and render stacked avatars with an overflow count.                               |
+| `Activity`       | Show current-page or workspace participants.                                                   |
+| `Cursors`        | Wrap a cursor surface; optional stable `surface` name.                                         |
+| `PresenceFrame`  | Wrap a control with `target`; `each` tracks each keyed direct child of a list/form.            |
+| `PresenceGutter` | Same contract, with an avatar beside the focused item; `each` also scopes its animation group. |
+| `PresenceGroup`  | Optionally group gutter targets to constrain avatar layout animations.                         |
+| `Selection`      | Wrap a `target` and supply a controlled `selected` boolean.                                    |
 
 Frame and gutter do not accept user IDs. They discover focus through presence and share the same
 target channel. Nested focus belongs to the nearest target wrapper. Use semantic targets such as
 `todo:42:title`, never array positions or inferred DOM paths. Reusing a modal for another record
 must change its target. Scope animation groups to related list/form regions.
+
+With `each`, a single frame or gutter wraps a list/form and creates indicators for its keyed direct
+children, including composed components with nested controls. Each child must have a unique,
+explicit semantic React key. The target is `groupTarget + '/' + encodeURIComponent(childKey)`;
+reordering keeps presence attached to its data and removal releases it. Empty children are ignored;
+unkeyed elements, duplicate keys, and bare text are rejected. A keyed fragment is one target.
+The group's `className` controls layout. `PresenceGutter each` owns its animation group automatically.
+Default single-target mode and explicit `PresenceGroup` remain available for individual controls.
+
+`useWorkspaceUsers` enumerates the full host directory, while `usePeers` enumerates connections
+deduplicated by user. The workspace header shows connected users (active or away) only; its member
+popover can list offline users too. Without a host directory, enumeration falls back to the local
+identity and currently connected profiles, so it cannot discover offline members.
 
 `Cursors` is the public cursor component; the singular cursor renderer is internal. Pointer updates
 are coalesced to 50 ms. Optional `data-collab-target` anchors allow pointers to follow an element

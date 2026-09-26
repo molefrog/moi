@@ -51,7 +51,9 @@ revision stream, profile database, or synchronization service is introduced into
   browser using its own transport, then calls the setters there. moi does not fan out the directory.
 
 A profile's `status` is not supplied by Batiok. moi derives it from live connections when returning
-`useMe`, `useUser`, or `usePeers`. Profile data is independent of presence: an offline member's name
+`useMe`, `useUser`, `useWorkspaceUsers`, or `usePeers`. Applets can enumerate the complete directory
+with `useWorkspaceUsers()` and optionally filter by `active`, `away`, or `offline`. `usePeers()`
+continues to list connected users only. Profile data is independent of presence: an offline member's name
 can change without that person opening the workspace.
 
 ## Bootstrap before moi loads

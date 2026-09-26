@@ -8,7 +8,14 @@ import {
   PresenceGutter,
   Selection
 } from './components'
-import { useMe, usePeers, usePresence, usePublishPresence, useUser } from './hooks'
+import {
+  useMe,
+  usePeers,
+  usePresence,
+  usePublishPresence,
+  useUser,
+  useWorkspaceUsers
+} from './hooks'
 
 export { CollabWorkspaceProvider, AppletCollabProvider, CollabBackendProvider } from './hooks'
 export { WorkspaceCollabControls } from './WorkspaceCollabControls'
@@ -26,6 +33,7 @@ const appletApi = {
   useMe,
   usePeers,
   useUser,
+  useWorkspaceUsers,
   usePresence,
   usePublishPresence
 }

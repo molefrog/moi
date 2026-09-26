@@ -15,12 +15,14 @@ when their publisher leaves. Do not use them as a database, lock, or source of a
 ## Users
 
 ```tsx
-import { useMe, useUser, usePeers, User, Facepile, Activity } from 'moi/collab'
+import { useMe, useUser, usePeers, useWorkspaceUsers, User, Facepile, Activity } from 'moi/collab'
 
 const me = useMe()
 const author = useUser(authorId)
 const peers = usePeers() // Other connected users on this page
 const workspacePeers = usePeers({ scope: 'workspace' })
+const members = useWorkspaceUsers() // Includes you and offline members
+const offlineMembers = useWorkspaceUsers({ status: 'offline' })
 ```
 
 A resolved user is `{ id, name, color, avatar?, email?, status }`. `useMe()` and `useUser(id)` return
@@ -31,6 +33,11 @@ connections hidden), or `offline` (none). A user on another page is not offline.
 Its options are `{ scope?: 'page' | 'workspace', status?: 'active' | 'away' }`. It never lists offline
 members. `useUser` can resolve an offline member from the host's directory, even one who has never
 opened the workspace. Unknown or removed IDs return `null`.
+
+`useWorkspaceUsers({ status? })` returns the complete supplied workspace directory, including you
+and offline members. Filter by `active`, `away`, or `offline`, or omit options for everyone. Use it
+for assignee pickers and member lists. Without a host directory, only the local identity and current
+connection profiles are available; this fallback cannot discover offline members.
 
 Store user IDs in your application data and resolve current profiles at display time. Batiok or
 another outer host owns profiles; applets only read them. Workspace-specific metadata belongs in
@@ -90,13 +97,15 @@ import { Cursors, PresenceFrame, PresenceGutter, PresenceGroup, Selection } from
     <Input value={title} onChange={event => setTitle(event.target.value)} />
   </PresenceFrame>
 
-  <PresenceGroup>
+  <PresenceGutter target="tasks" each className="space-y-4">
     {tasks.map(task => (
-      <PresenceGutter key={task.id} target={`todo:${task.id}:row`}>
-        <Input value={task.title} onChange={event => updateDraft(task.id, event.target.value)} />
-      </PresenceGutter>
+      <Input
+        key={task.id}
+        value={task.title}
+        onChange={event => updateDraft(task.id, event.target.value)}
+      />
     ))}
-  </PresenceGroup>
+  </PresenceGutter>
 
   <Selection target={`todo:${task.id}`} selected={selected}>
     <Button onClick={() => setSelected(value => !value)}>Select task</Button>
@@ -108,13 +117,23 @@ Use your workspace's existing Input/Button components. The example's values and 
 are ordinary application state; the wrappers add presence only.
 
 - `PresenceFrame` and `PresenceGutter` both take a required stable `target`, `children`, and optional
-  `className`. They publish focus from descendant controls and show the users focused on that target.
+  `className` and `each`. They publish focus from descendant controls and show the users focused on that target.
   Do not pass users or manually fetch presence for these wrappers.
 - Frame draws an outline; gutter draws an avatar beside the target. Both use the same focus channel,
-  so different views of the same target can choose different presentation.
+  so different layouts of the same applet can choose different presentation. Presence stays scoped
+  to the same page and applet; a matching target in another view does not share it.
+- With `each`, wrap a whole list or form once. Each direct child needs an explicit, unique React
+  `key` identifying its data, never its array position. A child can contain nested controls or be
+  a composed component; focus anywhere inside it belongs to that item. A keyed fragment is one
+  item. Empty children are ignored; unkeyed children, duplicate keys, and bare text are errors.
+- In `each` mode, `target` is the group namespace and each item's target is
+  `target + '/' + encodeURIComponent(key)`. Reordering preserves identity; removing a child releases
+  its presence. Changing the group target changes all child targets, so include the record ID for
+  a form reused by different records. `className` controls the group layout.
 - A nested wrapper owns focus inside its own target; its outer wrapper does not also claim it.
 - `PresenceGroup` takes `children` and confines avatar movement to a related set of gutter targets.
-  Use separate groups for unrelated lists or panels.
+  Use separate groups for unrelated lists or panels. `PresenceGutter each` supplies its own group,
+  so it does not need another `PresenceGroup` wrapper.
 - `Selection` takes `target`, controlled `selected`, `children`, and optional `className`.
 - `Cursors` wraps an area and accepts optional stable `surface` and `className`. It publishes your
   pointer and displays remote pointers. No singular cursor renderer is exposed to applets.
@@ -122,6 +141,19 @@ are ordinary application state; the wrappers add presence only.
 Targets identify data, not DOM position. Use `todo:42:title`, not `row:0`. When a modal opens a
 different record, change the target even if the input occupies the same DOM position. If multiple
 cursor areas are mounted within an applet, give each a distinct stable surface name.
+
+```tsx
+<PresenceFrame target={`project:${project.id}`} each className="space-y-4">
+  <label key="name">
+    Project name
+    <Input value={name} onChange={event => setName(event.target.value)} />
+  </label>
+  <label key="notes">
+    Notes
+    <Textarea value={notes} onChange={event => setNotes(event.target.value)} />
+  </label>
+</PresenceFrame>
+```
 
 Cursor anchors can use `data-collab-target="todo:42"` on semantic elements. This lets another
 browser place the pointer relative to that element through scroll/layout changes. The API does not
