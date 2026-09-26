@@ -3,12 +3,12 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { clientAppConfig, resetAppConfig } from '../app-config'
+import { clientAppConfig, initializeAppConfig, resetAppConfig } from '../app-config'
 import { getCollabReferencePath, isCollabEnabled } from './config'
 import { collabSkillReferencePath } from './skill'
 
 let workspacePath: string
-const envKeys = ['MOI_EXPERIMENTAL_COLLAB', 'MOI_COLLAB', 'MOI_DEV', 'MOI_COLLAB_IDENTITY']
+const envKeys = ['MOI_COLLAB', 'MOI_DEV', 'MOI_COLLAB_IDENTITY']
 let savedEnv: Record<string, string | undefined>
 beforeEach(async () => {
   workspacePath = await mkdtemp(join(tmpdir(), 'moi-collab-config-'))
@@ -40,7 +40,7 @@ describe('collab process opt-in', () => {
   })
 
   test('the process flag enables every workspace without configuration or files', async () => {
-    process.env.MOI_EXPERIMENTAL_COLLAB = '1'
+    initializeAppConfig({ experimentalCollab: true })
     expect(isCollabEnabled()).toBe(true)
     expect(clientAppConfig().experimentalCollab).toBe(true)
     expect(await getCollabReferencePath(workspacePath)).toBeUndefined()
@@ -49,10 +49,14 @@ describe('collab process opt-in', () => {
     expect(await Bun.file(collabSkillReferencePath(workspacePath)).exists()).toBe(false)
   })
 
-  test('runtime and client flag stay in agreement until the process config is reset', () => {
-    process.env.MOI_EXPERIMENTAL_COLLAB = '1'
+  test('runtime and client flag stay in agreement across initialization and reset', () => {
+    initializeAppConfig({ experimentalCollab: true })
     expect(isCollabEnabled()).toBe(true)
-    process.env.MOI_EXPERIMENTAL_COLLAB = '0'
+    expect(clientAppConfig().experimentalCollab).toBe(true)
+    initializeAppConfig({ experimentalCollab: false })
+    expect(isCollabEnabled()).toBe(false)
+    expect(clientAppConfig().experimentalCollab).toBe(false)
+    initializeAppConfig({ experimentalCollab: true })
     expect(isCollabEnabled()).toBe(true)
     expect(clientAppConfig().experimentalCollab).toBe(true)
     resetAppConfig()
@@ -64,8 +68,7 @@ describe('collab process opt-in', () => {
     const referencePath = collabSkillReferencePath(workspacePath)
     await Bun.write(referencePath, '# Collaborative applets')
     expect(await getCollabReferencePath(workspacePath)).toBeUndefined()
-    process.env.MOI_EXPERIMENTAL_COLLAB = '1'
-    resetAppConfig()
+    initializeAppConfig({ experimentalCollab: true })
     expect(await getCollabReferencePath(workspacePath)).toBe(referencePath)
   })
 })

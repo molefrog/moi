@@ -128,14 +128,7 @@ const ENV_ALLOW_PREFIXES = ['MOI_', 'ANTHROPIC_', 'OPENCLAW_', 'OPENAI_', 'PUBLI
 // Runtime flags the unit stamps itself — never inherited from the installing
 // shell (a dev shell must not bake MOI_DEV into the service, and an
 // agent-run install must not bake its MOI_AGENT marker into the daemon).
-const ENV_OWNED = new Set([
-  'MOI_SERVER',
-  'MOI_SERVICE',
-  'MOI_DEV',
-  'MOI_DEBUG',
-  'MOI_AGENT',
-  'MOI_EXPERIMENTAL_COLLAB'
-])
+const ENV_OWNED = new Set(['MOI_SERVER', 'MOI_SERVICE', 'MOI_DEV', 'MOI_DEBUG', 'MOI_AGENT'])
 
 const ENV_KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/
 

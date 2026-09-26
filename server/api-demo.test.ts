@@ -9,12 +9,7 @@ import { resetAppConfig } from './app-config'
 import { claudeCodeHarness } from './harness/claude-code'
 
 const originalClaudeAvailability = claudeCodeHarness.availability
-const envKeys = [
-  'MOI_CLOUD_DEMO',
-  'MOI_EXPERIMENTS',
-  'MOI_EXPERIMENTAL_COLLAB',
-  'MOI_DEMO_INSTALL_URL'
-]
+const envKeys = ['MOI_CLOUD_DEMO', 'MOI_EXPERIMENTS', 'MOI_DEMO_INSTALL_URL']
 let savedEnv: Record<string, string | undefined>
 
 // Deployment env vars are pinned so a real config.json on the machine running the
@@ -25,7 +20,6 @@ beforeEach(() => {
   savedEnv = Object.fromEntries(envKeys.map(key => [key, process.env[key]]))
   process.env.MOI_CLOUD_DEMO = '1'
   process.env.MOI_EXPERIMENTS = ''
-  process.env.MOI_EXPERIMENTAL_COLLAB = '0'
   process.env.MOI_DEMO_INSTALL_URL = 'https://moi.computer'
   resetAppConfig()
   claudeCodeHarness.availability = async () => ({ status: 'available' })

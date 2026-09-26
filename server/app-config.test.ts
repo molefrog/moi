@@ -76,12 +76,11 @@ test('collab ignores config files, experiment slugs and legacy environment setti
   expect(config.experiments).toEqual(['collab'])
 })
 
-test('collab accepts only the CLI-owned process marker', async () => {
+test('collab accepts only explicit startup flags', async () => {
   const file = await configFile(JSON.stringify({ experimentalCollab: false }))
-  for (const value of [undefined, '', '0', 'true', 'TRUE', 'false', 'yes']) {
-    expect(loadAppConfig(file, { MOI_EXPERIMENTAL_COLLAB: value }).experimentalCollab).toBe(false)
-  }
-  expect(loadAppConfig(file, { MOI_EXPERIMENTAL_COLLAB: '1' }).experimentalCollab).toBe(true)
+  expect(loadAppConfig(file, NO_ENV).experimentalCollab).toBe(false)
+  expect(loadAppConfig(file, NO_ENV, { experimentalCollab: true }).experimentalCollab).toBe(true)
+  expect(loadAppConfig(file, NO_ENV, { experimentalCollab: false }).experimentalCollab).toBe(false)
 })
 
 test('invalid JSON falls back to defaults without throwing', async () => {

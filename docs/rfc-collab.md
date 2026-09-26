@@ -34,6 +34,8 @@ between hooks and the live transport; the development playground supplies a fake
 - `moi start` disables live presence, even after a previously enabled start.
 - `moi init --experimental-collab` separately installs the optional applet guide and types.
 
+Only command-line flags enable collaboration; environment variables and config files cannot enable it.
+The launcher forwards the runtime flag to its child server, including after development and update restarts.
 Startup configuration exposes `experimentalCollab` through `/api/config`. The app loads it before
 React mounts and refreshes it on workspace-event reconnect. Workers start lazily.
 

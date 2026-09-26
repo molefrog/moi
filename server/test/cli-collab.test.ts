@@ -13,7 +13,7 @@ const children: ReturnType<typeof Bun.spawn>[] = []
 beforeEach(async () => {
   directory = await mkdtemp(join(tmpdir(), 'moi-cli-collab-'))
   workspace = join(directory, 'workspace')
-  capturePath = join(directory, 'server-env.json')
+  capturePath = join(directory, 'server-launch.json')
   await mkdir(join(workspace, '.moi'), { recursive: true })
   await Bun.write(join(workspace, '.moi', 'package.json'), '{}\n')
   const bin = join(directory, 'bin')
@@ -23,7 +23,7 @@ beforeEach(async () => {
   await Bun.write(
     join(bin, 'bun'),
     '#!/bin/sh\n' +
-      `printf '{"enabled":"%s","dev":"%s","server":"%s"}\\n' "$MOI_EXPERIMENTAL_COLLAB" "$MOI_DEV" "$MOI_SERVER" > "$COLLAB_CAPTURE_PATH"\n`
+      `printf '{"command":"%s","flag":"%s","dev":"%s","server":"%s"}\\n' "$2" "$3" "$MOI_DEV" "$MOI_SERVER" > "$COLLAB_CAPTURE_PATH"\n`
   )
   await chmod(join(bin, 'bun'), 0o755)
   env = {
@@ -36,9 +36,8 @@ beforeEach(async () => {
     MOI_SERVICE: undefined,
     MOI_CLOUD_DEMO: undefined,
     MOI_DEV: undefined,
-    // Neither a legacy flag nor an inherited child marker enables plain start.
+    // A legacy environment setting does not enable plain start.
     MOI_COLLAB: '1',
-    MOI_EXPERIMENTAL_COLLAB: '1',
     COLLAB_CAPTURE_PATH: capturePath,
     NO_COLOR: '1'
   }
@@ -74,7 +73,12 @@ async function runCli(args: string[]) {
   return { code, stdout, stderr }
 }
 
-async function capturedServerEnv(): Promise<{ enabled: string; dev: string; server: string }> {
+async function capturedServerLaunch(): Promise<{
+  command: string
+  flag: string
+  dev: string
+  server: string
+}> {
   const deadline = Date.now() + 10_000
   while (Date.now() < deadline) {
     const file = Bun.file(capturePath)
@@ -95,10 +99,11 @@ describe('collab runtime CLI flag', () => {
         ...(dev ? ['--dev'] : []),
         ...(enabled ? ['--experimental-collab'] : [])
       ]
-      test(`${args.join(' ')} sets the child runtime explicitly`, async () => {
+      test(`${args.join(' ')} forwards only the requested runtime flag`, async () => {
         const child = spawnCli(args)
-        expect(await capturedServerEnv()).toEqual({
-          enabled: enabled ? '1' : '0',
+        expect(await capturedServerLaunch()).toEqual({
+          command: 'start',
+          flag: enabled ? '--experimental-collab' : '',
           dev: dev ? '1' : '',
           server: '1'
         })
@@ -107,6 +112,12 @@ describe('collab runtime CLI flag', () => {
       }, 15_000)
     }
   }
+
+  test('an explicitly negated runtime flag stays disabled', async () => {
+    const child = spawnCli(['start', '--experimental-collab', '--no-experimental-collab'])
+    expect((await capturedServerLaunch()).flag).toBe('')
+    expect(await child.exited).toBe(0)
+  }, 15_000)
 })
 
 describe('collab init CLI flag', () => {
@@ -137,7 +148,7 @@ describe('collab init CLI flag', () => {
 
   test('init --web --experimental-collab installs docs without enabling the runtime', async () => {
     spawnCli(['init', '--harness=codex', '--web', '--experimental-collab'])
-    expect((await capturedServerEnv()).enabled).toBe('0')
+    expect((await capturedServerLaunch()).flag).toBe('')
     expect(await Bun.file(join(workspace, '.moi', 'collab-env.d.ts')).exists()).toBe(true)
   }, 15_000)
 

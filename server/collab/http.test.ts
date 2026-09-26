@@ -7,7 +7,7 @@ import type { CollabServerMessage } from '@/lib/collab/types'
 import type { WorkspaceEntry } from '@/lib/types'
 
 import { api } from '../api'
-import { clientAppConfig, resetAppConfig } from '../app-config'
+import { clientAppConfig, initializeAppConfig, resetAppConfig } from '../app-config'
 import { DEFAULT_REGISTRY_PATH, setRegistryPath } from '../registry'
 import { collabManager, type CollabSocket } from './manager'
 import { collabSkillReferencePath } from './skill'
@@ -15,7 +15,7 @@ import { collabSkillReferencePath } from './skill'
 let directory: string
 let workspace: WorkspaceEntry
 let savedEnv: Record<string, string | undefined>
-const envKeys = ['MOI_EXPERIMENTAL_COLLAB', 'MOI_COLLAB', 'MOI_DEV']
+const envKeys = ['MOI_COLLAB', 'MOI_DEV']
 
 async function until(predicate: () => boolean) {
   const deadline = Date.now() + 5000
@@ -69,8 +69,7 @@ function command(command: unknown, id = 'agent') {
 }
 
 function enable() {
-  process.env.MOI_EXPERIMENTAL_COLLAB = '1'
-  resetAppConfig()
+  initializeAppConfig({ experimentalCollab: true })
   expect(clientAppConfig().experimentalCollab).toBe(true)
 }
 
@@ -130,8 +129,7 @@ describe('collab HTTP integration', () => {
     }
     await Bun.write(referencePath, '# Manually installed guide')
     expect((await (await api.request(workspaceUrl)).json()).collabReference).toBe(referencePath)
-    process.env.MOI_EXPERIMENTAL_COLLAB = '0'
-    resetAppConfig()
+    initializeAppConfig({ experimentalCollab: false })
     expect(await (await api.request(workspaceUrl)).json()).not.toHaveProperty('collabReference')
   })
 
@@ -173,8 +171,7 @@ describe('collab HTTP integration', () => {
     )
     await until(() => messages.some(message => message.type === 'welcome'))
     await collabManager.stopWorkspace(directory)
-    process.env.MOI_EXPERIMENTAL_COLLAB = '0'
-    resetAppConfig()
+    initializeAppConfig({ experimentalCollab: false })
     expect(closed).toBe(true)
     expect(await Bun.file(referencePath).text()).toBe('# Manually installed guide')
     expect(new Uint8Array(await Bun.file(databasePath).arrayBuffer())).toEqual(previousDatabase)

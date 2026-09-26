@@ -9,7 +9,7 @@ import { dirname, join, resolve } from 'path'
 import pc from './cli-pc'
 
 import { isAgentCaller } from './agent-caller'
-import { getAppConfig } from './app-config'
+import { getAppConfig, initializeAppConfig } from './app-config'
 
 import { appletSelectorMatches, parseAppletSelector } from '@/lib/applet-selector'
 import type { AppletSelector } from '@/lib/applet-selector'
@@ -161,17 +161,16 @@ function spawnServer(
   env: Record<string, string | undefined> = process.env,
   experimentalCollab = false
 ): ReturnType<typeof Bun.spawn> {
-  return Bun.spawn(['bun', import.meta.filename, 'start'], {
+  const argv = ['bun', import.meta.filename, 'start']
+  if (experimentalCollab) argv.push('--experimental-collab')
+  return Bun.spawn(argv, {
     stdin: 'inherit',
     stdout: 'inherit',
     stderr: 'inherit',
     cwd,
     env: {
       ...env,
-      MOI_SERVER: '1',
-      // Runtime opt-in comes only from `start --experimental-collab`.
-      // Override inherited values, including when `init --web` starts us.
-      MOI_EXPERIMENTAL_COLLAB: experimentalCollab ? '1' : '0'
+      MOI_SERVER: '1'
     }
   })
 }
@@ -566,7 +565,7 @@ const start = defineCommand({
     // This IS the server process (MOI_SERVER=1). cwd is the package root when the
     // dev bundler runs (bunfig loaded at Bun startup) or a neutral dir for a
     // prebuilt install — see serverCwd().
-    if (args['experimental-collab']) process.env.MOI_EXPERIMENTAL_COLLAB = '1'
+    initializeAppConfig({ experimentalCollab: args['experimental-collab'] })
     try {
       await import('./web')
     } catch (err) {

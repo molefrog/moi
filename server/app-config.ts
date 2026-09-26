@@ -11,9 +11,10 @@ import { DATA_DIR } from './data-dir'
 // runtime): config.json describes the deployment itself — nothing here changes
 // without a server restart, and no API writes it.
 //
-// Resolution: defaults < config.json < env. A missing file is the normal local
-// case; a malformed file or wrong-typed key warns on stderr and falls back
-// per-key, so a broken config never takes the CLI or server down with it.
+// Resolution: defaults < config.json < env; CLI-only flags are supplied separately.
+// A missing file is the normal local case; a malformed file or wrong-typed key
+// warns on stderr and falls back per-key, so a broken config never takes the
+// CLI or server down with it.
 export type AppConfig = {
   // Cloud demo deployment: workspace creation is blocked (UI shows the
   // cloud-demo promo dialog instead) and `moi` system commands are disabled.
@@ -111,23 +112,28 @@ function fileValues(file: string): Partial<AppConfig> {
 // Pure resolver, exported for tests. `getAppConfig` is the cached entrypoint.
 export function loadAppConfig(
   file: string = APP_CONFIG_FILE,
-  env: Record<string, string | undefined> = process.env
+  env: Record<string, string | undefined> = process.env,
+  flags: Pick<AppConfig, 'experimentalCollab'> = { experimentalCollab: false }
 ): AppConfig {
   const fromFile = fileValues(file)
   const fromEnv: Partial<AppConfig> = {
     cloudDemo: parseBool(env.MOI_CLOUD_DEMO),
     experiments: parseList(env.MOI_EXPERIMENTS),
-    experimentalCollab: env.MOI_EXPERIMENTAL_COLLAB === '1',
     demoInstallUrl: parseString(env.MOI_DEMO_INSTALL_URL)
   }
   const merged = { ...DEFAULTS, ...fromFile }
   for (const key of Object.keys(fromEnv) as (keyof AppConfig)[]) {
     if (fromEnv[key] === undefined) delete fromEnv[key]
   }
-  return Object.freeze({ ...merged, ...fromEnv })
+  return Object.freeze({ ...merged, ...fromEnv, ...flags })
 }
 
 let _config: AppConfig | null = null
+
+// The CLI supplies parsed startup flags before importing the web server.
+export function initializeAppConfig(flags: Pick<AppConfig, 'experimentalCollab'>): void {
+  _config = loadAppConfig(undefined, undefined, flags)
+}
 
 export function getAppConfig(): AppConfig {
   _config ??= loadAppConfig()
