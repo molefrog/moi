@@ -107,8 +107,17 @@ describe('collab runtime CLI flag', () => {
           dev: dev ? '1' : '',
           server: '1'
         })
-        if (dev) child.kill('SIGTERM')
-        expect(await child.exited).toBe(0)
+        if (dev) {
+          expect(child.exitCode).toBeNull()
+          child.kill('SIGTERM')
+          const code = await child.exited
+          // The stub can capture launch before the supervisor installs its
+          // signal handlers. Both direct SIGTERM and graceful exit are cleanup.
+          if (child.signalCode === null) expect(code).toBe(0)
+          else expect(child.signalCode).toBe('SIGTERM')
+        } else {
+          expect(await child.exited).toBe(0)
+        }
       }, 15_000)
     }
   }
