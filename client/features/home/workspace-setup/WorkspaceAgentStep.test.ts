@@ -10,7 +10,8 @@ describe('getWorkspaceAgentOptions', () => {
       'claude-code',
       'codex',
       'openclaw',
-      'hermes'
+      'hermes',
+      'fx'
     ])
     expect(options.every(option => !option.disabled)).toBe(true)
   })
@@ -26,6 +27,11 @@ describe('getWorkspaceAgentOptions', () => {
       description: 'OpenAI',
       reason:
         'Run curl -fsSL https://chatgpt.com/codex/install.sh | sh in your terminal to install Codex'
+    },
+    {
+      type: 'fx' as const,
+      description: 'Vercel Labs',
+      reason: 'Run curl -fsSL https://fx.sh/setup.sh | bash in your terminal to install fx'
     }
   ])('keeps the vendor description and exposes the disabled reason for $type', input => {
     const options = getWorkspaceAgentOptions({
@@ -48,6 +54,16 @@ describe('getWorkspaceAgentOptions', () => {
       disabledReason: 'To connect an OpenClaw agent, run',
       disabledCommand: 'moi openclaw init'
     })
+  })
+
+  test('allows creating fx workspaces without prior discovery', () => {
+    const options = getWorkspaceAgentOptions({ availability: { fx: { status: 'available' } } })
+    expect(options.find(option => option.type === 'fx')).toEqual({
+      type: 'fx',
+      description: 'Vercel Labs',
+      disabled: false
+    })
+    expect(resolveWorkspaceAgentSelection(options, 'fx')).toBe('fx')
   })
 
   test('enables OpenClaw when it was detected', () => {
@@ -95,7 +111,8 @@ describe('getWorkspaceAgentOptions', () => {
     const options = getWorkspaceAgentOptions({
       availability: {
         'claude-code': { status: 'unavailable', reason: 'Install Claude' },
-        codex: { status: 'unavailable', reason: 'Install Codex' }
+        codex: { status: 'unavailable', reason: 'Install Codex' },
+        fx: { status: 'unavailable', reason: 'Install fx' }
       }
     })
 

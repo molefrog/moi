@@ -32,6 +32,7 @@ import {
 } from './TimelineRow'
 import { ToolOutput } from './ToolOutput'
 import {
+  formatResultSummary,
   formatDuration,
   formatInputBrief,
   parseCodexMcp,
@@ -96,7 +97,8 @@ function ToolRow({ isFirst, isLast, call, leading, marker, name, brief, preview 
     : typeof call.output === 'string'
       ? call.output
       : ''
-  const hasBody = !!(output || isError || preview)
+  const summary = formatResultSummary(call)
+  const hasBody = !!(output || isError || preview || summary)
   const title = brief ? `${name}: ${brief}` : name
 
   return (
@@ -112,6 +114,7 @@ function ToolRow({ isFirst, isLast, call, leading, marker, name, brief, preview 
           type="button"
           title={title}
           onClick={() => hasBody && setOpen(o => !o)}
+          aria-expanded={hasBody ? open : undefined}
           className={cn(HEADER, hasBody ? 'cursor-pointer' : 'cursor-default')}
         >
           {leading}
@@ -137,6 +140,7 @@ function ToolRow({ isFirst, isLast, call, leading, marker, name, brief, preview 
             <div className="mt-1 mb-1 flex flex-col gap-1.5">
               {preview}
               {(output || isError) && <ToolOutput call={call} output={output} isError={isError} />}
+              {summary && <p className="text-xs text-muted-foreground tabular-nums">{summary}</p>}
             </div>
           </Collapse>
         )}

@@ -86,7 +86,8 @@ export const claudeCodeHarness: Harness = {
     imagesInline: 'base64',
     liveModelSwitch: true,
     liveEffortSwitch: true,
-    nativeUserEcho: false // streaming-input never echoes; the server synthesizes the turn
+    nativeUserEcho: false, // streaming-input never echoes; the server synthesizes the turn
+    queuesFollowUps: false
   },
 
   sendMessage: input => sendCCMessage(input),

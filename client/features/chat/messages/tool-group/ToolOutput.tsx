@@ -6,8 +6,9 @@ import { cn } from '@/client/lib/cn'
 import type { ToolCall } from '@/lib/types'
 
 import { Button } from '@/client/components/ui/button'
+import { MarkdownContent } from '@/client/features/chat/messages/MarkdownContent'
 import { CodeBlock } from './CodeBlock'
-import { detectOutput } from './detect'
+import { type DiffLine, detectOutput } from './detect'
 
 type ToolOutputProps = { call: ToolCall; output: string; isError: boolean }
 
@@ -24,6 +25,8 @@ export function ToolOutput({ call, output, isError }: ToolOutputProps) {
     [call, output, isError]
   )
 
+  if (view.kind === 'empty') return null
+
   if (view.kind === 'plain') {
     return (
       <div
@@ -35,7 +38,7 @@ export function ToolOutput({ call, output, isError }: ToolOutputProps) {
         <pre
           className={cn(
             PRE,
-            'break-all whitespace-pre-wrap',
+            'wrap-break-word whitespace-pre-wrap',
             isError ? 'text-destructive' : 'text-muted-foreground'
           )}
         >
@@ -50,13 +53,50 @@ export function ToolOutput({ call, output, isError }: ToolOutputProps) {
       {/* Size is always the raw output; copy grabs whatever's currently shown. */}
       <Header raw={raw} onRaw={setRaw} label={view.label} copyText={raw ? output : view.code} />
       {raw ? (
-        <pre className={cn(PRE, 'break-all whitespace-pre-wrap text-muted-foreground')}>
+        <pre className={cn(PRE, 'wrap-break-word whitespace-pre-wrap text-muted-foreground')}>
           {output || '(empty)'}
         </pre>
+      ) : view.kind === 'diff' ? (
+        <DiffBlock lines={view.lines} />
+      ) : view.kind === 'text' ? (
+        <pre className={cn(PRE, 'wrap-break-word whitespace-pre-wrap text-muted-foreground')}>
+          {view.code}
+        </pre>
+      ) : view.kind === 'markdown' ? (
+        <div className="max-h-[280px] overflow-auto px-3 py-2.5 text-muted-foreground">
+          <MarkdownContent size="xs" content={view.code} />
+        </div>
       ) : (
         <CodeBlock code={view.code} className={cn(PRE, 'text-muted-foreground')} />
       )}
     </div>
+  )
+}
+
+type DiffBlockProps = { lines: DiffLine[] }
+
+// Added and removed lines carry a sign column and the success/destructive
+// tint, so the change reads without relying on color alone.
+function DiffBlock({ lines }: DiffBlockProps) {
+  return (
+    <pre className="max-h-[280px] overflow-auto py-2.5 font-mono text-xs leading-relaxed">
+      {lines.map((line, index) => (
+        <div
+          key={index}
+          className={cn(
+            'flex px-3 wrap-break-word whitespace-pre-wrap',
+            line.kind === 'addition' && 'bg-success/10 text-success',
+            line.kind === 'deletion' && 'bg-destructive/10 text-destructive',
+            line.kind === 'context' && 'text-muted-foreground'
+          )}
+        >
+          <span className="w-4 shrink-0 select-none">
+            {line.kind === 'addition' ? '+' : line.kind === 'deletion' ? '-' : ' '}
+          </span>
+          <span className="min-w-0 flex-1">{line.text || ' '}</span>
+        </div>
+      ))}
+    </pre>
   )
 }
 

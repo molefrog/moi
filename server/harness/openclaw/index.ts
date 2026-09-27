@@ -30,7 +30,8 @@ export const openclawHarness: Harness = {
     imagesInline: 'path-note',
     liveModelSwitch: true, // sessions.patch { model } before each send
     liveEffortSwitch: true, // sessions.patch { thinkingLevel }
-    nativeUserEcho: true // echo matched by `<runId>:user` idempotency key, text fallback
+    nativeUserEcho: true, // echo matched by `<runId>:user` idempotency key, text fallback
+    queuesFollowUps: false // a mid-run send steers the active run
   },
 
   sendMessage: async input => {

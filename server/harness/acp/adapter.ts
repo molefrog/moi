@@ -70,7 +70,16 @@ export function acpToolCallToTurn(input: {
     previous?.parts.find((p): p is Extract<Part, { type: 'tool-call' }> => p.type === 'tool-call')
       ?.call ?? undefined
 
-  const text = toolContentToText(update.content)
+  const sidecar = { ...prevCall?.sidecar }
+  // ACP updates are patches: absent fields preserve the previous value, but
+  // supplied collections replace it (including an empty array). Keep the
+  // structured content as well as its readable preview so diffs and non-text
+  // results survive subsequent status-only updates.
+  if (update.content != null) sidecar.content = update.content
+  if (update.locations != null) sidecar.locations = update.locations.map(l => l.path)
+  if (update.rawOutput !== undefined) sidecar.rawOutput = update.rawOutput
+  if (update.name != null) sidecar.name = update.name
+  if (update.kind != null) sidecar.kind = update.kind
   const locations = update.locations?.map(l => l.path).filter(Boolean) ?? []
   const call: ToolCall = {
     toolCallId: update.toolCallId,
@@ -78,18 +87,28 @@ export function acpToolCallToTurn(input: {
     caller: 'model',
     provider,
     state: update.status ? toolStatusToState(update.status) : (prevCall?.state ?? 'running'),
-    input: update.rawInput ?? prevCall?.input ?? (locations.length ? { path: locations[0] } : {}),
-    ...(locations.length
-      ? { sidecar: { locations } }
-      : prevCall?.sidecar
-        ? { sidecar: prevCall.sidecar }
-        : {})
+    input:
+      update.rawInput !== undefined
+        ? update.rawInput
+        : prevCall
+          ? prevCall.input
+          : locations.length
+            ? { path: locations[0] }
+            : {},
+    ...(Object.keys(sidecar).length ? { sidecar } : {})
   }
-  // `tool_call` announces with a preview blurb and `tool_call_update` carries
-  // the result; keep whichever text we have most recently seen.
-  const output = text || (typeof prevCall?.output === 'string' ? prevCall.output : '')
-  if (output) call.output = output
-  if (call.state === 'error' && output) call.errorText = output
+  // Visible content takes precedence over raw output. An explicit content
+  // clear is still a value; never revive the previous preview or raw result.
+  const output =
+    update.content != null
+      ? toolContentToText(update.content)
+      : 'content' in sidecar
+        ? prevCall?.output
+        : 'rawOutput' in sidecar
+          ? sidecar.rawOutput
+          : prevCall?.output
+  if (output !== undefined) call.output = output
+  if (call.state === 'error' && typeof output === 'string' && output) call.errorText = output
 
   return {
     id: toolTurnId(sessionId, update.toolCallId),
@@ -102,24 +121,44 @@ export function acpToolCallToTurn(input: {
 
 export function acpUsageToTurnMeta(usage: Usage | null | undefined): TurnMeta['usage'] | undefined {
   if (!usage) return undefined
-  const { inputTokens, outputTokens, totalTokens } = usage
+  const { inputTokens, outputTokens } = usage
+  // ACP requires `totalTokens`, but fx 0.0.11 omits it.
+  const totalTokens =
+    usage.totalTokens ??
+    (typeof inputTokens === 'number' && typeof outputTokens === 'number'
+      ? inputTokens + outputTokens
+      : undefined)
   if (inputTokens === undefined && outputTokens === undefined && totalTokens === undefined) {
     return undefined
   }
   return { inputTokens, outputTokens, totalTokens }
 }
 
+// Marks a run the user stopped, live and when a reload replays it.
+export const STOPPED_NOTICE = 'This run was stopped before it finished.'
+
 // Replay collects text and image chunks before reconstructing attachments,
 // so inline images can be paired with their descriptions in message order.
+// Agents such as fx store a `[Image #1]` line per inline image; the image
+// itself is replayed as its own part, so the marker line is dropped.
 export function replayedUserParts(raw: string, images: readonly Part[] = []): Part[] {
-  return replayAttachmentParts([...images, { type: 'text', text: raw }])
+  const text = images.length ? raw.replace(/\n*^\[Image #\d+\][ \t]*$/gm, '').trimEnd() : raw
+  return replayAttachmentParts([...images, { type: 'text', text }])
 }
 
-export function acpSessionToSessionInfo(entry: AcpSessionListEntry): SessionInfo {
+// `firstMessage` titles a chat the agent has not named yet, the way the client
+// titles it optimistically, instead of a generic placeholder.
+export function acpSessionToSessionInfo(
+  entry: AcpSessionListEntry,
+  firstMessage?: string
+): SessionInfo {
   const updated = entry.updatedAt ? Date.parse(entry.updatedAt) : NaN
   return {
     sessionId: entry.sessionId,
-    summary: formatChatTitle(entry.title?.trim() ?? '') || 'Untitled session',
+    summary:
+      formatChatTitle(entry.title?.trim() ?? '') ||
+      formatChatTitle(firstMessage ?? '') ||
+      'Untitled session',
     lastModified: Number.isNaN(updated) ? 0 : updated,
     ...(entry.cwd ? { cwd: entry.cwd } : {})
   }
@@ -194,6 +233,17 @@ export class AssistantTurnAccumulator {
     this.startedAt = null
     this.runIndex++
     return turn
+  }
+
+  // Continue numbering after runs already in a transcript this accumulator did
+  // not build (a retained live view), so new runs never reuse their ids.
+  continueAfter(turns: readonly Turn[]) {
+    const prefix = `${this.sessionId}:msg:`
+    for (const turn of turns) {
+      if (!turn.id.startsWith(prefix)) continue
+      const index = Number(turn.id.slice(prefix.length))
+      if (Number.isInteger(index) && index >= this.runIndex) this.runIndex = index + 1
+    }
   }
 
   // Abandon the open run without emitting (used when a replay pass restarts).

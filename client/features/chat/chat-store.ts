@@ -2,7 +2,7 @@ import type { StagedAttachment, StagedAttachmentPatch } from './composer/attachm
 import { useStore } from 'zustand'
 import { createStore } from 'zustand/vanilla'
 
-import type { PreviewBlock, PreviewFrame, SessionActivity } from '@/lib/types'
+import type { PreviewBlock, PreviewFrame, SessionActivity, Turn } from '@/lib/types'
 
 // App-level ephemeral chat state — the bits that are *pushed* from the server
 // over the WebSocket and can't be re-fetched as request/response data:
@@ -89,6 +89,10 @@ export type LiveStore = {
   // Composer attachments are per chat, survive composer remounts, and clear on
   // send. Draft text is workspace-local persisted UI state (client/store/ui).
   attachments: Record<string, StagedAttachment[]>
+  // User turns sent mid-run to a backend that queues them (see
+  // WorkspaceAgent.queuesFollowUps). They stay out of the transcript until the
+  // server dispatches them, so the running reply is never split around them.
+  queued: Record<string, Turn[]>
 
   setActivity: (workspaceId: string, sessionId: string, value: SessionActivity) => void
   // Authoritative reconcile from a server `status_snapshot`: exactly the listed
@@ -102,6 +106,9 @@ export type LiveStore = {
   updateAttachment: (workspaceId: string, localId: string, patch: StagedAttachmentPatch) => void
   removeAttachment: (workspaceId: string, localId: string) => void
   clearAttachments: (workspaceId: string, sessionId: string | null) => void
+  addQueued: (workspaceId: string, sessionId: string, turn: Turn) => void
+  // Drop queued turns by id (dispatched), or all of a chat's turns (dropped).
+  removeQueued: (workspaceId: string, sessionId: string, ids?: readonly string[]) => void
   // `null` assigns the new-chat draft its first session id.
   renameSession: (workspaceId: string, from: string | null, to: string) => void
 
@@ -137,6 +144,7 @@ export const liveStore = createStore<LiveStore>()(set => ({
   errors: {},
   previews: {},
   attachments: {},
+  queued: {},
 
   setActivity: (workspaceId, sessionId, value) =>
     set(s => ({ activity: { ...s.activity, [key(workspaceId, sessionId)]: value } })),
@@ -243,6 +251,25 @@ export const liveStore = createStore<LiveStore>()(set => ({
       return { attachments: next }
     }),
 
+  addQueued: (workspaceId, sessionId, turn) =>
+    set(s => {
+      const k = key(workspaceId, sessionId)
+      return { queued: { ...s.queued, [k]: [...(s.queued[k] ?? []), turn] } }
+    }),
+
+  removeQueued: (workspaceId, sessionId, ids) =>
+    set(s => {
+      const k = key(workspaceId, sessionId)
+      const list = s.queued[k]
+      if (!list) return s
+      const rest = ids ? list.filter(turn => !ids.includes(turn.id)) : []
+      if (rest.length === list.length) return s
+      const queued = { ...s.queued }
+      if (rest.length) queued[k] = rest
+      else delete queued[k]
+      return { queued }
+    }),
+
   renameSession: (workspaceId, from, to) =>
     set(s => {
       const fromKey = attachmentKey(workspaceId, from)
@@ -280,7 +307,12 @@ export const liveStore = createStore<LiveStore>()(set => ({
         }
         delete attachments[fromKey]
       }
-      return { activity, errors, previews, attachments }
+      let queued = s.queued
+      if (fromKey !== toKey && queued[fromKey]) {
+        queued = { ...queued, [toKey]: [...(queued[toKey] ?? []), ...queued[fromKey]] }
+        delete queued[fromKey]
+      }
+      return { activity, errors, previews, attachments, queued }
     })
 }))
 

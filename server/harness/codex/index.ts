@@ -33,7 +33,8 @@ export const codexHarness: Harness = {
     imagesInline: 'data-url',
     liveModelSwitch: true, // per-turn override becomes the thread default
     liveEffortSwitch: true,
-    nativeUserEcho: true // clientUserMessageId echoes back as clientId
+    nativeUserEcho: true, // clientUserMessageId echoes back as clientId
+    queuesFollowUps: false // a mid-run send steers the active turn
   },
 
   sendMessage: input => sendCodexMessage(input),

@@ -10,6 +10,7 @@ import type {
   McpServer,
   Model,
   SessionActivity,
+  SessionConfig,
   SessionInfo,
   StreamEvent,
   WorkspaceEntry,
@@ -58,6 +59,10 @@ export type HarnessCapabilities = {
   liveEffortSwitch: boolean
   // Does the backend echo the sent user message back (with our optimistic id)?
   nativeUserEcho: boolean
+  // Does a message sent mid-run wait for the current run to finish (moi's own
+  // queue) instead of steering it? The chat then shows it as queued until it
+  // is dispatched, so the running reply stays above it.
+  queuesFollowUps: boolean
 }
 
 // Home-page workspace card data beyond thumbnails: latest session activity
@@ -99,7 +104,12 @@ export type Harness = {
     includeFirstUserMessage: boolean
   ): Promise<WorkspaceActivityPreview>
   sessionEvents(ws: WorkspaceEntry, sessionId: string): Promise<StreamEvent[]>
+  // Settings reported by this chat's backend, before explicit moi overrides.
+  sessionConfig?(ws: WorkspaceEntry, sessionId: string): Promise<SessionConfig>
   listModels(ws: WorkspaceEntry): Promise<Model[]>
+  // Learn a catalog model's selectors (effort levels) before a chat uses it,
+  // for backends that only advertise them for the active model.
+  probeModel?(ws: WorkspaceEntry, modelId: string): Promise<void>
   // MCP server status for the connectors UI; absent = backend has no MCP story.
   mcpStatus?(ws: WorkspaceEntry): Promise<McpServer[]>
   // Workspaces this backend knows about that aren't registered yet.

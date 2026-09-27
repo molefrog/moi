@@ -1,0 +1,1435 @@
+import { afterAll, afterEach, describe, expect, spyOn, test } from 'bun:test'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import type { ServerMessage, StreamEvent, Turn } from '@/lib/types'
+
+import { agentStore } from '../../agent'
+import { applyEnvChanged } from '../../env-apply'
+import {
+  DEFAULT_SESSION_CONFIG_PATH,
+  getSessionConfig,
+  saveSessionConfig,
+  setSessionConfigPath
+} from '../../session-config'
+import { getClientFrameLog } from '../debug'
+import {
+  describeFxOperationalMessage,
+  isFxOperationalMessage,
+  normalizeFxToolUpdate
+} from '../fx/adapter'
+import { fxModels, fxSessionConfig } from '../fx/models'
+import { getAcpClient, killAcpWorkspace, killAllAcpClients } from './client'
+import { listAcpModels } from './discovery'
+import { setRunDurationsPath } from './run-durations'
+import {
+  type AcpProviderConfig,
+  type AcpToolEnrichment,
+  ensureAcpSessionLive,
+  forgetAcpSession,
+  forgetAllAcpSessions,
+  getAcpActiveSessions,
+  getAcpSessionModelState,
+  getLiveAcpEvents,
+  interruptAcpRun,
+  releaseIdleAcpSessions,
+  sendAcpMessage
+} from './session'
+
+// A single-session process, like fx. Discovery or a second chat on the same
+// connection invalidates its predecessor. Slow load/prompt responses expose
+// races that immediate fixture responses would conceal.
+const SOURCE = `
+const { appendFileSync, existsSync, readFileSync, writeFileSync } = require('node:fs')
+const send = value => process.stdout.write(JSON.stringify(value) + '\\n')
+let active, prompt, model = 'model-a', timer
+if(process.env.MODEL_FILE && existsSync(process.env.MODEL_FILE)) model=readFileSync(process.env.MODEL_FILE,'utf8')
+const state = () => ({ models: { currentModelId: model, availableModels: [{modelId:'model-a'}, {modelId:'model-b'}] } })
+const update = value => send({jsonrpc:'2.0',method:'session/update',params:{sessionId:active,update:value}})
+let buffer = ''
+process.stdin.on('data', chunk => {
+  buffer += chunk
+  let nl
+  while ((nl = buffer.indexOf('\\n')) >= 0) {
+    const msg = JSON.parse(buffer.slice(0,nl)); buffer = buffer.slice(nl+1)
+    appendFileSync(process.env.LOG, JSON.stringify({method:msg.method, params:msg.params, pid:process.pid})+'\\n')
+    const result = value => send({jsonrpc:'2.0', id:msg.id,result:value})
+    const error = message => send({jsonrpc:'2.0',id:msg.id,error:{code:-32000,message}})
+    if(msg.method==='initialize') result({protocolVersion:1,agentCapabilities:{loadSession:true}})
+    else if(msg.method==='session/new') {
+      active='new-'+process.pid
+      setTimeout(()=>result({sessionId:active,...state()}),Number(process.env.NEW_DELAY || 0))
+    }
+    else if(msg.method==='session/load') {
+      active=msg.params.sessionId
+      if(process.env.LOADED_MODEL) model=process.env.LOADED_MODEL
+      if(process.env.PERSIST) {
+        // Like fx: history keeps user text and replies, never thoughts.
+        const saved=existsSync(process.env.PERSIST)?readFileSync(process.env.PERSIST,'utf8').trim().split('\\n').filter(Boolean).map(l=>JSON.parse(l)):[]
+        saved.forEach((turn,i)=>{
+          update({sessionUpdate:'user_message_chunk',messageId:'u'+i,content:{type:'text',text:turn.text}})
+          update({sessionUpdate:'agent_message_chunk',messageId:'a'+i,content:{type:'text',text:turn.reply}})
+        })
+        result(state());continue
+      }
+      if(process.env.REPLAY_UPDATES) {
+        for(const event of JSON.parse(process.env.REPLAY_UPDATES)) update(event)
+        result(state());continue
+      }
+      update({sessionUpdate:'user_message_chunk',messageId:'u1',content:{type:'text',text:'earlier'}})
+      setTimeout(()=>{
+        update({sessionUpdate:'agent_message_chunk',messageId:'a1',content:{type:'text',text:'history'}})
+        result(state())
+      },80)
+    } else if(msg.method==='session/set_mode') {
+      if(process.env.MODE_DELAY) setTimeout(()=>result({}),Number(process.env.MODE_DELAY))
+      else result({})
+    }
+    else if(msg.method==='session/set_model') {
+      if(msg.params.modelId==='bad') error('Model unavailable')
+      else {
+        model=msg.params.modelId
+        if(process.env.MODEL_FILE) writeFileSync(process.env.MODEL_FILE,model)
+        result({})
+      }
+    } else if(msg.method==='session/cancel') {
+      if(prompt) {
+        clearTimeout(timer)
+        const stopped=prompt;prompt=undefined
+        setTimeout(()=>send({jsonrpc:'2.0',id:stopped.id,result:{stopReason:'cancelled'}}),Number(process.env.CANCEL_DELAY || 0))
+      }
+    } else if(msg.method==='session/prompt') {
+      if(msg.params.sessionId!==active) {error('Session was displaced');continue}
+      prompt=msg
+      const text=msg.params.prompt.find(p=>p.type==='text')?.text || ''
+      if(text==='crash') {setTimeout(()=>process.exit(1),60);continue}
+      if(process.env.PROMPT_UPDATES) {
+        for(const event of JSON.parse(process.env.PROMPT_UPDATES)) update(event)
+        timer=setTimeout(()=>{
+          if(text!=='unfinished') update({sessionUpdate:'agent_message_chunk',messageId:'reply-'+msg.id,content:{type:'text',text:model+':'+text}})
+          if(process.env.PERSIST) appendFileSync(process.env.PERSIST,JSON.stringify({text,reply:model+':'+text})+'\\n')
+          result({stopReason:'end_turn',usage:{inputTokens:2,outputTokens:3,totalTokens:5}});prompt=undefined
+        },100)
+        continue
+      }
+      if(process.env.DIAGNOSTIC_CHUNKS) {
+        for(const text of JSON.parse(process.env.DIAGNOSTIC_CHUNKS)) {
+          update({sessionUpdate:'agent_message_chunk',messageId:'diagnostic-'+msg.id,content:{type:'text',text}})
+        }
+      }
+      update({sessionUpdate:'tool_call',toolCallId:'tool-'+msg.id,title:'Running',kind:'execute',status:'in_progress'})
+      timer=setTimeout(()=>{
+        if(text!=='unfinished') update({sessionUpdate:'tool_call_update',toolCallId:'tool-'+msg.id,status:'completed',content:[{type:'content',content:{type:'text',text:'tool result'}}]})
+        if(text!=='tool-only' && text!=='unfinished') update({sessionUpdate:'agent_message_chunk',messageId:'reply-'+msg.id,content:{type:'text',text:model+':'+text}})
+        result({stopReason:'end_turn',usage:{inputTokens:2,outputTokens:3,totalTokens:5}});prompt=undefined
+      },100)
+    } else if(msg.id!==undefined) result({})
+  }
+})
+`
+
+type Call = { method: string; params: Record<string, unknown>; pid: number }
+const dirs: string[] = []
+type FixtureOptions = {
+  newDelay?: number
+  modeDelay?: number
+  cancelDelay?: number
+  persistModel?: boolean
+  loadedModel?: string
+  replayUpdates?: Record<string, unknown>[]
+  promptUpdates?: Record<string, unknown>[]
+  diagnosticChunks?: string[]
+  persist?: boolean
+}
+async function fixture(options: FixtureOptions = {}) {
+  const dir = await mkdtemp(join(tmpdir(), 'moi-acp-lifecycle-'))
+  dirs.push(dir)
+  const log = join(dir, 'calls.jsonl')
+  setRunDurationsPath(join(dir, 'durations.json'))
+  const config: AcpProviderConfig = {
+    id: 'fx',
+    provider: 'fx',
+    processScope: 'session',
+    noPromptModeId: 'code',
+    spawn: async () => ({
+      provider: 'fx',
+      command: process.execPath,
+      args: ['-e', SOURCE],
+      workspacePath: dir,
+      env: {
+        LOG: log,
+        ...(options.newDelay ? { NEW_DELAY: String(options.newDelay) } : {}),
+        ...(options.modeDelay ? { MODE_DELAY: String(options.modeDelay) } : {}),
+        ...(options.cancelDelay ? { CANCEL_DELAY: String(options.cancelDelay) } : {}),
+        ...(options.persistModel ? { MODEL_FILE: join(dir, 'model') } : {}),
+        ...(options.loadedModel ? { LOADED_MODEL: options.loadedModel } : {}),
+        ...(options.replayUpdates ? { REPLAY_UPDATES: JSON.stringify(options.replayUpdates) } : {}),
+        ...(options.promptUpdates ? { PROMPT_UPDATES: JSON.stringify(options.promptUpdates) } : {}),
+        ...(options.diagnosticChunks
+          ? { DIAGNOSTIC_CHUNKS: JSON.stringify(options.diagnosticChunks) }
+          : {}),
+        ...(options.persist ? { PERSIST: join(dir, 'history.jsonl') } : {})
+      }
+    })
+  }
+  const ctx = { workspaceId: dir, workspacePath: dir }
+  const calls = async (): Promise<Call[]> =>
+    (
+      await Bun.file(log)
+        .text()
+        .catch(() => '')
+    )
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map(line => JSON.parse(line) as Call)
+  const send = (sessionId: string, content: string, model?: string) =>
+    sendAcpMessage(config, { ...ctx, sessionId, isNew: false, content, model })
+  const load = (sessionId: string) => ensureAcpSessionLive(config, { ...ctx, sessionId })
+  const events = (sessionId: string) => getLiveAcpEvents(ctx.workspaceId, sessionId) ?? []
+  return { dir, ctx, config, calls, send, load, events }
+}
+function turns(events: StreamEvent[]): Turn[] {
+  return events.flatMap(e => (e.kind === 'turn' ? [e.turn] : []))
+}
+async function until(check: () => Promise<boolean> | boolean) {
+  const deadline = Date.now() + 3000
+  while (!(await check())) {
+    if (Date.now() > deadline) throw new Error('Fixture did not reach expected state')
+    await Bun.sleep(5)
+  }
+}
+afterEach(async () => {
+  forgetAllAcpSessions()
+  killAllAcpClients()
+})
+afterAll(async () => {
+  for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true })
+})
+
+describe('ACP chat lifecycle', () => {
+  test('concurrent cold reads share one complete load and remain unreadable while loading', async () => {
+    const agent = await fixture()
+    const first = agent.load('one')
+    await until(async () => (await agent.calls()).some(c => c.method === 'session/load'))
+    expect(getLiveAcpEvents(agent.ctx.workspaceId, 'one')).toBeNull()
+    const second = agent.load('one')
+    const config = getAcpSessionModelState(agent.config, { ...agent.ctx, sessionId: 'one' })
+    const [a, b, state] = await Promise.all([first, second, config])
+    expect(a).toEqual(b)
+    expect(state.currentModelId).toBe('model-a')
+    expect(turns(a).map(t => t.parts[0])).toEqual([
+      { type: 'text', text: 'earlier' },
+      { type: 'text', text: 'history' }
+    ])
+    expect((await agent.calls()).filter(c => c.method === 'session/load')).toHaveLength(1)
+  })
+
+  test('session settings are isolated from other chats and rediscovered after a cold load', async () => {
+    const agent = await fixture({ loadedModel: 'model-b' })
+    const first = await getAcpSessionModelState(agent.config, { ...agent.ctx, sessionId: 'one' })
+    expect(first.currentModelId).toBe('model-b')
+    await agent.send('two', 'different model', 'model-a')
+    expect(
+      (await getAcpSessionModelState(agent.config, { ...agent.ctx, sessionId: 'one' }))
+        .currentModelId
+    ).toBe('model-b')
+    forgetAcpSession(agent.ctx.workspaceId, 'one')
+    expect(
+      (await getAcpSessionModelState(agent.config, { ...agent.ctx, sessionId: 'one' }))
+        .currentModelId
+    ).toBe('model-b')
+    expect(
+      (await agent.calls()).filter(
+        call => call.method === 'session/load' && call.params.sessionId === 'one'
+      )
+    ).toHaveLength(2)
+  })
+
+  test('native settings do not become implicit moi overrides after sending', async () => {
+    const agent = await fixture({ loadedModel: 'model-b' })
+    agent.config.persistSessionModel = false
+    setSessionConfigPath(join(agent.dir, 'settings.json'))
+    try {
+      await agent.send('native', 'keep native model', 'model-b')
+      expect(await getSessionConfig(agent.dir, 'native')).toEqual({})
+      await saveSessionConfig(agent.dir, 'native', { effort: 'auto' })
+      await agent.send('native', 'keep explicit preference', 'model-b')
+      expect(await getSessionConfig(agent.dir, 'native')).toEqual({ effort: 'auto' })
+    } finally {
+      setSessionConfigPath(DEFAULT_SESSION_CONFIG_PATH)
+    }
+  })
+
+  test('new-chat config reads await model and effort confirmation before a queued follow-up', async () => {
+    const agent = await fixture()
+    agent.config.persistSessionModel = false
+    const applying = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    agent.config.applySettings = async (client, sessionId, requested, state) => {
+      applying.resolve()
+      await release.promise
+      if (requested.model && requested.model !== state.currentModelId) {
+        await client.rpc('session/set_model', { sessionId, modelId: requested.model })
+      }
+      return {
+        ...state,
+        currentModelId: requested.model ?? state.currentModelId,
+        configOptions: [
+          {
+            id: 'effort',
+            name: 'Effort',
+            type: 'select',
+            currentValue: requested.effort ?? 'auto',
+            options: [
+              { value: 'auto', name: 'Default' },
+              { value: 'high', name: 'High' }
+            ]
+          }
+        ]
+      }
+    }
+    const first = sendAcpMessage(agent.config, {
+      ...agent.ctx,
+      sessionId: 'temporary',
+      isNew: true,
+      content: 'first',
+      model: 'model-b',
+      effort: 'high'
+    })
+    await applying.promise
+    const rename = getClientFrameLog(agent.ctx.workspaceId)
+      .map(frame => frame.frame as ServerMessage)
+      .find(frame => 'type' in frame && frame.type === 'session_renamed')
+    if (!rename || !('to' in rename)) throw new Error('Expected new-chat rename')
+    const sessionId = rename.to
+    let configResolved = false
+    const reading = getAcpSessionModelState(agent.config, { ...agent.ctx, sessionId }).then(
+      state => {
+        configResolved = true
+        return fxSessionConfig(state)
+      }
+    )
+    await Bun.sleep(20)
+    expect(configResolved).toBe(false)
+    expect((await agent.calls()).some(call => call.method === 'session/prompt')).toBe(false)
+    release.resolve()
+    const confirmed = await reading
+    expect(confirmed).toEqual({ model: 'model-b', effort: 'high' })
+    expect(
+      getClientFrameLog(agent.ctx.workspaceId).some(frame => {
+        const value = frame.frame as ServerMessage
+        return 'type' in value && value.type === 'sessions_changed'
+      })
+    ).toBe(true)
+    await sendAcpMessage(agent.config, {
+      ...agent.ctx,
+      sessionId,
+      isNew: false,
+      content: 'queued',
+      ...confirmed
+    })
+    await first
+    await until(
+      () =>
+        !getAcpActiveSessions('fx').some(session => session.workspaceId === agent.ctx.workspaceId)
+    )
+    expect(
+      (await agent.calls())
+        .filter(call => call.method === 'session/set_model')
+        .map(call => call.params.modelId)
+    ).toEqual(['model-b'])
+    expect(
+      turns(agent.events(sessionId))
+        .filter(turn => turn.role === 'assistant')
+        .flatMap(turn => turn.parts)
+        .filter(part => part.type === 'text')
+    ).toEqual([
+      { type: 'text', text: 'model-b:first' },
+      { type: 'text', text: 'model-b:queued' }
+    ])
+  })
+
+  test('a send waits for replay and retains the confirmed loaded model', async () => {
+    const agent = await fixture()
+    const load = agent.load('one')
+    const send = agent.send('one', 'hello', 'model-a')
+    await Promise.all([load, send])
+    const methods = (await agent.calls()).map(c => c.method)
+    expect(methods).toEqual(['initialize', 'session/load', 'session/set_mode', 'session/prompt'])
+    expect(turns(agent.events('one')).at(-1)?.meta?.model).toBe('model-a')
+  })
+
+  test('two chats and model discovery use separate processes without displacing context', async () => {
+    const agent = await fixture()
+    await Promise.all([agent.load('one'), agent.load('two')])
+    await listAcpModels(agent.config, agent.ctx)
+    await Promise.all([agent.send('one', 'first'), agent.send('two', 'second')])
+    const calls = await agent.calls()
+    const ids = calls
+      .filter(c => c.method === 'session/load' || c.method === 'session/new')
+      .map(c => c.pid)
+    expect(new Set(ids).size).toBe(3)
+    expect(turns(agent.events('one')).at(-1)?.parts).toEqual([
+      { type: 'text', text: 'model-a:first' }
+    ])
+    expect(turns(agent.events('two')).at(-1)?.parts).toEqual([
+      { type: 'text', text: 'model-a:second' }
+    ])
+  })
+
+  test('queued model settings apply only after the preceding turn completes', async () => {
+    const agent = await fixture()
+    await agent.load('one')
+    const first = agent.send('one', 'first', 'model-a')
+    await until(async () => (await agent.calls()).some(c => c.method === 'session/prompt'))
+    await agent.send('one', 'second', 'model-b')
+    expect((await agent.calls()).some(c => c.method === 'session/set_model')).toBe(false)
+    await first
+    await until(() => getAcpActiveSessions('fx').length === 0)
+    const replies = turns(agent.events('one')).filter(t => t.meta?.usage)
+    expect(replies.map(t => t.meta?.model)).toEqual(['model-a', 'model-b'])
+    expect(replies.map(t => t.parts)).toEqual([
+      [{ type: 'text', text: 'model-a:first' }],
+      [{ type: 'text', text: 'model-b:second' }]
+    ])
+  })
+
+  test('failed model changes stop the send instead of using a different model', async () => {
+    const agent = await fixture()
+    await agent.load('one')
+    await agent.send('one', 'hello', 'bad')
+    expect((await agent.calls()).filter(c => c.method === 'session/prompt')).toHaveLength(0)
+  })
+
+  test('tool-only turns keep usage and unresolved tools never become successful', async () => {
+    const agent = await fixture()
+    await agent.send('one', 'tool-only')
+    expect(turns(agent.events('one')).at(-1)?.meta?.usage?.totalTokens).toBe(5)
+    await agent.send('one', 'unfinished')
+    const part = turns(agent.events('one')).at(-1)?.parts[0]
+    expect(part?.type === 'tool-call' && part.call.state).toBe('error')
+    expect(part?.type === 'tool-call' && part.call.errorText).toContain('without reporting')
+  })
+
+  test('cancellation drops queued work and marks unfinished calls honestly', async () => {
+    const agent = await fixture()
+    await agent.load('one')
+    const running = agent.send('one', 'first')
+    await until(() => turns(agent.events('one')).some(t => t.parts[0]?.type === 'tool-call'))
+    await agent.send('one', 'queued')
+    await interruptAcpRun(agent.config, { workspaceId: agent.ctx.workspaceId, sessionId: 'one' })
+    await running
+    const calls = (await agent.calls()).filter(c => c.method === 'session/prompt')
+    expect(calls).toHaveLength(1)
+    const part = turns(agent.events('one')).at(-1)?.parts[0]
+    expect(part?.type === 'tool-call' && part.call.state).toBe('error')
+    expect(
+      agent
+        .events('one')
+        .flatMap(event =>
+          event.kind === 'notice' && event.notice.kind === 'warning' ? [event.notice.message] : []
+        )
+    ).toEqual(['This run was stopped before it finished.'])
+    expect(getAcpActiveSessions('fx')).toEqual([])
+  })
+
+  test('process exit cannot drain queued work through a fresh client', async () => {
+    const agent = await fixture()
+    await agent.load('one')
+    const running = agent.send('one', 'crash')
+    await until(async () => (await agent.calls()).some(c => c.method === 'session/prompt'))
+    await agent.send('one', 'queued')
+    await running
+    expect((await agent.calls()).filter(c => c.method === 'session/prompt')).toHaveLength(1)
+    expect(getLiveAcpEvents(agent.ctx.workspaceId, 'one')).toBeNull()
+    await agent.send('one', 'recovered')
+    expect((await agent.calls()).filter(c => c.method === 'session/load')).toHaveLength(2)
+    expect(turns(agent.events('one')).at(-1)?.parts).toEqual([
+      { type: 'text', text: 'model-a:recovered' }
+    ])
+  })
+
+  test('forget invalidates pending attachment and releases its owned process', async () => {
+    const agent = await fixture()
+    const load = agent.load('one').catch(error => error)
+    await until(async () => (await agent.calls()).some(c => c.method === 'session/load'))
+    const client = await getAcpClient({
+      ...(await agent.config.spawn(agent.ctx)),
+      scope: 'chat:one'
+    })
+    forgetAcpSession(agent.ctx.workspaceId, 'one')
+    expect(await load).toBeInstanceOf(Error)
+    expect(client.isAlive()).toBe(false)
+    expect(getLiveAcpEvents(agent.ctx.workspaceId, 'one')).toBeNull()
+  })
+
+  test('real-id reads await policy setup while a new chat is still connecting', async () => {
+    const agent = await fixture({ modeDelay: 150 })
+    const sending = sendAcpMessage(agent.config, {
+      ...agent.ctx,
+      sessionId: 'temporary',
+      isNew: true,
+      content: 'first'
+    })
+    await until(async () => (await agent.calls()).some(call => call.method === 'session/set_mode'))
+    const modeCall = (await agent.calls()).find(call => call.method === 'session/set_mode')!
+    const realId = modeCall.params.sessionId as string
+    expect(getLiveAcpEvents(agent.ctx.workspaceId, realId)).toBeNull()
+    let readFinished = false
+    const reading = agent.load(realId).then(events => {
+      readFinished = true
+      return events
+    })
+    await Bun.sleep(20)
+    expect(readFinished).toBe(false)
+    await reading
+    expect(getLiveAcpEvents(agent.ctx.workspaceId, realId)).not.toBeNull()
+    await sending
+    expect((await agent.calls()).filter(call => call.method === 'session/load')).toHaveLength(0)
+  })
+
+  test('a new chat reports running while its agent starts', async () => {
+    const agent = await fixture({ newDelay: 100 })
+    const before = getClientFrameLog(agent.ctx.workspaceId).length
+    const sending = sendAcpMessage(agent.config, {
+      ...agent.ctx,
+      sessionId: 'starting',
+      isNew: true,
+      content: 'first'
+    })
+    await until(async () => (await agent.calls()).some(call => call.method === 'session/new'))
+    // Other tabs keep a shared selection of a running chat they do not list yet.
+    const statuses = getClientFrameLog(agent.ctx.workspaceId)
+      .slice(before)
+      .map(entry => entry.frame as { type?: string; sessionId?: string; activity?: string })
+      .filter(frame => frame.type === 'status')
+    expect(statuses[0]).toMatchObject({ sessionId: 'starting', activity: 'running' })
+    await sending
+  })
+
+  test('a temporary-id alias resumes its canonical session after process exit', async () => {
+    const agent = await fixture()
+    await sendAcpMessage(agent.config, {
+      ...agent.ctx,
+      sessionId: 'temporary',
+      isNew: true,
+      content: 'first'
+    })
+    const creation = (await agent.calls()).find(call => call.method === 'session/new')!
+    const realId = `new-${creation.pid}`
+    killAcpWorkspace(agent.ctx.workspacePath, 'fx')
+    expect(getLiveAcpEvents(agent.ctx.workspaceId, 'temporary')).toBeNull()
+    await agent.load('temporary')
+    const loads = (await agent.calls()).filter(call => call.method === 'session/load')
+    expect(loads).toHaveLength(1)
+    expect(loads[0]?.params.sessionId).toBe(realId)
+    expect(loads[0]?.pid).not.toBe(creation.pid)
+    expect(agent.events('temporary')).toEqual(agent.events(realId))
+  })
+
+  for (const phase of ['before initialization', 'during session creation'] as const) {
+    test(`stop ${phase} prevents the first prompt from starting`, async () => {
+      const agent = await fixture({ newDelay: 100 })
+      const sending = sendAcpMessage(agent.config, {
+        ...agent.ctx,
+        sessionId: 'temporary',
+        isNew: true,
+        content: 'do not run'
+      })
+      if (phase === 'during session creation') {
+        await until(async () => (await agent.calls()).some(call => call.method === 'session/new'))
+      }
+      await interruptAcpRun(agent.config, {
+        workspaceId: agent.ctx.workspaceId,
+        sessionId: 'temporary'
+      })
+      await sending
+      expect((await agent.calls()).filter(call => call.method === 'session/prompt')).toHaveLength(0)
+      expect(getAcpActiveSessions('fx')).toEqual([])
+      expect(getLiveAcpEvents(agent.ctx.workspaceId, 'temporary')).toBeNull()
+    })
+  }
+
+  test('follow-ups sent after stop drain in order when cancellation settles', async () => {
+    const agent = await fixture({ cancelDelay: 80 })
+    await agent.load('one')
+    const running = agent.send('one', 'first')
+    await until(async () => (await agent.calls()).some(call => call.method === 'session/prompt'))
+    await agent.send('one', 'drop this queued message')
+    await interruptAcpRun(agent.config, { workspaceId: agent.ctx.workspaceId, sessionId: 'one' })
+    await agent.send('one', 'after stop')
+    await running
+    await until(() => getAcpActiveSessions('fx').length === 0)
+    const texts = async () =>
+      (await agent.calls())
+        .filter(call => call.method === 'session/prompt')
+        .map(
+          call =>
+            (call.params.prompt as { type: string; text?: string }[]).find(
+              block => block.type === 'text'
+            )?.text
+        )
+    expect(await texts()).toEqual(['first', 'after stop'])
+    await agent.send('one', 'third')
+    expect(await texts()).toEqual(['first', 'after stop', 'third'])
+  })
+
+  test('a partial settings failure reloads the confirmed model before the next prompt', async () => {
+    const agent = await fixture({ persistModel: true })
+    agent.config.applySettings = async (client, sessionId, settings, state) => {
+      let confirmed = state
+      if (settings.model && settings.model !== state.currentModelId) {
+        await client.rpc('session/set_model', { sessionId, modelId: settings.model })
+        confirmed = { ...state, currentModelId: settings.model }
+      }
+      // Like a model switch that succeeds before the new model rejects effort.
+      if (settings.effort === 'unsupported') throw new Error('Effort is unavailable')
+      return confirmed
+    }
+    await agent.load('one')
+    await sendAcpMessage(agent.config, {
+      ...agent.ctx,
+      sessionId: 'one',
+      isNew: false,
+      content: 'do not prompt after settings fail',
+      model: 'model-b',
+      effort: 'unsupported'
+    })
+    expect(getLiveAcpEvents(agent.ctx.workspaceId, 'one')).toBeNull()
+    expect((await agent.calls()).filter(call => call.method === 'session/prompt')).toHaveLength(0)
+    expect(await Bun.file(join(agent.dir, 'model')).text()).toBe('model-b')
+    await agent.send('one', 'recovered', 'model-a')
+    const calls = await agent.calls()
+    const loads = calls.filter(call => call.method === 'session/load')
+    expect(loads).toHaveLength(2)
+    expect(loads[0]?.pid).not.toBe(loads[1]?.pid)
+    expect(
+      calls.filter(call => call.method === 'session/set_model').map(call => call.params.modelId)
+    ).toEqual(['model-b', 'model-a'])
+    expect(turns(agent.events('one')).at(-1)?.parts).toEqual([
+      { type: 'text', text: 'model-a:recovered' }
+    ])
+    expect(turns(agent.events('one')).at(-1)?.meta?.model).toBe('model-a')
+  })
+
+  test('replay preserves adjacent user and assistant message identities across chunks', async () => {
+    const chunk = (sessionUpdate: string, messageId: string, text: string) => ({
+      sessionUpdate,
+      messageId,
+      content: { type: 'text', text }
+    })
+    const agent = await fixture({
+      replayUpdates: [
+        chunk('user_message_chunk', 'u1', 'first '),
+        chunk('user_message_chunk', 'u1', 'user'),
+        chunk('user_message_chunk', 'u2', 'second user'),
+        chunk('agent_message_chunk', 'a1', 'first '),
+        chunk('agent_message_chunk', 'a1', 'assistant'),
+        chunk('agent_message_chunk', 'a2', 'second '),
+        chunk('agent_message_chunk', 'a2', 'assistant')
+      ]
+    })
+    const replay = turns(await agent.load('one'))
+    expect(replay.map(turn => ({ role: turn.role, parts: turn.parts }))).toEqual([
+      { role: 'user', parts: [{ type: 'text', text: 'first user' }] },
+      { role: 'user', parts: [{ type: 'text', text: 'second user' }] },
+      { role: 'assistant', parts: [{ type: 'text', text: 'first assistant' }] },
+      { role: 'assistant', parts: [{ type: 'text', text: 'second assistant' }] }
+    ])
+    expect(new Set(replay.map(turn => turn.id)).size).toBe(4)
+  })
+
+  test('a replay labels only its latest run with the model the load reports', async () => {
+    const chunk = (sessionUpdate: string, messageId: string, text: string) => ({
+      sessionUpdate,
+      messageId,
+      content: { type: 'text', text }
+    })
+    const agent = await fixture({
+      loadedModel: 'model-b',
+      replayUpdates: [
+        chunk('user_message_chunk', 'u1', 'first'),
+        chunk('agent_message_chunk', 'a1', 'earlier answer'),
+        chunk('user_message_chunk', 'u2', 'second'),
+        chunk('agent_message_chunk', 'a2', 'latest answer')
+      ]
+    })
+    // A send that resumes the chat must not stamp history with its own model.
+    await agent.send('one', 'next', 'model-a')
+    const models = Object.fromEntries(
+      turns(getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? []).flatMap(turn =>
+        turn.role === 'assistant'
+          ? turn.parts.flatMap(part =>
+              part.type === 'text' ? [[part.text, turn.meta?.model]] : []
+            )
+          : []
+      )
+    )
+    expect(models).toEqual({
+      'earlier answer': undefined,
+      'latest answer': 'model-b',
+      'model-a:next': 'model-a'
+    })
+  })
+
+  test('split diagnostics become notices without leaking a partial streaming preview', async () => {
+    const chunks = ['[con', 'text] workspace instructions were omitted outside the home directory.']
+    const agent = await fixture({ diagnosticChunks: chunks })
+    agent.config.isOperationalMessage = isFxOperationalMessage
+    await sendAcpMessage(agent.config, {
+      ...agent.ctx,
+      sessionId: 'one',
+      isNew: false,
+      content: 'a normal reply long enough to produce a streaming preview',
+      stream: true
+    })
+    const frames = getClientFrameLog(agent.ctx.workspaceId).map(
+      entry => entry.frame as ServerMessage
+    )
+    const previews = frames.flatMap(frame =>
+      'type' in frame && frame.type === 'preview' ? [frame] : []
+    )
+    expect(previews.length).toBeGreaterThan(0)
+    expect(previews.every(frame => frame.blocks.every(block => !block.text.includes('[con')))).toBe(
+      true
+    )
+    const notices = agent
+      .events('one')
+      .flatMap(event => (event.kind === 'notice' ? [event.notice] : []))
+    expect(
+      notices.flatMap(notice => (notice.kind === 'warning' ? [notice.message] : []))
+    ).toContain(chunks.join(''))
+    const assistantText = turns(agent.events('one')).flatMap(turn =>
+      turn.role === 'assistant'
+        ? turn.parts.flatMap(part => (part.type === 'text' ? [part.text] : []))
+        : []
+    )
+    expect(assistantText.every(text => !text.includes('[context]'))).toBe(true)
+    // Every emitted preview belongs to an eventual assistant turn, so the
+    // client's existing apiMessageId clearing leaves no diagnostic fragment.
+    const finalized = new Set(turns(agent.events('one')).map(turn => turn.meta?.apiMessageId))
+    expect(previews.every(frame => finalized.has(frame.messageId))).toBe(true)
+  })
+
+  test('an identified warning cannot swallow unlabelled thoughts before the answer', async () => {
+    // Captured fx order: a skill warning has a messageId, thought chunks omit
+    // it entirely, and the final answer introduces a different messageId.
+    const warning = 'skill discovery warning: a fixture skill was skipped'
+    const reasoning = 'Need to compute the answer carefully.'
+    const agent = await fixture({
+      promptUpdates: [
+        {
+          sessionUpdate: 'agent_message_chunk',
+          messageId: 'warning',
+          content: { type: 'text', text: warning }
+        },
+        { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'Need' } },
+        {
+          sessionUpdate: 'agent_thought_chunk',
+          content: { type: 'text', text: reasoning.slice(4) }
+        }
+      ]
+    })
+    agent.config.isOperationalMessage = isFxOperationalMessage
+    await sendAcpMessage(agent.config, {
+      ...agent.ctx,
+      sessionId: 'one',
+      isNew: false,
+      content: 'the final answer',
+      stream: true
+    })
+    const frames = getClientFrameLog(agent.ctx.workspaceId).map(
+      entry => entry.frame as ServerMessage
+    )
+    const previews = frames.flatMap(frame =>
+      'type' in frame && frame.type === 'preview' ? [frame] : []
+    )
+    // Even the first short thought streams immediately, without trailing
+    // warning text that would make the UI collapse its Thinking row.
+    expect(previews[0]?.blocks).toEqual([{ index: 0, kind: 'reasoning', text: 'Need' }])
+    expect(
+      previews.every(frame => frame.blocks.every(block => !block.text.includes(warning)))
+    ).toBe(true)
+    const completed = turns(agent.events('one')).at(-1)!
+    expect(completed.parts).toEqual([
+      { type: 'reasoning', text: reasoning },
+      { type: 'text', text: 'model-a:the final answer' }
+    ])
+    const warnings = agent
+      .events('one')
+      .flatMap(event =>
+        event.kind === 'notice' && event.notice.kind === 'warning' ? [event.notice.message] : []
+      )
+    expect(warnings).toEqual([warning])
+    expect(previews.every(frame => frame.messageId === completed.meta?.apiMessageId)).toBe(true)
+  })
+
+  test('classifying a later warning preserves thoughts already in the accumulator', async () => {
+    const reasoning = 'This is a genuine thought before the operational warning.'
+    const warning = 'skill discovery warning: the next skill was skipped'
+    const agent = await fixture({
+      promptUpdates: [
+        { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: reasoning } },
+        {
+          sessionUpdate: 'agent_message_chunk',
+          messageId: 'warning',
+          content: { type: 'text', text: warning }
+        }
+      ]
+    })
+    agent.config.isOperationalMessage = isFxOperationalMessage
+    await sendAcpMessage(agent.config, {
+      ...agent.ctx,
+      sessionId: 'one',
+      isNew: false,
+      content: 'answer',
+      stream: true
+    })
+    const assistantParts = turns(agent.events('one'))
+      .filter(turn => turn.role === 'assistant')
+      .flatMap(turn => turn.parts)
+    expect(assistantParts).toContainEqual({ type: 'reasoning', text: reasoning })
+    expect(assistantParts).not.toContainEqual({ type: 'text', text: warning })
+    const previews = getClientFrameLog(agent.ctx.workspaceId).flatMap(entry => {
+      const frame = entry.frame as ServerMessage
+      return 'type' in frame && frame.type === 'preview' ? [frame] : []
+    })
+    expect(
+      previews.every(frame => frame.blocks.every(block => !block.text.includes(warning)))
+    ).toBe(true)
+  })
+
+  test.each([false, true])(
+    'thought-only output survives without an answer (cancel=%s)',
+    async cancel => {
+      const reasoning = 'Need'
+      const agent = await fixture({
+        promptUpdates: [
+          { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: reasoning } }
+        ]
+      })
+      agent.config.isOperationalMessage = isFxOperationalMessage
+      const send = sendAcpMessage(agent.config, {
+        ...agent.ctx,
+        sessionId: 'one',
+        isNew: false,
+        content: 'unfinished',
+        stream: true
+      })
+      await until(() =>
+        getClientFrameLog(agent.ctx.workspaceId).some(entry => {
+          const frame = entry.frame as ServerMessage
+          return (
+            'type' in frame &&
+            frame.type === 'preview' &&
+            frame.blocks.some(block => block.kind === 'reasoning')
+          )
+        })
+      )
+      if (cancel)
+        await interruptAcpRun(agent.config, {
+          workspaceId: agent.ctx.workspaceId,
+          sessionId: 'one'
+        })
+      await send
+      const completed = turns(agent.events('one')).at(-1)!
+      expect(completed.parts).toEqual([{ type: 'reasoning', text: reasoning }])
+      expect(completed.meta?.stopReason).toBe(cancel ? 'cancelled' : 'end_turn')
+    }
+  )
+
+  test('cold resume can discover the provider default without displacing its loaded chat', async () => {
+    const agent = await fixture({ loadedModel: 'model-b' })
+    agent.config.mapModels = fxModels
+    agent.config.defaultModel = async ctx =>
+      (await listAcpModels(agent.config, ctx)).find(model => model.value === 'default')
+        ?.resolvedModel
+    await agent.load('one')
+    await agent.send('one', 'use the provider default', 'default')
+    const calls = await agent.calls()
+    const loaded = calls.find(call => call.method === 'session/load')!
+    const discovered = calls.find(call => call.method === 'session/new')!
+    expect(discovered.pid).not.toBe(loaded.pid)
+    expect(
+      calls.filter(call => call.method === 'session/set_model').map(call => call.params.modelId)
+    ).toEqual(['model-a'])
+    expect(turns(agent.events('one')).at(-1)?.parts).toEqual([
+      { type: 'text', text: 'model-a:use the provider default' }
+    ])
+  })
+
+  test('cold load publishes restored effort choices while preserving the provider default', async () => {
+    const agent = await fixture({ loadedModel: 'model-b' })
+    agent.config.modelState = result => {
+      const model = result.models?.currentModelId
+      const levels = model === 'model-b' ? ['auto', 'high'] : ['auto', 'low']
+      return {
+        ...result.models,
+        defaultModelId: model,
+        configOptions: [
+          {
+            id: 'effort',
+            type: 'select',
+            name: 'Effort',
+            category: 'thought_level',
+            currentValue: model === 'model-b' ? 'high' : 'auto',
+            options: levels.map(value => ({ value, name: value }))
+          }
+        ]
+      }
+    }
+    agent.config.mapModels = fxModels
+    agent.config.defaultModel = async ctx =>
+      (await listAcpModels(agent.config, ctx)).find(model => model.value === 'default')
+        ?.resolvedModel
+    const initial = await listAcpModels(agent.config, agent.ctx)
+    expect(initial.find(model => model.value === 'default')?.resolvedModel).toBe('model-a')
+    expect(initial.find(model => model.value === 'model-b')?.supportsEffort).toBeUndefined()
+
+    let readyWhenPublished = false
+    const refresh = spyOn(agentStore, 'refresh').mockImplementation(async workspace => {
+      if (workspace.id === agent.ctx.workspaceId) {
+        readyWhenPublished = getLiveAcpEvents(workspace.id, 'one') !== null
+      }
+      return { status: 'available' }
+    })
+    try {
+      await agent.load('one')
+      const restored = await listAcpModels(agent.config, agent.ctx)
+      expect(restored.find(model => model.value === 'default')?.resolvedModel).toBe('model-a')
+      expect(restored.find(model => model.value === 'model-b')?.supportedEffortLevels).toEqual([
+        'auto',
+        'high'
+      ])
+      expect(restored.find(model => model.value === 'model-b')?.defaultEffort).toBe('auto')
+      expect(readyWhenPublished).toBe(true)
+      expect(refresh).toHaveBeenCalledWith({
+        id: agent.ctx.workspaceId,
+        path: agent.ctx.workspacePath,
+        type: 'fx'
+      })
+      expect((await agent.calls()).filter(call => call.method === 'session/new')).toHaveLength(1)
+    } finally {
+      refresh.mockRestore()
+    }
+  })
+})
+
+describe('fx history and diagnostics', () => {
+  const clippedEnvelope =
+    '{"session_id":null,"state":"completed","backend":"captured","persistence":"process","output_truncated":false,"output_incomplete":false,"output_terminal_safe":true,"full_output_handle":"fx-command-repl'
+  function fxConfig(
+    base: AcpProviderConfig,
+    history: Map<string, AcpToolEnrichment> = new Map()
+  ): AcpProviderConfig & { reads: number } {
+    const config = {
+      ...base,
+      reads: 0,
+      normalizeToolUpdate: normalizeFxToolUpdate,
+      isOperationalMessage: isFxOperationalMessage,
+      describeOperationalMessage: describeFxOperationalMessage,
+      enrichToolCalls: async () => {
+        config.reads++
+        return history
+      }
+    }
+    return config
+  }
+  function toolCalls(events: StreamEvent[]) {
+    return turns(events).flatMap(turn =>
+      turn.parts.flatMap(part => (part.type === 'tool-call' ? [part.call] : []))
+    )
+  }
+  function notices(events: StreamEvent[]) {
+    return events.flatMap(event =>
+      event.kind === 'notice' && event.notice.kind === 'warning' ? [event.notice.message] : []
+    )
+  }
+
+  test('a cold load replaces clipped tool previews with saved results before it resolves', async () => {
+    const agent = await fixture({
+      replayUpdates: [
+        {
+          sessionUpdate: 'user_message_chunk',
+          messageId: 'u',
+          content: { type: 'text', text: 'run it' }
+        },
+        {
+          sessionUpdate: 'tool_call',
+          toolCallId: 'sh',
+          name: 'shell',
+          title: 'Running',
+          kind: 'execute',
+          status: 'pending',
+          rawInput: { action: 'run', command: 'seq 3' }
+        },
+        {
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'sh',
+          status: 'completed',
+          content: [{ type: 'content', content: { type: 'text', text: clippedEnvelope } }]
+        }
+      ]
+    })
+    const config = fxConfig(
+      agent.config,
+      new Map([
+        ['sh', { output: '1\n2\n3\n', sidecar: { fxShell: { exitCode: 0, signal: null } } }]
+      ])
+    )
+    const events = await ensureAcpSessionLive(config, { ...agent.ctx, sessionId: 'one' })
+    const [call] = toolCalls(events)
+    expect(call).toMatchObject({ name: 'shell', state: 'success', output: '1\n2\n3\n' })
+    expect(call?.sidecar).toMatchObject({ fxShell: { exitCode: 0 } })
+    expect(config.reads).toBe(1)
+  })
+
+  test('a finished prompt enriches its tool rows from saved history', async () => {
+    const agent = await fixture({
+      promptUpdates: [
+        {
+          sessionUpdate: 'tool_call',
+          toolCallId: 'w',
+          name: 'edit_file',
+          title: 'Editing',
+          kind: 'edit',
+          status: 'pending',
+          rawInput: { path: 'a.txt', old_string: 'a', new_string: 'b' }
+        },
+        {
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'w',
+          status: 'completed',
+          content: [{ type: 'content', content: { type: 'text', text: 'edited a.txt (2 bytes)' } }]
+        }
+      ]
+    })
+    const change = {
+      path: 'a.txt',
+      kind: 'edited',
+      additions: 1,
+      deletions: 1,
+      truncated: false,
+      lines: [
+        { kind: 'deletion', text: 'a' },
+        { kind: 'addition', text: 'b' }
+      ]
+    }
+    const config = fxConfig(
+      agent.config,
+      new Map([['w', { output: 'edited a.txt (2 bytes)', sidecar: { fxFileChange: change } }]])
+    )
+    await sendAcpMessage(config, { ...agent.ctx, sessionId: 'one', isNew: false, content: 'edit' })
+    await until(() =>
+      toolCalls(getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? []).some(
+        call => call.sidecar?.fxFileChange !== undefined
+      )
+    )
+    const [call] = toolCalls(getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? [])
+    expect(call).toMatchObject({
+      name: 'edit_file',
+      state: 'success',
+      output: 'edited a.txt (2 bytes)'
+    })
+    expect(call?.sidecar?.fxFileChange).toEqual(change)
+  })
+
+  test('late output from a backgrounded command keeps the row successful', async () => {
+    const running =
+      '{"session_id":"shell-1","state":"running","backend":"captured","persistence":"process","output_truncated":false,"output_incomplete":false,"output_terminal_safe":true,"full_output_handle":null,"exit_co'
+    const agent = await fixture({
+      promptUpdates: [
+        {
+          sessionUpdate: 'tool_call',
+          toolCallId: 'bg',
+          name: 'shell',
+          title: 'Running',
+          kind: 'execute',
+          status: 'pending',
+          rawInput: {
+            request: { action: 'run', command: 'sleep 60; echo late', yield_time_ms: 30000 }
+          }
+        },
+        {
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'bg',
+          status: 'completed',
+          content: [{ type: 'content', content: { type: 'text', text: running } }]
+        },
+        {
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'bg',
+          status: 'in_progress',
+          content: [{ type: 'content', content: { type: 'text', text: 'late\n' } }]
+        }
+      ]
+    })
+    await sendAcpMessage(fxConfig(agent.config), {
+      ...agent.ctx,
+      sessionId: 'one',
+      isNew: false,
+      content: 'background'
+    })
+    const [call] = toolCalls(getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? [])
+    expect(call).toMatchObject({ name: 'shell', state: 'success', output: 'late\n' })
+    expect(call?.errorText).toBeUndefined()
+  })
+
+  test('late output from a backgrounded command does not split the reply around it', async () => {
+    const running =
+      '{"session_id":"shell-1","state":"running","backend":"captured","persistence":"process","output_truncated":false,"output_incomplete":false,"output_terminal_safe":true,"full_output_handle":null,"exit_co'
+    const text = (value: string) => ({
+      sessionUpdate: 'agent_message_chunk',
+      messageId: 'm',
+      content: { type: 'text', text: value }
+    })
+    const agent = await fixture({
+      promptUpdates: [
+        {
+          sessionUpdate: 'tool_call',
+          toolCallId: 'bg',
+          name: 'shell',
+          title: 'Running',
+          kind: 'execute',
+          status: 'pending',
+          rawInput: { request: { action: 'run', command: 'make', yield_time_ms: 30000 } }
+        },
+        {
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'bg',
+          status: 'completed',
+          content: [{ type: 'content', content: { type: 'text', text: running } }]
+        },
+        text('While it builds, '),
+        {
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'bg',
+          status: 'in_progress',
+          content: [{ type: 'content', content: { type: 'text', text: 'late\n' } }]
+        },
+        text('I will explain.')
+      ]
+    })
+    await sendAcpMessage(fxConfig(agent.config), {
+      ...agent.ctx,
+      sessionId: 'one',
+      isNew: false,
+      content: 'build'
+    })
+    const replies = turns(getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? []).flatMap(turn =>
+      turn.role === 'assistant'
+        ? turn.parts.flatMap(part => (part.type === 'text' ? [part.text] : []))
+        : []
+    )
+    expect(replies).toContain('While it builds, I will explain.')
+    expect(toolCalls(getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? [])[0]?.output).toBe(
+      'late\n'
+    )
+  })
+
+  test('a failed row takes its saved failure text on a cold load', async () => {
+    const agent = await fixture({
+      replayUpdates: [
+        {
+          sessionUpdate: 'tool_call',
+          toolCallId: 'sh',
+          name: 'shell',
+          title: 'Running',
+          kind: 'execute',
+          status: 'pending',
+          rawInput: { action: 'run', command: 'npm test' }
+        },
+        {
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'sh',
+          status: 'failed',
+          content: [{ type: 'content', content: { type: 'text', text: clippedEnvelope } }]
+        }
+      ]
+    })
+    const config = fxConfig(
+      agent.config,
+      new Map([['sh', { output: '1 failing', errorText: '1 failing' }]])
+    )
+    const [call] = toolCalls(await ensureAcpSessionLive(config, { ...agent.ctx, sessionId: 'one' }))
+    expect(call).toMatchObject({ state: 'error', output: '1 failing', errorText: '1 failing' })
+  })
+
+  test('a stop while a cold chat loads its saved history cancels the send', async () => {
+    const agent = await fixture()
+    const gate = Promise.withResolvers<void>()
+    let reading = false
+    const config = {
+      ...fxConfig(agent.config),
+      enrichToolCalls: async () => {
+        reading = true
+        await gate.promise
+        return new Map()
+      }
+    }
+    const sending = sendAcpMessage(config, {
+      ...agent.ctx,
+      sessionId: 'one',
+      isNew: false,
+      content: 'hello'
+    })
+    await until(() => reading)
+    await interruptAcpRun(config, { workspaceId: agent.ctx.workspaceId, sessionId: 'one' })
+    gate.resolve()
+    await sending
+    expect((await agent.calls()).filter(call => call.method === 'session/prompt')).toHaveLength(0)
+  })
+
+  test('provider failures and replayed interruptions become notices, not replies', async () => {
+    const agent = await fixture({
+      replayUpdates: [
+        {
+          sessionUpdate: 'user_message_chunk',
+          messageId: 'u',
+          content: { type: 'text', text: 'stop me' }
+        },
+        {
+          sessionUpdate: 'agent_message_chunk',
+          messageId: 'o',
+          content: { type: 'text', text: 'cancelled' }
+        }
+      ],
+      promptUpdates: [
+        {
+          sessionUpdate: 'agent_message_chunk',
+          messageId: 'op',
+          content: { type: 'text', text: 'HTTP 502: upstream unavailable' }
+        }
+      ]
+    })
+    const config = fxConfig(agent.config)
+    const loaded = await ensureAcpSessionLive(config, { ...agent.ctx, sessionId: 'one' })
+    expect(notices(loaded)).toEqual(['This run was stopped before it finished.'])
+    // Replayed turns carry no time, so the notice names the turn it follows.
+    const stopped = loaded.find(event => event.kind === 'notice')
+    const [asked] = turns(loaded)
+    expect(stopped?.kind === 'notice' && stopped.notice).toMatchObject({ afterTurnId: asked?.id })
+    await sendAcpMessage(config, {
+      ...agent.ctx,
+      sessionId: 'one',
+      isNew: false,
+      content: 'failed'
+    })
+    const events = getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? []
+    expect(notices(events)).toContain('The model request failed: HTTP 502: upstream unavailable')
+    // A live reply that happens to say "failed" is still a reply.
+    expect(
+      turns(events).some(
+        turn =>
+          turn.role === 'assistant' &&
+          turn.parts.some(part => part.type === 'text' && part.text === 'model-a:failed')
+      )
+    ).toBe(true)
+  })
+
+  test('streams a many-line command to clients in a few coalesced frames', async () => {
+    const lines = Array.from({ length: 200 }, (_, i) => `${i + 1}\n`)
+    const agent = await fixture({
+      promptUpdates: [
+        {
+          sessionUpdate: 'tool_call',
+          toolCallId: 'seq',
+          name: 'shell',
+          title: 'Running',
+          kind: 'execute',
+          status: 'pending',
+          rawInput: { command: 'seq 200' }
+        },
+        { sessionUpdate: 'tool_call_update', toolCallId: 'seq', status: 'in_progress' },
+        ...lines.map(text => ({
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'seq',
+          status: 'in_progress',
+          content: [{ type: 'content', content: { type: 'text', text } }]
+        })),
+        {
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'seq',
+          status: 'completed',
+          content: [{ type: 'content', content: { type: 'text', text: clippedEnvelope } }]
+        }
+      ]
+    })
+    const before = getClientFrameLog(agent.ctx.workspaceId).length
+    await sendAcpMessage(fxConfig(agent.config), {
+      ...agent.ctx,
+      sessionId: 'one',
+      isNew: false,
+      content: 'seq'
+    })
+    const frames = getClientFrameLog(agent.ctx.workspaceId)
+      .slice(before)
+      .map(entry => entry.frame as { kind?: string; turn?: Turn })
+      .filter(
+        frame => frame.kind === 'turn' && frame.turn?.parts.some(part => part.type === 'tool-call')
+      )
+    expect(frames.length).toBeLessThan(10)
+    const [call] = toolCalls(getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? [])
+    expect(call).toMatchObject({ state: 'success', output: lines.join('') })
+    const last = frames.at(-1)?.turn?.parts.find(part => part.type === 'tool-call')
+    expect(last?.type === 'tool-call' && last.call.output).toBe(lines.join(''))
+  })
+
+  test('a turn end broadcasts each settled turn and the chat list change once', async () => {
+    const agent = await fixture({
+      promptUpdates: [
+        {
+          sessionUpdate: 'tool_call',
+          toolCallId: 'ls',
+          name: 'shell',
+          title: 'Running',
+          kind: 'execute',
+          status: 'pending',
+          rawInput: { command: 'ls' }
+        },
+        { sessionUpdate: 'tool_call_update', toolCallId: 'ls', status: 'in_progress' },
+        {
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'ls',
+          status: 'completed',
+          content: [{ type: 'content', content: { type: 'text', text: clippedEnvelope } }]
+        },
+        { sessionUpdate: 'session_info_update', title: 'List files' }
+      ]
+    })
+    const before = getClientFrameLog(agent.ctx.workspaceId).length
+    await sendAcpMessage(fxConfig(agent.config), {
+      ...agent.ctx,
+      sessionId: 'one',
+      isNew: false,
+      content: 'ls'
+    })
+    const frames = getClientFrameLog(agent.ctx.workspaceId)
+      .slice(before)
+      .map(entry => entry.frame as { kind?: string; type?: string; turn?: Turn })
+    const turnFrames = (predicate: (turn: Turn) => boolean) =>
+      frames.filter(frame => frame.kind === 'turn' && frame.turn && predicate(frame.turn))
+    const toolFrames = turnFrames(turn => turn.parts.some(part => part.type === 'tool-call'))
+    // The fixture ends every prompt with a `<model>:<prompt>` reply.
+    const replies = turnFrames(turn =>
+      turn.parts.some(part => part.type === 'text' && part.text.endsWith(':ls'))
+    )
+    // pending, then settled: the status-only in_progress update adds nothing.
+    expect(toolFrames).toHaveLength(2)
+    expect(replies).toHaveLength(1)
+    expect(replies[0]?.turn?.meta).toMatchObject({ provider: 'fx', stopReason: 'end_turn' })
+    expect(frames.filter(frame => frame.type === 'sessions_changed')).toHaveLength(1)
+  })
+
+  test('a cold load tells clients to refetch instead of broadcasting replayed turns', async () => {
+    const agent = await fixture()
+    const before = getClientFrameLog(agent.ctx.workspaceId).length
+    const events = await agent.load('one')
+    expect(turns(events).map(turn => turn.role)).toEqual(['user', 'assistant'])
+    const frames = getClientFrameLog(agent.ctx.workspaceId)
+      .slice(before)
+      .map(entry => entry.frame as { kind?: string; type?: string; sessionId?: string })
+    expect(frames.filter(frame => frame.kind === 'turn')).toEqual([])
+    expect(frames.filter(frame => frame.type === 'session_reloaded')).toEqual([
+      expect.objectContaining({ type: 'session_reloaded', sessionId: 'one' })
+    ])
+  })
+
+  test('an idle-released chat keeps its live transcript unless its history changed', async () => {
+    const agent = await fixture({
+      persist: true,
+      promptUpdates: [
+        {
+          sessionUpdate: 'agent_thought_chunk',
+          content: { type: 'text', text: 'private reasoning' }
+        }
+      ]
+    })
+    const config = { ...fxConfig(agent.config), keepViewOnIdleRelease: true }
+    const ctx = { ...agent.ctx, sessionId: 'one' }
+    const reasoning = (events: StreamEvent[]) =>
+      turns(events).some(turn => turn.parts.some(part => part.type === 'reasoning'))
+    await sendAcpMessage(config, { ...ctx, isNew: false, content: 'first' })
+    const live = getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? []
+    expect(reasoning(live)).toBe(true)
+
+    releaseIdleAcpSessions(0)
+    // Read without a process: the retained transcript, thoughts included.
+    expect(getLiveAcpEvents(agent.ctx.workspaceId, 'one')).toEqual(live)
+    const loadsBefore = (await agent.calls()).filter(c => c.method === 'session/load').length
+    const reloaded = await ensureAcpSessionLive(config, ctx)
+    expect((await agent.calls()).filter(c => c.method === 'session/load')).toHaveLength(
+      loadsBefore + 1
+    )
+    expect(reasoning(reloaded)).toBe(true)
+    // New runs continue after the retained ids instead of overwriting them.
+    await sendAcpMessage(config, { ...ctx, isNew: false, content: 'second' })
+    const ids = turns(getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? []).map(turn => turn.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(
+      turns(getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? []).filter(
+        turn => turn.role === 'assistant' && turn.parts.some(part => part.type === 'text')
+      )
+    ).toHaveLength(2)
+
+    // Continued elsewhere while released: the replay wins.
+    releaseIdleAcpSessions(0)
+    await Bun.write(
+      join(agent.dir, 'history.jsonl'),
+      `${await Bun.file(join(agent.dir, 'history.jsonl')).text()}${JSON.stringify({ text: 'from the CLI', reply: 'ok' })}\n`
+    )
+    const changed = await ensureAcpSessionLive(config, ctx)
+    expect(reasoning(changed)).toBe(false)
+    expect(turns(changed).filter(turn => turn.role === 'user')).toHaveLength(3)
+  })
+
+  test('an environment change restarts an idle chat without losing its transcript', async () => {
+    const agent = await fixture({
+      persist: true,
+      promptUpdates: [
+        {
+          sessionUpdate: 'agent_thought_chunk',
+          content: { type: 'text', text: 'private reasoning' }
+        }
+      ]
+    })
+    const config = { ...fxConfig(agent.config), keepViewOnIdleRelease: true }
+    const ctx = { ...agent.ctx, sessionId: 'one' }
+    await sendAcpMessage(config, { ...ctx, isNew: false, content: 'first' })
+    const live = getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? []
+    // Every harness hears the change (Hermes first); only fx's chats are fx's.
+    applyEnvChanged({ id: agent.ctx.workspaceId, path: agent.ctx.workspacePath })
+    expect(getLiveAcpEvents(agent.ctx.workspaceId, 'one')).toEqual(live)
+    const loads = (await agent.calls()).filter(c => c.method === 'session/load').length
+    expect(await ensureAcpSessionLive(config, ctx)).toEqual(live)
+    expect((await agent.calls()).filter(c => c.method === 'session/load')).toHaveLength(loads + 1)
+  })
+
+  test('a reconnect stopped before it finishes keeps the retained transcript', async () => {
+    const agent = await fixture({
+      persist: true,
+      modeDelay: 200,
+      promptUpdates: [
+        {
+          sessionUpdate: 'agent_thought_chunk',
+          content: { type: 'text', text: 'private reasoning' }
+        }
+      ]
+    })
+    const config = { ...fxConfig(agent.config), keepViewOnIdleRelease: true }
+    const ctx = { ...agent.ctx, sessionId: 'one' }
+    await sendAcpMessage(config, { ...ctx, isNew: false, content: 'first' })
+    const live = getLiveAcpEvents(agent.ctx.workspaceId, 'one') ?? []
+    releaseIdleAcpSessions(0)
+    const modes = (await agent.calls()).filter(c => c.method === 'session/set_mode').length
+    const reconnect = ensureAcpSessionLive(config, ctx).catch(error => error)
+    await until(
+      async () => (await agent.calls()).filter(c => c.method === 'session/set_mode').length > modes
+    )
+    await interruptAcpRun(config, { workspaceId: agent.ctx.workspaceId, sessionId: 'one' })
+    expect(await reconnect).toBeInstanceOf(Error)
+    expect(getLiveAcpEvents(agent.ctx.workspaceId, 'one')).toEqual(live)
+  })
+})

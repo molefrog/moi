@@ -27,7 +27,7 @@ import { ErrorBanner } from '@/client/features/chat/composer/banners/ErrorBanner
 import { ChatSessionItem } from '@/client/features/chat/sessions/ChatSelector'
 import { TurnView } from '@/client/features/chat/messages/TurnView'
 import { isSessionRunning, liveStore } from '@/client/features/chat/chat-store'
-import { groupTurns } from '@/client/features/chat/messages/group-turns'
+import { groupedTurnIds, groupTurns } from '@/client/features/chat/messages/group-turns'
 import { interleaveNotices } from '@/client/features/chat/messages/interleave-notices'
 import { buildPreviewTurn } from '@/client/features/chat/messages/preview-turn'
 import {
@@ -112,8 +112,9 @@ function Transcript({
   processing = false,
   anchors = {}
 }: TranscriptProps) {
-  const grouped = groupTurns(previewTurn ? [...turns, previewTurn] : turns)
-  const timeline = interleaveNotices(grouped, notices)
+  const all = previewTurn ? [...turns, previewTurn] : turns
+  const grouped = groupTurns(all)
+  const timeline = interleaveNotices(grouped, notices, groupedTurnIds(all))
   const lastTurnId = grouped.length > 0 ? grouped[grouped.length - 1].id : null
   return (
     <div className="flex w-full flex-col gap-6">

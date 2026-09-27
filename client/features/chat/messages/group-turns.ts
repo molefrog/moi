@@ -33,6 +33,19 @@ export function appendPreviewTurn(grouped: Turn[], preview: Turn | null | undefi
   return [...grouped, preview]
 }
 
+// Each visible turn's id mapped to the id of the grouped turn that shows it:
+// a run of assistant turns keeps its first turn's id (see groupTurns).
+export function groupedTurnIds(turns: Turn[]): Map<string, string> {
+  const ids = new Map<string, string>()
+  let head: Turn | null = null
+  for (const turn of turns) {
+    if (!isVisibleChatTurn(turn)) continue
+    if (turn.role !== 'assistant' || head?.role !== 'assistant') head = turn
+    ids.set(turn.id, head.id)
+  }
+  return ids
+}
+
 export function groupTurns(turns: Turn[]): Turn[] {
   const out: Turn[] = []
   for (const t of turns) {

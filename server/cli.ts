@@ -159,7 +159,9 @@ function spawnServer(
   cwd: string,
   env: Record<string, string | undefined> = process.env
 ): ReturnType<typeof Bun.spawn> {
-  return Bun.spawn(['bun', import.meta.filename, 'start'], {
+  // Keep the supervisor's runtime: `bun run` can put a package's older Bun
+  // peer dependency first on PATH, which otherwise changes the child bundler.
+  return Bun.spawn([process.execPath, import.meta.filename, 'start'], {
     stdin: 'inherit',
     stdout: 'inherit',
     stderr: 'inherit',

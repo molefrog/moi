@@ -13,6 +13,8 @@ export type Shorten = (s: string) => string
 export type ToolFormatter = {
   displayName: (call: ToolCall) => string
   brief: (call: ToolCall, shorten: Shorten) => string
+  // Optional one-line outcome under the expanded output (exit code, duration).
+  resultSummary?: (call: ToolCall) => string | undefined
 }
 
 export function toolInput(call: ToolCall): Record<string, unknown> {

@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { IconBolt, IconBoltFilled } from '@tabler/icons-react'
 
 import { useSaveSessionConfig, useSessionConfig } from '../sessions/api'
-import { useWorkspaceAgent } from '@/client/features/workspace/api'
+import { useProbeModelOptions, useWorkspaceAgent } from '@/client/features/workspace/api'
 import {
   groupModels,
   hasEffortChoice,
@@ -319,6 +319,12 @@ export const ModelPicker = memo(function ModelPicker({ sessionId }: ModelPickerP
   }
 
   const model = resolveSelectedModel(models, selectedModel, defaultEntry?.resolvedModel)
+  // Learn an unseen model's effort levels so its first message can use them.
+  useProbeModelOptions(
+    workspaceId,
+    data?.probesModelOptions && model && model.supportsEffort === undefined ? model.value : null
+  )
+  if (sessionId && sessionConfig === undefined) return null
   if (!model) return null
   const effortLevels = model.supportsEffort ? (model.supportedEffortLevels ?? []) : []
   const currentEffort = resolveDisplayedEffort(effortLevels, selectedEffort, model.defaultEffort)

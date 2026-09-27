@@ -6,6 +6,7 @@ import type { WorkspaceEntry, WorkspaceType } from '@/lib/types'
 
 import { claudeCodeHarness } from './claude-code'
 import { codexHarness } from './codex'
+import { fxHarness } from './fx'
 import { hermesHarness } from './hermes'
 import { openclawHarness } from './openclaw'
 import type { Harness } from './types'
@@ -16,7 +17,8 @@ const harnesses = {
   'claude-code': claudeCodeHarness,
   openclaw: openclawHarness,
   codex: codexHarness,
-  hermes: hermesHarness
+  hermes: hermesHarness,
+  fx: fxHarness
 } satisfies Partial<Record<WorkspaceType, Harness>>
 
 // An untyped registry entry is a Claude Code workspace (pre-typing legacy).

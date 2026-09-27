@@ -280,6 +280,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     view,
     chatLoaded,
     previewTurn,
+    queuedTurns,
     sessionId,
     processing,
     error,
@@ -612,6 +613,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       hasWorkspaceApplets={hasWorkspaceApplets}
       view={view}
       previewTurn={previewTurn}
+      queuedTurns={queuedTurns}
       sessionId={sessionId}
       processing={processing}
       composerBanner={activeDraftBuilder ? builderComposerBanner : composerBanner}
@@ -635,6 +637,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       hasWorkspaceApplets={hasWorkspaceApplets}
       view={view}
       previewTurn={previewTurn}
+      queuedTurns={queuedTurns}
       sessionId={sessionId}
       processing={processing}
       composerBanner={composerBanner}
@@ -812,6 +815,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
               hasWorkspaceApplets={hasWorkspaceApplets}
               view={view}
               previewTurn={previewTurn}
+              queuedTurns={queuedTurns}
               sessionId={sessionId}
               processing={processing}
               composerBanner={activeDraftBuilder ? builderComposerBanner : composerBanner}

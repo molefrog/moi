@@ -16,12 +16,15 @@ type Entry = {
 }
 
 const entries = new Map<string, Entry>()
+const keyOf = (workspacePath: string, provider = 'hermes') =>
+  JSON.stringify([provider, workspacePath])
 
 export function peekAcpModelState(
   workspacePath: string,
-  fingerprint?: string
+  fingerprint?: string,
+  provider = 'hermes'
 ): Promise<AcpModelState | undefined> | undefined {
-  const entry = entries.get(workspacePath)
+  const entry = entries.get(keyOf(workspacePath, provider))
   if (!entry) return undefined
   if (
     fingerprint !== undefined &&
@@ -35,9 +38,10 @@ export function peekAcpModelState(
 export function storeAcpModelState(
   workspacePath: string,
   state: Promise<AcpModelState | undefined>,
-  fingerprint?: string
+  fingerprint?: string,
+  provider = 'hermes'
 ): void {
-  entries.set(workspacePath, { state, fingerprint })
+  entries.set(keyOf(workspacePath, provider), { state, fingerprint })
 }
 
 // Seed from a `session/new` moi made anyway. Empty catalogs are skipped so a
@@ -45,13 +49,40 @@ export function storeAcpModelState(
 export function cacheAcpModelState(
   workspacePath: string,
   models: AcpModelState | null | undefined,
-  fingerprint?: string
+  fingerprint?: string,
+  provider = 'hermes'
 ): void {
   if (models?.availableModels?.length) {
-    storeAcpModelState(workspacePath, Promise.resolve(models), fingerprint)
+    const previous = entries.get(keyOf(workspacePath, provider))
+    const state =
+      previous && previous.fingerprint === fingerprint && models.configOptionsByModel
+        ? previous.state.then(
+            prior => {
+              if (prior?.configOptionsScope !== models.configOptionsScope) return models
+              // The latest observation replaces this model's full selector list,
+              // including an empty list. Other models keep their known choices.
+              const known = { ...prior?.configOptionsByModel, ...models.configOptionsByModel }
+              return {
+                ...models,
+                configOptionsByModel: Object.fromEntries(
+                  models.availableModels!.flatMap(model =>
+                    known[model.modelId] ? [[model.modelId, known[model.modelId]]] : []
+                  )
+                )
+              }
+            },
+            () => models
+          )
+        : Promise.resolve(models)
+    storeAcpModelState(workspacePath, state, fingerprint, provider)
   }
 }
 
-export function clearAcpModelCache(workspacePath: string): void {
-  entries.delete(workspacePath)
+export function clearAcpModelCache(workspacePath: string, provider?: string): void {
+  if (provider) entries.delete(keyOf(workspacePath, provider))
+  else
+    for (const key of entries.keys()) {
+      const [, path] = JSON.parse(key) as [string, string]
+      if (path === workspacePath) entries.delete(key)
+    }
 }
