@@ -91,10 +91,12 @@ jobs:
       # No NODE_AUTH_TOKEN: npm detects the OIDC environment and mints a
       # short-lived credential. Provenance is attached automatically.
       - name: Publish to npm
-        # prepack inlines the tldraw license key into the client bundle; fail
-        # rather than ship a build that nags about a missing license.
+        # prepack inlines the tldraw license key into the client bundle. Unset →
+        # keyless build: the Scratchpad works with tldraw's watermark. An expired
+        # key is worse (tldraw blanks the canvas), so delete the variable rather
+        # than leave a dead key in it. See docs/moi-scratchpad.md § License key.
         env:
           PUBLIC_TLDRAW_LICENSE_KEY: ${{ vars.PUBLIC_TLDRAW_LICENSE_KEY }}
         run: |
-          [ -n "$PUBLIC_TLDRAW_LICENSE_KEY" ] || { echo "::error::PUBLIC_TLDRAW_LICENSE_KEY variable is not set"; exit 1; }
+          [ -n "$PUBLIC_TLDRAW_LICENSE_KEY" ] || echo "::warning::PUBLIC_TLDRAW_LICENSE_KEY is not set, publishing a keyless build (tldraw watermark on the Scratchpad)"
           npm publish --tag ${{ steps.meta.outputs.dist_tag }}
