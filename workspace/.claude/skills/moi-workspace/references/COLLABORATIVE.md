@@ -126,4 +126,26 @@ separate presence values in multiple tabs.
 Channel names are local to the applet, not to `PresenceGroup`. Include record IDs in your
 values when an activity belongs to a particular record.
 
+## Component props cheat sheet
+
+All components accept optional `className: string` except `PresenceGroup`. The last column
+lists optional props, with defaults where applicable.
+
+| Component                          | Required props                                           | Optional props and defaults                                                                                                    |
+| ---------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `User`                             | `id: string`                                             | `size="md"` (`xs`, `sm`, `md`, `lg`); `avatarOnly=false`; `you=false`; `detail: ReactNode`; `showStatus=true`; `label: string` |
+| `Facepile`                         | `ids: readonly string[]`                                 | `size="sm"` (`xs`, `sm`, `md`); `max=3`; `showStatus=false`                                                                    |
+| `Activity`                         | None                                                     | `scope="page"` (`page`, `workspace`)                                                                                           |
+| `Cursors`                          | `children: ReactNode`                                    | `surface="default"` (string)                                                                                                   |
+| `PresenceFrame` / `PresenceGutter` | `id: string`; `children`: exactly one React element      | None beyond `className`                                                                                                        |
+| `PresenceGroup`                    | `id: string`; `children: ReactNode`                      | None                                                                                                                           |
+| `Selection`                        | `id: string`; `selected: boolean`; `children: ReactNode` | None beyond `className`                                                                                                        |
+
+- `User`: `avatarOnly` hides the visible name and detail; `you` adds a manual “(you)” suffix;
+  `detail` adds secondary content. `label` sets the avatar tooltip and accessible label, not
+  the visible user name. `showStatus` shows a dot for active users.
+- `Facepile`: duplicate IDs appear once; users beyond `max` become a `+N` overflow indicator.
+- Only `User` and `Facepile` accept `size`. `Activity` shows all matching users and has no
+  `size` or `max` prop.
+
 See `.moi/collab-env.d.ts` for the complete public types and component props.
