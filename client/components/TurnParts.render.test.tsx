@@ -15,7 +15,7 @@ import {
   AssistantTurnParts,
   TurnParts,
   splitCompletedAssistantParts
-} from '@/client/features/chat/TurnView'
+} from '@/client/features/chat/messages/TurnView'
 import type { Part } from '@/lib/types'
 
 const render = (parts: Part[], processing: boolean) =>

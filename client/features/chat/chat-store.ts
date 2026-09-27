@@ -1,41 +1,8 @@
+import type { StagedAttachment, StagedAttachmentPatch } from './composer/attachments/types'
 import { useStore } from 'zustand'
 import { createStore } from 'zustand/vanilla'
 
-import type {
-  PreviewBlock,
-  PreviewFrame,
-  SessionActivity,
-  UploadInfo,
-  WorkspaceTabId
-} from '@/lib/types'
-
-// One composer attachment, tracked per session until the message is sent. A
-// file uploads as soon as it's added (drop/paste/pick); an annotation stays a
-// local `draft` while it's being drawn and uploads once when the drawing
-// session ends. `status` reflects that lifecycle, and `upload` holds the server
-// handle once ready. `previewUrl` is a local object URL for image thumbnails
-// (revoked on remove/clear).
-type ChatAttachmentBase = {
-  localId: string
-  name: string
-  mediaType: string
-  previewUrl?: string
-  status: 'draft' | 'uploading' | 'ready' | 'error'
-  upload?: UploadInfo
-  error?: string
-}
-
-export type DrawingPurpose = 'annotation' | 'sketch'
-
-export type ChatAttachment = ChatAttachmentBase &
-  (
-    | { kind: 'file'; purpose?: never; sourceTab?: never }
-    | { kind: 'drawing'; purpose: DrawingPurpose; sourceTab: WorkspaceTabId }
-  )
-
-type ChatAttachmentPatch = Partial<
-  Pick<ChatAttachmentBase, 'name' | 'mediaType' | 'previewUrl' | 'status' | 'upload' | 'error'>
->
+import type { PreviewBlock, PreviewFrame, SessionActivity } from '@/lib/types'
 
 // App-level ephemeral chat state — the bits that are *pushed* from the server
 // over the WebSocket and can't be re-fetched as request/response data:
@@ -121,7 +88,7 @@ export type LiveStore = {
   previews: Record<string, LivePreview>
   // Composer attachments are per chat, survive composer remounts, and clear on
   // send. Draft text is workspace-local persisted UI state (client/store/ui).
-  attachments: Record<string, ChatAttachment[]>
+  attachments: Record<string, StagedAttachment[]>
 
   setActivity: (workspaceId: string, sessionId: string, value: SessionActivity) => void
   // Authoritative reconcile from a server `status_snapshot`: exactly the listed
@@ -131,16 +98,12 @@ export type LiveStore = {
     sessions: { workspaceId: string; sessionId: string; activity: SessionActivity }[]
   ) => void
   setError: (workspaceId: string, sessionId: string, message: string | null) => void
-  addAttachments: (workspaceId: string, sessionId: string | null, items: ChatAttachment[]) => void
-  updateAttachment: (
-    workspaceId: string,
-    sessionId: string | null,
-    localId: string,
-    patch: ChatAttachmentPatch
-  ) => void
-  removeAttachment: (workspaceId: string, sessionId: string | null, localId: string) => void
+  addAttachments: (workspaceId: string, sessionId: string | null, items: StagedAttachment[]) => void
+  updateAttachment: (workspaceId: string, localId: string, patch: StagedAttachmentPatch) => void
+  removeAttachment: (workspaceId: string, localId: string) => void
   clearAttachments: (workspaceId: string, sessionId: string | null) => void
-  renameSession: (workspaceId: string, from: string, to: string) => void
+  // `null` assigns the new-chat draft its first session id.
+  renameSession: (workspaceId: string, from: string | null, to: string) => void
 
   // Upsert a preview snapshot (last write wins — blocks are cumulative).
   setPreview: (frame: Omit<PreviewFrame, 'type'>) => void
@@ -154,6 +117,19 @@ export type LiveStore = {
   clearAllPreviews: () => void
   // Reap previews older than `maxAgeMs` (TTL backstop against a missed clear).
   sweepPreviews: (maxAgeMs: number, now: number) => void
+}
+
+// Stable IDs keep asynchronous attachment work attached to a renamed session.
+export function findAttachment(
+  attachments: LiveStore['attachments'],
+  workspaceId: string,
+  localId: string
+) {
+  for (const [key, items] of Object.entries(attachments)) {
+    if (!key.startsWith(`${workspaceId}:`)) continue
+    const attachment = items.find(item => item.localId === localId)
+    if (attachment) return { key, attachment }
+  }
 }
 
 export const liveStore = createStore<LiveStore>()(set => ({
@@ -224,30 +200,35 @@ export const liveStore = createStore<LiveStore>()(set => ({
       return { attachments: { ...s.attachments, [k]: [...(s.attachments[k] ?? []), ...items] } }
     }),
 
-  updateAttachment: (workspaceId, sessionId, localId, patch) =>
+  updateAttachment: (workspaceId, localId, patch) =>
     set(s => {
-      const k = attachmentKey(workspaceId, sessionId)
+      const found = findAttachment(s.attachments, workspaceId, localId)
+      if (!found) return {}
+      const { key: k, attachment: target } = found
       const list = s.attachments[k]
-      if (!list) return {}
-      const target = list.find(attachment => attachment.localId === localId)
-      if (target?.previewUrl && 'previewUrl' in patch && patch.previewUrl !== target.previewUrl) {
+      if (
+        target.kind !== 'text' &&
+        target.previewUrl &&
+        'previewUrl' in patch &&
+        patch.previewUrl !== target.previewUrl
+      ) {
         URL.revokeObjectURL(target.previewUrl)
       }
       return {
         attachments: {
           ...s.attachments,
-          [k]: list.map(a => (a.localId === localId ? { ...a, ...patch } : a))
+          [k]: list.map(a => (a.localId === localId && a.kind !== 'text' ? { ...a, ...patch } : a))
         }
       }
     }),
 
-  removeAttachment: (workspaceId, sessionId, localId) =>
+  removeAttachment: (workspaceId, localId) =>
     set(s => {
-      const k = attachmentKey(workspaceId, sessionId)
+      const found = findAttachment(s.attachments, workspaceId, localId)
+      if (!found) return {}
+      const { key: k, attachment: target } = found
       const list = s.attachments[k]
-      if (!list) return {}
-      const target = list.find(a => a.localId === localId)
-      if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl)
+      if (target.kind !== 'text' && target.previewUrl) URL.revokeObjectURL(target.previewUrl)
       return { attachments: { ...s.attachments, [k]: list.filter(a => a.localId !== localId) } }
     }),
 
@@ -255,7 +236,7 @@ export const liveStore = createStore<LiveStore>()(set => ({
     set(s => {
       const k = attachmentKey(workspaceId, sessionId)
       for (const a of s.attachments[k] ?? []) {
-        if (a.previewUrl) URL.revokeObjectURL(a.previewUrl)
+        if (a.kind !== 'text' && a.previewUrl) URL.revokeObjectURL(a.previewUrl)
       }
       const next = { ...s.attachments }
       delete next[k]
@@ -264,7 +245,7 @@ export const liveStore = createStore<LiveStore>()(set => ({
 
   renameSession: (workspaceId, from, to) =>
     set(s => {
-      const fromKey = key(workspaceId, from)
+      const fromKey = attachmentKey(workspaceId, from)
       const toKey = key(workspaceId, to)
       const activity = { ...s.activity }
       const errors = { ...s.errors }
@@ -289,7 +270,17 @@ export const liveStore = createStore<LiveStore>()(set => ({
           previews[id] = { ...p, sessionId: to }
         }
       }
-      return { activity, errors, previews }
+      // Upload completions use stable attachment IDs, so every draft item can
+      // follow the chat through both temporary and provider session IDs.
+      let attachments = s.attachments
+      if (fromKey !== toKey && attachments[fromKey]) {
+        attachments = {
+          ...attachments,
+          [toKey]: [...(attachments[toKey] ?? []), ...attachments[fromKey]]
+        }
+        delete attachments[fromKey]
+      }
+      return { activity, errors, previews, attachments }
     })
 }))
 

@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
+import { appendAttachments } from '@/lib/moi-attachments'
 import type { OpenClawMessage } from './discovery'
 import { flattenToolResultContent, toSessionInfo, toStreamEvents } from './adapter'
 
@@ -63,6 +64,22 @@ describe('toSessionInfo', () => {
         '/workspace'
       ).summary
     ).toBe('**Build a dashboard**')
+  })
+
+  test('uses the attachment label for an attachment-only preview', () => {
+    expect(
+      toSessionInfo(
+        {
+          key: 'agent:main:one',
+          sessionId: 'one',
+          updatedAt: 1,
+          lastMessagePreview: appendAttachments('', [
+            { type: 'image', label: 'Sketch.png', mediaType: 'image/png' }
+          ])
+        },
+        '/workspace'
+      ).summary
+    ).toBe('Sketch.png')
   })
 
   test('suppresses the webchat origin — that is moi itself', () => {

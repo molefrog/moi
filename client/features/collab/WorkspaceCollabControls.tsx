@@ -8,7 +8,8 @@ import {
   IconUserEdit
 } from '@tabler/icons-react'
 import type { Icon as TabIcon } from '@tabler/icons-react'
-import { Link, useLocation } from 'wouter'
+import { Link, useRouter } from 'wouter'
+import { usePathname } from 'wouter/use-browser-location'
 
 import { Button, buttonVariants } from '@/client/components/ui/button'
 import {
@@ -20,7 +21,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { cn } from '@/client/lib/cn'
 import type { WorkspaceTabId } from '@/lib/types'
-import { parseWorkspaceTab } from '@/lib/workspace-tabs'
+import { tabFromPath } from '@/lib/navigation'
 import { Avatar, AvatarFallback } from '@/ui-components/avatar'
 
 import { User } from './primitives'
@@ -49,8 +50,9 @@ export function WorkspaceCollabControls({
   const state = useConnection()
   const users = useWorkspaceUsers()
   const identity = useSyncExternalStore(subscribeIdentityStore, getIdentity, getIdentity)
-  const [path] = useLocation()
-  const page = pageFromPath(path)
+  const router = useRouter()
+  const path = usePathname(router)
+  const page = pageFromPath(path, workspaceId, router.base)
   const people = groupPeople(state.participants, {
     identity,
     connectionId: state.connectionId,
@@ -155,7 +157,7 @@ type Place = { where: string; Icon?: TabIcon; target: WorkspaceTabId | null; awa
 
 function placeOf(person: PresentPerson, page: string, describeTab: DescribeTab): Place {
   const tabs = person.pages.map(candidate => {
-    const tab = parseWorkspaceTab(candidate)
+    const tab = tabFromPath(candidate)
     return { tab, info: tab ? describeTab(tab) : null }
   })
   const away = tabs.length === 0

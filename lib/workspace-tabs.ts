@@ -1,7 +1,4 @@
-// Workspace tab addressing, shared by the client router, the control server,
-// and the CLI. A tab id doubles as the URL suffix of `/workspace/:id/<tab>` —
-// ids are URL-safe as-is (`:` is a legal path character), so building a path
-// is plain concatenation and parsing is plain validation.
+// Tab IDs are workspace-relative paths without query strings.
 import type { WorkspaceTabId } from './types'
 
 export function isWorkspaceTabId(value: unknown): value is WorkspaceTabId {
@@ -9,40 +6,19 @@ export function isWorkspaceTabId(value: unknown): value is WorkspaceTabId {
     value === 'agent' ||
     value === 'overview' ||
     value === 'scratchpad' ||
-    // One path segment: a URL wildcard can span segments, a tab id never does.
-    (typeof value === 'string' &&
-      (/^view:[^/]+$/.test(value) || /^view-builder:[^/]+$/.test(value)))
+    // Match the applet IDs accepted by the server's module routes.
+    (typeof value === 'string' && /^(views|view-builders)\/[a-zA-Z0-9_-]+$/.test(value))
   )
 }
 
-// The tab id carried by a URL's wildcard segment, or null when the segment is
-// missing or isn't a tab id (bare `/workspace/:id`, stale or mangled links).
-export function parseWorkspaceTab(segment: string | null | undefined): WorkspaceTabId | null {
-  return isWorkspaceTabId(segment) ? segment : null
-}
-
-export function workspaceTabPath(workspaceId: string, tab: WorkspaceTabId): string {
-  return `/workspace/${workspaceId}/${tab}`
-}
-
-export const viewTabId = (viewId: string): WorkspaceTabId => `view:${viewId}`
+export const viewTabId = (viewId: string): WorkspaceTabId => `views/${viewId}`
 export const viewIdFromTab = (tab: WorkspaceTabId): string | null =>
-  tab.startsWith('view:') ? tab.slice('view:'.length) : null
-export const viewBuilderTabId = (builderId: string): WorkspaceTabId => `view-builder:${builderId}`
+  tab.startsWith('views/') ? tab.slice('views/'.length) : null
+export const viewBuilderTabId = (builderId: string): WorkspaceTabId => `view-builders/${builderId}`
 export const viewBuilderIdFromTab = (tab: WorkspaceTabId): string | null =>
-  tab.startsWith('view-builder:') ? tab.slice('view-builder:'.length) : null
+  tab.startsWith('view-builders/') ? tab.slice('view-builders/'.length) : null
 
-// The only params shape focusTab / `moi tabs focus` carry: one JSON-plain
-// object. Arrays and null are valid JSON but not a params record.
+// A record check shared by JSON boundary validators.
 export function isParamsRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-// Applet params as read back from navigation state (`state.appletParams`).
-// Anything malformed degrades to `{}` — a view must render with empty params
-// anyway (fresh mount, new browser tab, plain tab-bar click).
-export function readAppletParams(state: unknown): Record<string, unknown> {
-  if (!isParamsRecord(state)) return {}
-  const params = (state as { appletParams?: unknown }).appletParams
-  return isParamsRecord(params) ? params : {}
 }

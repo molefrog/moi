@@ -5,7 +5,7 @@ import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useAppConfig } from '@/client/api/app-config'
 import { LedLogo } from '@/client/components/shared/LedLogo'
 import { SidebarLayout } from '@/client/app/shell/SidebarLayout'
-import { useSelectedSession } from '@/client/features/chat/useSelectedSession'
+import { useSelectedSession } from '@/client/features/chat/sessions/useSelectedSession'
 import { useAppletCacheInvalidation } from '@/client/features/applets/useApplet'
 import { Workspace } from '@/client/features/workspace/WorkspaceContext'
 import {
@@ -21,8 +21,8 @@ type WorkspaceRouteProps = {
   id: string
 }
 
-// The URL's tab segment is not threaded down — useWorkspaceNavigation reads it
-// off the matched route with wouter's `useParams`.
+// Navigation reads the raw browser address so encoded paths and query params
+// are decoded exactly once; the route only owns the workspace ID.
 export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
   return (
     <Workspace id={id}>

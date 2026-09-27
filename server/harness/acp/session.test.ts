@@ -1,3 +1,4 @@
+import { splitAttachments } from '@/lib/moi-attachments'
 // Tests for the ACP session layer against a mock ACP agent (a tiny
 // newline-JSON-RPC script), exercising the REAL client transport + session
 // record + adapter — everything except a live backend. Covers the replay path
@@ -298,7 +299,11 @@ describe('ACP session replay', () => {
     const turns = events.flatMap(e => (e.kind === 'turn' ? [e.turn] : []))
     expect(turns.map(t => t.role)).toEqual(['user', 'assistant'])
     expect(turns[0].parts).toEqual([
-      { type: 'file', mediaType: 'image/png', url: 'data:image/png;base64,aGVsbG8=' }
+      {
+        type: 'file-attachment',
+        mediaType: 'image/png',
+        previewUrl: 'data:image/png;base64,aGVsbG8='
+      }
     ])
   })
 })
@@ -374,4 +379,21 @@ describe('ACP model state', () => {
     ])
     expect(calls[3].params).toEqual({ sessionId: agent.sessionId, modelId: 'model-b' })
   })
+})
+
+test('text-attachment-only sends reach the ACP prompt and retain display parts', async () => {
+  const agent = await mockAgent()
+  const textAttachments = [{ source: 'view:orders', label: 'Order', text: 'Order ID: 1' }]
+  await sendAcpMessage(agent.config, {
+    ...agent.ctx,
+    sessionId: agent.sessionId,
+    isNew: false,
+    content: '',
+    attachments: textAttachments.map(a => ({ type: 'text' as const, ...a }))
+  })
+  const prompt = (await agent.calls()).find(call => call.method === 'session/prompt')!
+  const params = prompt.params as { prompt: Array<{ type: string; text?: string }> }
+  expect(splitAttachments(params.prompt.find(b => b.type === 'text')!.text!).attachments).toEqual(
+    textAttachments.map(a => ({ type: 'text', ...a }))
+  )
 })

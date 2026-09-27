@@ -29,7 +29,12 @@ export function ChatPopup({
     nextOpen,
     eventDetails
   ) => {
-    if (!nextOpen && eventDetails.reason === 'outside-press') {
+    // Applet actions move focus outside before their click handler runs.
+    // Keep chat open so adding context only refocuses the existing composer.
+    if (
+      !nextOpen &&
+      (eventDetails.reason === 'outside-press' || eventDetails.reason === 'focus-out')
+    ) {
       eventDetails.cancel()
       return
     }

@@ -8,6 +8,7 @@
 //
 // `toStreamEvents` is the cold path (REST replay); `messageToTurn` is the
 // per-frame path the live session uses.
+import { replayAttachmentParts, stripAttachmentsLoose } from '@/lib/moi-attachments'
 import type { Part, StreamEvent, ToolCall, ToolState, Turn, TurnMeta } from '@/lib/format'
 import type { SessionInfo } from '@/lib/types'
 
@@ -28,7 +29,9 @@ import { stripSubagentEnvelope, stripUserMessageMetadata } from './strip'
 // every title source, not just the preview, so no title shows the envelope.
 // A no-op on channel/cron labels that never contain it.
 function cleanTitle(text: string | undefined): string {
-  return stripSubagentEnvelope(stripMoiContextLoose(text?.trim() ?? '')).trim()
+  return stripSubagentEnvelope(
+    stripAttachmentsLoose(stripMoiContextLoose(text?.trim() ?? ''))
+  ).trim()
 }
 
 export function toSessionInfo(row: OpenClawSessionRow, cwd: string): SessionInfo {
@@ -36,7 +39,9 @@ export function toSessionInfo(row: OpenClawSessionRow, cwd: string): SessionInfo
     cleanTitle(row.label) ||
     cleanTitle(row.displayName) ||
     cleanTitle(row.derivedTitle) ||
-    formatChatTitle(cleanTitle(row.lastMessagePreview)) ||
+    formatChatTitle(
+      stripSubagentEnvelope(stripMoiContextLoose(row.lastMessagePreview?.trim() ?? ''))
+    ) ||
     ''
   // External channel provenance. 'webchat' is moi's own chat surface — only
   // real external channels (telegram/irc/discord/…) get an origin badge.
@@ -224,9 +229,22 @@ export function messageToTurn(
     : typeof msg.content === 'string'
       ? [{ type: 'text', text: msg.content }]
       : []
-  const parts = blocks
-    .map(b => blockToPart(b, msg.role, results, omitToolCallIds))
+  const rawParts = blocks
+    .flatMap(b => {
+      if (msg.role === 'user' && b.type === 'text' && typeof b.text === 'string') {
+        return [
+          blockToPart(
+            { ...b, text: stripUserMessageMetadata(b.text) },
+            msg.role,
+            results,
+            omitToolCallIds
+          )
+        ]
+      }
+      return [blockToPart(b, msg.role, results, omitToolCallIds)]
+    })
     .filter((p): p is Part => p !== null)
+  const parts = msg.role === 'user' ? replayAttachmentParts(rawParts) : rawParts
   if (parts.length === 0) return null
   const ocId = msg.__openclaw?.id
   const seq = msg.__openclaw?.seq

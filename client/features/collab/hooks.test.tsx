@@ -6,6 +6,7 @@ import { setIdentity } from './identity'
 import {
   AppletCollabProvider,
   CollabBackendProvider,
+  pageFromPath,
   useMe,
   usePeers,
   usePresence,
@@ -17,6 +18,20 @@ import type { CollabUser } from './hooks'
 
 const alice = { id: 'alice', name: 'Alice', color: '#0f766e' }
 const bob = { id: 'bob', name: 'Bob', color: '#2563eb' }
+
+test('presence pages follow nested navigation paths and deployment bases, decoding once', () => {
+  expect(pageFromPath('/workspace/test/views/board', 'test')).toBe('views/board')
+  expect(pageFromPath('/prefix/workspace/test/view-builders/draft', 'test', '/prefix')).toBe(
+    'view-builders/draft'
+  )
+  expect(pageFromPath('/prefix/workspace/test/views/%62oard', 'test', '/prefix')).toBe(
+    'views/board'
+  )
+  expect(pageFromPath('/workspace/test/views/%2562oard', 'test')).toBe('views/%2562oard')
+  expect(pageFromPath('/workspace/test/view:board', 'test')).toBe('views/board')
+  expect(pageFromPath('/workspace/test', 'test')).toBe('overview')
+})
+
 function Observer() {
   return (
     <output>

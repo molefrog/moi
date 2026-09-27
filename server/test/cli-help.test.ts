@@ -74,13 +74,26 @@ describe('moi --help (e2e)', () => {
     expect(out).not.toContain('System commands:')
   }, 30_000)
 
-  test('tabs owns the focus subcommand without a singular alias', async () => {
+  test('navigation has its own command and tabs is discovery only', async () => {
     const rootHelp = await runHelp({})
     const tabsHelp = await runHelp({}, 'tabs')
 
-    expect(rootHelp).toContain('moi tabs focus <tab-id>')
+    expect(rootHelp).toContain('navigate')
+    expect(rootHelp).not.toContain('tabs focus')
     expect(rootHelp).not.toMatch(/^\s+tab\s/m)
-    expect(tabsHelp).toContain('focus    Focus a workspace tab in every open client')
-    expect(tabsHelp).toContain('Use moi tabs <command> --help')
+    expect(tabsHelp).not.toContain('focus')
+    const navigationHelp = await runHelp({}, 'navigate')
+    expect(navigationHelp).not.toContain('--replace')
+    expect(navigationHelp).toContain('moi:/views/events')
   }, 30_000)
+})
+
+test('removed tab focus command fails before contacting a server', async () => {
+  const proc = Bun.spawn(['bun', CLI, 'tabs', 'focus', 'view:events'], {
+    stdout: 'pipe',
+    stderr: 'pipe'
+  })
+  const [error, code] = await Promise.all([new Response(proc.stderr).text(), proc.exited])
+  expect(code).toBe(1)
+  expect(error).toContain('Use moi navigate <address>')
 })

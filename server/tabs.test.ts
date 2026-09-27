@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import type { ViewInfo } from '@/lib/types'
 
-import { assembleTabRows, resolveFocusTab } from './tabs'
+import { assembleTabRows, assertNavigableTab } from './tabs'
 
 const views: ViewInfo[] = [
   { id: 'roadmap', config: { title: 'Roadmap' } },
@@ -11,62 +11,45 @@ const views: ViewInfo[] = [
 
 describe('assembleTabRows', () => {
   test('lists static tabs then views, marking the saved default', () => {
-    const rows = assembleTabRows(views, 'view:roadmap')
+    const rows = assembleTabRows(views, 'views/roadmap')
     expect(rows.map(r => r.id)).toEqual([
       'overview',
       'agent',
       'scratchpad',
-      'view:roadmap',
-      'view:orders'
+      'views/roadmap',
+      'views/orders'
     ])
-    expect(rows.find(r => r.isDefault)?.id).toBe('view:roadmap')
+    expect(rows.find(r => r.isDefault)?.id).toBe('views/roadmap')
   })
 
   test('falls back to the view id when the title is empty', () => {
     const rows = assembleTabRows(views, 'agent')
-    expect(rows.find(r => r.id === 'view:orders')?.title).toBe('orders')
-    expect(rows.find(r => r.id === 'view:roadmap')?.title).toBe('Roadmap')
+    expect(rows.find(r => r.id === 'views/orders')?.title).toBe('orders')
+    expect(rows.find(r => r.id === 'views/roadmap')?.title).toBe('Roadmap')
   })
 
   test('a default that maps to no row marks nothing', () => {
-    const rows = assembleTabRows(views, 'view-builder:abc')
+    const rows = assembleTabRows(views, 'view-builders/abc')
     expect(rows.every(r => !r.isDefault)).toBe(true)
   })
 })
 
-describe('resolveFocusTab', () => {
-  const deps = {
-    hasView: (id: string) => Promise.resolve(id === 'roadmap'),
-    viewList: () => Promise.resolve(views)
-  }
+test('discovery includes portable links but no singleton chat contract', () => {
+  const rows = assembleTabRows(views, 'overview')
+  expect(rows.find(row => row.id === 'views/orders')?.href).toBe('moi:/views/orders')
+  expect(rows.find(row => row.id === 'agent')?.href).toBeUndefined()
+})
 
-  test('accepts static tab ids', async () => {
-    expect(await resolveFocusTab('overview', deps)).toEqual({ ok: true, tab: 'overview' })
-    expect(await resolveFocusTab('agent', deps)).toEqual({ ok: true, tab: 'agent' })
-    expect(await resolveFocusTab('scratchpad', deps)).toEqual({ ok: true, tab: 'scratchpad' })
+describe('assertNavigableTab', () => {
+  test('accepts built-in destinations and built views', () => {
+    expect(() => assertNavigableTab('overview', views)).not.toThrow()
+    expect(() => assertNavigableTab('scratchpad', views)).not.toThrow()
+    expect(() => assertNavigableTab('views/orders', views)).not.toThrow()
   })
 
-  test('accepts a view tab whose view exists', async () => {
-    expect(await resolveFocusTab('view:roadmap', deps)).toEqual({ ok: true, tab: 'view:roadmap' })
-  })
-
-  test('rejects an unknown view id, listing the valid ids', async () => {
-    const result = await resolveFocusTab('view:nope', deps)
-    expect(result.ok).toBe(false)
-    if (!result.ok) {
-      expect(result.error).toContain('view:nope')
-      expect(result.error).toContain('overview, agent, scratchpad, view:roadmap, view:orders')
-    }
-  })
-
-  test('rejects the old Widgets tab id', async () => {
-    expect((await resolveFocusTab('widgets', deps)).ok).toBe(false)
-  })
-
-  test('rejects view-builder tabs and garbage', async () => {
-    expect((await resolveFocusTab('view-builder:abc', deps)).ok).toBe(false)
-    expect((await resolveFocusTab('Roadmap', deps)).ok).toBe(false)
-    expect((await resolveFocusTab('', deps)).ok).toBe(false)
-    expect((await resolveFocusTab(undefined, deps)).ok).toBe(false)
+  test('lists the current addresses when a view is missing', () => {
+    expect(() => assertNavigableTab('views/order', views)).toThrow(
+      'Unknown destination "moi:/views/order". Valid addresses: moi:/overview, moi:/scratchpad, moi:/views/roadmap, moi:/views/orders'
+    )
   })
 })

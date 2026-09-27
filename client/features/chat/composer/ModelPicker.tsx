@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react'
 
 import { IconBolt, IconBoltFilled } from '@tabler/icons-react'
 
-import { useSaveSessionConfig, useSessionConfig } from '../api'
+import { useSaveSessionConfig, useSessionConfig } from '../sessions/api'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import {
   groupModels,
@@ -36,19 +36,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { cn } from '@/client/lib/cn'
 import type { Model } from '@/lib/types'
-
-// Models describe themselves with a " · "-joined blurb; we show only the
-// headline (e.g. "Opus 4.8 with 1M context · Most capable…" → "Opus 4.8 with 1M context").
-function headline(description?: string): string {
-  return description?.split(/\s*·\s*/)[0] ?? ''
-}
-
-// Row and trigger label. Claude's description headline names the model better
-// than its `displayName` ("Sonnet 4.6 with 1M context" vs "Sonnet"); backends
-// without one fall back to the name.
-function modelLabel(model: Model): string {
-  return headline(model.description) || model.displayName
-}
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
@@ -100,7 +87,7 @@ type ModelDropdownProps = {
 }
 
 function ModelDropdown({ current, model, models, onValueChange }: ModelDropdownProps) {
-  const label = modelLabel(model)
+  const label = model.displayName
   const groups = groupModels(models, 'Models')
 
   return (
@@ -115,7 +102,7 @@ function ModelDropdown({ current, model, models, onValueChange }: ModelDropdownP
               <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
               {group.models.map(item => (
                 <DropdownMenuRadioItem key={item.value} value={item.value} closeOnClick>
-                  {modelLabel(item)}
+                  {item.displayName}
                 </DropdownMenuRadioItem>
               ))}
             </DropdownMenuGroup>

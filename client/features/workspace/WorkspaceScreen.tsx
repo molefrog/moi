@@ -17,12 +17,11 @@ import { DrawingLayer } from '@/client/features/drawings/DrawingLayer'
 import { DrawingToolbar } from '@/client/features/drawings/DrawingToolbar'
 import { useChatAnnotation } from '@/client/features/drawings/useChatAnnotation'
 import { ChatPanel } from '@/client/features/chat/ChatPanel'
-import type { WelcomeDestination } from '@/client/features/chat/ChatEmptyState'
+import type { WelcomeDestination } from '@/client/features/chat/messages/ChatEmptyState'
 import { ChatPopup } from '@/client/features/chat/ChatPopup'
 import { ThemePanel } from '@/client/features/workspace/ThemePanel'
-import { useAppletEvent } from '@/client/features/applets/applet-runtime'
 import { Overview } from '@/client/features/overview/Overview'
-import { CollabControls, useCollabIdentityEnabled } from '@/client/features/collab/entry'
+import { CollabControls } from '@/client/features/collab/entry'
 import { PanelHeader } from '@/client/components/shared/PanelHeader'
 import { WorkspaceIcon } from '@/client/components/shared/WorkspaceIcon'
 import { Button } from '@/client/components/ui/button'
@@ -34,7 +33,10 @@ import {
   DropdownMenuTrigger
 } from '@/client/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
-import { useAppletChatMessage } from '@/client/features/chat/useAppletChatMessage'
+import {
+  useAppletChatMessage,
+  useAppletChatAttachment
+} from '@/client/features/chat/applet-chat-intents'
 import { useChat } from '@/client/features/chat/useChat'
 import {
   WorkspaceSettingsDialog,
@@ -86,6 +88,7 @@ import {
 } from '@/lib/workspace-tabs'
 
 import { WorkspaceSplitLayout } from './WorkspaceSplitLayout'
+import { UnavailablePage } from './UnavailablePage'
 
 const Scratchpad = lazy(() =>
   import('@/client/features/scratchpad/Scratchpad').then(module => ({
@@ -218,7 +221,6 @@ function WorkspaceMenu({ onOpenTheme }: WorkspaceMenuProps) {
 
 export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenProps) {
   const { layout, setLayout, workspaceId } = useWorkspaceLayoutCtx()
-  const collabIdentityEnabled = useCollabIdentityEnabled()
   const theme = resolveWorkspaceTheme(layout.theme)
   const builderActions = useViewBuilderActions()
   const {
@@ -260,7 +262,15 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
 
   // The tab address: URL in, active tab + applet params out, plus the persisted
   // tab state it keeps in sync. See useWorkspaceNavigation for the invariants.
-  const { tabsState, activeTab, appletParams, navigateToTab, setTabs } = useWorkspaceNavigation({
+  const {
+    tabsState,
+    activeTab,
+    appletParams,
+    navigateToTab,
+    setTabs,
+    isUnavailable,
+    onNavigationClick
+  } = useWorkspaceNavigation({
     views,
     builders,
     split: dockedSplit
@@ -370,7 +380,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
 
     // The URL follows a replaced builder tab to the view that took its place.
     const urlReplacement = replacements.get(activeTab)
-    if (urlReplacement) navigateToTab(urlReplacement)
+    if (urlReplacement) navigateToTab(urlReplacement, { replace: true })
 
     const replacementViews = new Set(replacements.values())
     const sourceForView = new Map(
@@ -408,8 +418,8 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
 
   // Tab switching is navigation; the saved default and the open set follow via
   // the navigation hook. Only the chat side effects belong to the screen.
-  const openTab = (tab: WorkspaceTabId, params?: Record<string, unknown>) => {
-    navigateToTab(tab, params)
+  const openTab = (tab: WorkspaceTabId) => {
+    navigateToTab(tab)
     if (tab === 'agent') {
       setFloatingChatOpen(false)
       setChatFocusRequest(request => request + 1)
@@ -433,18 +443,8 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     setFloatingChatOpen(false)
   }
 
-  // Focus requests from applet bridges arrive here already validated — the
-  // applet runtime narrows the untrusted tab id and params shape at the trust
-  // boundary (applet-runtime.ts). A well-formed id for a missing view just
-  // resolves to the default like any dead URL.
-  useAppletEvent(workspaceId, 'focusTab', openTab)
-
-  // `moi tabs focus` — a workspace event, not an applet call: the control
-  // server validated the target and params before publishing.
   useWorkspaceEvent(event => {
-    if (event.type === 'tab:focus' && event.workspaceId === workspaceId && !collabIdentityEnabled) {
-      openTab(event.tab, event.params)
-    } else if (
+    if (
       event.type === 'view:deleted' &&
       event.workspaceId === workspaceId &&
       activeTab === viewTabId(event.name)
@@ -516,7 +516,8 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   // Chat messages fired from applet UI. `openChat` is the reveal: on a view tab
   // in full-screen mode the chat is a closed popover, and a run the user can't
   // see is worse than a panel that opens itself.
-  useAppletChatMessage({ send, revealChat: openChat, agentAvailability })
+  useAppletChatMessage({ sessionId, send, revealChat: openChat, agentAvailability })
+  useAppletChatAttachment(sessionId, openChat)
 
   const createItems: CreateWorkspaceTabItem[] = [
     ...(!dockedSplit && !openSet.has('agent')
@@ -660,7 +661,9 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
           aria-hidden={annotationControls.active || undefined}
           className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background transition-colors duration-100 ease-out motion-reduce:transition-none"
         >
-          {activeTab === 'agent' ? (
+          {isUnavailable ? (
+            <UnavailablePage onOpenOverview={() => openTab('overview')} />
+          ) : activeTab === 'agent' ? (
             tabbedChat
           ) : activeTab === 'overview' ? (
             <Overview
@@ -695,7 +698,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
                   if (handle) builderRefs.current.set(builder.id, handle)
                   else builderRefs.current.delete(builder.id)
                 }}
-                active={activeBuilder?.id === builder.id}
+                active={!isUnavailable && activeBuilder?.id === builder.id}
                 builder={builder}
                 chatDocked={mode === 'split'}
                 workspaceId={workspaceId}
@@ -715,7 +718,11 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
                 mounted across tab switches (and collapses to nothing while
                 another tab is on screen), which is what makes a switch back
                 instant. */}
-          <ViewManager views={views} activeViewId={activeView?.id ?? null} params={appletParams} />
+          <ViewManager
+            views={views}
+            activeViewId={isUnavailable ? null : (activeView?.id ?? null)}
+            params={appletParams}
+          />
         </div>
 
         <DrawingLayer {...annotationLayerProps}>
@@ -772,7 +779,10 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   )
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col font-sans text-foreground">
+    <div
+      onClick={onNavigationClick}
+      className="relative flex h-full min-h-0 flex-col font-sans text-foreground"
+    >
       <div ref={rowRef} className="flex min-h-0 flex-1">
         {hasWorkspaceContent && canUseSplit && splitLayoutConstraints ? (
           <WorkspaceSplitLayout

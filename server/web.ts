@@ -1,8 +1,10 @@
+import { isMessageAttachments } from '@/lib/message-attachments'
 import type { ClientMessage, StatusSnapshotMessage } from '@/lib/types'
 import { isMoiContext, type MoiContext } from '@/lib/moi-context'
 
 import index from '../client/index.html'
 import { api } from './api'
+import { AttachmentUploadError } from './attachment-message'
 import { PORT } from './constants'
 import { control } from './control'
 import { getCollabReferencePath, isCollabEnabled } from './collab/config'
@@ -12,10 +14,18 @@ import { EVENTS_TOPIC, setEventServer } from './events'
 import { killBuildWorkers } from './applets/build-worker'
 import { killAllWorkers } from './functions'
 import { startScratchpadSweeper } from './scratchpad'
+import { navigationRelay } from './navigation-relay'
 import { resolveScratchOp } from './scratchpad-relay'
 import { allHarnesses, harnessFor } from './harness/registry'
 import { getWorkspace } from './registry'
-import { addClient, broadcastAll, getClientCount, removeClient, sendToClient } from './state'
+import {
+  addClient,
+  broadcast,
+  broadcastAll,
+  getClientCount,
+  removeClient,
+  sendToClient
+} from './state'
 import { startServiceLogMaintenance } from './service'
 import { distShell, prebuilt } from './static'
 import { renderStatus } from './status'
@@ -58,8 +68,7 @@ function isClientMessage(value: unknown): value is ClientMessage {
       (v.fastMode === undefined || typeof v.fastMode === 'boolean') &&
       (v.stream === undefined || typeof v.stream === 'boolean') &&
       (v.context === undefined || isMoiContext(v.context)) &&
-      (v.attachments === undefined ||
-        (Array.isArray(v.attachments) && v.attachments.every(a => typeof a === 'string')))
+      (v.attachments === undefined || isMessageAttachments(v.attachments))
     )
   if (v.type === 'stop') return typeof v.workspaceId === 'string' && typeof v.sessionId === 'string'
   if (v.type === 'scratchpad:op-result') return typeof v.opId === 'string'
@@ -167,7 +176,12 @@ export const app = Bun.serve<WsData>({
         collabManager.message(ws, message)
         return
       }
-      if (ws.data.channel !== 'chat') return
+      if (ws.data.channel === 'events') {
+        try {
+          navigationRelay.receive(ws, JSON.parse(String(message)))
+        } catch {}
+        return
+      }
       try {
         const data = JSON.parse(String(message))
         if (!isClientMessage(data)) return
@@ -187,8 +201,9 @@ export const app = Bun.serve<WsData>({
           if (data.isNew) {
             await selectChatSession(workspace, data.sessionId, data.personalSelection, null)
           }
-          // Harnesses ignore fields they don't support (see SendMessageInput);
-          // failures surface as error frames from inside the harness.
+          // Harnesses ignore fields they don't support (see SendMessageInput).
+          // Their failures surface internally; attachment resolution happens
+          // before a harness owns the send, so surface that one here.
           void harnessFor(workspace)
             .sendMessage({
               workspaceId: data.workspaceId,
@@ -205,7 +220,15 @@ export const app = Bun.serve<WsData>({
               context,
               agentId: workspace.agentId
             })
-            .catch(() => {})
+            .catch(error => {
+              if (error instanceof AttachmentUploadError) {
+                broadcast(data.workspaceId, {
+                  kind: 'error',
+                  sessionId: data.sessionId,
+                  content: error.message
+                })
+              }
+            })
         }
         if (data.type === 'stop') {
           const workspace = await getWorkspace(data.workspaceId)
@@ -223,7 +246,10 @@ export const app = Bun.serve<WsData>({
     close(ws) {
       if (ws.data.channel === 'collab') collabManager.close(ws)
       else if (ws.data.channel === 'chat') removeClient(ws)
-      else ws.unsubscribe(EVENTS_TOPIC)
+      else {
+        navigationRelay.remove(ws)
+        ws.unsubscribe(EVENTS_TOPIC)
+      }
     }
   }
 })

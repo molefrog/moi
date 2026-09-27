@@ -7,7 +7,7 @@ import {
   renameSelectedSessionInCache,
   selectedSessionKey,
   settleSelectedSessionSave
-} from '@/client/features/chat/useSelectedSession'
+} from '@/client/features/chat/sessions/useSelectedSession'
 import type { SelectedSessionState, WorkspaceTabsState } from '@/lib/types'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import { mergeLayoutForSave } from '@/server/layout'
@@ -48,7 +48,7 @@ afterEach(() => {
   else Reflect.deleteProperty(globalThis, 'sessionStorage')
 })
 
-const defaults: WorkspaceTabsState = { open: ['overview', 'view:board'], active: 'overview' }
+const defaults: WorkspaceTabsState = { open: ['overview', 'views/board'], active: 'overview' }
 
 describe('collab personal state', () => {
   test('two browser tabs select chats independently, including New chat', () => {
@@ -69,7 +69,10 @@ describe('collab personal state', () => {
 
   test('personal chat and view choices survive reads and stay partitioned by workspace', () => {
     useBrowserTab(browserTab())
-    const selected: WorkspaceTabsState = { open: ['overview', 'view:board'], active: 'view:board' }
+    const selected: WorkspaceTabsState = {
+      open: ['overview', 'views/board'],
+      active: 'views/board'
+    }
     writePersonalSession('one', 'chat-one')
     writePersonalSession('two', 'chat-two')
     writePersonalTabs('one', selected)
@@ -84,13 +87,13 @@ describe('collab personal state', () => {
     const anna = browserTab()
     const boris = browserTab()
     useBrowserTab(anna)
-    writePersonalTabs('workspace', { open: ['overview', 'view:board'], active: 'view:board' })
+    writePersonalTabs('workspace', { open: ['overview', 'views/board'], active: 'views/board' })
     useBrowserTab(boris)
     expect(readPersonalTabs('workspace', defaults)).toEqual(defaults)
     writePersonalTabs('workspace', { open: ['overview', 'scratchpad'], active: 'scratchpad' })
     useBrowserTab(anna)
-    expect(readPersonalTabs('workspace', defaults).active).toBe('view:board')
-    expect(defaults).toEqual({ open: ['overview', 'view:board'], active: 'overview' })
+    expect(readPersonalTabs('workspace', defaults).active).toBe('views/board')
+    expect(defaults).toEqual({ open: ['overview', 'views/board'], active: 'overview' })
   })
 
   test('malformed saved tabs fall back safely and stored tab lists are normalized', () => {
@@ -101,12 +104,12 @@ describe('collab personal state', () => {
     storage.setItem(
       'moi:collab:workspace:tabs',
       JSON.stringify({
-        open: ['view:board', 'view:board', 'not-a-tab'],
+        open: ['views/board', 'views/board', 'not-a-tab'],
         active: 'not-a-tab'
       })
     )
     expect(readPersonalTabs('workspace', defaults)).toEqual({
-      open: ['overview', 'view:board'],
+      open: ['overview', 'views/board'],
       active: 'overview'
     })
   })

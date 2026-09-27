@@ -9,7 +9,19 @@ import {
 import { ClaudeAdapter } from '../harness/claude-code/adapter'
 import type { Part } from '@/lib/format'
 
-import { buildUserMessage } from '../harness/claude-code/session'
+import { buildUserMessage as toClaudeMessage } from '../harness/claude-code/session'
+import { prepareAttachmentMessage } from '../attachment-message'
+import { splitAttachments } from '@/lib/moi-attachments'
+import type { StoredUpload } from '../uploads'
+
+async function buildUserMessage(text: string, uploads: StoredUpload[]) {
+  const prepared = prepareAttachmentMessage(
+    uploads[0]?.workspaceId ?? 'empty',
+    text,
+    uploads.map(upload => ({ type: 'upload', uploadId: upload.id }))
+  )
+  return toClaudeMessage(prepared)
+}
 import {
   addUpload,
   getUpload,
@@ -36,7 +48,9 @@ async function addImage(workspaceId: string, name = 'shot.png') {
 }
 
 function fileParts(parts: Part[]) {
-  return parts.filter((p): p is Extract<Part, { type: 'file' }> => p.type === 'file')
+  return parts.filter(
+    (p): p is Extract<Part, { type: 'file-attachment' }> => p.type === 'file-attachment'
+  )
 }
 function textPart(parts: Part[]) {
   return parts.find((p): p is Extract<Part, { type: 'text' }> => p.type === 'text')
@@ -48,7 +62,7 @@ type Block = {
   source?: { type?: string; media_type?: string; data?: string }
 }
 function asBlocks(content: string | unknown[]): Block[] {
-  if (typeof content === 'string') throw new Error('expected content blocks, got a string')
+  if (typeof content === 'string') return [{ type: 'text', text: content }]
   return content as Block[]
 }
 
@@ -275,10 +289,11 @@ describe('uploads: resolve + display helpers', () => {
   test('uploadToDisplayPart points at the served URL, never a data URL', async () => {
     const img = await addImage('wsp')
     const imgPart = uploadToDisplayPart(img)
-    expect(imgPart?.type).toBe('file')
-    if (imgPart?.type === 'file') {
+    expect(imgPart?.type).toBe('file-attachment')
+    if (imgPart?.type === 'file-attachment') {
       expect(imgPart.mediaType).toBe('image/png')
-      expect(imgPart.url).toBe(`/api/workspaces/wsp/uploads/${img.id}`)
+      expect(imgPart.previewUrl).toBe(`/api/workspaces/wsp/uploads/${img.id}`)
+      expect(imgPart.path).toBeUndefined()
     }
 
     const fileInfo = await addUpload({
@@ -289,9 +304,10 @@ describe('uploads: resolve + display helpers', () => {
     })
     const [file] = resolveUploads('wsp', [fileInfo.id])
     const filePart = uploadToDisplayPart(file)
-    if (filePart?.type === 'file') {
-      expect(filePart.filename).toBe('doc.txt')
-      expect(filePart.url).toBe(`/api/workspaces/wsp/uploads/${file.id}`)
+    if (filePart?.type === 'file-attachment') {
+      expect(filePart.label).toBe('doc.txt')
+      expect(filePart.previewUrl).toBeUndefined()
+      expect(filePart.path).toBe(file.path!)
     }
   })
 
@@ -320,8 +336,8 @@ describe('uploads: resolve + display helpers', () => {
 // cc-session: buildUserMessage --------------------------------------------
 
 describe('buildUserMessage', () => {
-  test('no attachments → plain string content', () => {
-    const { content, parts } = buildUserMessage('hi there', [])
+  test('no attachments → plain string content', async () => {
+    const { content, parts } = await buildUserMessage('hi there', [])
     expect(content).toBe('hi there')
     expect(parts).toHaveLength(1)
     expect(textPart(parts)?.text).toBe('hi there')
@@ -329,7 +345,7 @@ describe('buildUserMessage', () => {
 
   test('image attachment → base64 image block + trailing text block', async () => {
     const img = await addImage('wsb')
-    const { content, parts } = buildUserMessage('describe', [img])
+    const { content, parts } = await buildUserMessage('describe', [img])
     const blocks = asBlocks(content as unknown[])
     expect(blocks).toHaveLength(2)
     expect(blocks[0].type).toBe('image')
@@ -337,20 +353,22 @@ describe('buildUserMessage', () => {
     expect(blocks[0].source?.media_type).toBe('image/png')
     expect(blocks[0].source?.data).toBe(img.data!.toString('base64'))
     expect(blocks[1].type).toBe('text')
-    expect(blocks[1].text).toBe('describe')
+    expect(splitAttachments(blocks[1].text!).text).toBe('describe')
 
     // Display parts: attachment first, then text.
-    expect(parts[0].type).toBe('file')
+    expect(parts[0].type).toBe('file-attachment')
     expect(parts[1].type).toBe('text')
   })
 
   test('image-only message still ends with a text block', async () => {
     const img = await addImage('wsb2')
-    const { content, parts } = buildUserMessage('', [img])
+    const { content, parts } = await buildUserMessage('', [img])
     const blocks = asBlocks(content as unknown[])
     expect(blocks[0].type).toBe('image')
     expect(blocks.at(-1)?.type).toBe('text')
-    expect(blocks.at(-1)?.text).toBe('(see attached files) shot.png')
+    expect(splitAttachments(blocks.at(-1)!.text!).attachments).toEqual([
+      { type: 'image', label: 'shot.png', mediaType: 'image/png' }
+    ])
     // No empty text display part for an image-only turn.
     expect(textPart(parts)).toBeUndefined()
     expect(fileParts(parts)).toHaveLength(1)
@@ -364,7 +382,7 @@ describe('buildUserMessage', () => {
       bytes: Buffer.from('a,b\n1,2')
     })
     const [u] = resolveUploads('wsf', [info.id])
-    const { content, parts } = buildUserMessage('summarize this', [u])
+    const { content, parts } = await buildUserMessage('summarize this', [u])
     const blocks = asBlocks(content as unknown[])
     // Only a text block (no image), carrying the path note.
     expect(blocks).toHaveLength(1)
@@ -386,7 +404,7 @@ describe('buildUserMessage', () => {
       bytes: Buffer.from('{}')
     })
     const [file] = resolveUploads('wsmix', [fInfo.id])
-    const { content } = buildUserMessage('look', [img, file])
+    const { content } = await buildUserMessage('look', [img, file])
     const blocks = asBlocks(content as unknown[])
     expect(blocks[0].type).toBe('image')
     expect(blocks.at(-1)?.type).toBe('text')
@@ -399,7 +417,7 @@ describe('buildUserMessage', () => {
 describe('persist/reload round-trip', () => {
   test('image block built for the agent re-parses into a file part', async () => {
     const img = await addImage('wsr')
-    const { content } = buildUserMessage('hi', [img])
+    const { content } = await buildUserMessage('hi', [img])
     // Simulate what the SDK persists to the session .jsonl: a user message whose
     // content is exactly the blocks we sent.
     const adapter = new ClaudeAdapter()
@@ -408,7 +426,7 @@ describe('persist/reload round-trip', () => {
     if (turn?.kind !== 'turn') throw new Error('expected a turn')
     const file = fileParts(turn.turn.parts)[0]
     expect(file.mediaType).toBe('image/png')
-    expect(file.url).toBe(`data:image/png;base64,${img.data!.toString('base64')}`)
+    expect(file.previewUrl).toBe(`data:image/png;base64,${img.data!.toString('base64')}`)
   })
 
   test('persisted base64 document (PDF) block → file part', () => {
@@ -431,8 +449,8 @@ describe('persist/reload round-trip', () => {
     if (turn?.kind !== 'turn') throw new Error('expected a turn')
     const file = fileParts(turn.turn.parts)[0]
     expect(file.mediaType).toBe('application/pdf')
-    expect(file.url).toBe('data:application/pdf;base64,JVBER')
-    expect(file.filename).toBe('spec.pdf')
+    expect(file.previewUrl).toBe('data:application/pdf;base64,JVBER')
+    expect(file.label).toBe('spec.pdf')
   })
 
   test('file-note text built for the agent folds back into chips on replay', async () => {
@@ -443,7 +461,7 @@ describe('persist/reload round-trip', () => {
       bytes: Buffer.from('a,b\n1,2')
     })
     const [u] = resolveUploads('wsrt', [info.id])
-    const { content } = buildUserMessage('summarize this', [u])
+    const { content } = await buildUserMessage('summarize this', [u])
     // Replay the exact content the SDK would persist to the .jsonl.
     const adapter = new ClaudeAdapter()
     const events = adapter.ingest({ type: 'user', uuid: 'rt1', message: { role: 'user', content } })
@@ -454,13 +472,14 @@ describe('persist/reload round-trip', () => {
     expect(text?.text).toBe('summarize this')
     // …and re-rendered as a file chip.
     const chip = fileParts(turn.turn.parts)[0]
-    expect(chip.filename).toBe('report.csv')
-    expect(chip.url).toBe(u.path!)
+    expect(chip.label).toBe('report.csv')
+    expect(chip.path).toBe(u.path!)
+    expect(chip.previewUrl).toBeUndefined()
   })
 
   test('image-only placeholder text is dropped on replay', async () => {
     const img = await addImage('wsro')
-    const { content } = buildUserMessage('', [img])
+    const { content } = await buildUserMessage('', [img])
     const adapter = new ClaudeAdapter()
     const events = adapter.ingest({ type: 'user', uuid: 'ro1', message: { role: 'user', content } })
     const turn = events.find(e => e.kind === 'turn')
@@ -512,6 +531,6 @@ describe('persist/reload round-trip', () => {
     })
     const turn = events.find(e => e.kind === 'turn')
     if (turn?.kind !== 'turn') throw new Error('expected a turn')
-    expect(fileParts(turn.turn.parts)[0].url).toBe('https://x/y.jpg')
+    expect(fileParts(turn.turn.parts)[0].previewUrl).toBe('https://x/y.jpg')
   })
 })

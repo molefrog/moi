@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { stageDrawing, stageDrawingDraft } from '@/client/features/chat/attachment-staging'
+import {
+  stageDrawing,
+  stageDrawingDraft
+} from '@/client/features/chat/composer/attachments/draft-attachments'
 import { attachmentKey, liveStore } from '@/client/features/chat/chat-store'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import type { WorkspaceTabId } from '@/lib/types'
@@ -11,7 +14,7 @@ type UseViewBuilderSketchOptions = {
   active: boolean
   builderId: string
   sessionId: string
-  sourceTab: WorkspaceTabId
+  source: WorkspaceTabId
   workspaceId: string
   onEditingStart: () => void
   onContinueInChat: () => void
@@ -23,7 +26,7 @@ export function useViewBuilderSketch({
   active,
   builderId,
   sessionId,
-  sourceTab,
+  source,
   workspaceId,
   onEditingStart,
   onContinueInChat
@@ -47,7 +50,7 @@ export function useViewBuilderSketch({
         uploadRevisionRef.current += 1
         uploadedBlobRef.current = null
         pendingStageRef.current = null
-        liveStore.getState().removeAttachment(workspaceId, sessionId, attachmentIdRef.current)
+        liveStore.getState().removeAttachment(workspaceId, attachmentIdRef.current)
         return
       }
 
@@ -56,11 +59,11 @@ export function useViewBuilderSketch({
         sessionId,
         localId: attachmentIdRef.current,
         purpose: 'sketch',
-        sourceTab,
+        source,
         blob
       })
     },
-    [sessionId, sourceTab, workspaceId]
+    [sessionId, source, workspaceId]
   )
 
   // Exports are cached per history version, so an unchanged sketch comes back
@@ -76,6 +79,7 @@ export function useViewBuilderSketch({
           .attachments[attachmentKey(workspaceId, sessionId)]?.some(
             attachment =>
               attachment.localId === attachmentIdRef.current &&
+              attachment.kind !== 'text' &&
               (attachment.status === 'ready' || attachment.status === 'uploading')
           )
         if (staged) return pendingStageRef.current ?? Promise.resolve()
@@ -87,14 +91,14 @@ export function useViewBuilderSketch({
         sessionId,
         localId: attachmentIdRef.current,
         purpose: 'sketch',
-        sourceTab,
+        source,
         blob,
         isCurrent: () => uploadRevisionRef.current === revision
       })
       pendingStageRef.current = pending
       return pending
     },
-    [sessionId, sourceTab, workspaceId]
+    [sessionId, source, workspaceId]
   )
 
   const drawing = useDrawingLayer({
@@ -128,13 +132,13 @@ export function useViewBuilderSketch({
     uploadRevisionRef.current += 1
     uploadedBlobRef.current = null
     pendingStageRef.current = null
-    liveStore.getState().removeAttachment(workspaceId, sessionId, attachmentIdRef.current)
+    liveStore.getState().removeAttachment(workspaceId, attachmentIdRef.current)
     try {
       await controls.cancel()
     } finally {
       acceptExportsRef.current = true
     }
-  }, [controls, sessionId, workspaceId])
+  }, [controls, workspaceId])
 
   useEffect(() => {
     if (!active && controls.active) void deactivate()

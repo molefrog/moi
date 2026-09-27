@@ -1,3 +1,4 @@
+import { appendAttachments } from '@/lib/moi-attachments'
 // Wire-fixture tests for the live protocol-v4 layer: chat delta previews,
 // session.tool result flattening, and durable-row → Turn mapping. Fixtures are
 // real frames captured from live gateways (2026.7.1 events-v2/events-tool runs,
@@ -12,7 +13,7 @@ import {
   messageToTurn,
   toStreamEvents
 } from './adapter'
-import { chatPreviewBlocks, claimPreviewSource, normalizeEchoText } from './session'
+import { chatPreviewBlocks, claimPreviewSource, normalizeEchoText, userEchoKey } from './session'
 
 describe('chatPreviewBlocks', () => {
   test('maps a real first chat delta onto one text block', () => {
@@ -314,4 +315,37 @@ describe('claimPreviewSource', () => {
     expect(claimPreviewSource(rec, 'r2', 'chat')).toBe(true)
     expect(claimPreviewSource(rec, 'r2', 'agent')).toBe(false)
   })
+})
+
+test('text-attachment-only echo keys are non-empty and distinguish attached records', () => {
+  const first = {
+    type: 'text' as const,
+    source: 'view:orders',
+    label: 'Order',
+    text: 'Order ID: 1'
+  }
+  const wire = appendAttachments('', [first])
+  expect(normalizeEchoText(wire)).not.toBe('')
+  expect(normalizeEchoText(wire)).toBe(
+    normalizeEchoText(
+      appendAttachments('', [
+        { type: 'text', text: first.text, label: first.label, source: first.source }
+      ])
+    )
+  )
+  expect(normalizeEchoText(wire)).not.toBe(
+    normalizeEchoText(appendAttachments('', [{ ...first, text: 'Order ID: 2' }]))
+  )
+})
+
+test('parsed user turns match serialized echo keys with and without message text', () => {
+  const attachments = [
+    { type: 'text' as const, source: 'view:orders', label: 'Order', text: 'Order ID: 1' }
+  ]
+  for (const text of ['', 'Review  this\norder']) {
+    const wire = appendAttachments(text, attachments)
+    const turn = messageToTurn({ role: 'user', content: wire }, 'test-session', 0, new Map())
+    expect(turn).not.toBeNull()
+    expect(userEchoKey(turn!.parts)).toBe(normalizeEchoText(wire))
+  }
 })

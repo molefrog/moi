@@ -22,7 +22,7 @@ Message types flow through four layers; each has one home:
    │           REST payloads (SessionInfo, Models, …)    re-exports it)
    ▼
 4. client      React Query cache of StreamEvents +      client/features/chat/*
-               ephemeral preview store → ViewState →     (tool-group/format.ts holds the
+               ephemeral preview store → ViewState →     (messages/tool-group/format/ holds the
                TurnView rendering                         per-provider labels/briefs)
 ```
 
@@ -272,7 +272,9 @@ doubles as the evaluation rubric for new harnesses.
 ### Input capabilities
 
 - Images (base64 blocks vs data URLs vs file paths — a capability, not a given).
-- File attachments (path-note fallback via `lib/attachment-note.ts`).
+- Attachments share `server/attachment-message.ts` for preparation and
+  `lib/moi-attachments.ts` for serialization and replay. Files and path-delivered
+  images carry readable paths; inline images keep their native content blocks.
 - Rich content blocks vs plain-string prompts.
 
 ### Discovery / metadata

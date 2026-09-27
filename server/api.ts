@@ -1,3 +1,4 @@
+import { isMessageAttachments } from '@/lib/message-attachments'
 import { Hono } from 'hono'
 import { serveStatic } from 'hono/bun'
 import { createMiddleware } from 'hono/factory'
@@ -67,7 +68,7 @@ import type { SessionConfigPatch } from './session-config'
 import { DIST_DIR, prebuilt } from './static'
 import { getWorkspaceSkillsStatus, updateWorkspaceSkills } from './skill-update'
 import { serveWorkspaceImagePreview } from './preview'
-import { MAX_UPLOAD_BYTES, addUpload, getUpload } from './uploads'
+import { MAX_UPLOAD_BYTES, addUpload, addWorkspaceFileUpload, getUpload } from './uploads'
 import { requiredEnvFor } from './required-env'
 import {
   deleteView,
@@ -320,15 +321,12 @@ one.post('/view-builders/:builderId/submit', async c => {
   const availableIcons = parseAvailableViewIcons(body.availableIcons)
   if (!availableIcons) return c.text('Available view icons are required', 400)
   const attachments = body.attachments ?? []
-  if (
-    !Array.isArray(attachments) ||
-    attachments.length > 1 ||
-    !attachments.every(id => typeof id === 'string' && /^[a-f0-9]{64}$/.test(id))
-  ) {
-    return c.text('Invalid sketch attachment', 400)
-  }
-  if (attachments.some(id => getUpload(ws.id, id)?.kind !== 'image')) {
-    return c.text('Sketch attachment not found or expired', 400)
+  if (!isMessageAttachments(attachments)) return c.text('Invalid attachments', 400)
+  for (const attachment of attachments) {
+    if (attachment.type !== 'upload') continue
+    if (!/^[a-f0-9]{64}$/.test(attachment.uploadId)) return c.text('Invalid upload id', 400)
+    if (!getUpload(ws.id, attachment.uploadId))
+      return c.text('Attachment not found or expired', 400)
   }
   const availability = await workspaceTypeAvailability(ws.type ?? 'claude-code')
   if (availability.status !== 'available') return c.text(availability.reason, 400)
@@ -346,11 +344,11 @@ one.post('/view-builders/:builderId/submit', async c => {
     const collabReference = await getCollabReferencePath(ws.path, ws.type)
     const context: MoiContext = {
       ...(collabReference ? { collabReference } : {}),
-      activeTab: `view-builder:${builder.id}`,
+      activeTab: `view-builders/${builder.id}`,
       directives: [
         ...viewBuilderDirectives(builder.id, availableIcons),
         ...(attachments.length > 0
-          ? ["The attached image is the user's sketch of the intended view layout."]
+          ? ['Use the attachments as reference material for the intended view.']
           : [])
       ]
     }
@@ -483,16 +481,16 @@ one.post('/uploads', async c => {
   try {
     form = await c.req.formData()
   } catch {
-    return c.text('Expected multipart/form-data', 400)
+    return c.text('Choose a file to upload', 400)
   }
   const files = form.getAll('files').filter((f): f is File => f instanceof File)
-  if (files.length === 0) return c.text('No files', 400)
-  if (files.length > 20) return c.text('Too many files (max 20)', 400)
+  if (files.length === 0) return c.text('Choose a file to upload', 400)
+  if (files.length > 20) return c.text('You can upload up to 20 files at a time', 400)
 
   const out: UploadInfo[] = []
   for (const file of files) {
     if (file.size > MAX_UPLOAD_BYTES) {
-      return c.text(`"${file.name}" is too large (max ${MAX_UPLOAD_BYTES / (1024 * 1024)} MB)`, 413)
+      return c.text(`Files can be up to ${MAX_UPLOAD_BYTES / (1024 * 1024)} MB`, 413)
     }
     try {
       const bytes = Buffer.from(await file.arrayBuffer())
@@ -504,12 +502,34 @@ one.post('/uploads', async c => {
           bytes
         })
       )
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to process upload'
-      return c.text(`"${file.name}": ${message}`, 400)
+    } catch {
+      return c.text(`Couldn’t process "${file.name}"`, 400)
     }
   }
   return c.json(out)
+})
+
+// Existing workspace documents enter the same upload pipeline without a browser round trip.
+one.post('/uploads/from-path', async c => {
+  const body: unknown = await c.req.json().catch(() => null)
+  if (!body || typeof body !== 'object' || !('path' in body) || typeof body.path !== 'string') {
+    return c.text('Choose a file from this workspace', 400)
+  }
+  const ws = c.get('ws')
+  try {
+    return c.json(await addWorkspaceFileUpload(ws.id, ws.path, body.path))
+  } catch (error) {
+    if (error instanceof Error && 'code' in error) {
+      if (error.code === 'ENOENT') return c.text('This file no longer exists', 400)
+      if (error.code === 'EACCES' || error.code === 'EPERM')
+        return c.text('This file can’t be read by moi', 400)
+      return c.text('Something went wrong while adding this file', 400)
+    }
+    return c.text(
+      error instanceof Error ? error.message : 'Something went wrong while adding this file',
+      400
+    )
+  }
 })
 
 // Serve an upload's bytes back. Display parts reference this URL instead of a

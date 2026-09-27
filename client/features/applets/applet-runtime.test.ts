@@ -1,4 +1,6 @@
-import { describe, expect, test } from 'bun:test'
+import * as appletLog from './applet-log'
+import { describe, expect, test, spyOn } from 'bun:test'
+import { toast } from '@/client/components/ui/toast'
 
 import {
   appletKey,
@@ -23,11 +25,9 @@ import {
 const VIEW: AppletIdentity = { kind: 'view', name: 'board' }
 const WIDGET: AppletIdentity = { kind: 'widget', name: 'clock' }
 
-function subscribeFocus(workspaceId: string) {
-  const calls: [string, Record<string, unknown> | undefined][] = []
-  const unbind = appletRuntime(workspaceId).on('focusTab', (tab, params) =>
-    calls.push([tab, params])
-  )
+function subscribeNavigation(workspaceId: string) {
+  const calls: string[] = []
+  const unbind = appletRuntime(workspaceId).on('navigate', href => calls.push(href))
   return { calls, unbind }
 }
 
@@ -38,34 +38,45 @@ function subscribeChat(workspaceId: string) {
 }
 
 describe('bridge validation', () => {
-  test('emits a well-formed call and narrows malformed params to undefined', () => {
+  test('emits URL navigation and rejects malformed addresses', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    const { calls } = subscribeFocus(ws)
+    const { calls } = subscribeNavigation(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
-
-    bridge.focusTab('view:orders', { order: 'o-1' })
-    bridge.focusTab('overview')
-    // Valid JSON, wrong shape — params must degrade, not leak through.
-    bridge.focusTab('view:orders', ['not', 'a', 'record'])
-    bridge.focusTab('view:orders', null)
-
-    expect(calls).toEqual([
-      ['view:orders', { order: 'o-1' }],
-      ['overview', undefined],
-      ['view:orders', undefined],
-      ['view:orders', undefined]
-    ])
+    const log = spyOn(appletLog, 'reportAppletError').mockImplementation(() => {})
+    bridge.navigate('moi:/views/orders?order=o-1')
+    bridge.navigate('moi:/overview')
+    bridge.navigate(['invalid'])
+    bridge.navigate('javascript:alert(1)')
+    expect(calls).toEqual(['moi:/views/orders?order=o-1', 'moi:/overview'])
+    expect(log).toHaveBeenCalledTimes(2)
+    log.mockRestore()
   })
 
-  test('drops calls with a malformed tab id instead of emitting', () => {
+  test('resolves native anchor hrefs in the source workspace and disposes safely', () => {
+    const { bridge, dispose } = appletRuntime('ws-1').connect(VIEW)
+    expect(bridge.resolveHref('moi:/views/orders?order=o-1')).toBe(
+      '/workspace/ws-1/views/orders?order=o-1'
+    )
+    expect(bridge.resolveHref('https://example.com/')).toBe('https://example.com/')
+    expect(() => bridge.resolveHref('javascript:alert(1)')).toThrow()
+    dispose()
+    expect(bridge.resolveHref('moi:/overview')).toBe('')
+  })
+
+  test('resolves applet links with the host router base', () => {
+    const { bridge } = appletRuntime('prefixed').connect(VIEW, '/prefix')
+    expect(bridge.resolveHref('moi:/views/orders')).toBe('/prefix/workspace/prefixed/views/orders')
+  })
+
+  test('drops calls with malformed addresses instead of emitting', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    const { calls } = subscribeFocus(ws)
+    const { calls } = subscribeNavigation(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
 
-    bridge.focusTab('not-a-tab')
-    bridge.focusTab('view:multi/segment')
-    bridge.focusTab(42)
-    bridge.focusTab({ toString: () => 'agent' })
+    bridge.navigate('not-a-tab')
+    bridge.navigate('view:multi/segment')
+    bridge.navigate(42)
+    bridge.navigate({ toString: () => 'moi:/scratchpad' })
 
     expect(calls).toEqual([])
   })
@@ -73,24 +84,21 @@ describe('bridge validation', () => {
   test('emitting with no subscribers (screen unmounted) is a no-op', () => {
     const ws = `ws-${crypto.randomUUID()}`
     const { bridge } = appletRuntime(ws).connect(VIEW)
-    expect(() => bridge.focusTab('agent')).not.toThrow()
+    expect(() => bridge.navigate('moi:/scratchpad')).not.toThrow()
   })
 
   test('an unbound subscriber stops receiving; others keep receiving', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    const first = subscribeFocus(ws)
-    const second = subscribeFocus(ws)
+    const first = subscribeNavigation(ws)
+    const second = subscribeNavigation(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
 
-    bridge.focusTab('agent')
+    bridge.navigate('moi:/scratchpad')
     first.unbind()
-    bridge.focusTab('overview')
+    bridge.navigate('moi:/overview')
 
-    expect(first.calls).toEqual([['agent', undefined]])
-    expect(second.calls).toEqual([
-      ['agent', undefined],
-      ['overview', undefined]
-    ])
+    expect(first.calls).toEqual(['moi:/scratchpad'])
+    expect(second.calls).toEqual(['moi:/scratchpad', 'moi:/overview'])
   })
 })
 
@@ -100,10 +108,47 @@ describe('sendChatMessage validation', () => {
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(WIDGET)
 
-    bridge.sendChatMessage('  Chase order A-1042  ', { order: 'A-1042' })
+    bridge.sendChatMessage({
+      message: '  Chase order A-1042  ',
+      attachments: [{ type: 'text', label: 'Order', text: 'A-1042', source: 'forged' }]
+    })
 
     expect(calls).toEqual([
-      { message: 'Chase order A-1042', source: 'widget:clock', context: { order: 'A-1042' } }
+      {
+        message: 'Chase order A-1042',
+        source: 'widget:clock',
+        attachments: [{ type: 'text', label: 'Order', text: 'A-1042', source: 'widget:clock' }]
+      }
+    ])
+  })
+
+  test('normalizes legacy calls through the same validation and rate limiter', () => {
+    const ws = `ws-${crypto.randomUUID()}`
+    const { calls } = subscribeChat(ws)
+    const { bridge } = appletRuntime(ws).connect(WIDGET)
+
+    bridge.sendChatMessage('  Legacy  ', { order: '1042' })
+    bridge.sendChatMessage({ message: 'Legacy', attachments: [] })
+    bridge.sendChatMessage('Message only')
+    bridge.sendChatMessage('Array context', [])
+    bridge.sendChatMessage('x'.repeat(1001))
+    bridge.sendChatMessage({ message: 'Object' }, { ignored: true })
+
+    expect(calls).toEqual([
+      {
+        message: 'Legacy',
+        source: 'widget:clock',
+        attachments: [
+          { type: 'text', label: 'Context', text: '{"order":"1042"}', source: 'widget:clock' }
+        ]
+      },
+      { message: 'Message only', source: 'widget:clock', attachments: [] },
+      {
+        message: 'Array context',
+        source: 'widget:clock',
+        attachments: [{ type: 'text', label: 'Context', text: '[]', source: 'widget:clock' }]
+      },
+      { message: 'Object', source: 'widget:clock', attachments: [] }
     ])
   })
 
@@ -111,43 +156,106 @@ describe('sendChatMessage validation', () => {
     const ws = `ws-${crypto.randomUUID()}`
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
+    const notices = spyOn(toast, 'add').mockImplementation(() => crypto.randomUUID())
 
-    bridge.sendChatMessage('')
-    bridge.sendChatMessage('   ')
-    bridge.sendChatMessage(42)
+    bridge.sendChatMessage({ message: '' })
+    bridge.sendChatMessage({ message: '   ' })
+    bridge.sendChatMessage({ message: 42 })
+    bridge.sendChatMessage({ message: null })
     bridge.sendChatMessage(null)
-    bridge.sendChatMessage({ toString: () => 'Do a thing' })
+    bridge.sendChatMessage('   ')
+    bridge.sendChatMessage({ context: {} })
+    bridge.sendChatMessage({ message: { toString: () => 'Do a thing' } })
 
     expect(calls).toEqual([])
+    expect(notices).toHaveBeenCalledTimes(8)
+    expect(notices).toHaveBeenLastCalledWith({
+      title: 'Couldn’t send message',
+      description: 'This message uses an unsupported format',
+      type: 'error'
+    })
+    notices.mockRestore()
   })
 
   test('drops a message too long to be a chat bubble', () => {
     const ws = `ws-${crypto.randomUUID()}`
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
+    const notices = spyOn(toast, 'add').mockImplementation(() => crypto.randomUUID())
 
-    bridge.sendChatMessage('x'.repeat(1001))
+    bridge.sendChatMessage({ message: 'x'.repeat(1001) })
 
     expect(calls).toEqual([])
+    expect(notices).toHaveBeenCalledWith({
+      title: 'Couldn’t send message',
+      description: 'Messages can be up to 1,000 characters',
+      type: 'error'
+    })
+    notices.mockRestore()
   })
 
-  test('keeps the message but drops a context that cannot ride the envelope', () => {
+  test('legacy serialization failures reject the entire call', () => {
     const ws = `ws-${crypto.randomUUID()}`
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
-
     const cyclic: Record<string, unknown> = {}
     cyclic.self = cyclic
+    for (const context of [cyclic, 1n, () => {}, { blob: 'x'.repeat(5000) }]) {
+      bridge.sendChatMessage('Invalid legacy', context)
+    }
+    expect(calls).toEqual([])
+    // Rejected arguments do not consume the message cooldown.
+    bridge.sendChatMessage('Invalid legacy', 'x'.repeat(4998))
+    expect(calls[0].attachments[0]).toMatchObject({
+      label: 'Context',
+      text: JSON.stringify('x'.repeat(4998))
+    })
+  })
 
-    bridge.sendChatMessage('array context', ['not', 'a', 'record'])
-    bridge.sendChatMessage('cyclic context', cyclic)
-    bridge.sendChatMessage('huge context', { blob: 'x'.repeat(2001) })
+  test('rejects the removed object context field with a clear error', () => {
+    const ws = `ws-${crypto.randomUUID()}`
+    const { calls } = subscribeChat(ws)
+    const { bridge } = appletRuntime(ws).connect(VIEW)
+    const log = spyOn(appletLog, 'reportAppletError').mockImplementation(() => {})
+    try {
+      bridge.sendChatMessage({ message: 'Review', context: undefined })
+      expect(calls).toEqual([])
+      expect(log.mock.calls[0][1].message).toContain('This message uses an outdated format')
+    } finally {
+      log.mockRestore()
+    }
+  })
 
-    // The message carries the user's intent, so a bad payload must not lose it.
-    expect(calls.map(c => [c.message, c.context])).toEqual([
-      ['array context', undefined],
-      ['cyclic context', undefined],
-      ['huge context', undefined]
+  test('validates all attachments before emitting and snapshots all input fields', () => {
+    const ws = `ws-${crypto.randomUUID()}`
+    const { calls } = subscribeChat(ws)
+    const { bridge } = appletRuntime(ws).connect(VIEW)
+    const file = new File(['hello'], 'hello.txt')
+    const text = { type: 'text', label: 'Order', text: '  snapshot  ' }
+    const path = { type: 'file', path: 'reports/order.pdf' }
+    const attachments = [text, { type: 'file', file }, path]
+    for (const invalid of [
+      null,
+      {},
+      { type: 'text', label: '', text: 'x' },
+      { type: 'text', label: 'x'.repeat(121), text: 'x' },
+      { type: 'text', label: 'x', text: 'x'.repeat(5001) },
+      { type: 'file', path: '../secret' },
+      { type: 'file', path: 'x', file },
+      { type: 'file', file: new File([new Uint8Array(32 * 1024 * 1024 + 1)], 'big') }
+    ]) {
+      bridge.sendChatMessage({ message: 'Review', attachments: [...attachments, invalid] })
+    }
+    bridge.sendChatMessage({ message: 'Review', attachments: {} })
+    expect(calls).toEqual([])
+    bridge.sendChatMessage({ message: 'Review', attachments })
+    text.text = 'changed'
+    path.path = 'changed.txt'
+    attachments.length = 0
+    expect(calls[0].attachments).toEqual([
+      { type: 'text', label: 'Order', text: '  snapshot  ', source: 'view:board' },
+      { type: 'file', file, source: 'view:board' },
+      { type: 'file', path: 'reports/order.pdf', source: 'view:board' }
     ])
   })
 
@@ -156,9 +264,9 @@ describe('sendChatMessage validation', () => {
     const { calls } = subscribeChat(ws)
     const { bridge, dispose } = appletRuntime(ws).connect(VIEW)
 
-    bridge.sendChatMessage('before')
+    bridge.sendChatMessage({ message: 'before' })
     dispose()
-    bridge.sendChatMessage('after')
+    bridge.sendChatMessage({ message: 'after' })
 
     expect(calls.map(c => c.message)).toEqual(['before'])
   })
@@ -172,9 +280,9 @@ describe('sendChatMessage rate limiting', () => {
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(WIDGET)
 
-    bridge.sendChatMessage('Sync now')
-    bridge.sendChatMessage('Sync now')
-    bridge.sendChatMessage('Sync now')
+    bridge.sendChatMessage({ message: 'Sync now' })
+    bridge.sendChatMessage({ message: 'Sync now' })
+    bridge.sendChatMessage({ message: 'Sync now' })
 
     expect(calls.map(c => c.message)).toEqual(['Sync now'])
   })
@@ -185,10 +293,10 @@ describe('sendChatMessage rate limiting', () => {
     const widget = appletRuntime(ws).connect(WIDGET)
     const view = appletRuntime(ws).connect(VIEW)
 
-    widget.bridge.sendChatMessage('Sync now')
+    widget.bridge.sendChatMessage({ message: 'Sync now' })
     // Same text, different applet — a real second message.
-    view.bridge.sendChatMessage('Sync now')
-    widget.bridge.sendChatMessage('Something else')
+    view.bridge.sendChatMessage({ message: 'Sync now' })
+    widget.bridge.sendChatMessage({ message: 'Something else' })
 
     expect(calls.map(c => [c.source, c.message])).toEqual([
       ['widget:clock', 'Sync now'],
@@ -202,7 +310,7 @@ describe('sendChatMessage rate limiting', () => {
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(WIDGET)
 
-    for (let i = 0; i < 25; i++) bridge.sendChatMessage(`message ${i}`)
+    for (let i = 0; i < 25; i++) bridge.sendChatMessage({ message: `message ${i}` })
 
     expect(calls).toHaveLength(10)
   })
@@ -214,9 +322,11 @@ describe('sendChatMessage rate limiting', () => {
     const b = subscribeChat(wsB)
 
     for (let i = 0; i < 25; i++) {
-      appletRuntime(wsA).connect(WIDGET).bridge.sendChatMessage(`a ${i}`)
+      appletRuntime(wsA)
+        .connect(WIDGET)
+        .bridge.sendChatMessage({ message: `a ${i}` })
     }
-    appletRuntime(wsB).connect(WIDGET).bridge.sendChatMessage('b 0')
+    appletRuntime(wsB).connect(WIDGET).bridge.sendChatMessage({ message: 'b 0' })
 
     expect(a.calls).toHaveLength(10)
     expect(b.calls.map(c => c.message)).toEqual(['b 0'])
@@ -224,15 +334,31 @@ describe('sendChatMessage rate limiting', () => {
 })
 
 describe('disposal', () => {
+  test('collaboration shares the host API and is revoked with its connection', () => {
+    const runtime = appletRuntime(`ws-${crypto.randomUUID()}`)
+    const view = runtime.connect(VIEW)
+    const widget = runtime.connect(WIDGET)
+    const api = view.bridge.collab
+
+    expect(typeof api?.usePeers).toBe('function')
+    expect(typeof api?.useWorkspaceUsers).toBe('function')
+    expect(widget.bridge.collab).toBe(api)
+
+    view.dispose()
+    expect(view.bridge.collab).toBeUndefined()
+    expect(widget.bridge.collab).toBe(api)
+    widget.dispose()
+  })
+
   test('a disposed connection is inert even while subscribers are live', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    const { calls } = subscribeFocus(ws)
+    const { calls } = subscribeNavigation(ws)
 
     const { bridge, dispose } = appletRuntime(ws).connect(VIEW)
-    bridge.focusTab('agent')
+    bridge.navigate('moi:/scratchpad')
     dispose()
-    bridge.focusTab('agent')
-    expect(calls).toEqual([['agent', undefined]])
+    bridge.navigate('moi:/scratchpad')
+    expect(calls).toEqual(['moi:/scratchpad'])
   })
 })
 
@@ -244,29 +370,29 @@ function fakeModule() {
     __attachBridge: (next: AppletBridge) => {
       bridge = next
     },
-    focusTab: (tab: unknown, params?: unknown) => bridge?.focusTab(tab, params)
+    navigate: (href: unknown) => bridge?.navigate(href)
   }
 }
 
 describe('attachAppletBridge', () => {
   test('wires a module to its workspace runtime; invalidateApplet neuters it', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    const { calls } = subscribeFocus(ws)
+    const { calls } = subscribeNavigation(ws)
 
     const mod = fakeModule()
     attachAppletBridge(mod, ws, appletKey('views', ws, 'board'), VIEW)
-    mod.focusTab('view:board')
-    expect(calls).toEqual([['view:board', undefined]])
+    mod.navigate('moi:/views/board')
+    expect(calls).toEqual(['moi:/views/board'])
 
     // The rebuild path: invalidation must leave the OLD module instance inert.
     invalidateApplet('views', ws, 'board')
-    mod.focusTab('view:board')
-    expect(calls).toEqual([['view:board', undefined]])
+    mod.navigate('moi:/views/board')
+    expect(calls).toEqual(['moi:/views/board'])
   })
 
   test('invalidateAppletSegment disposes bridges kind-wide', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    const { calls } = subscribeFocus(ws)
+    const { calls } = subscribeNavigation(ws)
 
     const mod = fakeModule()
     const key = appletKey('widgets', ws, 'clock')
@@ -275,7 +401,7 @@ describe('attachAppletBridge', () => {
     setCachedApplet(key, Promise.resolve(mod))
     attachAppletBridge(mod, ws, key, WIDGET)
     invalidateAppletSegment('widgets')
-    mod.focusTab('overview')
+    mod.navigate('moi:/overview')
     expect(calls).toEqual([])
   })
 
@@ -287,7 +413,7 @@ describe('attachAppletBridge', () => {
 
   test('re-attaching under a key disposes the previous connection', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    const { calls } = subscribeFocus(ws)
+    const { calls } = subscribeNavigation(ws)
     const key = appletKey('views', ws, 'board')
 
     const oldMod = fakeModule()
@@ -295,9 +421,9 @@ describe('attachAppletBridge', () => {
     const newMod = fakeModule()
     attachAppletBridge(newMod, ws, key, VIEW)
 
-    oldMod.focusTab('agent')
-    newMod.focusTab('overview')
-    expect(calls).toEqual([['overview', undefined]])
+    oldMod.navigate('moi:/scratchpad')
+    newMod.navigate('moi:/overview')
+    expect(calls).toEqual(['moi:/overview'])
   })
 })
 
@@ -305,11 +431,104 @@ describe('workspace isolation', () => {
   test('bridges reach only their own workspace runtime', () => {
     const wsA = `ws-${crypto.randomUUID()}`
     const wsB = `ws-${crypto.randomUUID()}`
-    const a = subscribeFocus(wsA)
-    const b = subscribeFocus(wsB)
+    const a = subscribeNavigation(wsA)
+    const b = subscribeNavigation(wsB)
 
-    appletRuntime(wsA).connect(VIEW).bridge.focusTab('agent')
-    expect(a.calls).toEqual([['agent', undefined]])
+    appletRuntime(wsA).connect(VIEW).bridge.navigate('moi:/scratchpad')
+    expect(a.calls).toEqual(['moi:/scratchpad'])
     expect(b.calls).toEqual([])
+  })
+})
+
+describe('addChatAttachment', () => {
+  test('accepts text and both file sources, stamps source, and ignores disposed bridges', () => {
+    const ws = `ws-${crypto.randomUUID()}`
+    const received: unknown[] = []
+    const runtime = appletRuntime(ws)
+    const off = runtime.on('addChatAttachment', value => received.push(value))
+    const { bridge, dispose } = runtime.connect(VIEW)
+    const file = new File(['hello'], 'notes.txt')
+    bridge.addChatAttachment({
+      type: 'text',
+      label: ' Notes ',
+      text: '  hello\n',
+      source: 'forged'
+    })
+    bridge.addChatAttachment({ type: 'file', file })
+    const pathInput = { type: 'file', path: 'reports/september.pdf' }
+    bridge.addChatAttachment(pathInput)
+    pathInput.path = 'changed.pdf'
+    dispose()
+    bridge.addChatAttachment({ type: 'file', file })
+    expect(received).toEqual([
+      { type: 'text', label: 'Notes', text: '  hello\n', source: 'view:board' },
+      { type: 'file', file, source: 'view:board' },
+      { type: 'file', path: 'reports/september.pdf', source: 'view:board' }
+    ])
+    off()
+  })
+
+  test('rejects invalid attachments with a toast and without emitting', () => {
+    const ws = `ws-${crypto.randomUUID()}`
+    const received: unknown[] = []
+    const runtime = appletRuntime(ws)
+    const off = runtime.on('addChatAttachment', value => received.push(value))
+    const { bridge } = runtime.connect(VIEW)
+    const notices = spyOn(toast, 'add').mockImplementation(() => crypto.randomUUID())
+    const file = new File(['hello'], 'notes.txt')
+    const oversized = new File([new Uint8Array(32 * 1024 * 1024 + 1)], 'large.bin')
+    for (const input of [
+      null,
+      {},
+      { type: 'text', label: '', text: 'hello' },
+      { type: 'text', label: 'x'.repeat(121), text: 'hello' },
+      { type: 'text', label: 'Notes', text: ' ' },
+      { type: 'text', label: 'Notes', text: 'x'.repeat(5001) },
+      { type: 'file' },
+      { type: 'file', file: {} },
+      { type: 'file', file: new Blob(['x']) },
+      { type: 'file', file, path: 'notes.txt' },
+      { type: 'file', file: oversized },
+      ...['', '/etc/passwd', '../outside.txt', '.env', 'a/.hidden/b', 'C:\\file.txt'].map(path => ({
+        type: 'file',
+        path
+      }))
+    ])
+      bridge.addChatAttachment(input)
+    expect(received).toEqual([])
+    expect(notices).toHaveBeenCalledTimes(17)
+    expect(new Set(notices.mock.calls.map(([notice]) => notice.description))).toEqual(
+      new Set([
+        'This attachment isn’t supported',
+        'Add a label to this text attachment',
+        'Attachment labels can be up to 120 characters',
+        'Add some text to this attachment',
+        'Text attachments can be up to 5,000 characters',
+        'Files can be up to 32 MB',
+        'Choose a file from this workspace'
+      ])
+    )
+    notices.mockRestore()
+    off()
+  })
+
+  test('does not cooldown repeated attachment intents', () => {
+    const ws = `ws-${crypto.randomUUID()}`
+    const received: unknown[] = []
+    const runtime = appletRuntime(ws)
+    const off = runtime.on('addChatAttachment', value => received.push(value))
+    const { bridge } = runtime.connect(VIEW)
+    const text = { type: 'text', label: 'Order', text: 'Order #1042' }
+    const file = () => new File(['hello'], 'notes.txt', { type: 'text/plain', lastModified: 1_000 })
+
+    bridge.addChatAttachment(text)
+    bridge.addChatAttachment(structuredClone(text))
+    bridge.addChatAttachment({ type: 'file', file: file() })
+    bridge.addChatAttachment({ type: 'file', file: file() })
+    bridge.addChatAttachment({ type: 'file', path: 'reports/september.pdf' })
+    bridge.addChatAttachment({ type: 'file', path: 'reports/september.pdf' })
+
+    expect(received).toHaveLength(6)
+    off()
   })
 })

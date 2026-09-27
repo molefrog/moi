@@ -1,7 +1,9 @@
+import type { MessageAttachment } from '@/lib/types'
+import { attachmentLabel } from '@/lib/moi-attachments'
 // Live state per (workspaceId, sessionId): display history, native lifecycle,
 // and previews. client.ts owns the shared workspace process;
 // Codex owns durable history. See NOTES.md for ordering and recovery rules.
-import { appendAttachmentNote } from '@/lib/attachment-note'
+import { prepareAttachmentMessage, type PreparedAttachmentMessage } from '../../attachment-message'
 import { buildSessionTitleSource } from '../session-title'
 import {
   type MoiContext,
@@ -9,7 +11,7 @@ import {
   renderMoiContext,
   renderMoiContextBody
 } from '@/lib/moi-context'
-import { type Part, type SubagentRecord, type Turn, applyEvent, emptyViewState } from '@/lib/format'
+import { type SubagentRecord, type Turn, applyEvent, emptyViewState } from '@/lib/format'
 import type { SessionActivity, StreamEvent, ViewState } from '@/lib/types'
 
 import {
@@ -45,12 +47,6 @@ import { broadcast } from '../../state'
 import { renameSelectedSession } from '../../selected-session'
 import { hasSessionConfig, renameSessionConfig, saveSessionConfig } from '../../session-config'
 import { renameViewBuilderSession } from '../../view-builders'
-import {
-  type StoredUpload,
-  materializeToPath,
-  resolveUploads,
-  uploadToDisplayPart
-} from '../../uploads'
 
 type CodexUserInputItem = { type: 'text'; text: string } | { type: 'image'; url: string }
 
@@ -885,34 +881,16 @@ async function resumeSession(input: ResumeInput): Promise<SessionRecord> {
   }
 }
 
-// Images send inline; other uploads become readable path notes. Display parts
-// retain the original attachment metadata for the user's bubble.
-async function buildUserInput(
-  text: string,
-  uploads: StoredUpload[]
-): Promise<{ input: CodexUserInputItem[]; parts: Part[] }> {
-  const parts: Part[] = []
-  for (const u of uploads) {
-    const part = uploadToDisplayPart(u)
-    if (part) parts.push(part)
-  }
-  if (text) parts.push({ type: 'text', text })
-
-  const input: CodexUserInputItem[] = []
-  for (const u of uploads) {
-    if (u.kind === 'image' && u.data) {
-      input.push({ type: 'image', url: `data:${u.mediaType};base64,${u.data.toString('base64')}` })
-    }
-  }
-  const files: { filename: string; path: string }[] = []
-  for (const u of uploads) {
-    if (u.kind !== 'file') continue
-    const p = await materializeToPath(u)
-    if (p) files.push({ filename: u.filename, path: p })
-  }
-  const agentText = appendAttachmentNote(text, files)
-  if (agentText) input.push({ type: 'text', text: agentText })
-  return { input, parts }
+function buildUserInput(message: PreparedAttachmentMessage): CodexUserInputItem[] {
+  const images = message.attachments.filter(
+    attachment => attachment.type === 'image' && 'data' in attachment
+  )
+  const input: CodexUserInputItem[] = images.map(image => ({
+    type: 'image',
+    url: `data:${image.mediaType};base64,${image.data.toString('base64')}`
+  }))
+  if (message.text) input.push({ type: 'text', text: message.text })
+  return input
 }
 
 type CodexSendInput = {
@@ -921,7 +899,7 @@ type CodexSendInput = {
   sessionId: string
   isNew: boolean
   content: string
-  attachments?: string[]
+  attachments?: MessageAttachment[]
   optimisticId?: string
   model?: string
   effort?: string
@@ -949,18 +927,13 @@ async function sendMessage(
   lane: SendLane,
   generation: number
 ): Promise<void> {
-  const uploads = input.attachments?.length
-    ? resolveUploads(input.workspaceId, input.attachments)
-    : []
-  if (!input.content && uploads.length === 0) return
+  const prepared = prepareAttachmentMessage(input.workspaceId, input.content, input.attachments)
+  if (!prepared.text) return
   const sessionTitleSource = input.isNew
-    ? buildSessionTitleSource(
-        input.content,
-        uploads.map(upload => upload.filename)
-      )
+    ? buildSessionTitleSource(input.content, prepared.attachments.map(attachmentLabel))
     : undefined
-  const { input: userInput, parts } = await buildUserInput(input.content, uploads)
-  if (userInput.length === 0) return
+  const userInput = buildUserInput(prepared)
+  const { parts } = prepared
   const serviceTier = codexServiceTierForFastMode(input.fastMode)
 
   let rec: SessionRecord

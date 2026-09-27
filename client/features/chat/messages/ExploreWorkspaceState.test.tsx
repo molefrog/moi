@@ -1,0 +1,63 @@
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+
+import { describe, expect, test } from 'bun:test'
+
+import {
+  ChatEmptyState,
+  WORKSPACE_ANALYSIS_PROMPT
+} from '@/client/features/chat/messages/ChatEmptyState'
+import { renderMoiContext } from '@/lib/moi-context'
+
+function renderExploreWorkspace(disabled = false): string {
+  return renderToStaticMarkup(
+    createElement(ChatEmptyState, {
+      agent: 'boxy',
+      kind: 'explore-workspace',
+      hasWorkspaceApplets: false,
+      disabled,
+      onSelectPrompt: () => undefined,
+      onNavigate: () => undefined
+    })
+  )
+}
+
+describe('ExploreWorkspaceState', () => {
+  test('renders the workspace analysis copy and one plain prompt', () => {
+    const html = renderExploreWorkspace()
+    const promptButtons = [...html.matchAll(/<button.*?<\/button>/gs)]
+
+    expect(html).toContain(
+      'Your agent can explore this workspace and suggest useful widgets and views based on'
+    )
+    expect(html).toContain('Explore the workspace')
+    expect(promptButtons).toHaveLength(1)
+    expect(promptButtons[0]?.[0]).toContain('<svg')
+    expect(promptButtons[0]?.[0]).not.toContain('grid')
+    expect(promptButtons[0]?.[0]).not.toContain('rotate')
+  })
+
+  test('disables the analysis prompt when sending is unavailable', () => {
+    const html = renderExploreWorkspace(true)
+
+    expect(html.match(/<button.*?<\/button>/s)?.[0]).toContain('disabled=""')
+  })
+
+  test('keeps analysis instructions in hidden message context', () => {
+    expect(WORKSPACE_ANALYSIS_PROMPT).toMatchObject({
+      label: 'Explore the workspace',
+      prompt: 'Explore this workspace and suggest what moi can build based on its content'
+    })
+
+    const html = renderExploreWorkspace()
+    expect(html).not.toContain('Wait for me to choose')
+
+    const context = renderMoiContext({
+      activeTab: 'agent',
+      directives: [...WORKSPACE_ANALYSIS_PROMPT.context]
+    })
+    expect(context).toContain('Explore the existing workspace files')
+    expect(context).toContain('which content informed your ideas')
+    expect(context).toContain('Wait for me to choose before building anything')
+  })
+})

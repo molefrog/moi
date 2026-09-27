@@ -3,13 +3,10 @@ import { describe, expect, test } from 'bun:test'
 import {
   isParamsRecord,
   isWorkspaceTabId,
-  parseWorkspaceTab,
-  readAppletParams,
   viewBuilderIdFromTab,
   viewBuilderTabId,
   viewIdFromTab,
-  viewTabId,
-  workspaceTabPath
+  viewTabId
 } from './workspace-tabs'
 
 describe('isWorkspaceTabId', () => {
@@ -20,13 +17,22 @@ describe('isWorkspaceTabId', () => {
   })
 
   test('accepts view and view-builder tabs with a non-empty id', () => {
-    expect(isWorkspaceTabId('view:roadmap')).toBe(true)
-    expect(isWorkspaceTabId('view-builder:abc123')).toBe(true)
-    expect(isWorkspaceTabId('view:')).toBe(false)
-    expect(isWorkspaceTabId('view-builder:')).toBe(false)
+    expect(isWorkspaceTabId('views/roadmap')).toBe(true)
+    expect(isWorkspaceTabId('view-builders/abc123')).toBe(true)
+    expect(isWorkspaceTabId('views/')).toBe(false)
+    expect(isWorkspaceTabId('view-builders/')).toBe(false)
   })
 
   test('rejects everything else', () => {
+    for (const tab of [
+      'view:roadmap',
+      'view-builder:abc',
+      'views/a/b',
+      'views/a?x=1',
+      'views/%65vents'
+    ]) {
+      expect(isWorkspaceTabId(tab)).toBe(false)
+    }
     expect(isWorkspaceTabId('')).toBe(false)
     expect(isWorkspaceTabId('widgets')).toBe(false)
     expect(isWorkspaceTabId('settings')).toBe(false)
@@ -37,41 +43,18 @@ describe('isWorkspaceTabId', () => {
   })
 })
 
-describe('parseWorkspaceTab', () => {
-  test('returns the tab id for a valid segment', () => {
-    expect(parseWorkspaceTab('view:orders')).toBe('view:orders')
-    expect(parseWorkspaceTab('agent')).toBe('agent')
-  })
-
-  test('returns null for missing or invalid segments', () => {
-    expect(parseWorkspaceTab(undefined)).toBeNull()
-    expect(parseWorkspaceTab(null)).toBeNull()
-    expect(parseWorkspaceTab('')).toBeNull()
-    expect(parseWorkspaceTab('nope')).toBeNull()
-    // A wildcard can span segments — that is never a tab id.
-    expect(parseWorkspaceTab('view:a/b')).toBeNull()
-  })
-})
-
-describe('workspaceTabPath', () => {
-  test('builds the tab URL', () => {
-    expect(workspaceTabPath('ws1', 'view:roadmap')).toBe('/workspace/ws1/view:roadmap')
-    expect(workspaceTabPath('ws1', 'agent')).toBe('/workspace/ws1/agent')
-  })
-})
-
 describe('tab id round-trips', () => {
   test('view tabs', () => {
-    expect(viewTabId('orders')).toBe('view:orders')
-    expect(viewIdFromTab('view:orders')).toBe('orders')
+    expect(viewTabId('orders')).toBe('views/orders')
+    expect(viewIdFromTab('views/orders')).toBe('orders')
     expect(viewIdFromTab('overview')).toBeNull()
-    expect(viewIdFromTab('view-builder:x')).toBeNull()
+    expect(viewIdFromTab('view-builders/x')).toBeNull()
   })
 
   test('view-builder tabs', () => {
-    expect(viewBuilderTabId('abc')).toBe('view-builder:abc')
-    expect(viewBuilderIdFromTab('view-builder:abc')).toBe('abc')
-    expect(viewBuilderIdFromTab('view:abc')).toBeNull()
+    expect(viewBuilderTabId('abc')).toBe('view-builders/abc')
+    expect(viewBuilderIdFromTab('view-builders/abc')).toBe('abc')
+    expect(viewBuilderIdFromTab('views/abc')).toBeNull()
   })
 })
 
@@ -87,20 +70,5 @@ describe('isParamsRecord', () => {
     expect(isParamsRecord('str')).toBe(false)
     expect(isParamsRecord(7)).toBe(false)
     expect(isParamsRecord(undefined)).toBe(false)
-  })
-})
-
-describe('readAppletParams', () => {
-  test('reads params out of navigation state', () => {
-    expect(readAppletParams({ appletParams: { order: 'o-1' } })).toEqual({ order: 'o-1' })
-  })
-
-  test('degrades to {} for anything malformed', () => {
-    expect(readAppletParams(null)).toEqual({})
-    expect(readAppletParams(undefined)).toEqual({})
-    expect(readAppletParams({})).toEqual({})
-    expect(readAppletParams({ appletParams: [1] })).toEqual({})
-    expect(readAppletParams({ appletParams: 'x' })).toEqual({})
-    expect(readAppletParams('state')).toEqual({})
   })
 })

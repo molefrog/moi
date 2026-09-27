@@ -525,8 +525,19 @@ const moonReplyWithMeta: Turn = {
 
 // Beat 12 — attachments: image thumbnail + non-image file chip on one user turn.
 const attachmentsTurn = turn('user', 23, 26, [
-  { type: 'file', mediaType: 'image/png', url: CHECKERBOARD_PNG, filename: 'pattern.png' },
-  { type: 'file', mediaType: 'application/pdf', url: '', filename: 'report.pdf' },
+  {
+    type: 'text-attachment',
+    source: 'view:board',
+    label: 'Selected board items',
+    text: 'Selected items: item-1, item-2'
+  },
+  {
+    type: 'file-attachment',
+    mediaType: 'image/png',
+    previewUrl: CHECKERBOARD_PNG,
+    label: 'pattern.png'
+  },
+  { type: 'file-attachment', mediaType: 'application/pdf', label: 'report.pdf' },
   text(
     'back to work — mole says the report draft is done. recreate this dither pattern in the scratchpad later, and let him know we got it'
   )

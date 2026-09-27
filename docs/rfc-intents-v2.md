@@ -1,3 +1,5 @@
+> Historical RFC. Navigation is superseded by [Workspace navigation](navigation.md).
+
 # RFC: workspace tab navigation and applet messaging (intents v2)
 
 Status: MVP 1 (tab foundation) and MVP 2 (chat messaging) implemented; MVP 3 skill guidance

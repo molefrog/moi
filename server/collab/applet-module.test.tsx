@@ -1,6 +1,7 @@
 import { expect, mock, spyOn, test } from 'bun:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { join } from 'path'
 import type * as CollabApi from 'moi/collab'
 
 import { COLLAB_MODULE_SOURCE } from './applet-module'
@@ -10,9 +11,7 @@ type TestModule = typeof CollabApi & { __attachBridge(bridge: unknown): void }
 async function loadModule(): Promise<TestModule> {
   const sources: Record<string, string> = {
     entry: `export * from 'moi/collab'; export { __attachBridge } from 'moi';`,
-    'moi/collab': COLLAB_MODULE_SOURCE,
-    moi: `let bridge; export function __attachBridge(next) { bridge = next; }
-      export function __getBridge() { return bridge; }`
+    'moi/collab': COLLAB_MODULE_SOURCE
   }
   const result = await Bun.build({
     entrypoints: ['entry'],
@@ -21,13 +20,16 @@ async function loadModule(): Promise<TestModule> {
       {
         name: 'collab-module-test',
         setup(build) {
-          build.onResolve({ filter: /^(entry|moi(?:\/collab)?)$/ }, args => ({
+          build.onResolve({ filter: /^(entry|moi\/collab)$/ }, args => ({
             path: args.path,
             namespace: 'collab-test'
           }))
           build.onLoad({ filter: /.*/, namespace: 'collab-test' }, args => ({
             contents: sources[args.path]!,
             loader: 'js'
+          }))
+          build.onResolve({ filter: /^moi$/ }, () => ({
+            path: join(import.meta.dir, '../applets/runtime/moi.ts')
           }))
           build.onResolve({ filter: /^react$/ }, () => ({
             path: Bun.resolveSync('react', import.meta.dir),

@@ -1,6 +1,8 @@
 // Pure Codex wire → display mapping. A rendered item becomes a Turn or notice;
 // tool items carry their native lifecycle through a tool-call part. The wire
 // types are a defensive subset; see NOTES.md for maintenance.
+import { replayAttachmentParts } from '@/lib/moi-attachments'
+import { formatChatTitle } from '@/lib/chat-title'
 import type {
   Part,
   StreamEvent,
@@ -10,7 +12,7 @@ import type {
   ToolState,
   Turn
 } from '@/lib/format'
-import { stripMoiContext, stripMoiContextLoose } from '@/lib/moi-context'
+import { stripMoiContextLoose } from '@/lib/moi-context'
 import type { McpServer, Model, SessionInfo } from '@/lib/types'
 
 import type { WorkspaceActivityPreview } from '../types'
@@ -138,7 +140,7 @@ export function codexServiceTierForFastMode(
 
 // Legacy context can be cut mid-envelope in a thread/list preview.
 function cleanPreview(preview: string | undefined): string {
-  return preview ? stripMoiContextLoose(preview).trim() : ''
+  return preview ? formatChatTitle(stripMoiContextLoose(preview)) : ''
 }
 
 export function codexThreadToSessionInfo(t: CodexThread): SessionInfo {
@@ -284,14 +286,13 @@ function userInputToParts(content: CodexUserInput[] | undefined): Part[] {
   for (const c of content ?? []) {
     // Strip context from older sends that used the text-envelope fallback.
     if (c.type === 'text' && c.text) {
-      const text = stripMoiContext(c.text)
-      if (text) parts.push({ type: 'text', text })
+      parts.push({ type: 'text', text: c.text })
     } else if (c.type === 'image' && c.url)
-      parts.push({ type: 'file', mediaType: 'image/*', url: c.url })
+      parts.push({ type: 'file-attachment', mediaType: 'image/*', previewUrl: c.url })
     else if (c.type === 'localImage' && c.path)
-      parts.push({ type: 'text', text: `[image: ${c.path}]` })
+      parts.push({ type: 'file-attachment', mediaType: 'image/*', path: c.path })
   }
-  return parts
+  return replayAttachmentParts(parts)
 }
 
 // Prefer structured MCP output; otherwise join text and label non-text blocks.

@@ -6,6 +6,15 @@ import type { WorkspaceTheme } from './themes'
 // A custom UI unit embedded in a workspace.
 export type AppletKind = 'view' | 'widget'
 
+// What a bundled applet's `moi` module may call on its host-attached bridge.
+// Inputs stay unknown at this trust boundary; the browser host narrows them.
+export type AppletBridge = {
+  addChatAttachment: (input: unknown) => void
+  navigate: (href: unknown) => void
+  resolveHref: (href: unknown) => string
+  sendChatMessage: (input: unknown, context?: unknown) => void
+}
+
 export type AppletInfo = {
   id: string
   // Content revision of the built bundle (`<size>-<mtime>` of index.js).
@@ -71,7 +80,7 @@ export type ViewBuilder = {
 // server-side (bundle pipeline, RPC route); `load`/`render`/`window`/`runtime`
 // are browser-side and reach the journal via POST
 // /api/workspaces/:id/applet-log. `runtime` is the applet API refusing a
-// request rather than code throwing — a `focusTab` at a tab that no longer
+// request rather than code throwing — a `navigate` to a view that no longer
 // exists, a `sendChatMessage` dropped by the rate limit — which the applet's
 // own code never sees.
 export type AppletLogSource = 'build' | 'load' | 'render' | 'window' | 'rpc' | 'runtime'
@@ -187,11 +196,45 @@ export type ScratchOpResult = { name: string } | { image: string } | { ok: true 
 // the snapshot can name the version it needs (see lib/scratchpad-skew.ts).
 export type ScratchpadWriter = { moi: string; tldraw: string }
 
-// An attachment uploaded ahead of a chat message. The bytes live server-side in
-// an in-memory upload store (see server/uploads.ts); a chat frame references it
-// by `id`. `kind` splits the two delivery paths: an `image` is inlined as a
-// base64 vision block in the agent message, a `file` is written to a temp path
-// the agent can `Read`. Returned by POST /api/workspaces/:id/uploads.
+// Attachments: caller input → upload receipt → send reference → resolved data.
+// Text skips uploading. Origin and drawing purpose follow the attachment.
+export type DrawingPurpose = 'annotation' | 'sketch'
+
+// Host-stamped ID of the applet or workspace tab that created the attachment.
+export type AttachmentOrigin = { source: string }
+
+export type TextAttachment = Partial<AttachmentOrigin> & { label: string; text: string }
+
+type FileAttachment = Partial<AttachmentOrigin> & {
+  mediaType: string
+  path: string
+  // Only set when the file contains a drawing image.
+  purpose?: DrawingPurpose
+}
+
+type ImageAttachment = Partial<AttachmentOrigin> & {
+  mediaType: string
+  label: string
+  purpose?: DrawingPurpose
+}
+
+// Resolved payloads: JSON-safe data shared by prompts and transcript replay.
+export type Attachment =
+  | ({ type: 'text' } & TextAttachment)
+  | ({ type: 'file' } & FileAttachment)
+  | ({ type: 'image' } & ImageAttachment)
+
+// Caller input: text or a browser file / workspace-relative path.
+export type TextAttachmentInput = Pick<TextAttachment, 'label' | 'text'>
+
+type FileAttachmentInput = { file: File; path?: never } | { path: string; file?: never }
+
+export type AttachmentInput =
+  | ({ type: 'text' } & TextAttachmentInput)
+  | ({ type: 'file' } & FileAttachmentInput)
+
+// Upload receipt: returned by the upload API before sending the message.
+// Bytes or an absolute file path live in the server's workspace-scoped store.
 export type UploadKind = 'image' | 'file'
 export type UploadInfo = {
   id: string
@@ -205,9 +248,13 @@ export type UploadInfo = {
   height?: number
 }
 
-// Client → Server messages.
-// The chat WebSocket is app-wide (one socket for the whole client, not scoped to
-// a workspace), so every message carries the `workspaceId` it targets.
+// Send reference: inline text or an upload ID for the server to resolve.
+// Drawing purpose belongs to this message's use of the uploaded image.
+export type MessageAttachment =
+  | ({ type: 'text' } & TextAttachment)
+  | ({ type: 'upload'; uploadId: string; purpose?: DrawingPurpose } & Partial<AttachmentOrigin>)
+
+// Client → server messages, routed by workspaceId over the shared WebSocket.
 export type ClientMessage =
   | {
       type: 'chat'
@@ -218,10 +265,9 @@ export type ClientMessage =
       // The browser owns its selected session; creating this chat must not
       // update the installation's shared selection or switch other tabs.
       personalSelection?: boolean
-      // Upload ids (from POST .../uploads) to attach to this turn. The server
-      // resolves each from its upload store and turns it into a vision block
-      // (image) or a temp-file path reference (other files). Order is preserved.
-      attachments?: string[]
+      // Text and upload references for this turn. The server resolves uploads
+      // and describes all attachments together, preserving their order.
+      attachments?: MessageAttachment[]
       // Client-chosen stable id for the user's turn. The server tells the
       // adapter to use this id when the SDK echoes the user input back, so
       // the optimistic bubble the client rendered gets upserted in place.
@@ -546,8 +592,8 @@ export type WorkspaceTabId =
   | 'agent'
   | 'overview'
   | 'scratchpad'
-  | `view:${string}`
-  | `view-builder:${string}`
+  | `views/${string}`
+  | `view-builders/${string}`
 
 // Open tabs plus the workspace's saved DEFAULT tab. `active` is not live focus
 // state — the live active tab is each browser tab's URL (`/workspace/:id/<tab>`).
@@ -673,7 +719,8 @@ export type Model = {
   resolvedModel?: string
   // Human-readable label (Claude `displayName`; OpenClaw `name`).
   displayName: string
-  // " · "-joined blurb (Claude): "<headline> · <tagline> · …". Absent for OpenClaw.
+  // One-line blurb (Claude: "Most efficient for everyday tasks"). Not shown by
+  // the picker. Absent for OpenClaw.
   description?: string
   // Heading this model sits under in the picker (Hermes: the upstream provider,
   // e.g. 'Ollama'). Absent when the backend serves one flat catalog.

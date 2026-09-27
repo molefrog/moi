@@ -1,8 +1,7 @@
-// `moi tabs` / `moi tabs focus` server logic: assemble the tab listing and
-// validate a focus target. Pure given its inputs — the control handler wires
-// in the workspace lookups (see control.ts), tests pass fakes.
+// Tab discovery with portable navigation addresses.
 import type { ViewInfo, WorkspaceTabId } from '@/lib/types'
-import { viewIdFromTab, viewTabId } from '@/lib/workspace-tabs'
+import { moiHref } from '@/lib/navigation'
+import { viewTabId } from '@/lib/workspace-tabs'
 
 // One row of `moi tabs`. `isDefault` marks the workspace's saved default tab
 // (`layout.tabs.active`) — where a bare `/workspace/:id` lands.
@@ -10,6 +9,7 @@ export type TabRow = {
   id: WorkspaceTabId
   title: string
   isDefault: boolean
+  href?: string
 }
 
 // The always-present tabs, titled like the tab bar renders them.
@@ -26,34 +26,20 @@ export function assembleTabRows(views: ViewInfo[], defaultTab: WorkspaceTabId): 
   return [
     ...STATIC_TABS,
     ...views.map(view => ({ id: viewTabId(view.id), title: view.config.title || view.id }))
-  ].map(row => ({ ...row, isDefault: row.id === defaultTab }))
+  ].map(row => ({
+    ...row,
+    isDefault: row.id === defaultTab,
+    ...(row.id === 'agent' ? {} : { href: moiHref(row.id) })
+  }))
 }
 
-type FocusTabDeps = {
-  // Whether a view id exists in the workspace (source or built) — hasViewId.
-  hasView: (viewId: string) => Promise<boolean>
-  // The built views, for the error message's valid-id list — getViewList.
-  viewList: () => Promise<ViewInfo[]>
-}
-
-export type FocusTabResult = { ok: true; tab: WorkspaceTabId } | { ok: false; error: string }
-
-// Validate a `moi tabs focus` target: static ids pass as-is, `view:<id>` must
-// name a real view. Anything else — including view-builder tabs — fails with
-// the list of valid ids. Addressing is by tab id, never by title.
-export async function resolveFocusTab(raw: unknown, deps: FocusTabDeps): Promise<FocusTabResult> {
-  const tab = typeof raw === 'string' ? raw.trim() : ''
-  if (STATIC_TABS.some(row => row.id === tab)) return { ok: true, tab: tab as WorkspaceTabId }
-
-  const viewId = tab.startsWith('view:') ? viewIdFromTab(tab as WorkspaceTabId) : null
-  if (viewId && (await deps.hasView(viewId))) return { ok: true, tab: tab as WorkspaceTabId }
-
-  const validIds = [
-    ...STATIC_TABS.map(row => row.id),
-    ...(await deps.viewList()).map(view => viewTabId(view.id))
-  ]
-  return {
-    ok: false,
-    error: `Unknown tab "${tab || String(raw ?? '')}". Valid tabs: ${validIds.join(', ')}`
-  }
+// CLI navigation checks the server's current built-view list before asking a
+// browser to move. The browser repeats the availability check in case its view
+// list is stale in either direction.
+export function assertNavigableTab(tab: WorkspaceTabId, views: ViewInfo[]): void {
+  const rows = assembleTabRows(views, 'agent').filter(row => row.href)
+  if (rows.some(row => row.id === tab)) return
+  throw new Error(
+    `Unknown destination "${moiHref(tab)}". Valid addresses: ${rows.map(row => row.href).join(', ')}`
+  )
 }

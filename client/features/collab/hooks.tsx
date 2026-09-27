@@ -10,10 +10,12 @@ import {
   useSyncExternalStore
 } from 'react'
 import type { ReactNode } from 'react'
-import { useLocation } from 'wouter'
+import { useRouter } from 'wouter'
+import { usePathname } from 'wouter/use-browser-location'
 
 import type { AppletKind } from '@/lib/types'
 import type { CollabJsonValue } from '@/lib/collab/types'
+import { legacyTabFromPath, tabFromPath, workspacePath } from '@/lib/navigation'
 
 import { createLiveBackend, NO_BACKEND } from './backend'
 import type { CollabBackend } from './backend'
@@ -30,8 +32,10 @@ const BackendContext = createContext<CollabBackend>(NO_BACKEND)
 const MountContext = createContext<Mount | null>(null)
 installIdentityApi()
 
-export function pageFromPath(path: string): string {
-  return path.split('/').slice(3).join('/') || 'overview'
+export function pageFromPath(path: string, workspaceId: string, base = ''): string {
+  const prefix = workspacePath(workspaceId, base) + '/'
+  const page = path.startsWith(prefix) ? path.slice(prefix.length) : ''
+  return tabFromPath(page) ?? legacyTabFromPath(page) ?? (page || 'overview')
 }
 
 export type CollabWorkspaceProviderProps = {
@@ -46,24 +50,24 @@ export function CollabWorkspaceProvider({
 }: CollabWorkspaceProviderProps) {
   const client = useMemo(() => new CollabClient(workspaceId), [workspaceId])
   const backend = useMemo(() => createLiveBackend(client, enabled), [client, enabled])
-  const [path] = useLocation()
+  const router = useRouter()
+  const path = usePathname(router)
+  const { base } = router
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('moi:collab-ready'))
     if (enabled) return client.start()
   }, [client, enabled])
   useEffect(() => {
-    client.store.setLocation(
-      document.visibilityState === 'hidden' ? null : { page: pageFromPath(path) }
-    )
-  }, [client, path])
-  useEffect(() => {
     const update = () =>
       client.store.setLocation(
-        document.visibilityState === 'hidden' ? null : { page: pageFromPath(location.pathname) }
+        document.visibilityState === 'hidden'
+          ? null
+          : { page: pageFromPath(window.location.pathname, workspaceId, base) }
       )
+    update()
     document.addEventListener('visibilitychange', update)
     return () => document.removeEventListener('visibilitychange', update)
-  }, [client])
+  }, [base, client, path, workspaceId])
   return <BackendContext value={backend}>{children}</BackendContext>
 }
 

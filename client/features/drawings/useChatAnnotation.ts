@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 
 import { toast } from '@/client/components/ui/toast'
-import { stageDrawing, stageDrawingDraft } from '@/client/features/chat/attachment-staging'
+import {
+  stageDrawing,
+  stageDrawingDraft
+} from '@/client/features/chat/composer/attachments/draft-attachments'
 import { liveStore } from '@/client/features/chat/chat-store'
 import type { ComposerAnnotationControls } from '@/client/features/chat/composer/ChatComposer'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
@@ -14,7 +17,7 @@ type AnnotationOrigin = 'docked' | 'popup'
 type ChatAnnotationDraft = {
   workspaceId: string
   sourceSessionId: string | null
-  sourceTab: WorkspaceTabId
+  source: WorkspaceTabId
   origin: AnnotationOrigin
   attachmentId: string
 }
@@ -58,9 +61,7 @@ export function useChatAnnotation({
 
     latestBlobRef.current = blob
     if (!blob) {
-      liveStore
-        .getState()
-        .removeAttachment(draft.workspaceId, draft.sourceSessionId, draft.attachmentId)
+      liveStore.getState().removeAttachment(draft.workspaceId, draft.attachmentId)
       return
     }
 
@@ -69,7 +70,7 @@ export function useChatAnnotation({
       sessionId: draft.sourceSessionId,
       localId: draft.attachmentId,
       purpose: 'annotation',
-      sourceTab: draft.sourceTab,
+      source: draft.source,
       blob
     })
   }, [])
@@ -82,7 +83,7 @@ export function useChatAnnotation({
       sessionId: draft.sourceSessionId,
       localId: draft.attachmentId,
       purpose: 'annotation',
-      sourceTab: draft.sourceTab,
+      source: draft.source,
       blob,
       isCurrent: () => uploadRevisionsRef.current.get(draft.attachmentId) === revision
     })
@@ -112,7 +113,7 @@ export function useChatAnnotation({
       const draft: ChatAnnotationDraft = {
         workspaceId,
         sourceSessionId: sessionId,
-        sourceTab: activeTab,
+        source: activeTab,
         origin,
         attachmentId: crypto.randomUUID()
       }
@@ -149,14 +150,14 @@ export function useChatAnnotation({
     (localId: string) => {
       const revision = (uploadRevisionsRef.current.get(localId) ?? 0) + 1
       uploadRevisionsRef.current.set(localId, revision)
-      liveStore.getState().removeAttachment(workspaceId, sessionId, localId)
+      liveStore.getState().removeAttachment(workspaceId, localId)
       if (draftRef.current?.attachmentId === localId) {
         draftRef.current = null
         latestBlobRef.current = null
         void cancelLayer()
       }
     },
-    [cancelLayer, sessionId, workspaceId]
+    [cancelLayer, workspaceId]
   )
 
   const finishDrawing = useCallback(async () => {
@@ -182,7 +183,7 @@ export function useChatAnnotation({
     if (
       draft.workspaceId !== workspaceId ||
       draft.sourceSessionId !== sessionId ||
-      draft.sourceTab !== activeTab ||
+      draft.source !== activeTab ||
       mode !== expectedMode ||
       !available
     ) {

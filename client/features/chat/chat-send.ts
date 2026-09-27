@@ -1,24 +1,120 @@
+import type {
+  AttachmentInput,
+  AttachmentOrigin,
+  DrawingPurpose,
+  MessageAttachment,
+  TextAttachment,
+  UploadInfo
+} from '@/lib/types'
+import { uploadChatFile } from './composer/attachments/uploads'
+import { attachmentPart } from '@/lib/moi-attachments'
 import type { QueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { attachmentKey, type ChatAttachment, liveStore } from '@/client/features/chat/chat-store'
+import { attachmentKey, liveStore } from '@/client/features/chat/chat-store'
+import type { StagedAttachment } from '@/client/features/chat/composer/attachments/types'
 import { resolveSelectedModel } from '@/client/features/chat/composer/model-order'
 import type { MoiUserMessageOptions } from '@/client/features/workspace/moi-context'
 import { STREAM_RESPONSES } from '@/client/lib/flags'
 import { formatChatTitle } from '@/lib/chat-title'
 import { applyEvent, emptyViewState } from '@/lib/format'
+import { messageAttachmentLimitError } from '@/lib/message-attachments'
 import type { Part, SessionInfo, ViewState, WorkspaceAgent } from '@/lib/types'
 
-// What a caller may attach to one message beyond its text. All of it is
-// envelope material — the agent sees it, the chat bubble does not.
-export type ChatSendOptions = MoiUserMessageOptions
+// Explicit attachments belong to this send, independently of the user's draft.
+export type PreparedAttachments = {
+  attachments: MessageAttachment[]
+  parts: Part[]
+}
+
+export type ChatSendOptions = MoiUserMessageOptions & {
+  preparedAttachments?: PreparedAttachments
+}
+
+// Both send paths derive the wire reference and optimistic display together.
+function prepareAttachment(
+  input: TextAttachment | UploadInfo,
+  previewUrl?: string,
+  options: Partial<AttachmentOrigin> & { purpose?: DrawingPurpose } = {}
+): { attachment: MessageAttachment; part: Part } {
+  if ('id' in input) {
+    const metadata = {
+      source: options.source,
+      ...(input.kind === 'image' ? { purpose: options.purpose } : {})
+    }
+    return {
+      attachment: { type: 'upload', uploadId: input.id, ...metadata },
+      part: {
+        type: 'file-attachment',
+        mediaType: input.mediaType,
+        label: input.filename,
+        ...metadata,
+        previewUrl: input.kind === 'image' ? previewUrl : undefined
+      }
+    }
+  }
+  const { source, label, text } = input
+  return {
+    attachment: { type: 'text', source, label, text },
+    part: attachmentPart({ type: 'text', source, label, text })
+  }
+}
+
+function collectPreparedAttachments(
+  items: ReturnType<typeof prepareAttachment>[]
+): PreparedAttachments {
+  return {
+    attachments: items.map(item => item.attachment),
+    parts: items.map(item => item.part)
+  }
+}
+
+export async function prepareChatAttachments(
+  workspaceId: string,
+  inputs: readonly (AttachmentInput & AttachmentOrigin)[]
+): Promise<PreparedAttachments> {
+  const limitError = messageAttachmentLimitError(inputs)
+  if (limitError) throw new Error(limitError)
+  return collectPreparedAttachments(
+    await Promise.all(
+      inputs.map(async input => {
+        if (input.type === 'text') return prepareAttachment(input)
+        const upload = await uploadChatFile(workspaceId, input.file ?? input.path)
+        return prepareAttachment(upload, `/api/workspaces/${workspaceId}/uploads/${upload.id}`, {
+          source: input.source
+        })
+      })
+    )
+  )
+}
+
+export function prepareDraftAttachments(
+  attachments: readonly StagedAttachment[]
+): PreparedAttachments {
+  return collectPreparedAttachments(
+    attachments.flatMap(attachment => {
+      if (attachment.kind === 'text') return [prepareAttachment(attachment)]
+      if (!attachment.upload) return []
+      return [
+        prepareAttachment(
+          { ...attachment.upload, filename: attachment.label, mediaType: attachment.mediaType },
+          attachment.previewUrl,
+          {
+            source: attachment.source,
+            purpose: attachment.kind === 'drawing' ? attachment.purpose : undefined
+          }
+        )
+      ]
+    })
+  )
+}
 
 // Whether this send owns what the user has staged in the composer. Only a send
 // FROM the composer does. An applet's message is not the message the user is
 // building, so it must neither carry files they staged for their own message
 // nor clear ones still uploading out from under them.
 export function ownsComposerAttachments(options?: ChatSendOptions): boolean {
-  return !options?.applet
+  return !options?.applet && !options?.preparedAttachments
 }
 
 // The fully-uploaded attachments this send should carry — none for a send that
@@ -27,65 +123,10 @@ export function attachmentsForSend(
   workspaceId: string,
   sessionId: string | null,
   options?: ChatSendOptions
-): ChatAttachment[] {
+): StagedAttachment[] {
   if (!ownsComposerAttachments(options)) return []
   const pending = liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)] ?? []
-  return pending.filter(a => a.status === 'ready' && a.upload)
-}
-
-export function attachmentPartsForOptimisticTurn(attachments: readonly ChatAttachment[]): Part[] {
-  return attachments.map(attachment => {
-    if (attachment.upload?.kind === 'image' && attachment.previewUrl) {
-      return {
-        type: 'file',
-        mediaType: attachment.mediaType,
-        url: attachment.previewUrl,
-        filename: attachment.name
-      }
-    }
-    return {
-      type: 'file',
-      mediaType: attachment.mediaType,
-      url: '',
-      filename: attachment.name
-    }
-  })
-}
-
-export function withAttachmentDirectives(
-  options: ChatSendOptions | undefined,
-  attachments: readonly ChatAttachment[]
-): ChatSendOptions | undefined {
-  if (!ownsComposerAttachments(options)) return options
-  const annotations: string[] = []
-  const sketches: string[] = []
-  let imagePosition = 0
-  for (const attachment of attachments) {
-    if (attachment.upload?.kind !== 'image') continue
-    imagePosition += 1
-    if (attachment.kind === 'drawing' && attachment.purpose === 'annotation') {
-      annotations.push(`${imagePosition}. ${JSON.stringify(attachment.sourceTab)}`)
-    }
-    if (attachment.kind === 'drawing' && attachment.purpose === 'sketch') {
-      sketches.push(`${imagePosition}. ${JSON.stringify(attachment.sourceTab)}`)
-    }
-  }
-  if (annotations.length === 0 && sketches.length === 0) return options
-
-  const directives = [...(options?.directives ?? [])]
-  if (annotations.length > 0) {
-    directives.push(`Annotation attachment sources in attachment order: ${annotations.join('; ')}.`)
-  }
-  if (sketches.length > 0) {
-    directives.push(
-      `Sketch attachment sources in attachment order: ${sketches.join('; ')}. Each sketch shows the intended layout of a new view.`
-    )
-  }
-
-  return {
-    ...options,
-    directives
-  }
+  return pending.filter(a => a.kind === 'text' || (a.status === 'ready' && a.upload))
 }
 
 type StartOptimisticTurnInput = {

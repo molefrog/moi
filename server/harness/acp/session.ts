@@ -1,3 +1,4 @@
+import type { MessageAttachment } from '@/lib/types'
 // Per-(workspaceId, sessionId) live ACP session adapter.
 //
 // One agent process per workspace (see ./client.ts) serves every session in
@@ -18,7 +19,11 @@
 //   - `session/prompt` is a long-running request that resolves at end of turn,
 //     so its promise IS the turn's lifetime — activity is mirrored from it,
 //     never derived by counting frames.
-import { appendAttachmentNote } from '@/lib/attachment-note'
+import {
+  materializeAttachmentPaths,
+  prepareAttachmentMessage,
+  type PreparedAttachmentMessage
+} from '../../attachment-message'
 import { type MoiContext, appendMoiContext, renderMoiContext } from '@/lib/moi-context'
 import { type Part, applyEvent, emptyViewState } from '@/lib/format'
 import type { Model, SessionActivity, StreamEvent, ViewState, WorkspaceType } from '@/lib/types'
@@ -50,12 +55,6 @@ import { broadcast } from '../../state'
 import { renameSelectedSession } from '../../selected-session'
 import { hasSessionConfig, renameSessionConfig, saveSessionConfig } from '../../session-config'
 import { renameViewBuilderSession } from '../../view-builders'
-import {
-  type StoredUpload,
-  materializeToPath,
-  resolveUploads,
-  uploadToDisplayPart
-} from '../../uploads'
 
 export type AcpSpawnContext = {
   workspaceId: string
@@ -204,11 +203,8 @@ function flushAssistant(
 
 function flushUserChunk(rec: SessionRecord) {
   if (!rec.userChunk && rec.userImageParts.length === 0) return
-  // The chunk is the persisted prompt verbatim; fold the appended machinery
-  // (moi-context envelope, attachment note) back out before the text becomes
-  // a bubble. Replayed images render above the text like the live bubble, and
-  // a turn with nothing left (no typed text, no images) drops entirely.
-  const parts = [...rec.userImageParts, ...replayedUserParts(rec.userChunk)]
+  // Reconstruct the full message once its text and image chunks are collected.
+  const parts = replayedUserParts(rec.userChunk, rec.userImageParts)
   rec.userChunk = ''
   rec.userImageParts = []
   if (parts.length === 0) return
@@ -308,9 +304,9 @@ function handleSessionUpdate(rec: SessionRecord, update: SessionUpdate, provider
         // Rebuilt as a data URL — the cold-reload fallback (live bubbles point
         // at moi's served upload URL, but that store is gone after a restart).
         rec.userImageParts.push({
-          type: 'file',
+          type: 'file-attachment',
           mediaType: content.mimeType,
-          url: `data:${content.mimeType};base64,${content.data}`
+          previewUrl: `data:${content.mimeType};base64,${content.data}`
         })
       }
       return
@@ -489,34 +485,17 @@ async function attachReplayDurations(rec: SessionRecord): Promise<void> {
   })
 }
 
-// Turn typed text + resolved uploads into ACP prompt blocks and the display
-// parts for the user's bubble. Images ride inline as base64 blocks; other
-// files are materialized to a temp path and referenced in an attachment note.
-async function buildPrompt(
-  text: string,
-  uploads: StoredUpload[],
-  supportsImages: boolean
-): Promise<{ blocks: AcpPromptBlock[]; parts: Part[] }> {
-  const parts: Part[] = []
-  for (const u of uploads) {
-    const part = uploadToDisplayPart(u)
-    if (part) parts.push(part)
-  }
-  if (text) parts.push({ type: 'text', text })
-
-  const blocks: AcpPromptBlock[] = []
-  const files: { filename: string; path: string }[] = []
-  for (const u of uploads) {
-    if (u.kind === 'image' && u.data && supportsImages) {
-      blocks.push({ type: 'image', mimeType: u.mediaType, data: u.data.toString('base64') })
-    } else if (u.kind === 'file' || (u.kind === 'image' && !supportsImages)) {
-      const p = await materializeToPath(u)
-      if (p) files.push({ filename: u.filename, path: p })
-    }
-  }
-  const agentText = appendAttachmentNote(text, files)
-  if (agentText) blocks.unshift({ type: 'text', text: agentText })
-  return { blocks, parts }
+function buildPrompt(message: PreparedAttachmentMessage): AcpPromptBlock[] {
+  const images = message.attachments.filter(
+    attachment => attachment.type === 'image' && 'data' in attachment
+  )
+  const blocks: AcpPromptBlock[] = images.map(image => ({
+    type: 'image',
+    mimeType: image.mediaType,
+    data: image.data.toString('base64')
+  }))
+  if (message.text) blocks.unshift({ type: 'text', text: message.text })
+  return blocks
 }
 
 // Run one prompt to completion, then drain anything queued behind it.
@@ -582,23 +561,25 @@ export async function sendAcpMessage(
     sessionId: string
     isNew: boolean
     content: string
-    attachments?: string[]
+    attachments?: MessageAttachment[]
     optimisticId?: string
     model?: string
     stream?: boolean
     context?: MoiContext
   }
 ): Promise<void> {
-  const uploads = input.attachments?.length
-    ? resolveUploads(input.workspaceId, input.attachments)
-    : []
-  if (!input.content && uploads.length === 0) return
-  const { blocks, parts } = await buildPrompt(
+  if (config.supportsImages === false) {
+    await materializeAttachmentPaths(input.workspaceId, input.attachments)
+  }
+  const prepared = prepareAttachmentMessage(
+    input.workspaceId,
     input.content,
-    uploads,
+    input.attachments,
     config.supportsImages !== false
   )
-  if (blocks.length === 0) return
+  if (!prepared.text) return
+  const blocks = buildPrompt(prepared)
+  const { parts } = prepared
 
   // ACP has no native ambient-context channel, so the envelope rides in the
   // text block. The backend persists that text verbatim and echoes it on

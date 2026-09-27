@@ -6,7 +6,7 @@ import { Router, useRoute } from 'wouter'
 import { Toaster } from '@/client/components/ui/toast'
 import { TooltipProvider } from '@/client/components/ui/tooltip'
 import { installAppletErrorHook } from '@/client/features/applets/applet-log'
-import { initConnection } from '@/client/features/chat/chat-connection'
+import { initConnection } from '@/client/features/chat/connection/chat-connection'
 import { AppRouter } from './app/AppRouter'
 
 const queryClient = new QueryClient()

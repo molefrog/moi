@@ -6,6 +6,8 @@
 //
 // The SDK persists history to disk. After eviction or a server restart, the
 // next message resumes that history in a new process.
+import { prepareAttachmentMessage, type PreparedAttachmentMessage } from '../../attachment-message'
+import { attachmentLabel } from '@/lib/moi-attachments'
 import {
   type Options,
   type Query,
@@ -13,7 +15,6 @@ import {
   query
 } from '@anthropic-ai/claude-agent-sdk'
 
-import { appendAttachmentNote, attachmentOnlyPlaceholder } from '@/lib/attachment-note'
 import { buildSessionTitleSource } from '../session-title'
 import { ClaudeAdapter } from './adapter'
 import { CLAUDE_APPROVAL_HOOKS } from './permissions'
@@ -28,7 +29,6 @@ import { tapWire } from '../debug'
 import { broadcast } from '../../state'
 import { renameSelectedSession } from '../../selected-session'
 import { hasSessionConfig, renameSessionConfig, saveSessionConfig } from '../../session-config'
-import { type StoredUpload, resolveUploads, uploadToDisplayPart } from '../../uploads'
 import {
   markViewBuilderBuildingBySession,
   markViewBuilderWaitingBySession,
@@ -44,44 +44,25 @@ type ImageMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
 
 type MessageContent = SDKUserMessage['message']['content']
 
-// Send images inline and other files by path. Keep those paths out of the
-// user's display text.
-export function buildUserMessage(
-  text: string,
-  uploads: StoredUpload[],
-  displayText = text
-): { content: MessageContent; parts: Part[] } {
-  const parts: Part[] = []
-  for (const u of uploads) {
-    const part = uploadToDisplayPart(u)
-    if (part) parts.push(part)
-  }
-  if (displayText) parts.push({ type: 'text', text: displayText })
-
-  if (uploads.length === 0) return { content: text, parts }
-
-  const blocks: Exclude<MessageContent, string> = []
-  for (const u of uploads) {
-    if (u.kind === 'image' && u.data) {
-      blocks.push({
-        type: 'image',
-        source: {
-          type: 'base64',
-          media_type: u.mediaType as ImageMediaType,
-          data: u.data.toString('base64')
-        }
-      })
-    }
-  }
-
-  const files = uploads.filter(u => u.kind === 'file' && u.path)
-  const agentText = appendAttachmentNote(
-    text || attachmentOnlyPlaceholder(uploads.map(upload => upload.filename)),
-    files.map(f => ({ filename: f.filename, path: f.path! }))
+// Only the native SDK block shape belongs to this harness.
+export function buildUserMessage(message: PreparedAttachmentMessage): {
+  content: MessageContent
+  parts: Part[]
+} {
+  const images = message.attachments.filter(
+    attachment => attachment.type === 'image' && 'data' in attachment
   )
-  // Always end with a text block so an image-only message still has a prompt.
-  blocks.push({ type: 'text', text: agentText })
-  return { content: blocks, parts }
+  if (!images.length) return { content: message.text, parts: message.parts }
+  const blocks: Exclude<MessageContent, string> = images.map(image => ({
+    type: 'image',
+    source: {
+      type: 'base64',
+      media_type: image.mediaType as ImageMediaType,
+      data: image.data.toString('base64')
+    }
+  }))
+  blocks.push({ type: 'text', text: message.text })
+  return { content: blocks, parts: message.parts }
 }
 
 // Each live session owns a subprocess. Only idle sessions can be evicted.
@@ -711,12 +692,9 @@ function createLiveSession(input: {
 // Accept immediately, but keep the prompt and its settings in moi until its
 // turn starts. The returned promise settles when the message reaches the SDK.
 export async function sendCCMessage(input: SendMessageInput): Promise<void> {
-  // Expired uploads are omitted. Avoid starting a session if nothing remains.
-  const uploads = input.attachments?.length
-    ? resolveUploads(input.workspaceId, input.attachments)
-    : []
-  if (!input.content && uploads.length === 0) return
-  const { content: userContent, parts } = buildUserMessage(input.content, uploads)
+  const prepared = prepareAttachmentMessage(input.workspaceId, input.content, input.attachments)
+  if (!prepared.text) return
+  const { content: userContent, parts } = buildUserMessage(prepared)
   // Keep context in its own block: the SDK skips tag-leading blocks when
   // extracting titles and previews, and the adapter strips them on replay.
   const content: MessageContent = input.context
@@ -756,7 +734,7 @@ export async function sendCCMessage(input: SendMessageInput): Promise<void> {
       timestamp: new Date().toISOString()
     }
   })
-  const label = input.content || uploads.map(u => u.filename).join(', ')
+  const label = input.content || prepared.attachments.map(attachmentLabel).join(', ')
   const completion = Promise.withResolvers<void>()
   const accepted = new Promise<void>((resolve, reject) => {
     messages.pending.push({
@@ -764,7 +742,7 @@ export async function sendCCMessage(input: SendMessageInput): Promise<void> {
       content,
       titleSource: buildSessionTitleSource(
         input.content,
-        uploads.map(u => u.filename)
+        prepared.attachments.map(attachmentLabel)
       ),
       turnId,
       wireId: crypto.randomUUID(),
