@@ -12,6 +12,7 @@ import { createDevIdentity, personaIdentity, randomPersona } from './dev-persona
 import type { Persona } from './dev-persona'
 import { facehashDataUrl } from './facehash-avatar'
 import { getIdentity, getIdentitySource, setDevIdentity, subscribeIdentityStore } from './identity'
+import { userDisplayName } from './people'
 
 export function DevCollabIdentity() {
   const source = useSyncExternalStore(subscribeIdentityStore, getIdentitySource, getIdentitySource)
@@ -24,10 +25,12 @@ export function DevCollabIdentity() {
 type AccessIdentityProps = { identity: CollabIdentity | null }
 
 // Behind Cloudflare Access the profile is inherited, so there is nothing to edit.
+// Access profiles carry no name, so the label is the email, as in workspaces.
 function AccessIdentity({ identity }: AccessIdentityProps) {
+  const label = identity ? userDisplayName(identity) : null
   const avatar = useMemo(
-    () => (identity ? (identity.avatar ?? facehashDataUrl(identity.name, identity.color)) : null),
-    [identity]
+    () => (identity && label ? (identity.avatar ?? facehashDataUrl(label, identity.color)) : null),
+    [identity, label]
   )
   return (
     <section aria-labelledby="dev-identity-title" className="flex flex-col gap-5">
@@ -37,20 +40,17 @@ function AccessIdentity({ identity }: AccessIdentityProps) {
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
           {identity
-            ? 'This server inherits identities from Cloudflare Access. Your name comes from your email, and your color from your Access user ID.'
+            ? 'This server inherits identities from Cloudflare Access. You appear by your email, with a color picked from your Access user ID.'
             : 'This server inherits identities from Cloudflare Access, but this page wasn’t opened through it. Open moi at its Cloudflare Access address to appear in workspaces.'}
         </p>
       </header>
-      {identity && (
+      {label && (
         <div className="flex items-center gap-3">
           <Avatar size="lg">
             {avatar && <AvatarImage src={avatar} alt="" />}
-            <AvatarFallback>{identity.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+            <AvatarFallback>{label.slice(0, 2).toUpperCase()}</AvatarFallback>
           </Avatar>
-          <div className="flex min-w-0 flex-col">
-            <span className="truncate text-sm font-medium">{identity.name}</span>
-            <span className="truncate text-sm text-muted-foreground">{identity.email}</span>
-          </div>
+          <span className="min-w-0 truncate text-sm font-medium">{label}</span>
         </div>
       )}
     </section>

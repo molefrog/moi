@@ -95,7 +95,7 @@ test.each([
 })
 
 describe('proxy identity', () => {
-  const carol = { id: 'cf-carol', name: 'carol', color: '#10b981', email: 'carol@example.com' }
+  const carol = { id: 'cf-carol', color: '#10b981', email: 'carol@example.com' }
   const signedIn = { provider: 'cloudflare-access', identity: carol } as const
   const unverified = { provider: 'cloudflare-access', identity: null } as const
 

@@ -128,12 +128,10 @@ export class CloudflareAccessVerifier {
   }
 }
 
-// Access tokens carry an id and an email but no display name, so the email's
-// local part stands in for one. The color is a stable pick from the id.
+// Access tokens carry an id and an email but no display name, so the profile
+// has none and labels fall back to the email. The color is a stable pick from the id.
 export function accessProfile({ id, email }: AccessUser): CollabIdentity | null {
-  const at = email.lastIndexOf('@')
-  const name = (at > 0 ? email.slice(0, at) : email).trim()
-  const profile: CollabIdentity = { id, name: name || email, color: colorForId(id), email }
+  const profile: CollabIdentity = { id, color: colorForId(id), email }
   return isCollabIdentity(profile) ? profile : null
 }
 

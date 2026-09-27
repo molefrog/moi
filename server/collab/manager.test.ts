@@ -298,7 +298,7 @@ describe('collab process and socket integration', () => {
   test('a proxy-verified socket joins and updates only as its verified profile', async () => {
     const runtime = manager()
     const workspace = directory()
-    const verified = { id: 'cf-user-1', name: 'alex', color: '#3b82f6', email: 'alex@example.com' }
+    const verified = { id: 'cf-user-1', color: '#3b82f6', email: 'alex@example.com' }
     const client = localSocket()
     const peer = localSocket()
     runtime.open(client.socket, workspace, verified)

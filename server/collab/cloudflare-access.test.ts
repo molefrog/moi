@@ -181,21 +181,21 @@ describe('CloudflareAccessVerifier', () => {
 })
 
 describe('accessProfile', () => {
-  test('names the user after the email local part and colors them by id', () => {
+  test('keeps the id and email, leaves the name out, and colors the user by id', () => {
     const profile = accessProfile({ id: 'user-1', email: 'alex.doe@example.com' })
     expect(profile).toEqual({
       id: 'user-1',
-      name: 'alex.doe',
       color: colorForId('user-1'),
       email: 'alex.doe@example.com'
     })
+    expect(profile).not.toHaveProperty('name')
     expect(PERSONA_COLORS.map(([, hex]) => hex as string)).toContain(profile?.color ?? '')
     expect(accessProfile({ id: 'user-1', email: 'other@example.com' })?.color).toBe(profile?.color)
   })
 
-  test('falls back to the whole email and rejects profiles moi cannot carry', () => {
-    expect(accessProfile({ id: 'user-2', email: '@example.com' })?.name).toBe('@example.com')
+  test('rejects profiles moi cannot carry', () => {
     expect(accessProfile({ id: 'x'.repeat(241), email: 'a@example.com' })).toBeNull()
+    expect(accessProfile({ id: 'user-2', email: `${'a'.repeat(320)}@example.com` })).toBeNull()
   })
 })
 
@@ -239,7 +239,6 @@ describe('proxyIdentity', () => {
         provider: 'cloudflare-access',
         identity: {
           id: '7335d417-61da-459d-899c-0a01c76a2f94',
-          name: 'alex',
           color: colorForId('7335d417-61da-459d-899c-0a01c76a2f94'),
           email: 'alex@example.com'
         }

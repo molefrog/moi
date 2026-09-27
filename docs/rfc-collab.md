@@ -74,9 +74,9 @@ token in the browser's `CF_Authorization` cookie when a proxy drops that header:
 signature against the team's published keys, the issuer, the audience, and expiry, with a minute of
 clock drift. Keys are cached and refetched for an unknown key id at most once a minute. Service
 tokens carry no user and resolve to no identity. The profile takes `id` from the token's `sub` and
-`email` from its `email`. Tokens carry no display name, so `name` is the email's local part.
-`color` is a stable pick from the persona palette, hashed from the id. There is no avatar, so
-components draw the usual generated face.
+`email` from its `email`. Tokens carry no display name, so the profile has no `name` and built-in
+labels show the email. `color` is a stable pick from the persona palette, hashed from the id. There
+is no avatar, so components draw the usual generated face.
 
 `GET /api/identity` returns `{ provider, identity }` and is never cached. The app loads it before
 mounting and again after a reconnect. The inherited profile replaces a saved dev profile and locks
