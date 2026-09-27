@@ -1,5 +1,5 @@
 import { isCollabIdentity } from '@/lib/collab/protocol'
-import type { CollabIdentity } from '@/lib/collab/types'
+import type { CollabIdentity, CollabIdentityProvider, ProxyIdentity } from '@/lib/collab/types'
 
 export type CollabShareContext = { workspaceId: string; url: string }
 export type CollabShareHandler = (context: CollabShareContext) => Promise<{ url: string }>
@@ -20,6 +20,9 @@ export type CollabIdentityApi = {
   subscribeHostState: (listener: (state: CollabHostState | null) => void) => () => void
   setShareHandler: (handler: CollabShareHandler | null) => void
 }
+// Who owns the viewer's identity: a tab-local dev profile, an outer browser
+// host, or a proxy in front of the deployment such as Cloudflare Access.
+export type IdentitySource = 'dev' | 'external' | CollabIdentityProvider
 
 // Earlier development builds generated dev-identity automatically. Only this
 // explicit profile key opts a tab into identity and workspace controls.
@@ -27,7 +30,7 @@ const PROFILE_KEY = 'moi:collab:dev-profile'
 let identity: CollabIdentity | null = null
 let installed = false
 let shareHandler: CollabShareHandler | null = null
-let identitySource: 'dev' | 'external' | null = null
+let identitySource: IdentitySource | null = null
 const listeners = new Set<() => void>()
 const workspaceListeners = new Map<string, Set<() => void>>()
 const hostListeners = new Set<() => void>()
@@ -211,8 +214,27 @@ export function subscribeIdentity(listener: (identity: CollabIdentity | null) =>
   return subscribeIdentityStore(() => listener(identity))
 }
 
-export function getIdentitySource(): 'dev' | 'external' | null {
+export function getIdentitySource(): IdentitySource | null {
   return identitySource
+}
+
+// A deployment proxy owns identity unless an outer host already claimed it.
+// Dev profiles never override it; a proxy that verified nobody signs the tab out.
+export function setProxyIdentity({ provider, identity: next }: ProxyIdentity): void {
+  if (identitySource === 'external') return
+  if (provider === null) {
+    // The server no longer trusts a proxy (restarted without one).
+    if (identitySource === null || identitySource === 'dev') return
+    identitySource = null
+    identity = null
+  } else {
+    const normalized = next === null ? null : normalizeIdentity(next)
+    if (identitySource === provider && JSON.stringify(identity) === JSON.stringify(normalized))
+      return
+    identitySource = provider
+    identity = normalized
+  }
+  listeners.forEach(listener => listener())
 }
 
 function persistDevIdentity(): void {
@@ -225,7 +247,7 @@ function persistDevIdentity(): void {
 
 export function setDevIdentity(next: CollabIdentity): void {
   // A provider may take over between rendering the dev form and handling input.
-  if (identitySource === 'external') return
+  if (identitySource !== null && identitySource !== 'dev') return
   const normalized = normalizeIdentity(next)
   identitySource = 'dev'
   identity = normalized
@@ -262,7 +284,7 @@ export function installIdentityApi(): void {
       // An unavailable host remains authoritative; never restore a dev profile.
       setHostState({ identity: null, workspaces: {} })
     }
-  } else if (identitySource !== 'external') {
+  } else if (identitySource === null) {
     try {
       const saved = sessionStorage.getItem(PROFILE_KEY)
       if (saved) {

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 import { COLLAB_MAX_MESSAGE_BYTES, isCollabClientMessage } from '@/lib/collab/protocol'
-import type { CollabServerMessage } from '@/lib/collab/types'
+import type { CollabClientMessage, CollabIdentity, CollabServerMessage } from '@/lib/collab/types'
 
 import { isCollabEnabled } from './config'
 import type { ParentMessage, WorkerMessage } from './ipc'
@@ -21,6 +21,8 @@ type Binding = {
   closed: boolean
   lastSeen: number
   joined: boolean
+  // Set when a proxy (Cloudflare Access) verified who opened this socket.
+  identity?: CollabIdentity
   slot?: Slot
   queue: Promise<void>
 }
@@ -54,6 +56,17 @@ export class CollabRuntimeError extends Error {
   ) {
     super(message)
   }
+}
+
+// A proxy-verified socket always speaks as the verified profile, whatever
+// profile its browser sends, so one viewer cannot appear as another.
+function verifiedMessage(
+  message: CollabClientMessage,
+  identity: CollabIdentity | undefined
+): CollabClientMessage {
+  if (!identity) return message
+  if (message.type === 'join' || message.type === 'identity') return { ...message, identity }
+  return message
 }
 
 // One owner map per moi server. No LRU: active workspaces cannot be evicted.
@@ -234,7 +247,7 @@ export class CollabManager {
     binding.socket.close(1012, reason.slice(0, 120))
   }
 
-  open(socket: CollabSocket, workspacePath: string) {
+  open(socket: CollabSocket, workspacePath: string, identity?: CollabIdentity) {
     const binding: Binding = {
       socket,
       workspacePaths: new Set([resolve(workspacePath)]),
@@ -242,6 +255,7 @@ export class CollabManager {
       closed: false,
       lastSeen: Date.now(),
       joined: false,
+      identity,
       queue: Promise.resolve()
     }
     this.bindings.set(socket, binding)
@@ -294,7 +308,7 @@ export class CollabManager {
       return
     }
     binding.lastSeen = Date.now()
-    const validated = message
+    const validated = verifiedMessage(message, binding.identity)
     binding.queue = binding.queue
       .then(() => {
         if (binding.closed || !binding.slot) return

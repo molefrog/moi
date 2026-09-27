@@ -1,3 +1,4 @@
+import type { CollabIdentity } from '@/lib/collab/types'
 import { isMessageAttachments } from '@/lib/message-attachments'
 import type { ClientMessage, StatusSnapshotMessage } from '@/lib/types'
 import { isMoiContext, type MoiContext } from '@/lib/moi-context'
@@ -7,6 +8,7 @@ import { api } from './api'
 import { AttachmentUploadError } from './attachment-message'
 import { PORT } from './constants'
 import { control } from './control'
+import { proxyIdentity } from './collab/cloudflare-access'
 import { getCollabReferencePath, isCollabEnabled } from './collab/config'
 import { selectChatSession } from './chat-selection'
 import { collabManager } from './collab/manager'
@@ -35,6 +37,8 @@ type WsData = {
   channel: 'chat' | 'events' | 'collab'
   workspaceId: string
   workspacePath?: string
+  // The collab profile a proxy (Cloudflare Access) verified for the upgrade.
+  identity?: CollabIdentity
 }
 
 function isClientMessage(value: unknown): value is ClientMessage {
@@ -146,10 +150,16 @@ export const app = Bun.serve<WsData>({
       if (!isCollabEnabled()) {
         return new Response('Collab is not enabled for this workspace', { status: 403 })
       }
+      // Behind Cloudflare Access, presence is joined only as the verified viewer.
+      const { provider, identity } = await proxyIdentity(req)
+      if (provider && !identity) {
+        return new Response('Sign in through Cloudflare Access to join', { status: 401 })
+      }
       return upgrade(server, req, {
         channel: 'collab',
         workspaceId,
-        workspacePath: workspace.path
+        workspacePath: workspace.path,
+        ...(identity ? { identity } : {})
       })
     }
   },
@@ -159,7 +169,7 @@ export const app = Bun.serve<WsData>({
   websocket: {
     open(ws) {
       if (ws.data.channel === 'collab') {
-        if (ws.data.workspacePath) collabManager.open(ws, ws.data.workspacePath)
+        if (ws.data.workspacePath) collabManager.open(ws, ws.data.workspacePath, ws.data.identity)
         else ws.close(1008, 'Missing workspace')
       } else if (ws.data.channel === 'chat') {
         addClient(ws)

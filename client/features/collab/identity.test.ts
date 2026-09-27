@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from 'bun:test'
+import { afterEach, describe, expect, test } from 'bun:test'
 
 import type { CollabIdentity } from '@/lib/collab/types'
 
@@ -23,7 +23,11 @@ afterEach(() => {
   }
 })
 
-async function setup(getHostState?: () => CollabHostState | null, profile?: CollabIdentity) {
+async function setup(
+  getHostState?: () => CollabHostState | null,
+  profile?: CollabIdentity,
+  beforeInstall?: (identity: typeof Identity) => void
+) {
   const host: { moi?: { collab?: Partial<CollabIdentityApi> } } = getHostState
     ? { moi: { collab: { getHostState } } }
     : {}
@@ -42,6 +46,7 @@ async function setup(getHostState?: () => CollabHostState | null, profile?: Coll
   // Each bridge starts fresh without changing the singleton used by client.test.ts.
   const path = `./identity.ts?identity-test=${++instance}`
   const identity: typeof Identity = await import(path)
+  beforeInstall?.(identity)
   identity.installIdentityApi()
   return { ...identity, host, saved }
 }
@@ -87,6 +92,75 @@ test.each([
   expect(JSON.parse(identity.saved.get(PROFILE_KEY) ?? 'null')).toEqual(alice)
   identity.host.moi?.collab?.setHostState?.({ identity: bob, workspaces: {} })
   expect(identity.getIdentity()).toEqual(bob)
+})
+
+describe('proxy identity', () => {
+  const carol = { id: 'cf-carol', name: 'carol', color: '#10b981', email: 'carol@example.com' }
+  const signedIn = { provider: 'cloudflare-access', identity: carol } as const
+  const unverified = { provider: 'cloudflare-access', identity: null } as const
+
+  test('Cloudflare Access replaces a saved dev profile and locks dev edits out', async () => {
+    const identity = await setup(undefined, alice)
+    expect(identity.getIdentitySource()).toBe('dev')
+    let notifications = 0
+    identity.subscribeIdentityStore(() => notifications++)
+    identity.setProxyIdentity(signedIn)
+    expect(identity.getIdentity()).toEqual(carol)
+    expect(identity.getIdentitySource()).toBe('cloudflare-access')
+    identity.setDevIdentity(bob)
+    expect(identity.getIdentity()).toEqual(carol)
+    // Refetching the same profile after a reconnect changes nothing.
+    identity.setProxyIdentity({ provider: 'cloudflare-access', identity: { ...carol } })
+    expect(notifications).toBe(1)
+    // The directory keeps its live fallback: Access supplies no membership.
+    expect(identity.getHostState()).toBeNull()
+    expect(identity.getWorkspaceDirectory('a').status).toBe('unavailable')
+  })
+
+  test('a proxy identity that arrives before install keeps a saved dev profile away', async () => {
+    const identity = await setup(undefined, alice, bridge => bridge.setProxyIdentity(signedIn))
+    expect(identity.getIdentity()).toEqual(carol)
+    expect(identity.getIdentitySource()).toBe('cloudflare-access')
+  })
+
+  test('a request Access did not verify signs the tab out', async () => {
+    const identity = await setup(undefined, alice)
+    identity.setProxyIdentity(unverified)
+    expect(identity.getIdentity()).toBeNull()
+    expect(identity.getIdentitySource()).toBe('cloudflare-access')
+    identity.setDevIdentity(bob)
+    expect(identity.getIdentity()).toBeNull()
+    identity.setProxyIdentity(signedIn)
+    expect(identity.getIdentity()).toEqual(carol)
+  })
+
+  test('an outer host stays in charge whichever arrives first', async () => {
+    const hostFirst = await setup(() => ({ identity: bob, workspaces: {} }))
+    hostFirst.setProxyIdentity(signedIn)
+    expect(hostFirst.getIdentity()).toEqual(bob)
+    expect(hostFirst.getIdentitySource()).toBe('external')
+
+    const proxyFirst = await setup(
+      () => ({ identity: bob, workspaces: {} }),
+      undefined,
+      bridge => bridge.setProxyIdentity(signedIn)
+    )
+    expect(proxyFirst.getIdentity()).toEqual(bob)
+    expect(proxyFirst.getIdentitySource()).toBe('external')
+  })
+
+  test('a server without a proxy leaves dev profiles alone and drops a stale proxy identity', async () => {
+    const dev = await setup(undefined, alice)
+    dev.setProxyIdentity({ provider: null, identity: null })
+    expect(dev.getIdentity()).toEqual(alice)
+    expect(dev.getIdentitySource()).toBe('dev')
+
+    const proxied = await setup()
+    proxied.setProxyIdentity(signedIn)
+    proxied.setProxyIdentity({ provider: null, identity: null })
+    expect(proxied.getIdentity()).toBeNull()
+    expect(proxied.getIdentitySource()).toBeNull()
+  })
 })
 
 test('preloaded state exposes stable copied identity and directories across later workspace visits', async () => {

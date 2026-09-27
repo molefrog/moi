@@ -55,6 +55,37 @@ Identity starts as `null`. Local development uses an explicit profile from `/dev
 in that browser tab's `sessionStorage`. An outer provider owns identity once injected, including
 when it signs out. Applets cannot set identity. Without an identity there is no presence connection.
 
+## Cloudflare Access identity
+
+A deployment behind Cloudflare Access (Zero Trust) can inherit each viewer's identity instead of
+asking for a dev profile. It is global deployment config: `cloudflareAccess` in `config.json` in
+moi's data directory, or env vars, which win per field. Both fields are required; half a
+configuration is ignored with a warning.
+
+```json
+{ "cloudflareAccess": { "teamDomain": "acme.cloudflareaccess.com", "audience": "<AUD tag>" } }
+```
+
+`MOI_CLOUDFLARE_ACCESS_TEAM_DOMAIN=acme` and `MOI_CLOUDFLARE_ACCESS_AUD=<tag>[,<tag>]` are the env
+equivalents. The team domain accepts a bare team name, a host, or its `https://` URL.
+
+The server verifies the `Cf-Access-Jwt-Assertion` token Access adds to each request, or the same
+token in the browser's `CF_Authorization` cookie when a proxy drops that header: the RS256
+signature against the team's published keys, the issuer, the audience, and expiry, with a minute of
+clock drift. Keys are cached and refetched for an unknown key id at most once a minute. Service
+tokens carry no user and resolve to no identity. The profile takes `id` from the token's `sub` and
+`email` from its `email`. Tokens carry no display name, so `name` is the email's local part.
+`color` is a stable pick from the persona palette, hashed from the id. There is no avatar, so
+components draw the usual generated face.
+
+`GET /api/identity` returns `{ provider, identity }` and is never cached. The app loads it before
+mounting and again after a reconnect. The inherited profile replaces a saved dev profile and locks
+the dev form. A request without a valid token leaves the tab signed out. The presence socket
+upgrade verifies the token too: without it the upgrade fails with 401, and with it the server
+replaces the profile in every `join` and `identity` message with the verified one, so a browser
+cannot appear as someone else. An outer host that injects state still owns identity in the
+browser. Access supplies no membership, so the workspace directory keeps the live fallback.
+
 ## Users and connections
 
 A user profile is `{ id, name, color, avatar?, email? }`. IDs are stable attribution identifiers;

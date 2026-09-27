@@ -295,6 +295,42 @@ describe('collab process and socket integration', () => {
     expect(latestParticipants(replacement.messages).users.map(user => user.id)).toEqual(['anna'])
   })
 
+  test('a proxy-verified socket joins and updates only as its verified profile', async () => {
+    const runtime = manager()
+    const workspace = directory()
+    const verified = { id: 'cf-user-1', name: 'alex', color: '#3b82f6', email: 'alex@example.com' }
+    const client = localSocket()
+    const peer = localSocket()
+    runtime.open(client.socket, workspace, verified)
+    joinLocal(runtime, client.socket, 'boris')
+    await until(() => client.messages.some(item => item.type === 'welcome'))
+    runtime.open(peer.socket, workspace)
+    joinLocal(runtime, peer.socket, 'carla')
+    await until(() => peer.messages.some(item => item.type === 'welcome'))
+    await until(() => latestParticipants(peer.messages).users.length === 2)
+    expect(latestParticipants(peer.messages).users).toContainEqual(verified)
+    expect(
+      latestParticipants(peer.messages)
+        .participants.map(item => item.userId)
+        .sort()
+    ).toEqual(['carla', 'cf-user-1'])
+
+    runtime.message(
+      client.socket,
+      JSON.stringify({
+        type: 'identity',
+        identity: { id: 'cf-user-1', name: 'Someone else', color: '#ec4899', email: 'x@y.z' }
+      })
+    )
+    runtime.message(client.socket, JSON.stringify({ type: 'ping' }))
+    await until(() => client.messages.some(item => item.type === 'pong'))
+    expect(client.messages.some(item => item.type === 'error')).toBe(false)
+    expect(latestParticipants(peer.messages).users).toContainEqual(verified)
+    expect(latestParticipants(peer.messages).users.map(user => user.name)).not.toContain(
+      'Someone else'
+    )
+  })
+
   test('heartbeats keep active sockets live and silent peers time out', async () => {
     const runtime = manager({ livenessTimeoutMs: 500 })
     const url = serve(runtime, directory())

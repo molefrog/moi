@@ -4,17 +4,57 @@ import { IconArrowsShuffle } from '@tabler/icons-react'
 
 import { Button } from '@/client/components/ui/button'
 import { Input } from '@/client/components/ui/input'
+import { PERSONA_COLORS } from '@/lib/collab/colors'
 import type { CollabIdentity } from '@/lib/collab/types'
+import { Avatar, AvatarFallback, AvatarImage } from '@/ui-components/avatar'
 
-import { PERSONA_COLORS, createDevIdentity, personaIdentity, randomPersona } from './dev-persona'
+import { createDevIdentity, personaIdentity, randomPersona } from './dev-persona'
 import type { Persona } from './dev-persona'
+import { facehashDataUrl } from './facehash-avatar'
 import { getIdentity, getIdentitySource, setDevIdentity, subscribeIdentityStore } from './identity'
 
 export function DevCollabIdentity() {
   const source = useSyncExternalStore(subscribeIdentityStore, getIdentitySource, getIdentitySource)
   const identity = useSyncExternalStore(subscribeIdentityStore, getIdentity, getIdentity)
   if (source === 'external') return null
+  if (source === 'cloudflare-access') return <AccessIdentity identity={identity} />
   return <DevIdentityForm key={identity?.id ?? 'setup'} savedIdentity={identity} />
+}
+
+type AccessIdentityProps = { identity: CollabIdentity | null }
+
+// Behind Cloudflare Access the profile is inherited, so there is nothing to edit.
+function AccessIdentity({ identity }: AccessIdentityProps) {
+  const avatar = useMemo(
+    () => (identity ? (identity.avatar ?? facehashDataUrl(identity.name, identity.color)) : null),
+    [identity]
+  )
+  return (
+    <section aria-labelledby="dev-identity-title" className="flex flex-col gap-5">
+      <header>
+        <h2 id="dev-identity-title" className="text-base font-medium">
+          Cloudflare Access identity
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {identity
+            ? 'This server inherits identities from Cloudflare Access. Your name comes from your email, and your color from your Access user ID.'
+            : 'This server inherits identities from Cloudflare Access, but this page wasn’t opened through it. Open moi at its Cloudflare Access address to appear in workspaces.'}
+        </p>
+      </header>
+      {identity && (
+        <div className="flex items-center gap-3">
+          <Avatar size="lg">
+            {avatar && <AvatarImage src={avatar} alt="" />}
+            <AvatarFallback>{identity.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+          </Avatar>
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate text-sm font-medium">{identity.name}</span>
+            <span className="truncate text-sm text-muted-foreground">{identity.email}</span>
+          </div>
+        </div>
+      )}
+    </section>
+  )
 }
 
 type DevIdentityFormProps = { savedIdentity: CollabIdentity | null }

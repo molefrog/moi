@@ -22,11 +22,12 @@ if (import.meta.hot) {
 }
 
 export async function init(el: HTMLElement) {
-  // Startup config loads in parallel with the main chunk, so it is available
-  // synchronously to every component from the first render.
+  // Startup config and any proxy-verified identity load in parallel with the
+  // main chunk, so both are available synchronously from the first render.
   const [{ mount }] = await Promise.all([
     import('./main'),
-    import('./api/app-config').then(m => m.loadAppConfig())
+    import('./api/app-config').then(m => m.loadAppConfig()),
+    import('./features/collab/proxy-identity').then(m => m.loadProxyIdentity())
   ])
   mount(el)
 }

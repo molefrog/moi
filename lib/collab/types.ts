@@ -14,6 +14,16 @@ export type CollabIdentity = {
   email?: string
 }
 
+// An authenticating proxy in front of the deployment that moi trusts for identity.
+export type CollabIdentityProvider = 'cloudflare-access'
+
+// GET /api/identity. `identity` is the profile the proxy verified for this
+// request: null without a configured provider or without a valid proxy token.
+export type ProxyIdentity = {
+  provider: CollabIdentityProvider | null
+  identity: CollabIdentity | null
+}
+
 export type CollabLocation = { page: string; title?: string; away?: boolean }
 
 export type CollabPresenceRegistration = {
