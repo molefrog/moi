@@ -101,6 +101,47 @@ test('hooks are safe without a backend or applet and resolve missing users to nu
   expect(html).toContain('[]')
 })
 
+test('user hooks preserve missing and empty names for self, peers, and offline members', () => {
+  const self = { id: 'self', color: '#0f766e', email: 'self@example.test' }
+  const peer = { id: 'bob', name: '', color: '#2563eb', email: 'bob@example.test' }
+  const offline = { id: 'offline', color: '#336699' }
+  const room = createFakeEngine({
+    self,
+    page: 'board',
+    users: [self, peer, offline],
+    others: [{ connectionId: 'b', userId: peer.id, location: { page: 'board' }, presence: [] }]
+  })
+  function Users() {
+    return encodeURIComponent(
+      JSON.stringify({
+        me: useMe(),
+        user: useUser('bob'),
+        peers: usePeers(),
+        users: useWorkspaceUsers()
+      })
+    )
+  }
+  const snapshot = JSON.parse(
+    decodeURIComponent(
+      renderToStaticMarkup(
+        <CollabContext value={room}>
+          <Users />
+        </CollabContext>
+      )
+    )
+  ) as { me: CollabUser; user: CollabUser; peers: CollabUser[]; users: CollabUser[] }
+  expect(snapshot).toEqual({
+    me: { ...self, status: 'active' },
+    user: { ...peer, status: 'active' },
+    peers: [{ ...peer, status: 'active' }],
+    users: [
+      { ...self, status: 'active' },
+      { ...peer, status: 'active' },
+      { ...offline, status: 'offline' }
+    ]
+  })
+})
+
 test('workspace users include self and offline members with workspace-wide status filters', () => {
   const carol = { id: 'carol', name: 'Carol', color: '#2563eb' }
   const david = { id: 'david', name: 'David', color: '#0f766e' }

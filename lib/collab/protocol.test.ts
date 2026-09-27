@@ -52,6 +52,36 @@ test('only identified protocol v2 clients can join', () => {
   ).toBe(false)
 })
 
+test('join and profile updates accept missing or empty names but retain identity validation', () => {
+  const unnamed = { id: 'anna', color: '#7c3aed' }
+  for (const profile of [
+    unnamed,
+    { ...unnamed, name: '' },
+    { ...unnamed, name: ' \t ' },
+    { ...unnamed, email: 'anna@example.com', avatar: 'https://example.com/avatar' }
+  ]) {
+    expect(isCollabIdentity(profile)).toBe(true)
+    expect(isCollabClientMessage({ type: 'join', version: 2, identity: profile })).toBe(true)
+    expect(isCollabClientMessage({ type: 'identity', identity: profile })).toBe(true)
+  }
+  for (const profile of [
+    { color: unnamed.color },
+    { ...unnamed, id: '' },
+    { ...unnamed, id: ' \t ' },
+    { ...unnamed, id: null },
+    { ...unnamed, name: null },
+    { ...unnamed, name: 7 },
+    { ...unnamed, name: 'a\0b' },
+    { ...unnamed, name: '🙂'.repeat(65) },
+    { id: unnamed.id }
+  ]) {
+    expect(isCollabIdentity(profile)).toBe(false)
+    expect(isCollabClientMessage({ type: 'join', version: 2, identity: profile })).toBe(false)
+    expect(isCollabClientMessage({ type: 'identity', identity: profile })).toBe(false)
+  }
+  expect(isCollabIdentity({ ...unnamed, name: '🙂'.repeat(64) })).toBe(true)
+})
+
 test('presence bounds JSON bytes, nesting and finite numbers', () => {
   expect(isCollabClientMessage({ ...presence, value: { x: 12, focused: true } })).toBe(true)
   expect(isCollabClientMessage({ ...presence, value: 'x'.repeat(COLLAB_MAX_PRESENCE_BYTES) })).toBe(

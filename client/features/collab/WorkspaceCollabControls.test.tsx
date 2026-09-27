@@ -28,14 +28,20 @@ function connection(user: CollabIdentity, page: string | null): CollabParticipan
   }
 }
 
-function renderHeader(users: CollabIdentity[], others: CollabParticipant[]) {
+function renderHeader(
+  users: CollabIdentity[],
+  others: CollabParticipant[],
+  viewer: CollabIdentity = self
+) {
   const previous = getIdentity()
-  setIdentity(self)
+  setIdentity(viewer)
   try {
     return renderToStaticMarkup(
       <Router ssrPath="/workspace/test/overview">
         <TooltipProvider>
-          <CollabContext value={createFakeEngine({ self, page: 'overview', users, others })}>
+          <CollabContext
+            value={createFakeEngine({ self: viewer, page: 'overview', users, others })}
+          >
             <WorkspaceCollabControls
               workspaceId="test"
               describeTab={() => null}
@@ -85,4 +91,21 @@ test('header overflow counts connected people once, excluding offline members an
   expect(html).toContain('>+1<')
   expect(html).not.toContain('Offline colleague')
   expect(html).not.toContain('aria-label="Fourth colleague"')
+})
+
+test('header gives nameless viewers and connected members nonempty accessible labels', () => {
+  const viewer = { id: 'nameless-self', color: '#0f766e' }
+  const member = { id: 'member-id', name: '', email: 'person@example.test', color: '#2563eb' }
+  const noEmail = { id: 'another-member', name: '  ', color: '#2563eb' }
+  const html = renderHeader(
+    [viewer, member, noEmail],
+    [connection(member, 'overview'), connection(noEmail, 'overview')],
+    viewer
+  )
+  expect(html).toContain('aria-label="nameless-self (you)"')
+  expect(html).toContain('aria-label="person@example.test"')
+  expect(html).toContain('aria-label="another-member"')
+  expect(html).not.toContain('undefined')
+  expect(html).not.toContain('aria-label=""')
+  expect(html).not.toContain('Unknown user')
 })

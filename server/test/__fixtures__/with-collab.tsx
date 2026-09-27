@@ -6,7 +6,11 @@ export default function CollaborationFixture() {
   return (
     <button
       onClick={() =>
-        addChatAttachment({ type: 'text', label: 'People', text: users.map(user => user.name).join(', ') })
+        addChatAttachment({
+          type: 'text',
+          label: 'People',
+          text: users.map(user => user.name?.trim() || user.email?.trim() || user.id).join(', ')
+        })
       }
     >
       Share people

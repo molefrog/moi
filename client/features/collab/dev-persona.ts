@@ -1,6 +1,7 @@
 import type { CollabIdentity } from '@/lib/collab/types'
 
 import { facehashDataUrl } from './facehash-avatar'
+import { userDisplayName } from './people'
 
 // Test profiles are activated only by explicit setup on /dev/collab.
 
@@ -66,8 +67,9 @@ export function randomPersona(current?: Persona): Persona {
 }
 
 export function personaIdentity(id: string, persona: Persona): CollabIdentity {
-  const avatar = facehashDataUrl(persona.name, persona.color)
-  return { id, name: persona.name, color: persona.color, ...(avatar ? { avatar } : {}) }
+  const identity = { id, name: persona.name, color: persona.color }
+  const avatar = facehashDataUrl(userDisplayName(identity), persona.color)
+  return { ...identity, ...(avatar ? { avatar } : {}) }
 }
 
 // The id stays with the tab through renames, so peers keep seeing one person.

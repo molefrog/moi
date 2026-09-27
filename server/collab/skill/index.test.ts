@@ -6,6 +6,7 @@ import type * as CollabApi from 'moi/collab'
 
 import type * as Components from '@/client/features/collab/components'
 import type * as Hooks from '@/client/features/collab/hooks'
+import type { CollabIdentity } from '@/lib/collab/types'
 import type { WorkspaceType } from '@/lib/types'
 
 import { provisionWorkspace, skillsDirFor } from '../../workspace-init'
@@ -35,6 +36,11 @@ type ActualComponents = Pick<
 // This assignment is checked by tsc without importing React into the server.
 const declarationsMatch: ActualHooks & ActualComponents extends typeof CollabApi ? true : false =
   true
+const profileDeclarationsMatch: CollabIdentity extends CollabApi.CollabIdentity
+  ? CollabApi.CollabIdentity extends CollabIdentity
+    ? true
+    : false
+  : false = true
 
 const directories: string[] = []
 
@@ -69,6 +75,7 @@ test('optional collab reference installs beside the default skill without changi
 
 test('workspace declarations match the public hooks and components', () => {
   expect(declarationsMatch).toBe(true)
+  expect(profileDeclarationsMatch).toBe(true)
 })
 
 test('optional guide uses each harness skill directory', async () => {

@@ -34,7 +34,8 @@ export function isCollabIdentity(value: unknown): value is CollabIdentity {
   return (
     isRecord(value) &&
     isCollabString(value.id, 240) &&
-    isCollabString(value.name) &&
+    value.id.trim().length > 0 &&
+    (value.name === undefined || value.name === '' || isCollabString(value.name)) &&
     isCollabString(value.color, 64) &&
     (value.avatar === undefined || isCollabString(value.avatar, COLLAB_MAX_AVATAR_BYTES)) &&
     (value.email === undefined || isCollabString(value.email, COLLAB_MAX_EMAIL_BYTES))

@@ -27,7 +27,7 @@ import { Avatar, AvatarFallback } from '@/ui-components/avatar'
 import { User } from './primitives'
 import { pageFromPath, useConnection, useWorkspaceUsers, useWorkspaceUsersStatus } from './hooks'
 import { getIdentity, getIdentitySource, shareWorkspace, subscribeIdentityStore } from './identity'
-import { groupPeople } from './people'
+import { groupPeople, userDisplayName } from './people'
 import type { PresentPerson } from './people'
 
 export type CollabTabInfo = { label: string; Icon: TabIcon }
@@ -103,7 +103,7 @@ export function WorkspaceCollabControls({
                 avatarOnly
                 id={self.identity.id}
                 showStatus={false}
-                label={`${self.identity.name} (you)`}
+                label={`${userDisplayName(self.identity)} (you)`}
                 className="ring-2 ring-background"
               />
             )}
@@ -116,7 +116,7 @@ export function WorkspaceCollabControls({
             <div className="flex items-center gap-3 px-2 pt-1">
               <User avatarOnly id={self.identity.id} size="lg" showStatus={false} />
               <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                {self.identity.name}{' '}
+                {userDisplayName(self.identity)}{' '}
                 <span className="font-normal text-muted-foreground">(you)</span>
               </span>
             </div>
@@ -214,7 +214,7 @@ function Face({ person, place, onJump }: FaceProps) {
       </TooltipTrigger>
       <TooltipContent side="bottom">
         <span className="flex flex-col">
-          <span>{person.identity.name}</span>
+          <span>{userDisplayName(person.identity)}</span>
           <span className="font-normal text-muted-foreground">{hint}</span>
         </span>
       </TooltipContent>
@@ -229,7 +229,7 @@ function PersonRow({ person, place, onJump }: PersonRowProps) {
     <>
       <User avatarOnly id={person.identity.id} size="md" />
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-sm">{person.identity.name}</span>
+        <span className="truncate text-sm">{userDisplayName(person.identity)}</span>
         <span className="flex items-center gap-1 text-xs text-muted-foreground">
           {Icon && <Icon size={12} stroke={1.75} className="shrink-0" />}
           <span className="truncate">{where}</span>

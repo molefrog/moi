@@ -1,6 +1,12 @@
 import { expect, test } from 'bun:test'
 import type { CollabParticipant } from '@/lib/collab/types'
-import { groupPeople, resolvePeers, resolveUser, workspaceProfiles } from './people'
+import {
+  groupPeople,
+  resolvePeers,
+  resolveUser,
+  userDisplayName,
+  workspaceProfiles
+} from './people'
 
 const alice = { id: 'alice', name: 'Alice', color: '#0f766e' }
 const bob = { id: 'bob', name: 'Bob', color: '#2563eb' }
@@ -21,6 +27,21 @@ const participants = [
   connection('e1', 'eve', null)
 ]
 const source = { participants, users: [alice, bob, eve] }
+
+test('display names fall back to email or stable id without changing profile fields', () => {
+  const nameless = {
+    id: 'member-id',
+    color: '#0f766e',
+    name: '  ',
+    email: '  person@example.test  '
+  }
+  expect(userDisplayName({ ...nameless, name: '  Named person  ' })).toBe('Named person')
+  expect(userDisplayName(nameless)).toBe('person@example.test')
+  expect(userDisplayName({ ...nameless, email: '  ' })).toBe('member-id')
+  expect(userDisplayName({ id: 'only-id', color: '#0f766e' })).toBe('only-id')
+  expect(nameless.name).toBe('  ')
+  expect(nameless.email).toBe('  person@example.test  ')
+})
 
 test('peers are other users, deduplicated across tabs, with page/workspace and status filters', () => {
   expect(resolvePeers(source, 'alice', { page: 'board' })).toEqual([{ ...bob, status: 'active' }])

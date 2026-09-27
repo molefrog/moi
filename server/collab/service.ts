@@ -19,10 +19,10 @@ type Client = {
 function cleanIdentity(identity: CollabIdentity): CollabIdentity {
   return {
     id: identity.id,
-    name: identity.name,
+    ...(identity.name !== undefined ? { name: identity.name } : {}),
     color: identity.color,
-    ...(identity.avatar ? { avatar: identity.avatar } : {}),
-    ...(identity.email ? { email: identity.email } : {})
+    ...(identity.avatar !== undefined ? { avatar: identity.avatar } : {}),
+    ...(identity.email !== undefined ? { email: identity.email } : {})
   }
 }
 

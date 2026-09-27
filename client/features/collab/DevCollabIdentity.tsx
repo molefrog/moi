@@ -21,13 +21,16 @@ type DevIdentityFormProps = { savedIdentity: CollabIdentity | null }
 
 function DevIdentityForm({ savedIdentity }: DevIdentityFormProps) {
   const [initial] = useState(() => savedIdentity ?? createDevIdentity())
-  const [persona, setPersona] = useState<Persona>({ name: initial.name, color: initial.color })
+  const [persona, setPersona] = useState<Persona>({
+    name: initial.name ?? '',
+    color: initial.color
+  })
   const name = persona.name.trim()
   const identity = useMemo(
-    () => (name ? personaIdentity(initial.id, { name, color: persona.color }) : null),
+    () => personaIdentity(initial.id, { name, color: persona.color }),
     [initial.id, name, persona.color]
   )
-  const changed = name !== savedIdentity?.name || persona.color !== savedIdentity?.color
+  const changed = name !== (savedIdentity?.name ?? '') || persona.color !== savedIdentity?.color
 
   return (
     <section aria-labelledby="dev-identity-title" className="flex flex-col gap-5">
@@ -44,11 +47,11 @@ function DevIdentityForm({ savedIdentity }: DevIdentityFormProps) {
         className="flex flex-col gap-5"
         onSubmit={event => {
           event.preventDefault()
-          if (identity) setDevIdentity(identity)
+          setDevIdentity(identity)
         }}
       >
         <div className="flex flex-col items-start gap-5 sm:flex-row">
-          {identity?.avatar ? (
+          {identity.avatar ? (
             <img
               src={identity.avatar}
               alt="Identity preview"
@@ -59,11 +62,10 @@ function DevIdentityForm({ savedIdentity }: DevIdentityFormProps) {
           )}
           <div className="flex w-full max-w-sm min-w-0 flex-col gap-4">
             <label className="flex flex-col gap-1.5 text-sm">
-              Name
+              Name (optional)
               <Input
                 value={persona.name}
                 maxLength={80}
-                required
                 placeholder="Type a name"
                 autoComplete="off"
                 spellCheck={false}
@@ -100,7 +102,7 @@ function DevIdentityForm({ savedIdentity }: DevIdentityFormProps) {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button type="submit" size="sm" disabled={!identity || !changed}>
+              <Button type="submit" size="sm" disabled={!changed}>
                 {savedIdentity ? 'Save identity' : 'Use dev identity'}
               </Button>
               <Button

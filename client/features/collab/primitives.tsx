@@ -10,6 +10,7 @@ import { Badge } from '@/ui-components/badge'
 
 import { facehashDataUrl } from './facehash-avatar'
 import { useUser, useUsers } from './hooks'
+import { userDisplayName } from './people'
 import { motion } from 'motion/react'
 
 // User components resolve IDs through the current workspace directory,
@@ -65,11 +66,11 @@ export function User({
   className
 }: UserProps) {
   const identity = useUser(id)
-  const name = identity?.name ?? UNKNOWN_NAME
+  const name = identity ? userDisplayName(identity) : UNKNOWN_NAME
   // A profile without a picture gets the same generated face on every client,
   // so nobody shows up as bare initials.
   const picture = identity?.avatar
-  const faceName = identity?.name
+  const faceName = identity ? name : undefined
   const faceColor = identity?.color
   const face = useMemo(
     () => (faceName && faceColor ? (picture ?? facehashDataUrl(faceName, faceColor)) : undefined),
@@ -86,7 +87,7 @@ export function User({
       {face && <AvatarImage src={face} alt="" />}
       <AvatarFallback>
         {identity ? (
-          identity.name.trim().slice(0, 2).toUpperCase()
+          name.slice(0, 2).toUpperCase()
         ) : (
           <IconUser size={size === 'xs' || size === 'sm' ? 12 : 16} stroke={1.75} />
         )}
@@ -237,7 +238,7 @@ export function Cursor({ id, x, y, label = true, className, ref }: CursorProps) 
         </svg>
         {label && (
           <UserTag
-            name={identity?.name ?? 'Someone'}
+            name={identity ? userDisplayName(identity) : 'Someone'}
             color={identity?.color}
             className="absolute top-4 left-3.5"
           />
@@ -271,7 +272,7 @@ export function PresenceFramePrimitive({
       {children}
       {lead && (
         <FrameOutline
-          names={resolved.map(person => person.name).join(', ')}
+          names={resolved.map(userDisplayName).join(', ')}
           color={lead.color}
           icon={icon}
         />
