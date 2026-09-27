@@ -295,13 +295,17 @@ describe('collab process and socket integration', () => {
     expect(latestParticipants(replacement.messages).users.map(user => user.id)).toEqual(['anna'])
   })
 
-  test('a proxy-verified socket joins and updates only as its verified profile', async () => {
+  test('a proxy-verified socket joins only with its verified id and keeps its verified profile', async () => {
     const runtime = manager()
     const workspace = directory()
     const verified = { id: 'cf-user-1', color: '#3b82f6', email: 'alex@example.com' }
-    const [client, peer] = [localSocket(), localSocket()]
+    const [client, peer, other] = [localSocket(), localSocket(), localSocket()]
+    runtime.open(other.socket, workspace, verified)
+    joinLocal(runtime, other.socket, 'host-user')
+    expect(other.messages).toContainEqual(expect.objectContaining({ code: 'identity_mismatch' }))
+    expect(other.reason).toContain('Cloudflare Access')
     runtime.open(client.socket, workspace, verified)
-    joinLocal(runtime, client.socket, 'boris')
+    joinLocal(runtime, client.socket, 'cf-user-1')
     const renamed = { type: 'identity', identity: { ...verified, name: 'Boris' } }
     runtime.message(client.socket, JSON.stringify(renamed))
     await until(() => client.messages.some(item => item.type === 'welcome'))

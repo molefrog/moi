@@ -96,6 +96,16 @@ test('an unknown key id refetches the keys at most once a minute', async () => {
   expect(requests).toHaveLength(2)
 })
 
+test('a key Cloudflare stops publishing stops verifying within ten minutes', async () => {
+  const keys = [current]
+  const clock = { now: NOW }
+  const { access } = verifier(keys, clock)
+  expect(await access.verify(await token())).not.toBeNull()
+  keys.splice(0, 1, rotated)
+  clock.now += 10 * 60_000
+  expect(await access.verify(await token())).toBeNull()
+})
+
 test('requests get a nameless Access profile only when Access is configured', async () => {
   const valid = await token()
   const request = (headers: Record<string, string>) => new Request(ISSUER, { headers })

@@ -15,8 +15,10 @@ export const ACCESS_TOKEN_COOKIE = 'CF_Authorization'
 
 const RS256 = { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }
 // Signing keys rotate every six weeks. An unknown key id refetches the set, at
-// most once a minute, so forged key ids cannot hammer the team domain.
+// most once a minute, so forged key ids cannot hammer the team domain. Known
+// keys expire too, so a key Cloudflare stops publishing stops verifying.
 const KEY_REFRESH_INTERVAL_MS = 60_000
+const KEY_MAX_AGE_MS = 10 * 60_000
 const KEY_FETCH_TIMEOUT_MS = 5_000
 // Tolerated clock drift between Cloudflare and this machine.
 const CLOCK_SKEW_SECONDS = 60
@@ -86,9 +88,9 @@ export class CloudflareAccessVerifier {
   }
 
   private async key(kid: string): Promise<CryptoKey | null> {
-    const known = this.keys.get(kid)
-    if (known) return known
-    if (!this.refreshing && this.now() - this.refreshedAt >= KEY_REFRESH_INTERVAL_MS) {
+    const age = this.now() - this.refreshedAt
+    const stale = age >= KEY_MAX_AGE_MS || (!this.keys.has(kid) && age >= KEY_REFRESH_INTERVAL_MS)
+    if (stale && !this.refreshing) {
       this.refreshing = this.refresh().finally(() => {
         this.refreshing = null
       })

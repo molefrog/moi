@@ -58,15 +58,15 @@ export class CollabRuntimeError extends Error {
   }
 }
 
-// A proxy-verified socket always speaks as the verified profile, whatever
-// profile its browser sends, so one viewer cannot appear as another.
+// A proxy-verified socket speaks only as the verified viewer. Another id, such
+// as an outer host's own identity, is refused rather than rewritten, so peers
+// never see someone other than the person the browser shows.
 function verifiedMessage(
   message: CollabClientMessage,
   identity: CollabIdentity | undefined
-): CollabClientMessage {
-  if (!identity) return message
-  if (message.type === 'join' || message.type === 'identity') return { ...message, identity }
-  return message
+): CollabClientMessage | null {
+  if (!identity || (message.type !== 'join' && message.type !== 'identity')) return message
+  return message.identity.id === identity.id ? { ...message, identity } : null
 }
 
 // One owner map per moi server. No LRU: active workspaces cannot be evicted.
@@ -309,6 +309,15 @@ export class CollabManager {
     }
     binding.lastSeen = Date.now()
     const validated = verifiedMessage(message, binding.identity)
+    if (!validated) {
+      this.emit(binding, {
+        type: 'error',
+        code: 'identity_mismatch',
+        message: 'Presence here uses your Cloudflare Access identity'
+      })
+      this.disconnect(binding, 'Identity does not match Cloudflare Access')
+      return
+    }
     binding.queue = binding.queue
       .then(() => {
         if (binding.closed || !binding.slot) return
