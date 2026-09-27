@@ -48,18 +48,13 @@ const LOADING_DIRECTORY: WorkspaceDirectory = Object.freeze({
 let hostState: CollabHostState | null = null
 
 export function normalizeIdentity(value: CollabIdentity): CollabIdentity {
-  if (
-    !value ||
-    typeof value.id !== 'string' ||
-    typeof value.name !== 'string' ||
-    !value.id.trim() ||
-    !value.name.trim()
-  ) {
-    throw new Error('An identity needs an id and name.')
-  }
+  if (!value || typeof value.id !== 'string' || !value.id.trim())
+    throw new Error('An identity needs an id.')
+  if (value.name !== undefined && typeof value.name !== 'string')
+    throw new Error('An identity name must be a string when provided.')
   const normalized: CollabIdentity = {
     id: value.id.trim(),
-    name: value.name.trim(),
+    ...(value.name !== undefined ? { name: value.name.trim() } : {}),
     color: /^#[0-9a-f]{6}$/i.test(value.color) ? value.color : '#0f766e',
     ...(value.avatar !== undefined ? { avatar: value.avatar } : {}),
     ...(value.email !== undefined ? { email: value.email } : {})

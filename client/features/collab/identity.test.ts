@@ -258,6 +258,76 @@ test('global identity supplies the same own profile in every membership list wit
   expect(identity.getWorkspaceUsers('c')).toEqual([bob])
 })
 
+test('host snapshots preserve nameless current and other users without inventing profile names', async () => {
+  const identity = await setup()
+  const self = { id: 'viewer', color: '#0f766e' }
+  const other = {
+    id: 'other',
+    color: '#2563eb',
+    email: 'other@example.test',
+    avatar: 'https://example.test/avatar'
+  }
+  identity.setHostState({
+    identity: self,
+    workspaces: {
+      a: {
+        status: 'ready',
+        users: [
+          { ...self, name: 'Old viewer name' },
+          other,
+          { id: 'empty', name: '', color: '#0f766e' },
+          { id: 'whitespace', name: ' \t ', color: '#2563eb' }
+        ]
+      }
+    }
+  })
+  expect(identity.getIdentity()).toEqual(self)
+  expect(Object.hasOwn(identity.getIdentity()!, 'name')).toBe(false)
+  const users = identity.getWorkspaceUsers('a')!
+  expect(users).toEqual([
+    self,
+    other,
+    { id: 'empty', name: '', color: '#0f766e' },
+    { id: 'whitespace', name: '', color: '#2563eb' }
+  ])
+  expect(Object.hasOwn(users[0]!, 'name')).toBe(false)
+  expect(Object.hasOwn(users[1]!, 'name')).toBe(false)
+  identity.setHostState({
+    identity: { ...self, name: '' },
+    workspaces: identity.getHostState()!.workspaces
+  })
+  expect(identity.getIdentity()).toEqual({ ...self, name: '' })
+  expect(identity.getWorkspaceUsers('a')?.[0]).toBe(identity.getIdentity()!)
+})
+
+test('optional names still reject invalid types and bounds, while ids remain required', async () => {
+  const identity = await setup()
+  identity.setHostState({ identity: alice, workspaces: {} })
+  const previous = identity.getHostState()
+  for (const profile of [
+    { color: alice.color },
+    { ...alice, id: '' },
+    { ...alice, id: ' \t ' },
+    { ...alice, id: null },
+    { ...alice, id: 'x'.repeat(241) },
+    { ...alice, name: null },
+    { ...alice, name: 4 },
+    { ...alice, name: 'x'.repeat(257) },
+    { ...alice, name: 'a\0b' }
+  ]) {
+    // The bridge must validate JavaScript callers as well as typed integrations.
+    expect(() =>
+      identity.setHostState({ identity: profile as CollabIdentity, workspaces: {} })
+    ).toThrow()
+    expect(identity.getHostState()).toBe(previous)
+  }
+  expect(identity.normalizeIdentity({ id: 'id', name: '', color: 'invalid' })).toEqual({
+    id: 'id',
+    name: '',
+    color: '#0f766e'
+  })
+})
+
 test('loading, empty, removed workspaces, and removed members remain distinct and authoritative', async () => {
   const identity = await setup()
   identity.setHostState({
@@ -302,7 +372,7 @@ test('sign-out atomically clears directories and remains authoritative over a sa
 
 test('invalid updates do not partially publish identity, directory, source, or notifications', async () => {
   const identity = await setup(undefined, alice)
-  const invalidUser = { ...bob, name: '' }
+  const invalidUser = { ...bob, id: '' }
   expect(() =>
     identity.setHostState({
       identity: bob,
@@ -317,7 +387,7 @@ test('invalid updates do not partially publish identity, directory, source, or n
   let notifications = 0
   identity.subscribeHostStateStore(() => notifications++)
   const invalidStates: CollabHostState[] = [
-    { identity: { ...bob, name: '' }, workspaces: {} },
+    { identity: { ...bob, id: '' }, workspaces: {} },
     {
       identity: bob,
       workspaces: {

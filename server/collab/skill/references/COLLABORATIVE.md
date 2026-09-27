@@ -35,7 +35,10 @@ const directoryStatus = useWorkspaceUsersStatus() // 'unavailable' | 'loading' |
 const offlineMembers = useWorkspaceUsers({ status: 'offline' })
 ```
 
-A resolved user is `{ id, name, color, avatar?, email?, status }`. `useMe()` and `useUser(id)` return
+A resolved user is `{ id, name?, color, avatar?, email?, status }`. ID and color are required; name
+may be omitted or empty, and email and avatar are optional. Built-in components display a nonblank
+name, otherwise email, otherwise ID. For custom labels use `user.name?.trim() || user.email?.trim() || user.id`;
+the hooks return the profile without inserting a fallback name. `useMe()` and `useUser(id)` return
 `null` if unavailable. Status is `active` (at least one visible workspace connection), `away` (all
 connections hidden or with no known page), or `offline` (none). A user on another page is not offline.
 Hidden users retain their page membership, so `usePeers({ status: 'away' })` lists away users on

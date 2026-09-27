@@ -12,7 +12,8 @@ declare module 'moi/collab' {
 
   export type CollabIdentity = {
     id: string
-    name: string
+    // May be omitted or empty; display with email or id as a fallback.
+    name?: string
     color: string
     avatar?: string
     email?: string

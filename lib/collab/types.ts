@@ -8,7 +8,7 @@ export type CollabJsonValue =
 
 export type CollabIdentity = {
   id: string
-  name: string
+  name?: string
   color: string
   avatar?: string
   email?: string

@@ -8,6 +8,11 @@ export type UsersSource = {
   users: readonly CollabIdentity[]
 }
 
+// Presentation only: keep the supplied profile unchanged in applet APIs.
+export function userDisplayName(user: CollabIdentity): string {
+  return user.name?.trim() || user.email?.trim() || user.id
+}
+
 export function userStatus(participants: readonly CollabParticipant[], id: string): UserStatus {
   const connections = participants.filter(participant => participant.userId === id)
   return connections.some(connection => connection.location !== null && !connection.location.away)

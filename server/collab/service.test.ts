@@ -106,6 +106,31 @@ describe('collab service', () => {
     expect(() => join('two', 'anna')).toThrow('already joined')
   })
 
+  test('nameless profiles and clearing a name preserve supplied optional data across tabs', () => {
+    const nameless = {
+      id: 'anna',
+      color: '#336699',
+      email: 'anna@example.com',
+      avatar: 'https://example.com/avatar'
+    }
+    service.receive('one', { type: 'join', version: 2, identity: nameless })
+    const welcome = messages.find(item => item.message.type === 'welcome')?.message
+    if (welcome?.type !== 'welcome') throw new Error('Missing welcome')
+    expect(welcome.users).toEqual([nameless])
+    expect(Object.hasOwn(welcome.users[0]!, 'name')).toBe(false)
+    service.receive('two', { type: 'join', version: 2, identity: nameless })
+    service.receive('one', { type: 'identity', identity: { ...nameless, name: '' } })
+    expect(latest().users).toEqual([{ ...nameless, name: '' }])
+    service.leave('one')
+    expect(latest().users).toEqual([{ ...nameless, name: '' }])
+    const minimal = { id: 'anna', color: '#336699' }
+    service.receive('two', { type: 'identity', identity: minimal })
+    expect(latest().users).toEqual([minimal])
+    expect(Object.hasOwn(latest().users[0]!, 'name')).toBe(false)
+    expect(Object.hasOwn(latest().users[0]!, 'email')).toBe(false)
+    expect(Object.hasOwn(latest().users[0]!, 'avatar')).toBe(false)
+  })
+
   test('presence and location updates are coalesced and deletion clears a registration', async () => {
     join('one')
     messages = []

@@ -88,7 +88,9 @@ browser. Access supplies no membership, so the workspace directory keeps the liv
 
 ## Users and connections
 
-A user profile is `{ id, name, color, avatar?, email? }`. IDs are stable attribution identifiers;
+A user profile is `{ id, name?, color, avatar?, email? }`. ID and color are required. Names may be
+omitted or empty; built-in labels fall back from a nonblank name to email, then ID, without changing
+the profile returned by hooks. IDs are stable attribution identifiers;
 profiles and browser injection do not provide authentication or workspace access enforcement.
 Those policies remain the outer host's responsibility.
 
@@ -183,7 +185,7 @@ Authoring guide: [COLLABORATIVE.md](../server/collab/skill/references/COLLABORAT
 
 ## Transport and lifecycle
 
-Protocol version 2 accepts a named `join`, profile updates, location updates, presence registration
+Protocol version 2 accepts an identified `join`, profile updates, location updates, presence registration
 updates/removals, and ping. It sends welcome, participant/profile snapshots, errors, and pong.
 Profiles in socket snapshots are only a fallback for current connections; the full host directory
 is never sent through this socket.

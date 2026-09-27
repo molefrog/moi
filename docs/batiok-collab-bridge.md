@@ -12,7 +12,7 @@ The bridge is `window.moi.collab`. Its implementation and exported TypeScript co
 ```ts
 type UserProfile = {
   id: string
-  name: string
+  name?: string
   color: string
   avatar?: string
   email?: string
@@ -34,6 +34,11 @@ type CollabHostBridge = {
   ): void
 }
 ```
+
+Every profile requires a nonblank `id` and a `color`. `name` may be omitted or empty; supplied names
+are trimmed. `email` and `avatar` are optional. User hooks preserve missing or empty names; built-in
+labels display the first nonblank value from name, email, and ID. These rules apply to both the
+current account and every workspace member, including offline members.
 
 `setHostState` replaces the complete snapshot. Identity and every supplied directory become visible
 together before any subscription runs. The whole input is validated before publishing; an invalid

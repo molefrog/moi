@@ -11,15 +11,15 @@ import { AppletScope, CollabContext, presenceChannels } from './hooks'
 
 const me: CollabIdentity = { id: 'me', name: 'Me', color: '#123456' }
 const peer: CollabIdentity = { id: 'peer', name: 'Ada', color: '#234567' }
-function room(target = 'task:42:title') {
+function room(target = 'task:42:title', person: CollabIdentity = peer) {
   return createFakeEngine({
     self: me,
     page: 'board',
-    users: [me, peer],
+    users: [me, person],
     others: [
       {
         connectionId: 'remote',
-        userId: peer.id,
+        userId: person.id,
         location: { page: 'board' },
         presence: [
           {
@@ -54,6 +54,60 @@ test('user rendering follows authoritative profile updates and removal', () => {
   expect(removed).not.toContain('Ada')
   expect(removed).not.toContain('data-slot="avatar-badge"')
 })
+
+test.each([
+  [{ id: 'member-id', color: '#234567' }, 'member-id'],
+  [{ id: 'member-id', name: '', color: '#234567' }, 'member-id'],
+  [
+    { id: 'member-id', name: '   ', email: 'person@example.test', color: '#234567' },
+    'person@example.test'
+  ],
+  [{ id: 'member-id', email: 'person@example.test', color: '#234567' }, 'person@example.test']
+] satisfies Array<[CollabIdentity, string]>)(
+  'nameless user UI resolves a usable label for %j',
+  (person: CollabIdentity, label: string) => {
+    const engine = room('task:42:title', person)
+    const user = render(engine, <User id={person.id} />)
+    expect(user).toContain(`aria-label="${label}"`)
+    expect(user).toContain(`title="${label}"`)
+    expect(user).toContain(`>${label}<`)
+    expect(user).toContain(`>${label.slice(0, 2).toUpperCase()}<`)
+    expect(user).not.toContain('Unknown user')
+    expect(engine.getWorkspaceUsers()?.[1]?.name).toBe(person.name?.trim())
+
+    const frame = render(
+      engine,
+      <PresenceFrame target="task:42:title">
+        <input />
+      </PresenceFrame>
+    )
+    expect(frame).toContain(`>${label}<`)
+    const gutter = render(
+      engine,
+      <PresenceGutter target="task:42:title">
+        <input />
+      </PresenceGutter>
+    )
+    expect(gutter).toContain(`aria-label="${label}"`)
+
+    engine.setOthers([
+      {
+        connectionId: 'remote',
+        userId: person.id,
+        location: { page: 'board' },
+        presence: [
+          {
+            registrationId: 'cursor',
+            surface: 'view:board',
+            channel: presenceChannels.cursor('board'),
+            value: { x: 10, y: 20 }
+          }
+        ]
+      }
+    ])
+    expect(render(engine, <Cursors surface="board">Board</Cursors>)).toContain(`>${label}<`)
+  }
+)
 
 test('frame and gutter resolve the same semantic target and reject a different record', () => {
   const backend = room()
