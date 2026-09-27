@@ -3,9 +3,9 @@ import { dirname, join } from 'node:path'
 
 import type { WorkspaceType } from '@/lib/types'
 
+import { COLLAB_REFERENCE_SOURCE_PATH } from '../../skills-template'
 import { skillsDirFor } from '../../workspace-init'
 
-export const COLLAB_REFERENCE_SOURCE_PATH = join(import.meta.dir, 'references', 'COLLABORATIVE.md')
 const TYPES_SOURCE_PATH = join(import.meta.dir, 'collab-env.d.ts')
 
 export type CollabSkillPaths = { referencePath: string; typesPath: string }
@@ -28,8 +28,7 @@ async function writeChanged(path: string, contents: string): Promise<void> {
   await Bun.write(path, contents)
 }
 
-// Keep this outside the ordinary skill template: only an explicit
-// `moi init --experimental-collab` installs the guide and types.
+// Only an explicit `moi init --experimental-collab` installs the guide and types.
 export async function installCollabSkill(
   workspacePath: string,
   type?: WorkspaceType

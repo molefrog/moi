@@ -9,8 +9,9 @@ import type * as Hooks from '@/client/features/collab/hooks'
 import type { CollabIdentity } from '@/lib/collab/types'
 import type { WorkspaceType } from '@/lib/types'
 
+import { COLLAB_REFERENCE_SOURCE_PATH } from '../../skills-template'
 import { provisionWorkspace, skillsDirFor } from '../../workspace-init'
-import { COLLAB_REFERENCE_SOURCE_PATH, installCollabSkill, removeCollabSkill } from './index'
+import { installCollabSkill, removeCollabSkill } from './index'
 
 type ActualHooks = Pick<
   typeof Hooks,

@@ -8,6 +8,7 @@ import { updateWorkspaceSkills } from '../skill-update'
 
 const SKILL_MD = join('moi-workspace', 'SKILL.md')
 const CHEAT_SHEET = join('moi-workspace', 'references', 'UI-COMPONENTS.md')
+const COLLAB_GUIDE = join('moi-workspace', 'references', 'COLLABORATIVE.md')
 
 async function withTempDir(run: (dir: string) => Promise<void>): Promise<void> {
   const dir = mkdtempSync(join(tmpdir(), 'moi-skills-'))
@@ -43,6 +44,7 @@ describe('installBundledSkills', () => {
       expect(skillMd).toContain('moi --help')
       expect(skillMd).not.toContain('moi help')
       expect(await Bun.file(join(dir, CHEAT_SHEET)).exists()).toBe(true)
+      expect(await Bun.file(join(dir, COLLAB_GUIDE)).exists()).toBe(false)
       // The rest of the skill installs normally.
       expect(skillMd).toContain('# moi workspace')
     })
@@ -80,12 +82,16 @@ describe('installBundledSkills', () => {
       const stripped = (await Bun.file(skillMd).text()).replace(/### Styling and UI components/, '')
       await Bun.write(skillMd, stripped)
       rmSync(join(skillsDir, CHEAT_SHEET), { force: true })
+      const collabGuide = join(skillsDir, COLLAB_GUIDE)
+      const installedGuide = '# Previously installed collaboration guide\n'
+      await Bun.write(collabGuide, installedGuide)
 
       const result = await updateWorkspaceSkills(workspace)
 
       expect(result.changedSkills).toEqual(['moi-workspace'])
       expect(await Bun.file(skillMd).text()).toContain('### Styling and UI components')
       expect(await Bun.file(join(skillsDir, CHEAT_SHEET)).exists()).toBe(true)
+      expect(await Bun.file(collabGuide).text()).toBe(installedGuide)
     })
   })
 })

@@ -71,20 +71,20 @@ test('every collaboration component renders nothing without its bridge, includin
   const api = await loadModule()
   const warning = spyOn(console, 'warn').mockImplementation(() => {})
   try {
-    const children = 'Applet child content'
+    const children = <span>Applet child content</span>
     const components = {
       Activity: <api.Activity />,
       User: <api.User id="alice" />,
       Facepile: <api.Facepile ids={['alice']} />,
       Cursors: <api.Cursors>{children}</api.Cursors>,
       Selection: (
-        <api.Selection target="task:1" selected>
+        <api.Selection id="task:1" selected>
           {children}
         </api.Selection>
       ),
-      PresenceFrame: <api.PresenceFrame target="task:1">{children}</api.PresenceFrame>,
-      PresenceGutter: <api.PresenceGutter target="task:1">{children}</api.PresenceGutter>,
-      PresenceGroup: <api.PresenceGroup>{children}</api.PresenceGroup>
+      PresenceFrame: <api.PresenceFrame id="task:1">{children}</api.PresenceFrame>,
+      PresenceGutter: <api.PresenceGutter id="task:1">{children}</api.PresenceGutter>,
+      PresenceGroup: <api.PresenceGroup id="tasks">{children}</api.PresenceGroup>
     }
     for (const component of Object.values(components))
       expect(renderToStaticMarkup(component)).toBe('')

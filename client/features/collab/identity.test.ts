@@ -371,25 +371,32 @@ test('invalid updates do not partially publish identity, directory, source, or n
   expect(notifications).toBe(0)
 })
 
-test('profiles are immutable copies and prototype-like workspace and user ids are safe', async () => {
-  const identity = await setup()
-  const user = { ...bob, id: '__proto__' }
-  const state = {
-    identity: { ...alice },
-    workspaces: {
-      ['__proto__']: { status: 'ready' as const, users: [user] },
-      constructor: { status: 'ready' as const, users: [alice] }
+test.each(['__proto__', 'constructor', 'toString'])(
+  'profiles are immutable and %s is safe as a workspace and user id',
+  async id => {
+    const identity = await setup()
+    const user = { ...bob, id }
+    const users: CollabIdentity[] = [user]
+    const state = {
+      identity: { ...alice },
+      workspaces: {
+        [id]: { status: 'ready' as const, users },
+        ordinary: { status: 'ready' as const, users: [alice] }
+      }
     }
+    identity.setHostState(state)
+    state.identity.name = 'Changed outside'
+    user.name = 'Changed outside'
+    users.push(alice)
+    expect(identity.getIdentity()?.name).toBe('Alice')
+    expect(identity.getWorkspaceUsers(id)).toEqual([{ ...bob, id }])
+    expect(identity.getWorkspaceUsers('ordinary')).toEqual([alice])
+    expect(identity.getWorkspaceDirectory('hasOwnProperty').status).toBe('loading')
+    identity.setWorkspaceUsers(id, [alice])
+    expect(identity.getWorkspaceUsers(id)).toEqual([alice])
+    expect(identity.getWorkspaceUsers('ordinary')).toEqual([alice])
   }
-  identity.setHostState(state)
-  state.identity.name = 'Changed outside'
-  user.name = 'Changed outside'
-  state.workspaces.__proto__.users.push(alice)
-  expect(identity.getIdentity()?.name).toBe('Alice')
-  expect(identity.getWorkspaceUsers('__proto__')).toEqual([{ ...bob, id: '__proto__' }])
-  expect(identity.getWorkspaceUsers('constructor')).toEqual([alice])
-  expect(identity.getWorkspaceDirectory('toString').status).toBe('loading')
-})
+)
 
 test('the outer bridge exposes atomic host state and share methods only', async () => {
   const identity = await setup()

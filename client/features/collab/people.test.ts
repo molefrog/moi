@@ -105,13 +105,14 @@ test('a visible connection makes the user active across their away page connecti
   ])
 })
 
-test('prototype-like ids resolve as ordinary user ids', () => {
-  const user = { ...alice, id: '__proto__' }
+test.each(['__proto__', 'constructor', 'toString'])('%s resolves as an ordinary user id', id => {
+  const user = { ...alice, id }
   expect(resolveUser({ participants: [], users: [user] }, user.id)).toEqual({
     ...user,
     status: 'offline'
   })
-  expect(resolveUser({ participants: [], users: [] }, 'constructor')).toBeNull()
+  expect(resolveUser({ participants: [], users: [] }, id)).toBeNull()
+  expect(workspaceProfiles([{ ...user, name: 'Stale name' }, bob], user, null)).toEqual([user, bob])
 })
 
 test('header groups users, includes offline users, and merges visible browser tabs', () => {

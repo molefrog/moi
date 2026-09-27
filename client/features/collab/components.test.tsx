@@ -1,17 +1,26 @@
 import { expect, test } from 'bun:test'
-import type { ReactNode } from 'react'
+import { Fragment } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import type { CollabIdentity } from '@/lib/collab/types'
 
-import { Cursors, PresenceFrame, PresenceGutter, User } from './components'
+import {
+  Cursors,
+  PresenceFrame,
+  PresenceGroup,
+  PresenceGutter,
+  Selection,
+  User
+} from './components'
 import { createFakeEngine } from './fake-engine'
 import type { FakeCollabEngine } from './fake-engine'
 import { AppletScope, CollabContext, presenceChannels } from './hooks'
+import { presenceTarget } from './presence-target'
 
 const me: CollabIdentity = { id: 'me', name: 'Me', color: '#123456' }
 const peer: CollabIdentity = { id: 'peer', name: 'Ada', color: '#234567' }
-function room(target = 'task:42:title', person: CollabIdentity = peer) {
+function room(target = presenceTarget('task:42:title'), person: CollabIdentity = peer) {
   return createFakeEngine({
     self: me,
     page: 'board',
@@ -66,7 +75,7 @@ test.each([
 ] satisfies Array<[CollabIdentity, string]>)(
   'nameless user UI resolves a usable label for %j',
   (person: CollabIdentity, label: string) => {
-    const engine = room('task:42:title', person)
+    const engine = room(presenceTarget('task:42:title'), person)
     const user = render(engine, <User id={person.id} />)
     expect(user).toContain(`aria-label="${label}"`)
     expect(user).toContain(`title="${label}"`)
@@ -77,14 +86,14 @@ test.each([
 
     const frame = render(
       engine,
-      <PresenceFrame target="task:42:title">
+      <PresenceFrame id="task:42:title">
         <input />
       </PresenceFrame>
     )
     expect(frame).toContain(`>${label}<`)
     const gutter = render(
       engine,
-      <PresenceGutter target="task:42:title">
+      <PresenceGutter id="task:42:title">
         <input />
       </PresenceGutter>
     )
@@ -114,7 +123,7 @@ test('frame and gutter resolve the same semantic target and reject a different r
   expect(
     render(
       backend,
-      <PresenceFrame target="task:42:title">
+      <PresenceFrame id="task:42:title">
         <input />
       </PresenceFrame>
     )
@@ -122,7 +131,7 @@ test('frame and gutter resolve the same semantic target and reject a different r
   expect(
     render(
       backend,
-      <PresenceGutter target="task:42:title">
+      <PresenceGutter id="task:42:title">
         <input />
       </PresenceGutter>
     )
@@ -130,7 +139,7 @@ test('frame and gutter resolve the same semantic target and reject a different r
   expect(
     render(
       backend,
-      <PresenceFrame target="task:43:title">
+      <PresenceFrame id="task:43:title">
         <input />
       </PresenceFrame>
     )
@@ -138,7 +147,7 @@ test('frame and gutter resolve the same semantic target and reject a different r
   expect(
     render(
       backend,
-      <PresenceGutter target="task:43:title">
+      <PresenceGutter id="task:43:title">
         <input />
       </PresenceGutter>
     )
@@ -148,7 +157,7 @@ test('frame and gutter resolve the same semantic target and reject a different r
 test('inactive applets retain content and hide remote focus', () => {
   const html = render(
     room(),
-    <PresenceFrame target="task:42:title">
+    <PresenceFrame id="task:42:title">
       <input aria-label="Title" />
     </PresenceFrame>,
     false
@@ -160,8 +169,10 @@ test('inactive applets retain content and hide remote focus', () => {
 test('connected components remain safe outside a collaboration provider', () => {
   const html = renderToStaticMarkup(
     <Cursors>
-      <PresenceFrame target="task:42:title">
-        <PresenceGutter target="task:42:notes">Local content</PresenceGutter>
+      <PresenceFrame id="task:42:title">
+        <PresenceGutter id="task:42:notes">
+          <span>Local content</span>
+        </PresenceGutter>
       </PresenceFrame>
     </Cursors>
   )
@@ -169,55 +180,46 @@ test('connected components remain safe outside a collaboration provider', () => 
   expect(html).not.toContain('data-slot="avatar"')
 })
 
-test('each wrapper attaches remote focus only to the matching keyed child', () => {
+test('grouped wrappers keep remote focus attached to semantic IDs through reorder and removal', () => {
   for (const Wrapper of [PresenceFrame, PresenceGutter]) {
-    const backend = room('task:42/title')
-    const title = <input key="title" aria-label="Title" />
-    const notes = <textarea key="notes" aria-label="Notes" />
-    const original = render(
-      backend,
-      <Wrapper target="task:42" each>
-        {[title, notes]}
+    const backend = room(presenceTarget('task:42', 'title'))
+    const title = (
+      <Wrapper key="title" id="title">
+        <input aria-label="Title" />
       </Wrapper>
     )
+    const notes = (
+      <Wrapper key="notes" id="notes">
+        <textarea aria-label="Notes" />
+      </Wrapper>
+    )
+    const original = render(backend, <PresenceGroup id="task:42">{[title, notes]}</PresenceGroup>)
     const children = original.split('data-presence-target=')
     expect(children).toHaveLength(3)
-    expect(children[1]).toStartWith('"task:42/title"')
+    expect(children[1]).toStartWith('"task%3A42/title"')
     expect(children[1]).toContain('Ada')
-    expect(children[2]).toStartWith('"task:42/notes"')
+    expect(children[2]).toStartWith('"task%3A42/notes"')
     expect(children[2]).not.toContain('Ada')
 
     const reordered = render(
       backend,
-      <Wrapper target="task:42" each>
-        {[notes, title]}
-      </Wrapper>
+      <PresenceGroup id="task:42">{[notes, title]}</PresenceGroup>
     ).split('data-presence-target=')
-    expect(reordered[1]).toStartWith('"task:42/notes"')
+    expect(reordered[1]).toStartWith('"task%3A42/notes"')
     expect(reordered[1]).not.toContain('Ada')
-    expect(reordered[2]).toStartWith('"task:42/title"')
+    expect(reordered[2]).toStartWith('"task%3A42/title"')
     expect(reordered[2]).toContain('Ada')
 
-    expect(
-      render(
-        backend,
-        <Wrapper target="task:42" each>
-          {notes}
-        </Wrapper>
-      )
-    ).not.toContain('Ada')
-    expect(
-      render(
-        backend,
-        <Wrapper target="task:43" each>
-          {title}
-        </Wrapper>
-      )
-    ).not.toContain('Ada')
+    expect(render(backend, <PresenceGroup id="task:42">{notes}</PresenceGroup>)).not.toContain(
+      'Ada'
+    )
+    expect(render(backend, <PresenceGroup id="task:43">{title}</PresenceGroup>)).not.toContain(
+      'Ada'
+    )
   }
 })
 
-test('each mode scopes composed children and leaves nested targets explicit', () => {
+test('nested groups scope composed children and keep sibling groups independent', () => {
   function Address() {
     return (
       <div>
@@ -227,42 +229,202 @@ test('each mode scopes composed children and leaves nested targets explicit', ()
     )
   }
   const html = render(
-    room('person/address'),
-    <PresenceGutter target="person" each className="grid gap-4">
-      <Address key="address" />
-      <PresenceFrame key="bio" target="person:bio">
-        <textarea />
-      </PresenceFrame>
-    </PresenceGutter>
+    room(presenceTarget('people', 'person:42', 'address')),
+    <PresenceGroup id="people">
+      <div className="grid gap-4">
+        <PresenceGroup id="person:42">
+          <PresenceGutter id="address">
+            <Address />
+          </PresenceGutter>
+        </PresenceGroup>
+        <PresenceGroup id="person:43">
+          <PresenceGutter id="address">
+            <Address />
+          </PresenceGutter>
+        </PresenceGroup>
+      </div>
+    </PresenceGroup>
   )
   expect(html).toContain('class="grid gap-4"')
-  expect(html).toContain('data-presence-target="person/address"')
-  expect(html).toContain('data-presence-target="person/bio"')
-  expect(html).toContain('data-presence-target="person:bio"')
+  const children = html.split('data-presence-target=')
+  expect(children).toHaveLength(3)
+  expect(children[1]).toStartWith('"people/person%3A42/address"')
+  expect(children[1]).toContain('Ada')
+  expect(children[2]).toStartWith('"people/person%3A43/address"')
+  expect(children[2]).not.toContain('Ada')
   expect(html).toContain('Street')
   expect(html).toContain('City')
   expect(html).toContain('Ada')
 })
 
-test('each wrappers ignore absent children but do not invent targets for unkeyed items', () => {
+test('frame and gutter require one direct element and reject fragments', () => {
   for (const Wrapper of [PresenceFrame, PresenceGutter]) {
+    const invalidChildren: ReactNode[] = [
+      null,
+      false,
+      '',
+      'Title',
+      0,
+      undefined,
+      [<input key="title" />],
+      [<input key="title" />, <input key="notes" />],
+      <Fragment key="one">
+        <input />
+      </Fragment>,
+      <Fragment key="multiple">
+        <input />
+        <input />
+      </Fragment>
+    ]
+    for (const children of invalidChildren) {
+      // JavaScript applets can pass child shapes rejected by the TypeScript declaration.
+      expect(() =>
+        render(room(), <Wrapper id="title">{children as ReactElement}</Wrapper>)
+      ).toThrow('exactly one child element')
+    }
     expect(
       render(
         room(),
-        <Wrapper target="empty" each>
-          {null}
-          {false}
-          {''}
+        <Wrapper id="title">
+          <label>
+            Title
+            <input />
+          </label>
         </Wrapper>
       )
-    ).not.toContain('data-presence-target')
+    ).toContain('Title')
+  }
+})
+
+test('groups add neither DOM nor presence publications', () => {
+  const engine = room()
+  let publications = 0
+  const observed = {
+    ...engine,
+    setPresence: () => {
+      publications++
+    }
+  }
+  const child = <span>Local content</span>
+  expect(
+    render(
+      observed,
+      <PresenceGroup id="outer">
+        <PresenceGroup id="inner">{child}</PresenceGroup>
+      </PresenceGroup>
+    )
+  ).toBe(render(engine, child))
+  expect(publications).toBe(0)
+  expect(engine.getSnapshot().participants[0]?.presence).toEqual([])
+})
+
+test('selection uses group scope while preserving flexible children', () => {
+  const engine = room()
+  engine.setOthers([
+    {
+      connectionId: 'remote',
+      userId: peer.id,
+      location: { page: 'board' },
+      presence: [
+        {
+          registrationId: 'selection',
+          surface: 'view:board',
+          channel: presenceChannels.selection(presenceTarget('tasks', '42')),
+          value: true
+        }
+      ]
+    }
+  ])
+  const html = render(
+    engine,
+    <>
+      <PresenceGroup id="tasks">
+        <Selection id="42" selected={false}>
+          Title<strong>Details</strong>
+        </Selection>
+      </PresenceGroup>
+      <PresenceGroup id="projects">
+        <Selection id="42" selected={false}>
+          Project
+        </Selection>
+      </PresenceGroup>
+    </>
+  )
+  const targets = html.split('data-collab-target=')
+  expect(targets).toHaveLength(3)
+  expect(targets[1]).toStartWith('"tasks/42"')
+  expect(targets[1]).toContain('Ada')
+  expect(targets[1]).toContain('Title')
+  expect(targets[1]).toContain('Details')
+  expect(targets[2]).toStartWith('"projects/42"')
+  expect(targets[2]).not.toContain('Ada')
+})
+
+test('path-like IDs stay separate from nested group boundaries in rendered controls', () => {
+  const html = render(
+    room(presenceTarget('a/b', 'title')),
+    <>
+      <PresenceGroup id="a/b">
+        <PresenceFrame id="title">
+          <input />
+        </PresenceFrame>
+      </PresenceGroup>
+      <PresenceGroup id="a">
+        <PresenceGroup id="b">
+          <PresenceFrame id="title">
+            <input />
+          </PresenceFrame>
+        </PresenceGroup>
+      </PresenceGroup>
+      <PresenceGroup id="a%2Fb">
+        <PresenceFrame id="title">
+          <input />
+        </PresenceFrame>
+      </PresenceGroup>
+    </>
+  )
+  const targets = html.split('data-presence-target=')
+  expect(targets[1]).toStartWith('"a%2Fb/title"')
+  expect(targets[1]).toContain('Ada')
+  expect(targets[2]).toStartWith('"a/b/title"')
+  expect(targets[2]).not.toContain('Ada')
+  expect(targets[3]).toStartWith('"a%252Fb/title"')
+  expect(targets[3]).not.toContain('Ada')
+})
+
+test('blank group and control IDs fail clearly, including groups without any control', () => {
+  for (const id of ['', '   ']) {
     expect(() =>
       render(
         room(),
-        <Wrapper target="task" each>
-          <input />
-        </Wrapper>
+        <PresenceGroup id={id}>
+          <span>Content</span>
+        </PresenceGroup>
       )
-    ).toThrow('explicit, stable key')
+    ).toThrow('nonempty id')
+    expect(() =>
+      render(
+        room(),
+        <PresenceFrame id={id}>
+          <input />
+        </PresenceFrame>
+      )
+    ).toThrow('nonempty id')
+    expect(() =>
+      render(
+        room(),
+        <PresenceGutter id={id}>
+          <input />
+        </PresenceGutter>
+      )
+    ).toThrow('nonempty id')
+    expect(() =>
+      render(
+        room(),
+        <Selection id={id} selected={false}>
+          Content
+        </Selection>
+      )
+    ).toThrow('nonempty id')
   }
 })
