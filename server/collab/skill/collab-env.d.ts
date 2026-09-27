@@ -44,27 +44,25 @@ declare module 'moi/collab' {
   export type CursorsProps = { surface?: string; children: ReactNode; className?: string }
   export function Cursors(props: CursorsProps): ReactElement
 
-  // Targets identify controls across browsers, reordered lists, and record modals.
-  // Both components handle focus presence internally.
-  // With each, target is a group namespace; direct children need explicit stable React keys.
+  // Stable local IDs compose with enclosing PresenceGroup IDs across browsers.
+  // Each focus wrapper accepts one element (not a fragment) and tracks its descendants.
   export type PresenceFrameProps = {
-    target: string
-    each?: boolean
-    children: ReactNode
+    id: string
+    children: ReactElement
     className?: string
   }
   export function PresenceFrame(props: PresenceFrameProps): ReactElement
   export type PresenceGutterProps = {
-    target: string
-    each?: boolean
-    children: ReactNode
+    id: string
+    children: ReactElement
     className?: string
   }
   export function PresenceGutter(props: PresenceGutterProps): ReactElement
-  export type PresenceGroupProps = { children: ReactNode }
+  // Adds a namespace and a local gutter animation group; no DOM or publication.
+  export type PresenceGroupProps = { id: string; children: ReactNode }
   export function PresenceGroup(props: PresenceGroupProps): ReactElement
   export type SelectionProps = {
-    target: string
+    id: string
     selected: boolean
     children: ReactNode
     className?: string

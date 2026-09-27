@@ -29,10 +29,10 @@ import {
   Cursors,
   Facepile,
   PresenceFrame,
+  PresenceGroup,
   PresenceGutter,
   Selection,
-  User,
-  presenceChildTarget
+  User
 } from './components'
 import { createFakeEngine } from './fake-engine'
 import type { FakeCollabEngine } from './fake-engine'
@@ -47,6 +47,7 @@ import {
   useUser,
   useWorkspaceUsers
 } from './hooks'
+import { presenceTarget } from './presence-target'
 
 const YOU: CollabIdentity = { id: 'you', name: 'You', color: '#8b5cf6' }
 const USERS: CollabIdentity[] = [
@@ -60,10 +61,10 @@ const USERS: CollabIdentity[] = [
 const PAGE = 'kit'
 const SURFACE = 'view:kit'
 const TARGETS = [
-  ['First task', presenceChildTarget('tasks', 'launch')],
-  ['Second task', presenceChildTarget('tasks', 'notes')],
-  ['Nested form', presenceChildTarget('project:launch:fields', 'name')],
-  ['Launch dialog', 'todo:launch:dialog:title']
+  ['First task', presenceTarget('tasks', 'launch')],
+  ['Second task', presenceTarget('tasks', 'notes')],
+  ['Nested form', presenceTarget('project', 'launch', 'fields', 'name')],
+  ['Launch dialog', presenceTarget('todo', 'launch', 'dialog', 'title')]
 ] as const
 
 function registration(
@@ -97,7 +98,11 @@ function peers(target: string, tick = 0): CollabParticipant[] {
       userId: 'alex',
       location: { page: PAGE },
       presence: [
-        registration('alex', presenceChannels.selection('todo:notes'), true),
+        registration(
+          'alex',
+          presenceChannels.selection(presenceTarget('tasks', 'selected:notes')),
+          true
+        ),
         registration('alex', presenceChannels.custom('mood'), 'Ready')
       ]
     },
@@ -165,9 +170,9 @@ function EditableList() {
   return (
     <Section
       title="Editable list"
-      hint="One gutter wraps the list. Reorder or remove rows: Fig stays with the task key. Alex has the announcement selected. Text edits stay local."
+      hint="Each task has an explicit presence ID inside the tasks group. Reorder or remove rows: Fig stays with the same task. Alex has the announcement selected. Text edits stay local."
       code={
-        '<PresenceGutter target="tasks" each className="space-y-4">\n  {tasks.map(task => (\n    <Input key={task.id} value={task.title} onChange={...} />\n  ))}\n</PresenceGutter>'
+        '<PresenceGroup id="tasks">\n  <div className="space-y-4">\n    {tasks.map(task => (\n      <PresenceGutter key={task.id} id={task.id}>\n        <Selection id={`selected:${task.id}`} selected={selected === task.id}>\n          <Input value={task.title} onChange={...} />\n        </Selection>\n      </PresenceGutter>\n    ))}\n  </div>\n</PresenceGroup>'
       }
     >
       <div className="flex flex-wrap gap-2">
@@ -191,35 +196,39 @@ function EditableList() {
           Reset list
         </Button>
       </div>
-      <PresenceGutter target="tasks" each className="flex flex-col gap-8 py-3">
-        {tasks.map(task => (
-          <Selection key={task.id} target={`todo:${task.id}`} selected={selected === task.id}>
-            <div className="flex items-center gap-2">
-              <Input
-                className="min-w-0 flex-1"
-                aria-label={`Title for ${task.id}`}
-                value={task.title}
-                onFocus={() => setSelected(task.id)}
-                onChange={event =>
-                  setTasks(current =>
-                    current.map(item =>
-                      item.id === task.id ? { ...item, title: event.target.value } : item
-                    )
-                  )
-                }
-              />
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                aria-label={`Remove ${task.title}`}
-                onClick={() => setTasks(current => current.filter(item => item.id !== task.id))}
-              >
-                <IconTrash stroke={1.75} />
-              </Button>
-            </div>
-          </Selection>
-        ))}
-      </PresenceGutter>
+      <PresenceGroup id="tasks">
+        <div className="flex flex-col gap-8 py-3">
+          {tasks.map(task => (
+            <PresenceGutter key={task.id} id={task.id}>
+              <Selection id={`selected:${task.id}`} selected={selected === task.id}>
+                <div className="flex items-center gap-2">
+                  <Input
+                    className="min-w-0 flex-1"
+                    aria-label={`Title for ${task.id}`}
+                    value={task.title}
+                    onFocus={() => setSelected(task.id)}
+                    onChange={event =>
+                      setTasks(current =>
+                        current.map(item =>
+                          item.id === task.id ? { ...item, title: event.target.value } : item
+                        )
+                      )
+                    }
+                  />
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label={`Remove ${task.title}`}
+                    onClick={() => setTasks(current => current.filter(item => item.id !== task.id))}
+                  >
+                    <IconTrash stroke={1.75} />
+                  </Button>
+                </div>
+              </Selection>
+            </PresenceGutter>
+          ))}
+        </div>
+      </PresenceGroup>
       {!tasks.length && (
         <p className="text-sm text-muted-foreground">No tasks. Add a task or reset the list.</p>
       )}
@@ -233,36 +242,43 @@ function NestedForm() {
   return (
     <Section
       title="Nested controls"
-      hint="One frame tracks each keyed field, including the controls inside its label. The nearest target owns focus, so the outer frame stays quiet."
+      hint="Nested groups combine their IDs without adding layout. Each field has its own frame, including the controls inside its label. The nearest frame owns focus, so the outer frame stays quiet."
       code={
-        '<PresenceFrame target="project:launch:fields" each className="space-y-6">\n  <label key="name">Project name <Input /></label>\n  <label key="notes">Project notes <Textarea /></label>\n</PresenceFrame>'
+        '<PresenceGroup id="project">\n  <PresenceGroup id="launch">\n    <PresenceFrame id="section">\n      <div className="space-y-6">\n        <PresenceGroup id="fields">\n          <PresenceFrame id="name">\n            <label>Project name <Input /></label>\n          </PresenceFrame>\n          <PresenceFrame id="notes">\n            <label>Project notes <Textarea /></label>\n          </PresenceFrame>\n        </PresenceGroup>\n      </div>\n    </PresenceFrame>\n  </PresenceGroup>\n</PresenceGroup>'
       }
     >
-      <PresenceFrame target="project:launch">
-        <PresenceFrame
-          target="project:launch:fields"
-          each
-          className="flex flex-col gap-6 rounded-lg bg-muted p-4"
-        >
-          <label key="name" className="flex flex-col gap-2 text-sm">
-            Project name
-            <Input value={name} onChange={event => setName(event.target.value)} />
-          </label>
-          <label key="notes" className="flex flex-col gap-2 text-sm">
-            Project notes
-            <Textarea value={notes} onChange={event => setNotes(event.target.value)} />
-          </label>
-          <Button
-            key="reset"
-            size="sm"
-            variant="secondary"
-            className="self-start"
-            onClick={() => setNotes('Confirm the venue by Friday.')}
-          >
-            Reset notes
-          </Button>
-        </PresenceFrame>
-      </PresenceFrame>
+      <PresenceGroup id="project">
+        <PresenceGroup id="launch">
+          <PresenceFrame id="section">
+            <div className="flex flex-col gap-6 rounded-lg bg-muted p-4">
+              <PresenceGroup id="fields">
+                <PresenceFrame id="name">
+                  <label className="flex flex-col gap-2 text-sm">
+                    Project name
+                    <Input value={name} onChange={event => setName(event.target.value)} />
+                  </label>
+                </PresenceFrame>
+                <PresenceFrame id="notes">
+                  <label className="flex flex-col gap-2 text-sm">
+                    Project notes
+                    <Textarea value={notes} onChange={event => setNotes(event.target.value)} />
+                  </label>
+                </PresenceFrame>
+                <PresenceFrame id="reset">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="self-start"
+                    onClick={() => setNotes('Confirm the venue by Friday.')}
+                  >
+                    Reset notes
+                  </Button>
+                </PresenceFrame>
+              </PresenceGroup>
+            </div>
+          </PresenceFrame>
+        </PresenceGroup>
+      </PresenceGroup>
     </Section>
   )
 }
@@ -274,7 +290,7 @@ function RecordDialogs() {
       title="One dialog, different records"
       hint="Choose Launch dialog in Fig’s controls, then open each record. Fig only appears on the matching record, even though both use the same dialog component."
       code={
-        '<PresenceFrame target={`todo:${record.id}:dialog:title`}>\n  <Input value={record.title} onChange={...} />\n</PresenceFrame>'
+        '<PresenceGroup id="todo">\n  <PresenceGroup id={record.id}>\n    <PresenceGroup id="dialog">\n      <PresenceFrame id="title">\n        <Input value={record.title} onChange={...} />\n      </PresenceFrame>\n    </PresenceGroup>\n  </PresenceGroup>\n</PresenceGroup>'
       }
     >
       <div className="flex flex-wrap gap-2">
@@ -295,13 +311,19 @@ function RecordDialogs() {
           <DialogDescription>Presence follows the record’s stable ID.</DialogDescription>
           {record && (
             <Cursors surface="examples" className="pt-6">
-              <PresenceFrame target={`todo:${record.id}:dialog:title`}>
-                <Input
-                  aria-label="Record title"
-                  value={record.title}
-                  onChange={event => setRecord({ ...record, title: event.target.value })}
-                />
-              </PresenceFrame>
+              <PresenceGroup id="todo">
+                <PresenceGroup id={record.id}>
+                  <PresenceGroup id="dialog">
+                    <PresenceFrame id="title">
+                      <Input
+                        aria-label="Record title"
+                        value={record.title}
+                        onChange={event => setRecord({ ...record, title: event.target.value })}
+                      />
+                    </PresenceFrame>
+                  </PresenceGroup>
+                </PresenceGroup>
+              </PresenceGroup>
             </Cursors>
           )}
           <div className="flex gap-2">

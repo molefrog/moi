@@ -1,5 +1,14 @@
-import { createContext, useContext, useId, useLayoutEffect, useRef } from 'react'
-import type { FocusEvent, PointerEvent, ReactNode, RefObject } from 'react'
+import {
+  Fragment,
+  createContext,
+  isValidElement,
+  useContext,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef
+} from 'react'
+import type { FocusEvent, PointerEvent, ReactElement, ReactNode, RefObject } from 'react'
 
 import { IconCursorText, IconPointer } from '@tabler/icons-react'
 import { LayoutGroup, MotionConfig } from 'motion/react'
@@ -16,10 +25,9 @@ import {
   usePublishPresenceChannel
 } from './hooks'
 import { Cursor, Facepile, PresenceFramePrimitive, PresenceGutterPrimitive } from './primitives'
-import { presenceChildren } from './presence-children'
+import { presenceTarget } from './presence-target'
 
 export { Facepile, User } from './primitives'
-export { presenceChildTarget } from './presence-children'
 
 // Built-in indicators have no registration while unfocused, unselected, or absent.
 const hasPresence = (value: CollabJsonValue) => value !== false && value !== null
@@ -149,7 +157,12 @@ function RemoteCursor({ root, point, id }: RemoteCursorProps) {
     const observer = new ResizeObserver(position)
     observer.observe(element)
     const changes = new MutationObserver(position)
-    changes.observe(element, { childList: true, subtree: true })
+    changes.observe(element, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-collab-target']
+    })
     element.addEventListener('scroll', position, true)
     window.addEventListener('resize', position)
     return () => {
@@ -162,17 +175,38 @@ function RemoteCursor({ root, point, id }: RemoteCursorProps) {
   return <Cursor ref={marker} id={id} />
 }
 
-const PresenceGroupContext = createContext(false)
-export type PresenceGroupProps = { children: ReactNode }
-export function PresenceGroup({ children }: PresenceGroupProps) {
-  const id = useId()
+const PresenceGroupContext = createContext<readonly string[]>([])
+export type PresenceGroupProps = { id: string; children: ReactNode }
+export function PresenceGroup({ id, children }: PresenceGroupProps) {
+  const parent = useContext(PresenceGroupContext)
+  const scope = useMemo(() => {
+    presenceTarget(id)
+    return [...parent, id]
+  }, [parent, id])
+  // The shared path identifies data across browsers; the generated ID keeps
+  // avatar animations inside this particular rendered group.
+  const animationId = useId()
   return (
     <MotionConfig reducedMotion="user">
-      <LayoutGroup id={id}>
-        <PresenceGroupContext value={true}>{children}</PresenceGroupContext>
+      <LayoutGroup id={animationId}>
+        <PresenceGroupContext value={scope}>{children}</PresenceGroupContext>
       </LayoutGroup>
     </MotionConfig>
   )
+}
+
+function usePresenceTarget(id: string): string {
+  return presenceTarget(...useContext(PresenceGroupContext), id)
+}
+
+function presenceChild(children: ReactNode): ReactElement {
+  if (!isValidElement(children) || children.type === Fragment) {
+    throw new Error(
+      'PresenceFrame and PresenceGutter require exactly one child element. ' +
+        'Wrap a list with PresenceGroup and give each item its own wrapper; fragments are not supported.'
+    )
+  }
+  return children
 }
 
 function useTargetPresence(target: string) {
@@ -208,32 +242,12 @@ function useTargetPresence(target: string) {
 }
 
 export type PresenceFrameProps = {
-  target: string
-  children: ReactNode
+  id: string
+  children: ReactElement
   className?: string
-  each?: boolean
 }
-export function PresenceFrame({ target, children, className, each = false }: PresenceFrameProps) {
-  if (each) {
-    return (
-      <div className={className}>
-        {presenceChildren(target, children).map(({ key, target: childTarget, child }) => (
-          <PresenceFrameTarget key={key} target={childTarget}>
-            {child}
-          </PresenceFrameTarget>
-        ))}
-      </div>
-    )
-  }
-  return (
-    <PresenceFrameTarget target={target} className={className}>
-      {children}
-    </PresenceFrameTarget>
-  )
-}
-
-type PresenceFrameTargetProps = Omit<PresenceFrameProps, 'each'>
-function PresenceFrameTarget({ target, children, className }: PresenceFrameTargetProps) {
+export function PresenceFrame({ id, children, className }: PresenceFrameProps) {
+  const target = usePresenceTarget(id)
   const presence = useTargetPresence(target)
   return (
     <PresenceFramePrimitive
@@ -242,42 +256,20 @@ function PresenceFrameTarget({ target, children, className }: PresenceFrameTarge
       icon={<IconCursorText size={12} stroke={1.75} />}
       className={className}
     >
-      {children}
+      {presenceChild(children)}
     </PresenceFramePrimitive>
   )
 }
 
 export type PresenceGutterProps = {
-  target: string
-  children: ReactNode
+  id: string
+  children: ReactElement
   className?: string
-  each?: boolean
 }
-export function PresenceGutter({ target, children, className, each = false }: PresenceGutterProps) {
-  if (each) {
-    return (
-      <PresenceGroup>
-        <div className={className}>
-          {presenceChildren(target, children).map(({ key, target: childTarget, child }) => (
-            <PresenceGutterTarget key={key} target={childTarget}>
-              {child}
-            </PresenceGutterTarget>
-          ))}
-        </div>
-      </PresenceGroup>
-    )
-  }
-  return (
-    <PresenceGutterTarget target={target} className={className}>
-      {children}
-    </PresenceGutterTarget>
-  )
-}
-
-type PresenceGutterTargetProps = Omit<PresenceGutterProps, 'each'>
-function PresenceGutterTarget({ target, children, className }: PresenceGutterTargetProps) {
+export function PresenceGutter({ id, children, className }: PresenceGutterProps) {
+  const target = usePresenceTarget(id)
   const presence = useTargetPresence(target)
-  const grouped = useContext(PresenceGroupContext)
+  const grouped = useContext(PresenceGroupContext).length > 0
   return (
     <PresenceGutterPrimitive
       {...presence.props}
@@ -285,18 +277,19 @@ function PresenceGutterTarget({ target, children, className }: PresenceGutterTar
       animate={grouped}
       className={className}
     >
-      {children}
+      {presenceChild(children)}
     </PresenceGutterPrimitive>
   )
 }
 
 export type SelectionProps = {
-  target: string
+  id: string
   selected: boolean
   children: ReactNode
   className?: string
 }
-export function Selection({ target, selected, children, className }: SelectionProps) {
+export function Selection({ id, selected, children, className }: SelectionProps) {
+  const target = usePresenceTarget(id)
   const channel = presenceChannels.selection(target)
   usePublishPresenceChannel(channel, selected, hasPresence)
   const others = usePresenceChannel<boolean>(channel)

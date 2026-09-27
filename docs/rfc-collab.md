@@ -116,29 +116,35 @@ builds, unmounts, and Strict Mode cleanup release registrations. Presence is res
 Custom channel names are scoped by applet surface (`view:<name>` or `widget:<name>`); they are not
 a persistent key/value store. Channel values must be JSON and fit within 4 KiB.
 
-| Component        | Contract                                                                                       |
-| ---------------- | ---------------------------------------------------------------------------------------------- |
-| `User`           | Resolve a profile by `id`; name/avatar, sizes, optional status and detail.                     |
-| `Facepile`       | Resolve `ids` and render stacked avatars with an overflow count.                               |
-| `Activity`       | Show current-page or workspace participants.                                                   |
-| `Cursors`        | Wrap a cursor surface; optional stable `surface` name.                                         |
-| `PresenceFrame`  | Wrap a control with `target`; `each` tracks each keyed direct child of a list/form.            |
-| `PresenceGutter` | Same contract, with an avatar beside the focused item; `each` also scopes its animation group. |
-| `PresenceGroup`  | Optionally group gutter targets to constrain avatar layout animations.                         |
-| `Selection`      | Wrap a `target` and supply a controlled `selected` boolean.                                    |
+| Component        | Contract                                                                                |
+| ---------------- | --------------------------------------------------------------------------------------- |
+| `User`           | Resolve a profile by `id`; name/avatar, sizes, optional status and detail.              |
+| `Facepile`       | Resolve `ids` and render stacked avatars with an overflow count.                        |
+| `Activity`       | Show current-page or workspace participants.                                            |
+| `Cursors`        | Wrap a cursor surface; optional stable `surface` name.                                  |
+| `PresenceFrame`  | Wrap one element with a stable local `id`; outline it when another user focuses inside. |
+| `PresenceGutter` | The same single-element focus contract, with avatars beside it.                         |
+| `PresenceGroup`  | Require `id`, namespace descendant targets, and constrain gutter avatar animations.     |
+| `Selection`      | Supply a local `id` and controlled `selected` boolean within the same group namespace.  |
 
-Frame and gutter do not accept user IDs. They discover focus through presence and share the same
-target channel. Nested focus belongs to the nearest target wrapper. Use semantic targets such as
-`todo:42:title`, never array positions or inferred DOM paths. Reusing a modal for another record
-must change its target. Scope animation groups to related list/form regions.
+Frame and gutter discover focus through presence and share the same target channel. Each accepts
+exactly one React element, including a label or composed component with nested controls; fragments,
+arrays, text, and absent children are rejected. Nested focus belongs to the nearest target wrapper.
+Their `id` identifies the target, not a user or an HTML element. `each` and `target` props are removed;
+lists explicitly render one wrapper per item with both a React `key` and a presence `id`.
 
-With `each`, a single frame or gutter wraps a list/form and creates indicators for its keyed direct
-children, including composed components with nested controls. Each child must have a unique,
-explicit semantic React key. The target is `groupTarget + '/' + encodeURIComponent(childKey)`;
-reordering keeps presence attached to its data and removal releases it. Empty children are ignored;
-unkeyed elements, duplicate keys, and bare text are rejected. A keyed fragment is one target.
-The group's `className` controls layout. `PresenceGutter each` owns its animation group automatically.
-Default single-target mode and explicit `PresenceGroup` remain available for individual controls.
+`PresenceGroup id` composes a namespace with its enclosing groups. A field `id="title"` inside
+groups `id="tasks"` and `id="42"` resolves to `tasks/42/title`. Each segment is URI-encoded before
+joining, so an ID containing `/` or `%` cannot collide with a different nesting structure. IDs must
+be nonblank and stable across browsers, and targets should be unique within their group. Reordering
+keeps presence attached to its data; removing a target or changing its ID/group clears the old
+registration. Reusing a modal for another record must change its group ID or local target ID.
+
+Groups add no DOM or presence publication; ordinary elements own layout. Each group also has a
+separate local animation identity so avatars do not glide between unrelated rendered groups which
+happen to share semantic IDs. Page and applet isolation remain outside this namespace. Group IDs
+scope frame, gutter, and selection targets; custom presence channels and cursor surface names keep
+their existing applet scope. Built-in target wrappers also provide the resolved cursor anchor.
 
 `useWorkspaceUsers` enumerates the full host directory, while `usePeers` enumerates connections
 deduplicated by user. The workspace header shows connected users (active or away) only; its member

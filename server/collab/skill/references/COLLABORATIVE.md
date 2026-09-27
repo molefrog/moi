@@ -115,69 +115,88 @@ persistent state, write acknowledgment, or transaction logic around these epheme
 ```tsx
 import { Cursors, PresenceFrame, PresenceGutter, PresenceGroup, Selection } from 'moi/collab'
 ;<Cursors surface="tasks" className="space-y-4">
-  <PresenceFrame target={`todo:${task.id}:title`}>
-    <Input value={title} onChange={event => setTitle(event.target.value)} />
-  </PresenceFrame>
-
-  <PresenceGutter target="tasks" each className="space-y-4">
-    {tasks.map(task => (
-      <Input
-        key={task.id}
-        value={task.title}
-        onChange={event => updateDraft(task.id, event.target.value)}
-      />
-    ))}
-  </PresenceGutter>
-
-  <Selection target={`todo:${task.id}`} selected={selected}>
-    <Button onClick={() => setSelected(value => !value)}>Select task</Button>
-  </Selection>
+  <PresenceGroup id="tasks">
+    <div className="space-y-4">
+      {tasks.map(task => (
+        <PresenceGroup key={task.id} id={task.id}>
+          <div className="space-y-2">
+            <PresenceFrame id="title">
+              <Input
+                value={task.title}
+                onChange={event => updateDraft(task.id, event.target.value)}
+              />
+            </PresenceFrame>
+            <PresenceGutter id="notes">
+              <Textarea
+                value={task.notes}
+                onChange={event => updateNotes(task.id, event.target.value)}
+              />
+            </PresenceGutter>
+            <Selection id="selected" selected={selectedId === task.id}>
+              <Button onClick={() => setSelectedId(task.id)}>Select task</Button>
+            </Selection>
+          </div>
+        </PresenceGroup>
+      ))}
+    </div>
+  </PresenceGroup>
 </Cursors>
 ```
 
 Use your workspace's existing Input/Button components. The example's values and editing handlers
 are ordinary application state; the wrappers add presence only.
 
-- `PresenceFrame` and `PresenceGutter` both take a required stable `target`, `children`, and optional
-  `className` and `each`. They publish focus from descendant controls and show the users focused on that target.
-  Do not pass users or manually fetch presence for these wrappers.
+- `PresenceFrame` and `PresenceGutter` take a required stable `id`, exactly one React element as
+  `children`, and optional `className`. They publish focus from controls inside that element and
+  show the users focused on it. A label, card, or composed component may contain several controls
+  and still be one target. Fragments, arrays, bare text, and absent children are rejected. Do not
+  pass users or manually fetch presence for these wrappers.
 - Frame draws an outline; gutter draws an avatar beside the target. Both use the same focus channel,
   so different layouts of the same applet can choose different presentation. Presence stays scoped
   to the same page and applet; a matching target in another view does not share it.
-- With `each`, wrap a whole list or form once. Each direct child needs an explicit, unique React
-  `key` identifying its data, never its array position. A child can contain nested controls or be
-  a composed component; focus anywhere inside it belongs to that item. A keyed fragment is one
-  item. Empty children are ignored; unkeyed children, duplicate keys, and bare text are errors.
-- In `each` mode, `target` is the group namespace and each item's target is
-  `target + '/' + encodeURIComponent(key)`. Reordering preserves identity; removing a child releases
-  its presence. Changing the group target changes all child targets, so include the record ID for
-  a form reused by different records. `className` controls the group layout.
+- `PresenceGroup` requires an `id` and scopes descendant frame, gutter, and selection IDs. Groups
+  nest: `tasks` → `42` → `title` identifies `tasks/42/title`. Each segment is URI-encoded before
+  joining, so `/` and `%` inside an ID are safe. IDs must be nonblank, stable across browsers, and
+  unique among targets within the same group. Changing any group ID changes its descendant targets.
+- Map lists explicitly; `each` and the old `target` prop are no longer supported. React's `key`
+  handles list reconciliation; the separate `id` identifies presence. Use stable record IDs for
+  both, never array positions. Reordering preserves identity; removal and ID/group changes release
+  old presence. Render a wrapper conditionally instead of giving it an absent child.
 - A nested wrapper owns focus inside its own target; its outer wrapper does not also claim it.
-- `PresenceGroup` takes `children` and confines avatar movement to a related set of gutter targets.
-  Use separate groups for unrelated lists or panels. `PresenceGutter each` supplies its own group,
-  so it does not need another `PresenceGroup` wrapper.
-- `Selection` takes `target`, controlled `selected`, `children`, and optional `className`.
+- `PresenceGroup` adds no DOM and publishes nothing. Use an ordinary `div` for layout. It also
+  confines avatar movement to its gutter targets; use separate groups for unrelated lists or panels.
+  Local animation identities are separate from shared presence IDs. Custom presence channels and
+  `Cursors` surface names retain their existing applet scope; group IDs scope the target components.
+- `Selection` takes `id`, controlled `selected`, `children`, and optional `className`. Its ID uses
+  the same enclosing groups as frame and gutter, but its selection channel is separate from focus.
 - `Cursors` wraps an area and accepts optional stable `surface` and `className`. It publishes your
   pointer and displays remote pointers. No singular cursor renderer is exposed to applets.
 
-Targets identify data, not DOM position. Use `todo:42:title`, not `row:0`. When a modal opens a
-different record, change the target even if the input occupies the same DOM position. If multiple
+Targets identify data, not DOM position. Use record IDs and field names, not row indexes. When a modal opens a
+different record, change the group ID even if the input occupies the same DOM position. If multiple
 cursor areas are mounted within an applet, give each a distinct stable surface name.
 
 ```tsx
-<PresenceFrame target={`project:${project.id}`} each className="space-y-4">
-  <label key="name">
-    Project name
-    <Input value={name} onChange={event => setName(event.target.value)} />
-  </label>
-  <label key="notes">
-    Notes
-    <Textarea value={notes} onChange={event => setNotes(event.target.value)} />
-  </label>
-</PresenceFrame>
+<PresenceGroup id={`project:${project.id}`}>
+  <div className="space-y-4">
+    <PresenceFrame id="name">
+      <label>
+        Project name
+        <Input value={name} onChange={event => setName(event.target.value)} />
+      </label>
+    </PresenceFrame>
+    <PresenceFrame id="notes">
+      <label>
+        Notes
+        <Textarea value={notes} onChange={event => setNotes(event.target.value)} />
+      </label>
+    </PresenceFrame>
+  </div>
+</PresenceGroup>
 ```
 
-Cursor anchors can use `data-collab-target="todo:42"` on semantic elements. This lets another
+Frame, gutter, and selection wrappers create scoped cursor anchors automatically. Custom cursor
+anchors can use `data-collab-target="todo:42"` on semantic elements. This lets another
 browser place the pointer relative to that element through scroll/layout changes. The API does not
 provide general canvas coordinate transforms. High-frequency pointer updates are coalesced by the
 host; applets do not need their own transport.
