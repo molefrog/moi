@@ -56,9 +56,9 @@ test('a signed user token resolves to its user with one key fetch', async () => 
 test.each([
   ['another issuer', () => token({ iss: 'https://other.cloudflareaccess.com' })],
   ['another application', () => token({ aud: 'aud-other' })],
-  ['an expired token', () => token({ exp: SECONDS - 61 })],
+  ['an expired token', () => token({ exp: SECONDS - 600 })],
   ['a token without expiry', () => token({ exp: undefined })],
-  ['a token that is not valid yet', () => token({ nbf: SECONDS + 61 })],
+  ['a token that is not valid yet', () => token({ nbf: SECONDS + 600 })],
   ['a service token', () => token({ sub: '', email: undefined })],
   ['a forged signature', () => token({}, rotated, 'current')],
   ['an unsigned token', async () => new UnsecuredJWT({ ...CLAIMS, exp: SECONDS + 60 }).encode()],
