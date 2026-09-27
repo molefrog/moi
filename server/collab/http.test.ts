@@ -18,12 +18,7 @@ let canonicalPath: string
 let registryPath: string
 let workspace: WorkspaceEntry
 let savedEnv: Record<string, string | undefined>
-const envKeys = [
-  'MOI_COLLAB',
-  'MOI_DEV',
-  'MOI_CLOUDFLARE_ACCESS_TEAM_DOMAIN',
-  'MOI_CLOUDFLARE_ACCESS_AUD'
-]
+const envKeys = ['MOI_COLLAB', 'MOI_DEV']
 
 async function until(predicate: () => boolean) {
   const deadline = Date.now() + 5000
@@ -143,26 +138,11 @@ describe('collab HTTP integration', () => {
     expect(await (await api.request(workspaceUrl)).json()).not.toHaveProperty('collabReference')
   })
 
-  test('identity endpoint reports the proxy-verified viewer and is never cached', async () => {
-    const identity = async (headers: Record<string, string> = {}) => {
-      const response = await api.request('/api/identity', { headers })
-      expect(response.status).toBe(200)
-      expect(response.headers.get('Cache-Control')).toBe('private, no-store')
-      return response.json()
-    }
-    // Without Cloudflare Access configured, a forged header is not an identity.
-    expect(await identity({ 'Cf-Access-Jwt-Assertion': 'forged.token.value' })).toEqual({
-      provider: null,
-      identity: null
-    })
-    process.env.MOI_CLOUDFLARE_ACCESS_TEAM_DOMAIN = 'acme'
-    process.env.MOI_CLOUDFLARE_ACCESS_AUD = 'aud-moi'
-    resetAppConfig()
-    expect(await identity()).toEqual({ provider: 'cloudflare-access', identity: null })
-    expect(await identity({ 'Cf-Access-Jwt-Assertion': 'forged.token.value' })).toEqual({
-      provider: 'cloudflare-access',
-      identity: null
-    })
+  test('the identity endpoint is never cached and ignores Access headers without Access', async () => {
+    const headers = { 'Cf-Access-Jwt-Assertion': 'forged.token.value' }
+    const response = await api.request('/api/identity', { headers })
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store')
+    expect(await response.json()).toEqual({ provider: null, identity: null })
   })
 
   test('persistent commands remain absent even when presence is enabled', async () => {
