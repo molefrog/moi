@@ -14,6 +14,18 @@ export const TEMPLATE_DIR = join(import.meta.dir, '..', 'workspace')
 // for what `moi skill update` copies and what versions it compares against.
 export const BUNDLED_SKILLS_DIR = join(TEMPLATE_DIR, '.claude', 'skills')
 
+export const COLLAB_REFERENCE_SOURCE_PATH = join(
+  BUNDLED_SKILLS_DIR,
+  'moi-workspace',
+  'references',
+  'COLLABORATIVE.md'
+)
+
+// The guide lives beside the other references, but only explicit collab init installs it.
+function isDefaultSkillFile(source: string): boolean {
+  return source !== COLLAB_REFERENCE_SOURCE_PATH
+}
+
 async function matchesBundledPath(source: string, target: string): Promise<boolean> {
   const sourceStat = await lstat(source)
   const targetStat = await lstat(target).catch(() => null)
@@ -21,7 +33,7 @@ async function matchesBundledPath(source: string, target: string): Promise<boole
 
   if (sourceStat.isDirectory()) {
     if (!targetStat.isDirectory()) return false
-    const entries = await readdir(source)
+    const entries = (await readdir(source)).filter(entry => isDefaultSkillFile(join(source, entry)))
     const matches = await Promise.all(
       entries.map(entry => matchesBundledPath(join(source, entry), join(target, entry)))
     )
@@ -62,7 +74,7 @@ export async function installBundledSkills(targetSkillsDir: string): Promise<str
     const target = join(targetSkillsDir, entry.name)
     if (await matchesBundledPath(source, target)) continue
 
-    await cp(source, target, { recursive: true, force: true })
+    await cp(source, target, { recursive: true, force: true, filter: isDefaultSkillFile })
     changedSkills.push(entry.name)
   }
 

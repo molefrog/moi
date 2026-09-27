@@ -156,7 +156,7 @@ are coalesced to 50 ms. Optional `data-collab-target` anchors allow pointers to 
 when layouts or scroll positions differ; arbitrary canvas coordinate mapping is not implemented.
 
 Public declarations: [collab-env.d.ts](../server/collab/skill/collab-env.d.ts).
-Authoring guide: [COLLABORATIVE.md](../server/collab/skill/references/COLLABORATIVE.md).
+Authoring guide: [COLLABORATIVE.md](../workspace/.claude/skills/moi-workspace/references/COLLABORATIVE.md).
 
 ## Transport and lifecycle
 
