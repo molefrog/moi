@@ -1,4 +1,6 @@
 import { beforeAll, expect, spyOn, test } from 'bun:test'
+import { SignJWT, UnsecuredJWT, exportJWK, generateKeyPair } from 'jose'
+import type { CryptoKey, JWK, JWTPayload } from 'jose'
 
 import { colorForId } from '@/lib/collab/colors'
 
@@ -6,56 +8,37 @@ import { resetAppConfig } from '../app-config'
 import {
   ACCESS_TOKEN_COOKIE,
   ACCESS_TOKEN_HEADER,
-  CloudflareAccessVerifier,
+  accessVerifier,
   proxyIdentity
 } from './cloudflare-access'
 
 const ISSUER = 'https://acme.cloudflareaccess.com'
-const NOW = Date.UTC(2026, 8, 27, 12)
-const SECONDS = NOW / 1000
 const SUB = '7335d417-61da-459d-899c-0a01c76a2f94'
-const RS256 = { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }
+const SECONDS = Math.floor(Date.now() / 1000)
+const CLAIMS = { iss: ISSUER, aud: 'aud-moi', sub: SUB, email: 'alex@example.com' }
 
-type Key = { kid: string; privateKey: CryptoKey; jwk: JsonWebKey & { kid: string } }
+type Key = { kid: string; privateKey: CryptoKey; jwk: JWK }
 let current: Key
 let rotated: Key
 
 async function signingKey(kid: string): Promise<Key> {
-  const { privateKey, publicKey } = await crypto.subtle.generateKey(
-    { ...RS256, modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]) },
-    true,
-    ['sign', 'verify']
-  )
-  return { kid, privateKey, jwk: { ...(await crypto.subtle.exportKey('jwk', publicKey)), kid } }
+  const { privateKey, publicKey } = await generateKeyPair('RS256')
+  return { kid, privateKey, jwk: { ...(await exportJWK(publicKey)), kid, alg: 'RS256' } }
 }
 
-const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url')
-
-async function token(claims = {}, key = current, header = {}): Promise<string> {
-  const payload = { iss: ISSUER, aud: ['aud-moi'], sub: SUB, email: 'alex@example.com' }
-  const signed = `${encode({ alg: 'RS256', kid: key.kid, ...header })}.${encode({
-    ...payload,
-    exp: SECONDS + 3600,
-    nbf: SECONDS,
-    ...claims
-  })}`
-  const signature = await crypto.subtle.sign(RS256, key.privateKey, Buffer.from(signed))
-  return `${signed}.${Buffer.from(signature).toString('base64url')}`
+function token(claims: JWTPayload = {}, key = current, kid = key.kid): Promise<string> {
+  return new SignJWT({ ...CLAIMS, exp: SECONDS + 3600, ...claims })
+    .setProtectedHeader({ alg: 'RS256', kid })
+    .sign(key.privateKey)
 }
 
-function verifier(keys: Key[], clock = { now: NOW }) {
+function verifier(keys: Key[]) {
   const requests: string[] = []
-  const access = new CloudflareAccessVerifier(
-    { teamDomain: ISSUER, audience: ['aud-moi'] },
-    {
-      now: () => clock.now,
-      fetch: async url => {
-        requests.push(url)
-        return Response.json({ keys: keys.map(key => key.jwk) })
-      }
-    }
-  )
-  return { access, requests }
+  const verify = accessVerifier({ teamDomain: ISSUER, audience: ['aud-moi'] }, async url => {
+    requests.push(url)
+    return Response.json({ keys: keys.map(key => key.jwk) })
+  })
+  return { verify, requests }
 }
 
 beforeAll(async () => {
@@ -63,47 +46,51 @@ beforeAll(async () => {
 })
 
 test('a signed user token resolves to its user with one key fetch', async () => {
-  const { access, requests } = verifier([current])
+  const { verify, requests } = verifier([current])
   const user = { id: SUB, email: 'alex@example.com' }
-  expect(await access.verify(await token())).toEqual(user)
-  expect(await access.verify(await token({ aud: 'aud-moi' }))).toEqual(user)
+  expect(await verify(await token())).toEqual(user)
+  expect(await verify(await token({ aud: ['aud-other', 'aud-moi'] }))).toEqual(user)
   expect(requests).toEqual([`${ISSUER}/cdn-cgi/access/certs`])
 })
 
 test.each([
   ['another issuer', () => token({ iss: 'https://other.cloudflareaccess.com' })],
-  ['another application', () => token({ aud: ['aud-other'] })],
+  ['another application', () => token({ aud: 'aud-other' })],
   ['an expired token', () => token({ exp: SECONDS - 61 })],
+  ['a token without expiry', () => token({ exp: undefined })],
   ['a token that is not valid yet', () => token({ nbf: SECONDS + 61 })],
   ['a service token', () => token({ sub: '', email: undefined })],
-  ['a forged signature', () => token({}, rotated, { kid: 'current' })],
-  ['another algorithm', () => token({}, current, { alg: 'HS256' })],
+  ['a forged signature', () => token({}, rotated, 'current')],
+  ['an unsigned token', async () => new UnsecuredJWT({ ...CLAIMS, exp: SECONDS + 60 }).encode()],
   ['a malformed token', async () => 'not.a.token']
 ])('rejects %s', async (_label, make) => {
-  expect(await verifier([current]).access.verify(await make())).toBeNull()
+  expect(await verifier([current]).verify(await make())).toBeNull()
 })
 
-test('an unknown key id refetches the keys at most once a minute', async () => {
+test('keys refresh for an unknown key id after a cooldown and expire after ten minutes', async () => {
   const keys = [current]
-  const clock = { now: NOW }
-  const { access, requests } = verifier(keys, clock)
-  expect(await access.verify(await token())).not.toBeNull()
-  keys.push(rotated)
-  clock.now += 30_000
-  expect(await access.verify(await token({}, rotated))).toBeNull()
-  clock.now += 30_000
-  expect(await access.verify(await token({}, rotated))).not.toBeNull()
-  expect(requests).toHaveLength(2)
-})
-
-test('a key Cloudflare stops publishing stops verifying within ten minutes', async () => {
-  const keys = [current]
-  const clock = { now: NOW }
-  const { access } = verifier(keys, clock)
-  expect(await access.verify(await token())).not.toBeNull()
-  keys.splice(0, 1, rotated)
-  clock.now += 10 * 60_000
-  expect(await access.verify(await token())).toBeNull()
+  const { verify, requests } = verifier(keys)
+  const start = Date.now()
+  const clock = spyOn(Date, 'now')
+  const at = (ms: number) => clock.mockReturnValue(start + ms)
+  try {
+    at(0)
+    expect(await verify(await token())).not.toBeNull()
+    keys.push(rotated)
+    at(10_000)
+    expect(await verify(await token({}, rotated))).toBeNull()
+    at(30_000)
+    expect(await verify(await token({}, rotated))).not.toBeNull()
+    // Cloudflare stops publishing the old key; the cached copy expires.
+    keys.shift()
+    at(30_000 + 9 * 60_000)
+    expect(await verify(await token())).not.toBeNull()
+    at(30_000 + 10 * 60_000)
+    expect(await verify(await token())).toBeNull()
+    expect(requests).toHaveLength(3)
+  } finally {
+    clock.mockRestore()
+  }
 })
 
 test('requests get a nameless Access profile only when Access is configured', async () => {
@@ -111,7 +98,6 @@ test('requests get a nameless Access profile only when Access is configured', as
   const request = (headers: Record<string, string>) => new Request(ISSUER, { headers })
   const fetch = spyOn(globalThis, 'fetch').mockImplementation((async () =>
     Response.json({ keys: [current.jwk] })) as unknown as typeof globalThis.fetch)
-  const clock = spyOn(Date, 'now').mockImplementation(() => NOW)
   try {
     expect(await proxyIdentity(request({ [ACCESS_TOKEN_HEADER]: valid }))).toEqual({
       provider: null,
@@ -130,7 +116,6 @@ test('requests get a nameless Access profile only when Access is configured', as
     expect((await proxyIdentity(request({}))).identity).toBeNull()
   } finally {
     fetch.mockRestore()
-    clock.mockRestore()
     delete process.env.MOI_CLOUDFLARE_ACCESS_TEAM_DOMAIN
     delete process.env.MOI_CLOUDFLARE_ACCESS_AUD
     resetAppConfig()

@@ -72,9 +72,10 @@ equivalents. The team domain accepts a bare team name, a host, or its `https://`
 The server verifies the `Cf-Access-Jwt-Assertion` token Access adds to each request, or the same
 token in the browser's `CF_Authorization` cookie when a proxy drops that header: the RS256
 signature against the team's published keys, the issuer, the audience, and expiry, with a minute of
-clock drift. Keys are cached for ten minutes, and an unknown key id refetches them at most once a
-minute, so a key Cloudflare stops publishing stops verifying. Service tokens carry no user and
-resolve to no identity. The profile takes `id` from the token's `sub` and `email` from its `email`.
+clock drift. Verification uses `jose`, which caches the keys for ten minutes and refetches them for
+an unknown key id at most every 30 seconds, so a key Cloudflare stops publishing stops verifying.
+Failed key fetches are logged and verify nothing. Service tokens carry no user and resolve to no
+identity. The profile takes `id` from the token's `sub` and `email` from its `email`.
 Tokens carry no display name, so the profile has no `name` and built-in labels show the email.
 `color` is a stable pick from the persona palette, hashed from the id. There is no avatar, so
 components draw the usual generated face.
