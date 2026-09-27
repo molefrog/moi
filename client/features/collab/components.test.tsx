@@ -5,14 +5,14 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import type { CollabIdentity } from '@/lib/collab/types'
 
 import { Cursors, PresenceFrame, PresenceGutter, User } from './components'
-import { createFakeBackend } from './fake-backend'
-import type { FakeCollabBackend } from './fake-backend'
-import { AppletCollabProvider, CollabBackendProvider, presenceChannels } from './hooks'
+import { createFakeEngine } from './fake-engine'
+import type { FakeCollabEngine } from './fake-engine'
+import { AppletScope, CollabContext, presenceChannels } from './hooks'
 
 const me: CollabIdentity = { id: 'me', name: 'Me', color: '#123456' }
 const peer: CollabIdentity = { id: 'peer', name: 'Ada', color: '#234567' }
 function room(target = 'task:42:title') {
-  return createFakeBackend({
+  return createFakeEngine({
     self: me,
     page: 'board',
     users: [me, peer],
@@ -33,17 +33,13 @@ function room(target = 'task:42:title') {
     ]
   })
 }
-function render(backend: FakeCollabBackend, children: ReactNode, active = true) {
+function render(backend: FakeCollabEngine, children: ReactNode, active = true) {
   return renderToStaticMarkup(
-    <CollabBackendProvider backend={backend}>
-      <AppletCollabProvider
-        workspaceId="test"
-        applet={{ kind: 'view', name: 'board' }}
-        active={active}
-      >
+    <CollabContext value={backend}>
+      <AppletScope surface="view:board" active={active}>
         {children}
-      </AppletCollabProvider>
-    </CollabBackendProvider>
+      </AppletScope>
+    </CollabContext>
   )
 }
 

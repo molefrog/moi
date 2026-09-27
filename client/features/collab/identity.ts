@@ -3,17 +3,22 @@ import type { CollabIdentity } from '@/lib/collab/types'
 
 export type CollabShareContext = { workspaceId: string; url: string }
 export type CollabShareHandler = (context: CollabShareContext) => Promise<{ url: string }>
+export type CollabHostDirectory =
+  | { readonly status: 'loading' }
+  | { readonly status: 'ready'; readonly users: readonly CollabIdentity[] }
+export type CollabHostState = {
+  readonly identity: CollabIdentity | null
+  readonly workspaces: Readonly<Record<string, CollabHostDirectory>>
+}
+export type WorkspaceDirectory = {
+  readonly status: 'unavailable' | 'loading' | 'ready'
+  readonly users: readonly CollabIdentity[]
+}
 export type CollabIdentityApi = {
-  getIdentity: () => CollabIdentity | null
-  setIdentity: (identity: CollabIdentity | null) => void
-  subscribeIdentity: (listener: (identity: CollabIdentity | null) => void) => () => void
+  getHostState: () => CollabHostState | null
+  setHostState: (state: CollabHostState) => void
+  subscribeHostState: (listener: (state: CollabHostState | null) => void) => () => void
   setShareHandler: (handler: CollabShareHandler | null) => void
-  getWorkspaceUsers: (workspaceId: string) => readonly CollabIdentity[] | null
-  setWorkspaceUsers: (workspaceId: string, users: readonly CollabIdentity[] | null) => void
-  subscribeWorkspaceUsers: (
-    workspaceId: string,
-    listener: (users: readonly CollabIdentity[] | null) => void
-  ) => () => void
 }
 
 // Earlier development builds generated dev-identity automatically. Only this
@@ -24,9 +29,20 @@ let installed = false
 let shareHandler: CollabShareHandler | null = null
 let identitySource: 'dev' | 'external' | null = null
 const listeners = new Set<() => void>()
-const workspaceUsers = new Map<string, readonly CollabIdentity[] | null>()
 const workspaceListeners = new Map<string, Set<() => void>>()
-let initialWorkspaceUsers: CollabIdentityApi['getWorkspaceUsers'] | undefined
+const hostListeners = new Set<() => void>()
+const EMPTY_USERS: readonly CollabIdentity[] = Object.freeze([])
+const EMPTY_WORKSPACES = Object.freeze({})
+const LOADING_HOST_DIRECTORY = Object.freeze({ status: 'loading' as const })
+const UNAVAILABLE_DIRECTORY: WorkspaceDirectory = Object.freeze({
+  status: 'unavailable',
+  users: EMPTY_USERS
+})
+const LOADING_DIRECTORY: WorkspaceDirectory = Object.freeze({
+  status: 'loading',
+  users: EMPTY_USERS
+})
+let hostState: CollabHostState | null = null
 
 export function normalizeIdentity(value: CollabIdentity): CollabIdentity {
   if (
@@ -63,32 +79,89 @@ export function normalizeWorkspaceUsers(
   return Object.freeze(snapshot)
 }
 
-// A null snapshot releases the override. An empty snapshot is authoritative.
-// Cache the preload getter once per workspace so React reads a stable snapshot.
-export function getWorkspaceUsers(workspaceId: string): readonly CollabIdentity[] | null {
-  if (!workspaceUsers.has(workspaceId)) {
-    let snapshot: readonly CollabIdentity[] | null = null
-    if (initialWorkspaceUsers) {
-      try {
-        const initial = initialWorkspaceUsers(workspaceId)
-        snapshot = initial === null ? null : normalizeWorkspaceUsers(initial)
-      } catch {
-        // A configured but unavailable directory must not expose fallback profiles.
-        snapshot = Object.freeze([])
-      }
-    }
-    workspaceUsers.set(workspaceId, snapshot)
-  }
-  return workspaceUsers.get(workspaceId) ?? null
+function normalizeHostState(value: CollabHostState): CollabHostState {
+  if (!value || typeof value !== 'object') throw new Error('Invalid host state.')
+  const current = value.identity === null ? null : normalizeIdentity(value.identity)
+  if (!value.workspaces || typeof value.workspaces !== 'object' || Array.isArray(value.workspaces))
+    throw new Error('Host workspaces must be a record.')
+  const entries = Object.entries(value.workspaces).map(([id, directory]) => {
+    if (!id.trim() || !directory || typeof directory !== 'object')
+      throw new Error('Invalid workspace directory.')
+    if (directory.status === 'loading') return [id, LOADING_HOST_DIRECTORY] as const
+    if (directory.status !== 'ready') throw new Error('Invalid workspace directory status.')
+    const profiles = normalizeWorkspaceUsers(directory.users)
+    // The viewer has one global profile; membership is still workspace-specific.
+    const users = Object.freeze(
+      profiles.map(user => (current && user.id === current.id ? current : user))
+    )
+    return [id, Object.freeze({ status: 'ready' as const, users })] as const
+  })
+  // Validate everything before discarding directories on sign-out.
+  return Object.freeze({
+    identity: current,
+    workspaces: current ? Object.freeze(Object.fromEntries(entries)) : EMPTY_WORKSPACES
+  })
 }
 
+export function getHostState(): CollabHostState | null {
+  return hostState
+}
+
+export function getWorkspaceDirectory(workspaceId: string): WorkspaceDirectory {
+  if (!hostState) return UNAVAILABLE_DIRECTORY
+  const directory = Object.hasOwn(hostState.workspaces, workspaceId)
+    ? hostState.workspaces[workspaceId]
+    : undefined
+  return directory?.status === 'ready' ? directory : LOADING_DIRECTORY
+}
+
+export function getWorkspaceUsers(workspaceId: string): readonly CollabIdentity[] | null {
+  const directory = getWorkspaceDirectory(workspaceId)
+  return directory.status === 'unavailable' ? null : directory.users
+}
+
+export function setHostState(next: CollabHostState): void {
+  const normalized = normalizeHostState(next)
+  const previousDirectories = new Map(
+    [...workspaceListeners.keys()].map(id => [id, getWorkspaceDirectory(id)])
+  )
+  // Publish every field before notifying any observer, including transport listeners.
+  hostState = normalized
+  identitySource = 'external'
+  identity = normalized.identity
+  listeners.forEach(listener => listener())
+  for (const [id, subscriptions] of workspaceListeners) {
+    if (getWorkspaceDirectory(id) !== previousDirectories.get(id))
+      subscriptions.forEach(listener => listener())
+  }
+  hostListeners.forEach(listener => listener())
+}
+
+export function subscribeHostStateStore(listener: () => void): () => void {
+  hostListeners.add(listener)
+  return () => {
+    hostListeners.delete(listener)
+  }
+}
+
+export function subscribeHostState(listener: (state: CollabHostState | null) => void): () => void {
+  const unsubscribe = subscribeHostStateStore(() => listener(getHostState()))
+  listener(getHostState())
+  return unsubscribe
+}
+
+// Internal compatibility helpers. External hosts replace the complete state atomically.
 export function setWorkspaceUsers(
   workspaceId: string,
   users: readonly CollabIdentity[] | null
 ): void {
-  const snapshot = users === null ? null : normalizeWorkspaceUsers(users)
-  workspaceUsers.set(workspaceId, snapshot)
-  workspaceListeners.get(workspaceId)?.forEach(listener => listener())
+  setHostState({
+    identity,
+    workspaces: {
+      ...hostState?.workspaces,
+      [workspaceId]: users === null ? { status: 'loading' } : { status: 'ready', users }
+    }
+  })
 }
 
 export function subscribeWorkspaceUsersStore(
@@ -123,11 +196,7 @@ export function getIdentity(): CollabIdentity | null {
 }
 
 export function setIdentity(next: CollabIdentity | null): void {
-  const normalized = next === null ? null : normalizeIdentity(next)
-  // Signing out still leaves the outer provider in charge of identity.
-  identitySource = 'external'
-  identity = normalized
-  listeners.forEach(listener => listener())
+  setHostState({ identity: next, workspaces: hostState?.workspaces ?? EMPTY_WORKSPACES })
 }
 
 export function subscribeIdentityStore(listener: () => void): () => void {
@@ -178,8 +247,7 @@ export async function shareWorkspace(workspaceId: string): Promise<'copied'> {
   return 'copied'
 }
 
-// Installed only when collab is loaded. An outer identity script can supply an
-// initial getter before loading; afterward it uses this stable subscription API.
+// A host supplies one initial atomic snapshot before loading moi's modules.
 export function installIdentityApi(): void {
   if (typeof window === 'undefined' || installed) return
   installed = true
@@ -187,15 +255,12 @@ export function installIdentityApi(): void {
     moi?: { collab?: Partial<CollabIdentityApi>; [key: string]: unknown }
   }
   const previous = host.moi?.collab
-  initialWorkspaceUsers = previous?.getWorkspaceUsers?.bind(previous)
-  if (previous?.getIdentity) {
-    identitySource = 'external'
-    identity = null
+  if (previous?.getHostState) {
     try {
-      const initial = previous.getIdentity()
-      identity = initial === null ? null : normalizeIdentity(initial)
+      setHostState(previous.getHostState() ?? { identity: null, workspaces: {} })
     } catch {
-      /* The provider still owns identity while unavailable or signed out. */
+      // An unavailable host remains authoritative; never restore a dev profile.
+      setHostState({ identity: null, workspaces: {} })
     }
   } else if (identitySource !== 'external') {
     try {
@@ -210,12 +275,9 @@ export function installIdentityApi(): void {
   }
   host.moi ??= {}
   host.moi.collab = {
-    getIdentity,
-    setIdentity,
-    subscribeIdentity,
-    getWorkspaceUsers,
-    setWorkspaceUsers,
-    subscribeWorkspaceUsers,
+    getHostState,
+    setHostState,
+    subscribeHostState,
     setShareHandler(handler) {
       shareHandler = handler
     }

@@ -3,7 +3,7 @@ import { afterEach, expect, test } from 'bun:test'
 import type { CollabIdentity } from '@/lib/collab/types'
 
 import type * as Identity from './identity'
-import type { CollabIdentityApi } from './identity'
+import type { CollabHostState, CollabIdentityApi, WorkspaceDirectory } from './identity'
 
 const PROFILE_KEY = 'moi:collab:dev-profile'
 const alice = { id: 'alice', name: 'Alice', color: '#0f766e' }
@@ -23,19 +23,10 @@ afterEach(() => {
   }
 })
 
-async function setup(
-  getIdentity?: () => CollabIdentity | null,
-  profile?: CollabIdentity,
-  getWorkspaceUsers?: (workspaceId: string) => readonly CollabIdentity[] | null
-) {
-  const host: { moi?: { collab?: Partial<CollabIdentityApi> } } = getIdentity
-    ? { moi: { collab: { getIdentity } } }
+async function setup(getHostState?: () => CollabHostState | null, profile?: CollabIdentity) {
+  const host: { moi?: { collab?: Partial<CollabIdentityApi> } } = getHostState
+    ? { moi: { collab: { getHostState } } }
     : {}
-  if (getWorkspaceUsers) {
-    host.moi ??= {}
-    host.moi.collab ??= {}
-    host.moi.collab.getWorkspaceUsers = getWorkspaceUsers
-  }
   const saved = new Map<string, string>([
     ['moi:collab:dev-identity', JSON.stringify(alice)],
     ...(profile ? [[PROFILE_KEY, JSON.stringify(profile)] as [string, string]] : [])
@@ -59,10 +50,14 @@ test('identity starts empty and persists only an explicitly enabled dev profile'
   const identity = await setup()
   expect(identity.getIdentity()).toBeNull()
   expect(identity.getIdentitySource()).toBeNull()
+  expect(identity.getHostState()).toBeNull()
+  expect(identity.getWorkspaceDirectory('a')).toEqual({ status: 'unavailable', users: [] })
+  expect(identity.getWorkspaceUsers('a')).toBeNull()
   expect(identity.saved.has(PROFILE_KEY)).toBe(false)
   identity.setDevIdentity(alice)
   expect(identity.getIdentity()).toEqual(alice)
   expect(identity.getIdentitySource()).toBe('dev')
+  expect(identity.getHostState()).toBeNull()
   expect(JSON.parse(identity.saved.get(PROFILE_KEY) ?? 'null')).toEqual(alice)
 })
 
@@ -72,47 +67,12 @@ test('an explicitly saved dev profile restores when no external provider is conf
   expect(identity.getIdentitySource()).toBe('dev')
 })
 
-test('external takeover and sign-out prevent late dev writes', async () => {
-  const identity = await setup()
-  identity.setDevIdentity(alice)
-  const notifications: Array<CollabIdentity | null> = []
-  const unsubscribe = identity.subscribeIdentity(value => notifications.push(value))
-  identity.setIdentity(bob)
-  identity.setDevIdentity({ ...alice, name: 'Late edit' })
-  expect(identity.getIdentity()).toEqual(bob)
-  expect(identity.getIdentitySource()).toBe('external')
-  identity.setIdentity(null)
-  identity.setDevIdentity(alice)
-  expect(identity.getIdentity()).toBeNull()
-  expect(identity.getIdentitySource()).toBe('external')
-  expect(notifications).toEqual([alice, bob, null])
-  expect(JSON.parse(identity.saved.get(PROFILE_KEY) ?? 'null')).toEqual(alice)
-  unsubscribe()
-  identity.setIdentity(bob)
-  expect(notifications).toHaveLength(3)
-})
-
-test('external sign-out claims identity even before a user is available', async () => {
-  const identity = await setup()
-  const sources: Array<ReturnType<typeof identity.getIdentitySource>> = []
-  const unsubscribe = identity.subscribeIdentityStore(() =>
-    sources.push(identity.getIdentitySource())
-  )
-  identity.setIdentity(null)
-  identity.setDevIdentity(alice)
-  expect(identity.getIdentity()).toBeNull()
-  expect(identity.getIdentitySource()).toBe('external')
-  expect(sources).toEqual(['external'])
-  expect(identity.saved.has(PROFILE_KEY)).toBe(false)
-  unsubscribe()
-})
-
 test.each([
-  ['signed in', (): CollabIdentity | null => bob, bob],
-  ['signed out', (): CollabIdentity | null => null, null],
+  ['signed in', (): CollabHostState => ({ identity: bob, workspaces: {} }), bob],
+  ['signed out', (): CollabHostState => ({ identity: null, workspaces: {} }), null],
   [
     'unavailable',
-    (): CollabIdentity | null => {
+    (): CollabHostState => {
       throw new Error('Provider unavailable')
     },
     null
@@ -121,24 +81,218 @@ test.each([
   const identity = await setup(getter, alice)
   expect(identity.getIdentity()).toEqual(expected)
   expect(identity.getIdentitySource()).toBe('external')
+  expect(identity.getWorkspaceDirectory('a')).toEqual({ status: 'loading', users: [] })
   identity.setDevIdentity(alice)
   expect(identity.getIdentity()).toEqual(expected)
   expect(JSON.parse(identity.saved.get(PROFILE_KEY) ?? 'null')).toEqual(alice)
-  identity.host.moi?.collab?.setIdentity?.(bob)
+  identity.host.moi?.collab?.setHostState?.({ identity: bob, workspaces: {} })
   expect(identity.getIdentity()).toEqual(bob)
 })
 
-test('invalid identities leave the current identity and source intact', async () => {
+test('preloaded state exposes stable copied identity and directories across later workspace visits', async () => {
+  const input: CollabHostState = {
+    identity: alice,
+    workspaces: { a: { status: 'ready', users: [alice, bob] }, b: { status: 'loading' } }
+  }
+  let reads = 0
+  const identity = await setup(() => {
+    reads++
+    return input
+  })
+  const state = identity.getHostState()!
+  expect(state).toEqual(input)
+  expect(identity.getHostState()).toBe(state)
+  expect(state).not.toBe(input)
+  expect(Object.is(identity.getWorkspaceDirectory('a'), state.workspaces.a)).toBe(true)
+  expect(identity.getWorkspaceDirectory('b')).toEqual({ status: 'loading', users: [] })
+  expect(identity.getWorkspaceDirectory('unknown')).toEqual({ status: 'loading', users: [] })
+  expect(identity.getWorkspaceUsers('unknown')).toEqual([])
+  expect(reads).toBe(1)
+  expect(Object.isFrozen(state)).toBe(true)
+  expect(Object.isFrozen(state.identity)).toBe(true)
+  expect(Object.isFrozen(state.workspaces)).toBe(true)
+  const directory = identity.getWorkspaceDirectory('a')
+  expect(Object.isFrozen(directory)).toBe(true)
+  expect(Object.isFrozen(directory.users)).toBe(true)
+  expect(Object.isFrozen(directory.users[1])).toBe(true)
+})
+
+test('every subscriber sees the complete new state after an atomic replacement', async () => {
+  const identity = await setup(() => ({
+    identity: alice,
+    workspaces: { a: { status: 'ready', users: [alice] } }
+  }))
+  const observed: Array<{
+    current: CollabIdentity | null
+    a: WorkspaceDirectory
+    b: WorkspaceDirectory
+    host: CollabHostState | null
+  }> = []
+  const read = () => {
+    observed.push({
+      current: identity.getIdentity(),
+      a: identity.getWorkspaceDirectory('a'),
+      b: identity.getWorkspaceDirectory('b'),
+      host: identity.getHostState()
+    })
+  }
+  const unsubscribe = [
+    identity.subscribeIdentityStore(read),
+    identity.subscribeWorkspaceUsersStore('a', read),
+    identity.subscribeWorkspaceUsersStore('b', read),
+    identity.subscribeHostStateStore(read)
+  ]
+  identity.setHostState({
+    identity: bob,
+    workspaces: {
+      a: { status: 'ready', users: [bob] },
+      b: { status: 'ready', users: [alice, bob] }
+    }
+  })
+  expect(observed).toHaveLength(4)
+  for (const state of observed) {
+    expect(state.current).toEqual(bob)
+    expect(state.a).toEqual({ status: 'ready', users: [bob] })
+    expect(state.b).toEqual({ status: 'ready', users: [alice, bob] })
+    expect(state.host).toBe(identity.getHostState())
+  }
+  unsubscribe.forEach(stop => stop())
+  identity.setHostState({ identity: null, workspaces: {} })
+  expect(observed).toHaveLength(4)
+})
+
+test('global identity supplies the same own profile in every membership list without adding membership', async () => {
   const identity = await setup()
-  const invalid = { ...alice, name: ' ' }
-  expect(() => identity.setDevIdentity(invalid)).toThrow('id and name')
-  expect(identity.getIdentitySource()).toBeNull()
-  expect(identity.getIdentity()).toBeNull()
+  identity.setHostState({
+    identity: { ...alice, name: 'Alicia', email: 'alice@example.test' },
+    workspaces: {
+      a: { status: 'ready', users: [alice, bob] },
+      b: { status: 'ready', users: [{ ...alice, name: 'Different old name' }] },
+      c: { status: 'ready', users: [bob] }
+    }
+  })
+  expect(identity.getWorkspaceUsers('a')?.[0]).toBe(identity.getIdentity()!)
+  expect(identity.getWorkspaceUsers('b')?.[0]).toBe(identity.getIdentity()!)
+  expect(identity.getWorkspaceUsers('a')?.[0]?.name).toBe('Alicia')
+  expect(identity.getWorkspaceUsers('c')).toEqual([bob])
+  identity.setHostState({
+    identity: { ...alice, name: 'Alice updated again' },
+    workspaces: identity.getHostState()!.workspaces
+  })
+  expect(identity.getWorkspaceUsers('a')?.[0]?.name).toBe('Alice updated again')
+  expect(identity.getWorkspaceUsers('b')?.[0]).toBe(identity.getIdentity()!)
+  expect(identity.getWorkspaceUsers('c')).toEqual([bob])
+})
+
+test('loading, empty, removed workspaces, and removed members remain distinct and authoritative', async () => {
+  const identity = await setup()
+  identity.setHostState({
+    identity: alice,
+    workspaces: {
+      loading: { status: 'loading' },
+      empty: { status: 'ready', users: [] },
+      members: { status: 'ready', users: [alice, bob] }
+    }
+  })
+  expect(identity.getWorkspaceDirectory('loading').status).toBe('loading')
+  expect(identity.getWorkspaceDirectory('empty')).toEqual({ status: 'ready', users: [] })
+  identity.setHostState({
+    identity: alice,
+    workspaces: { members: { status: 'ready', users: [] } }
+  })
+  expect(identity.getWorkspaceDirectory('members')).toEqual({ status: 'ready', users: [] })
+  expect(identity.getWorkspaceDirectory('empty').status).toBe('loading')
+  expect(identity.getWorkspaceUsers('members')).toEqual([])
+})
+
+test('sign-out atomically clears directories and remains authoritative over a saved dev identity', async () => {
+  const identity = await setup(undefined, alice)
+  identity.setHostState({
+    identity: bob,
+    workspaces: { a: { status: 'ready', users: [alice, bob] } }
+  })
+  const observed: Array<CollabHostState | null> = []
+  const unsubscribe = identity.subscribeHostState(state => observed.push(state))
+  expect(observed).toEqual([identity.getHostState()])
+  identity.setHostState({ identity: null, workspaces: identity.getHostState()!.workspaces })
   identity.setDevIdentity(alice)
-  expect(() => identity.setIdentity(invalid)).toThrow('id and name')
+  expect(identity.getIdentity()).toBeNull()
+  expect(identity.getIdentitySource()).toBe('external')
+  expect(identity.getHostState()).toEqual({ identity: null, workspaces: {} })
+  expect(identity.getWorkspaceUsers('a')).toEqual([])
+  expect(observed.at(-1)).toBe(identity.getHostState())
+  unsubscribe()
+  identity.setHostState({ identity: bob, workspaces: {} })
+  expect(observed).toHaveLength(2)
+})
+
+test('invalid updates do not partially publish identity, directory, source, or notifications', async () => {
+  const identity = await setup(undefined, alice)
+  const invalidUser = { ...bob, name: '' }
+  expect(() =>
+    identity.setHostState({
+      identity: bob,
+      workspaces: { invalid: { status: 'ready', users: [invalidUser] } }
+    })
+  ).toThrow()
   expect(identity.getIdentitySource()).toBe('dev')
   expect(identity.getIdentity()).toEqual(alice)
-  expect(JSON.parse(identity.saved.get(PROFILE_KEY) ?? 'null')).toEqual(alice)
+  expect(identity.getHostState()).toBeNull()
+  identity.setHostState({ identity: alice, workspaces: { a: { status: 'ready', users: [alice] } } })
+  const before = identity.getHostState()
+  let notifications = 0
+  identity.subscribeHostStateStore(() => notifications++)
+  const invalidStates: CollabHostState[] = [
+    { identity: { ...bob, name: '' }, workspaces: {} },
+    {
+      identity: bob,
+      workspaces: {
+        valid: { status: 'ready', users: [bob] },
+        invalid: { status: 'ready', users: [invalidUser] }
+      }
+    },
+    { identity: bob, workspaces: { a: { status: 'ready', users: [alice, alice] } } },
+    { identity: null, workspaces: { invalid: { status: 'ready', users: [invalidUser] } } },
+    // A JavaScript host may pass shapes that TypeScript rejects.
+    { identity: bob, workspaces: [] } as unknown as CollabHostState,
+    { identity: bob, workspaces: { a: { status: 'invalid' } } } as unknown as CollabHostState
+  ]
+  for (const invalid of invalidStates) {
+    expect(() => identity.setHostState(invalid)).toThrow()
+    expect(identity.getHostState()).toBe(before)
+    expect(identity.getIdentity()).toBe(before!.identity)
+  }
+  expect(notifications).toBe(0)
+})
+
+test('profiles are immutable copies and prototype-like workspace and user ids are safe', async () => {
+  const identity = await setup()
+  const user = { ...bob, id: '__proto__' }
+  const state = {
+    identity: { ...alice },
+    workspaces: {
+      ['__proto__']: { status: 'ready' as const, users: [user] },
+      constructor: { status: 'ready' as const, users: [alice] }
+    }
+  }
+  identity.setHostState(state)
+  state.identity.name = 'Changed outside'
+  user.name = 'Changed outside'
+  state.workspaces.__proto__.users.push(alice)
+  expect(identity.getIdentity()?.name).toBe('Alice')
+  expect(identity.getWorkspaceUsers('__proto__')).toEqual([{ ...bob, id: '__proto__' }])
+  expect(identity.getWorkspaceUsers('constructor')).toEqual([alice])
+  expect(identity.getWorkspaceDirectory('toString').status).toBe('loading')
+})
+
+test('the outer bridge exposes atomic host state and share methods only', async () => {
+  const identity = await setup()
+  expect(Object.keys(identity.host.moi!.collab!).sort()).toEqual([
+    'getHostState',
+    'setHostState',
+    'setShareHandler',
+    'subscribeHostState'
+  ])
 })
 
 test('the outer share bridge uses its URL and rejects unsafe destinations', async () => {
@@ -172,64 +326,4 @@ test('the outer share bridge uses its URL and rejects unsafe destinations', asyn
   api.setShareHandler(async () => ({ url: 'javascript:alert(1)' }))
   await expect(identity.shareWorkspace('board')).rejects.toThrow('invalid URL')
   expect(copied).toHaveLength(2)
-})
-
-test('preloaded workspace directories remain available for later visits and snapshots are stable', async () => {
-  const reads: string[] = []
-  const identity = await setup(undefined, undefined, workspace => {
-    reads.push(workspace)
-    return workspace === 'a' ? [alice] : [bob]
-  })
-  const first = identity.getWorkspaceUsers('a')
-  expect(first).toEqual([alice])
-  expect(identity.getWorkspaceUsers('a')).toBe(first)
-  expect(identity.host.moi?.collab?.getWorkspaceUsers?.('b')).toEqual([bob])
-  expect(reads).toEqual(['a', 'b'])
-})
-
-test('post-bootstrap directories replace, remove, release, and notify only their workspace', async () => {
-  const identity = await setup()
-  const a: Array<readonly CollabIdentity[] | null> = []
-  const b: Array<readonly CollabIdentity[] | null> = []
-  const stop = identity.subscribeWorkspaceUsers('a', users => a.push(users))
-  identity.subscribeWorkspaceUsers('b', users => b.push(users))
-  identity.host.moi?.collab?.setWorkspaceUsers?.('a', [alice, bob])
-  identity.setWorkspaceUsers('a', [bob])
-  identity.setWorkspaceUsers('a', [])
-  identity.setWorkspaceUsers('a', null)
-  expect(a).toEqual([null, [alice, bob], [bob], [], null])
-  expect(b).toEqual([null])
-  stop()
-  identity.setWorkspaceUsers('a', [alice])
-  expect(a).toHaveLength(5)
-})
-
-test('user snapshots are immutable copied data; invalid replacements are atomic', async () => {
-  const identity = await setup()
-  const input = [{ ...alice, email: 'alice@example.test' }]
-  identity.setWorkspaceUsers('__proto__', input)
-  const snapshot = identity.getWorkspaceUsers('__proto__')
-  input[0]!.name = 'Changed externally'
-  expect(snapshot?.[0]?.name).toBe('Alice')
-  expect(Object.isFrozen(snapshot)).toBe(true)
-  expect(Object.isFrozen(snapshot?.[0])).toBe(true)
-  for (const users of [
-    [alice, { ...bob, name: '' }],
-    [alice, alice],
-    [{ ...alice, email: 'x'.repeat(321) }]
-  ]) {
-    expect(() => identity.setWorkspaceUsers('__proto__', users)).toThrow()
-    expect(identity.getWorkspaceUsers('__proto__')).toBe(snapshot)
-  }
-  identity.setWorkspaceUsers('constructor', [{ ...alice, id: '__proto__' }])
-  expect(identity.getWorkspaceUsers('constructor')?.[0]?.id).toBe('__proto__')
-})
-
-test('unavailable preloaded directory remains authoritative empty until replaced', async () => {
-  const identity = await setup(undefined, undefined, () => {
-    throw new Error('Unavailable')
-  })
-  expect(identity.getWorkspaceUsers('a')).toEqual([])
-  identity.setWorkspaceUsers('a', [bob])
-  expect(identity.getWorkspaceUsers('a')).toEqual([bob])
 })

@@ -14,7 +14,7 @@ export type CollabIdentity = {
   email?: string
 }
 
-export type CollabLocation = { page: string; title?: string }
+export type CollabLocation = { page: string; title?: string; away?: boolean }
 
 export type CollabPresenceRegistration = {
   registrationId: string

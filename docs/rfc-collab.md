@@ -1,6 +1,6 @@
 # collab: experimental presence
 
-Status: experimental implementation, updated 2026-09-25.
+Status: experimental implementation, updated 2026-09-27.
 
 ## Scope
 
@@ -17,15 +17,18 @@ flowchart TB
   Host["Batiok / outer host"] -->|"Current identity + workspace users"| Directory["Browser user directory"]
   Applets["Widgets and views: moi/collab"] --> Hooks["Hooks and connected components"]
   Directory --> Hooks
-  Hooks --> Backend["Workspace backend + presence store"]
-  Backend <-->|WebSocket| Main["moi server: validation and supervision"]
+  Hooks --> Engine["CollabEngine: lifecycle + selected snapshots"]
+  Engine <-->|WebSocket| Main["moi server: validation and supervision"]
   Main <-->|Typed IPC| Room["One temporary presence room per workspace"]
 ```
 
 The existing applet bridge passes the host's actual hook and component functions into each
 separately compiled bundle. Those functions read the host's workspace and applet React contexts.
-There is one client per mounted workspace, shared by its applets. `CollabBackend` is the seam
-between hooks and the live transport; the development playground supplies a fake backend.
+React receives one `CollabEngine` per mounted workspace through `CollabProvider`. The engine owns
+transport lifecycle and exposes stable people and channel snapshots, so cursor-only traffic does not
+rerender profile readers or unrelated channels. Transport and registration storage remain private
+implementation details. `AppletScope` supplies only the surface and active mount lifetime. There is
+no separate enabled context or backend adapter; the playground supplies the same engine contract.
 
 ## Enable and install
 
@@ -59,25 +62,36 @@ profiles and browser injection do not provide authentication or workspace access
 Those policies remain the outer host's responsibility.
 
 A connection is `{ connectionId, userId, location, presence }`. One user can have multiple browser
-tabs. The server assigns connection IDs. `location` is `{ page, title? } | null`, with `null` for
-hidden tabs. A page is the route segment within the workspace. Status is aggregated across a
+tabs. The server assigns connection IDs. `location` is `{ page, title?, away? } | null`. Hidden tabs retain their page with
+`away: true`; `null` means the connection has no known page. A page is the route segment within the workspace. Status is aggregated across a
 user's workspace connections:
 
-- `active`: at least one visible connection.
-- `away`: connected, but all connections are hidden.
+- `active`: at least one connection with a known page and `away` absent or false.
+- `away`: connected, but no visible connection with a known page.
 - `offline`: no connection in this workspace.
 
 Being on a different page does not make someone offline. `usePeers()` defaults to the current
 page, deduplicates by user ID, and excludes the current user across all their connections.
-`scope: 'workspace'` includes other pages and hidden connections. Status filters are optional.
+Hidden peers remain members of their page, so `usePeers({ status: 'away' })` works with the default
+page scope. `scope: 'workspace'` includes other pages too. Status reflects tab visibility, not idle time
+or window focus. Hidden connections have no visible cursor/focus/selection markers.
 Presence values remain per connection and exclude only the observing connection, so another tab
 of the same user can still have its own pointer.
+
+Batiok atomically publishes `{ identity, workspaces }` through `window.moi.collab.setHostState`.
+Identity is global across all workspaces; each directory has an explicit `loading` or `ready` state.
+The global identity profile replaces its own row in every ready directory which includes that ID,
+without adding missing membership. Sign-out clears all directories in the same update.
 
 Batiok's full workspace directory is authoritative when supplied. It allows resolving an offline
 user, including someone who has never opened the workspace. Profile replacement and removal take
 effect immediately; live connections cannot resurrect removed directory entries. With no host
 directory, current connection profiles and the local identity provide a development fallback.
 This fallback is transient and makes no promise of resolving users after they leave.
+
+`useMe()` resolves the global identity through the current workspace membership. It returns `null`
+while membership loads or when a ready directory omits the viewer. `useWorkspaceUsersStatus()`
+distinguishes loading from a ready empty directory; readiness does not imply a live connection.
 
 The complete host integration contract and bootstrap example are in
 [batiok-collab-bridge.md](batiok-collab-bridge.md).
@@ -88,6 +102,7 @@ The complete host integration contract and bootstrap example are in
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
 | `useMe()`                            | Current user profile plus `status`, or `null`.                                                                    |
 | `useUser(id)`                        | A profile plus `status`, including offline users; `null` for unknown IDs.                                         |
+| `useWorkspaceUsersStatus()`          | Host directory readiness: `unavailable` (live/dev fallback), `loading`, or `ready` (possibly empty).              |
 | `useWorkspaceUsers({ status? })`     | Complete workspace directory, including self and offline members; optional `active`, `away`, or `offline` filter. |
 | `usePeers({ scope?, status? })`      | Other connected users; `scope` is `page` or `workspace`, `status` is `active` or `away`.                          |
 | `usePresence(channel)`               | Read-only array of `{ connectionId, userId, value }` for other connections on this page and applet surface.       |
@@ -144,23 +159,28 @@ is never sent through this socket.
 
 The main server owns sockets, validates messages, enforces payload limits, and supervises one
 subprocess per canonical workspace path. The process owns participants and temporary registrations.
-No persistent storage is opened. Slow sockets are disconnected when reliable delivery cannot be
-maintained; temporary participant broadcasts can be dropped under pressure.
+No persistent storage is opened. Each workspace supports up to 64 browser connections and each connection supports up to 128 active
+presence registrations, with a 4 KiB value limit per registration. Unfocused controls do not consume
+registrations. Limits count browser connections and active publishers, not directory members.
+Slow sockets are disconnected when reliable delivery cannot be maintained, including when a participant
+snapshot cannot be delivered. Reconnect repairs the full snapshot so a dropped final departure cannot
+leave ghost presence alive behind healthy heartbeats.
 
 Worker failure closes its sockets. Clients reconnect with backoff, join afresh, and republish live
 presence. Shutdown and parent IPC loss terminate children. Applet rebuilds and function-worker
 restarts do not restart presence. Idle workers can exit; active rooms are preserved.
 
 With runtime and identity enabled, selected chats and open/current tabs are browser-tab-local.
-Remote navigation broadcasts are ignored, while local applet navigation still works. Ordinary
-navigation behavior remains when no identity is supplied. Share invokes the outer host's handler,
+Local applet navigation and main's targeted navigation relay update the selected browser. Personal
+selection does not write shared tab/chat selection. Ordinary navigation behavior remains when no
+identity is supplied. Share invokes the outer host's handler,
 or copies the workspace URL if none exists; copying does not grant access or publish a workspace.
 
 ## Development and verification
 
 `/dev/collab` combines explicit dev identity setup with an isolated presence playground. The
 playground works without enabling runtime, opening a workspace, or creating an identity. It uses
-the same hooks, components, and presence store with a fake room and fixture directory. Reopening
+the same hooks, components, and selected snapshots with a fake engine and fixture directory. Reopening
 it resets its state; other browser tabs have independent fake rooms.
 
 Use real workspace applets in two browsers to verify transport: joins/leaves, duplicate user tabs,

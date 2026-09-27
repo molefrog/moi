@@ -56,6 +56,7 @@ test('missing collaboration bridge returns empty hook values and warns once', as
       expect(api.useUser('alice')).toBeNull()
       expect(api.usePeers()).toEqual([])
       expect(api.useWorkspaceUsers()).toEqual([])
+      expect(api.useWorkspaceUsersStatus()).toBe('unavailable')
       expect(api.usePresence('editing')).toEqual([])
       expect(api.usePublishPresence('editing', true)).toBeUndefined()
     }
@@ -104,6 +105,7 @@ test('the bridge delegates when attached and falls back again when disposed', as
   }
   const host = {
     useUser: mock((_id: string) => user),
+    useWorkspaceUsersStatus: mock(() => 'loading' as const),
     usePublishPresence: mock((_channel: string, _value: unknown) => {}),
     User: mock(() => createElement('span', null, 'Alice'))
   }
@@ -115,6 +117,7 @@ test('the bridge delegates when attached and falls back again when disposed', as
       }
     })
     expect(api.useUser('alice')).toBe(user)
+    expect(api.useWorkspaceUsersStatus()).toBe('loading')
     expect(host.useUser.mock.calls).toEqual([['alice']])
     api.usePublishPresence('editing', { field: 'title' })
     expect(host.usePublishPresence.mock.calls).toEqual([['editing', { field: 'title' }]])

@@ -1,9 +1,8 @@
 # Batiok integration: workspace users and presence
 
-This is the implemented boundary between an outer host such as Batiok and moi's presence feature.
-Batiok owns accounts, workspace membership, profiles, and access. moi consumes a current identity
-and a complete, replaceable user directory for each workspace. Applets read that information through
-`moi/collab`; they never register themselves as a different user.
+Batiok owns accounts, workspace membership, profiles, and access. moi receives one global current
+identity and workspace-specific membership directories through an atomic browser snapshot. Switching
+workspaces does not change who the viewer is. Applets read this information through `moi/collab`.
 
 ## Browser contract
 
@@ -19,131 +18,160 @@ type UserProfile = {
   email?: string
 }
 
+type WorkspaceDirectory = { status: 'loading' } | { status: 'ready'; users: readonly UserProfile[] }
+
+type HostState = {
+  identity: UserProfile | null
+  workspaces: Readonly<Record<string, WorkspaceDirectory>>
+}
+
 type CollabHostBridge = {
-  getIdentity(): UserProfile | null
-  setIdentity(user: UserProfile | null): void
-  subscribeIdentity(listener: (user: UserProfile | null) => void): () => void
-  getWorkspaceUsers(workspaceId: string): readonly UserProfile[] | null
-  setWorkspaceUsers(workspaceId: string, users: readonly UserProfile[] | null): void
-  subscribeWorkspaceUsers(
-    workspaceId: string,
-    listener: (users: readonly UserProfile[] | null) => void
-  ): () => void
+  getHostState(): HostState | null
+  setHostState(state: HostState): void
+  subscribeHostState(listener: (state: HostState | null) => void): () => void
   setShareHandler(
     handler: ((context: { workspaceId: string; url: string }) => Promise<{ url: string }>) | null
   ): void
 }
 ```
 
-`setWorkspaceUsers` replaces the entire snapshot atomically. This makes removals unambiguous and
-is sufficient for the small workspace membership lists targeted here. No incremental patch protocol,
-revision stream, profile database, or synchronization service is introduced into moi.
+`setHostState` replaces the complete snapshot. Identity and every supplied directory become visible
+together before any subscription runs. The whole input is validated before publishing; an invalid
+profile or directory leaves the previous snapshot intact. Getters return stable, copied, frozen data.
+Use the setter to publish changes instead of modifying objects returned by the getter.
 
-- An array, including `[]`, claims authority for that workspace. Unknown IDs resolve to `null`;
-  stale self-reported profiles from a connected tab never override it.
-- `null` means no host directory is supplied and releases the override. Development can then use
-  currently connected profiles. **Use `[]`, not `null`, to clear access to a previous directory.**
-- Profiles are validated and copied; the caller must use the setter to publish later changes.
-  Invalid snapshots fail without partially applying their contents.
-- Each workspace has its own snapshot and subscriptions. Updating one does not update another.
+- `identity` describes the current viewer globally, across all workspaces.
+- `status: 'loading'` means Batiok has not supplied the workspace's membership yet.
+- `status: 'ready', users: []` means the membership is known and empty. It is not a loading state.
+- A workspace omitted from a hosted snapshot is loading. It never falls back to self-reported profiles.
+- Ready lists are authoritative. Omitted users resolve as unknown, even if a stale connection reports
+  their IDs. If a list includes the viewer, moi uses the global identity's profile for that row. It
+  never inserts the viewer into a list which excludes them.
+- Setting `identity: null` signs out and clears all supplied directories in the same update. An external
+  host stays authoritative; an old development identity cannot reactivate it.
+- `getHostState() === null` means no external host has taken ownership. This is the development fallback,
+  distinct from a hosted signed-out snapshot with `identity: null`.
 - Subscriptions receive the current snapshot immediately and return an unsubscribe function.
-- These setters update this browser. Batiok distributes its membership/profile events to each
-  browser using its own transport, then calls the setters there. moi does not fan out the directory.
 
-A profile's `status` is not supplied by Batiok. moi derives it from live connections when returning
-`useMe`, `useUser`, `useWorkspaceUsers`, or `usePeers`. Applets can enumerate the complete directory
-with `useWorkspaceUsers()` and optionally filter by `active`, `away`, or `offline`. `usePeers()`
-continues to list connected users only. Profile data is independent of presence: an offline member's name
-can change without that person opening the workspace.
+Batiok distributes its membership and profile events to each browser using its own transport, then
+publishes the complete snapshot in that browser. moi does not fan out directory data through its
+presence socket. An offline member's profile can change without that member opening the workspace.
+
+The viewer has one canonical name, avatar, email, and color. If the viewer belongs to two workspaces,
+a single identity update changes their own row in both supplied lists. Other members' profiles come
+from their respective workspace lists. Membership remains independent: omitting the viewer's ID does
+not create membership merely because they have an identity.
+
+Applets can distinguish these states with `useWorkspaceUsersStatus()`, which returns `unavailable`,
+`loading`, or `ready`. `useWorkspaceUsers()` returns the member list; a loading empty list must not be
+presented as confirmation that the workspace has no members.
 
 ## Bootstrap before moi loads
 
-Put a script before moi's modules in the HTML shell. It can supply initial getters without waiting
-for the bridge to be installed. The directory getter is also consulted when another workspace is
-first visited, so it must be able to resolve each relevant workspace ID.
+Put a script before moi's modules in the HTML shell. Supply `getHostState` initially, then use the
+installed bridge after the `moi:collab-ready` event. Keep the snapshot in a closure so changes arriving
+before moi initializes are also available when it loads.
 
 ```js
 // This state comes from Batiok's authenticated session and workspace API.
 // These are example values; no credentials belong in user profiles.
-let currentUser = {
-  id: 'user-alex',
-  name: 'Alex',
-  color: '#0f766e',
-  email: 'alex@example.com'
+let currentState = {
+  identity: {
+    id: 'user-alex',
+    name: 'Alex',
+    color: '#0f766e',
+    email: 'alex@example.com'
+  },
+  workspaces: {
+    'workspace-design': { status: 'loading' }
+  }
 }
-const directories = new Map([
-  ['workspace-design', [currentUser, { id: 'user-anton', name: 'Anton', color: '#2563eb' }]]
-])
 
 window.moi ??= {}
-const bootstrap = {
-  getIdentity: () => currentUser,
-  // Empty until loaded: Batiok still owns the directory during loading.
-  getWorkspaceUsers: id => directories.get(id) ?? []
-}
-window.moi.collab = bootstrap
+window.moi.collab = { getHostState: () => currentState }
 
 let connectedBridge
 function connect() {
   const bridge = window.moi.collab
-  if (!bridge.setWorkspaceUsers || connectedBridge === bridge) return
+  if (!bridge.setHostState || connectedBridge === bridge) return
   connectedBridge = bridge
-  bridge.setIdentity(currentUser)
-  for (const [id, users] of directories) bridge.setWorkspaceUsers(id, users)
+  bridge.setHostState(currentState)
   // Install Batiok's share-link handler here when available.
 }
 window.addEventListener('moi:collab-ready', connect)
 connect()
 
-// Call these from Batiok's existing profile/membership subscription.
+function publishState(next) {
+  // If validation fails after initialization, keep the previous host snapshot too.
+  window.moi.collab.setHostState?.(next)
+  currentState = next
+}
+
+// Batiok calls these from its authenticated session and membership subscriptions.
 function workspaceUsersChanged(workspaceId, users) {
-  directories.set(workspaceId, users)
-  window.moi.collab.setWorkspaceUsers?.(workspaceId, users)
+  publishState({
+    ...currentState,
+    workspaces: {
+      ...currentState.workspaces,
+      [workspaceId]: { status: 'ready', users }
+    }
+  })
 }
 function currentUserChanged(user) {
-  currentUser = user
-  window.moi.collab.setIdentity?.(user)
+  publishState({
+    identity: user,
+    workspaces: user && user.id === currentState.identity?.id ? currentState.workspaces : {}
+  })
+}
+function signedOut() {
+  publishState({ identity: null, workspaces: {} })
 }
 ```
 
-The closure-backed getters also cover updates that arrive before moi initializes. Repeated ready
-events do not attach the same integration twice. In a long-lived outer shell, remove the listener
-and dispose Batiok's subscriptions when that shell unmounts.
+Repeated ready events do not attach the same integration twice. In a long-lived outer shell, remove
+the ready listener and dispose Batiok's subscriptions when that shell unmounts. A failed bootstrap
+getter leaves the host authoritative and signed out until it supplies a valid snapshot.
 
 ## Runtime updates
 
-When a member changes their avatar or name, Batiok sends the latest full workspace list to each
-viewer and calls `setWorkspaceUsers(workspaceId, users)`. `User`, `Facepile`, focus markers, cursors,
-and user hooks immediately resolve against the new profile. If that member is the current viewer,
-also call `setIdentity(updatedUser)` so their local identity stays current.
+When membership loads, replace that workspace's loading entry with a ready list. When a member is
+removed, omit their ID from the next ready list. `useUser(id)` becomes `null`, and components use their
+unknown-user fallback. Send an explicit ready empty list when a workspace has no members or the viewer
+should no longer see its membership. Omitting the entire workspace signals loading, not removal.
 
-When a member is removed, omit their ID from the next snapshot. `useUser(id)` becomes `null` even
-if a stale connection still reports that ID. Components show their unknown-user fallback. This
-changes display data; Batiok must independently revoke server access when appropriate.
+When the viewer's profile changes, replace `identity` in the complete snapshot. moi applies that global
+profile to the viewer's rows in every supplied directory. When another member changes their profile,
+replace the affected ready lists. Include all previously supplied workspace entries which remain valid;
+a snapshot is a full replacement, not a patch.
 
-On sign-out, call `setIdentity(null)` and clear previously supplied workspace lists with `[]`.
-An external provider remains authoritative while signed out; an old dev profile cannot reactivate
-it. On sign-in, provide the new viewer and that viewer's workspace directories. If host fetches can
-finish out of order, Batiok must discard stale responses before publishing snapshots; setters apply
-snapshots in call order.
+Sign out with `{ identity: null, workspaces: {} }`. For another account, supply its global identity and
+its directories together; use loading entries until its memberships arrive. Do not carry the previous
+account's directories into the new snapshot. If asynchronous requests finish out of order, Batiok must
+discard stale responses before publishing. Setters apply snapshots in call order.
+
+Directory changes describe display data. Batiok must independently enforce server access and revoke
+it when appropriate. The identity/profile bridge is not an authentication or authorization mechanism.
 
 ## Local and disabled modes
 
-With no external provider, `/dev/collab` can explicitly set a tab-local test identity. The live room
-exchanges temporary profiles for current connections. It does not remember users after disconnect;
-full offline lookup requires a directory supplied by the host or a playground fixture.
+Without an external host, `/dev/collab` can explicitly set a tab-local development identity. The live
+room exchanges temporary profiles for current connections; offline lookup requires a host directory
+or playground fixture. After an external host claims the bridge, missing directories remain loading
+and cannot silently restore the development fallback.
 
-With live presence disabled, user lookup can still resolve supplied profiles, but peers and presence
-are empty and publishing does nothing. No socket is opened. This lets the same applet run in local
-single-user and hosted multiplayer settings.
+With live presence disabled, supplied identity and directory data remain available. Peers and presence
+are empty, publishing does nothing, and no socket opens. Membership readiness is separate from live
+connection state: a ready directory does not mean its members are currently connected.
 
 ## Batiok work outside this repository
 
-1. Supply the bootstrap getters before loading moi.
-2. Connect the authenticated current-user and workspace-membership subscriptions to these setters.
-3. Deliver full replacement snapshots on changes and clear them on sign-out/access changes.
-4. Supply a share handler if Batiok creates invitations or share links.
-5. Verify two different browser sessions, an offline member, a profile update, a removal, and sign-out.
+1. Supply the bootstrap snapshot before loading moi.
+2. Maintain one global identity and a loading/ready membership entry for each relevant workspace.
+3. Publish a complete atomic snapshot for profile, membership, sign-in, and sign-out changes.
+4. Discard stale asynchronous results and independently enforce server access.
+5. Supply a share handler if Batiok creates invitations or share links.
+6. Verify two browser sessions, loading versus empty membership, an offline member, a profile update
+   across two workspaces, a removal, and sign-out.
 
-Authentication UI, billing, invitations, and arbitrary workspace-specific user metadata remain
-Batiok or workspace application concerns. This bridge introduces no realtime application-data API.
+Authentication UI, billing, invitations, and arbitrary workspace-specific user metadata remain Batiok
+or workspace application concerns. This bridge introduces no realtime application-data API.

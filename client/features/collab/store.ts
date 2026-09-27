@@ -1,6 +1,7 @@
 import type {
   CollabClientMessage,
   CollabIdentity,
+  CollabJsonValue,
   CollabLocation,
   CollabParticipant,
   CollabPresenceRegistration,
@@ -24,15 +25,31 @@ export const DISCONNECTED_STATE: CollabConnectionState = {
   error: null
 }
 
+export type CollabPresenceEntry = {
+  registrationId: string
+  connectionId: string
+  userId: string
+  value: CollabJsonValue
+}
+
+const EMPTY_PRESENCE: readonly CollabPresenceEntry[] = []
+const channelKey = (surface: string, channel: string) => JSON.stringify([surface, channel])
+
 // Sockets and timers live in client.ts; this model owns ephemeral registrations.
 export class CollabStore {
   private state: CollabConnectionState = DISCONNECTED_STATE
+  private peopleState: CollabConnectionState = DISCONNECTED_STATE
+  private channels = new Map<string, readonly CollabPresenceEntry[]>()
   private listeners = new Set<() => void>()
   private registrations = new Map<string, CollabPresenceRegistration>()
   private location: CollabLocation | null = null
   private send: (message: CollabClientMessage) => void = () => {}
 
   getSnapshot = (): CollabConnectionState => this.state
+  // User hooks never need cursor coordinates or other publication payloads.
+  getPeopleSnapshot = (): CollabConnectionState => this.peopleState
+  getPresenceSnapshot = (surface: string, channel: string): readonly CollabPresenceEntry[] =>
+    this.channels.get(channelKey(surface, channel)) ?? EMPTY_PRESENCE
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener)
     return () => {
@@ -49,9 +66,10 @@ export class CollabStore {
     this.publish({ ...DISCONNECTED_STATE, error: message ?? null })
   }
   setLocation(location: CollabLocation | null): void {
+    if (JSON.stringify(this.location) === JSON.stringify(location)) return
     this.location = location
     // Page filters update immediately, without waiting for the server echo.
-    this.publish({})
+    this.publish({}, true)
     if (this.state.status === 'connected') this.send({ type: 'location', location })
   }
   getLocation(): CollabLocation | null {
@@ -91,8 +109,48 @@ export class CollabStore {
         break
     }
   }
-  private publish(patch: Partial<CollabConnectionState>): void {
+  private publish(patch: Partial<CollabConnectionState>, locationChanged = false): void {
     this.state = { ...this.state, ...patch }
+    const people = {
+      ...this.state,
+      participants: this.state.participants.map(participant => ({ ...participant, presence: [] }))
+    }
+    if (locationChanged || JSON.stringify(people) !== JSON.stringify(this.peopleState)) {
+      this.peopleState = people
+    }
+    const channels = new Map<string, CollabPresenceEntry[]>()
+    if (this.location && !this.location.away) {
+      for (const participant of this.state.participants) {
+        if (
+          participant.connectionId === this.state.connectionId ||
+          participant.location?.page !== this.location.page ||
+          participant.location.away
+        )
+          continue
+        for (const registration of participant.presence) {
+          const key = channelKey(registration.surface, registration.channel)
+          const entries = channels.get(key) ?? []
+          entries.push({
+            registrationId: registration.registrationId,
+            connectionId: participant.connectionId,
+            userId: participant.userId,
+            value: registration.value
+          })
+          channels.set(key, entries)
+        }
+      }
+    }
+    // Keep references for unchanged channels. Only current nonempty channels are
+    // retained, so navigating through many records does not grow a selector cache.
+    this.channels = new Map(
+      [...channels].map(([key, entries]) => {
+        const previous = this.channels.get(key)
+        return [
+          key,
+          previous && JSON.stringify(previous) === JSON.stringify(entries) ? previous : entries
+        ]
+      })
+    )
     this.listeners.forEach(listener => listener())
   }
 }

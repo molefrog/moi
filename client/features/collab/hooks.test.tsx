@@ -1,18 +1,19 @@
 import { expect, test } from 'bun:test'
 import { renderToStaticMarkup } from 'react-dom/server'
-import type { CollabBackend } from './backend'
-import { createFakeBackend } from './fake-backend'
+import type { CollabEngineApi } from './engine'
+import { createFakeEngine } from './fake-engine'
 import { setIdentity } from './identity'
 import {
-  AppletCollabProvider,
-  CollabBackendProvider,
+  AppletScope,
+  CollabContext,
   pageFromPath,
   useMe,
   usePeers,
   usePresence,
   usePublishPresence,
   useUser,
-  useWorkspaceUsers
+  useWorkspaceUsers,
+  useWorkspaceUsersStatus
 } from './hooks'
 import type { CollabUser } from './hooks'
 
@@ -47,7 +48,7 @@ function Observer() {
 }
 
 test('observers resolve users and read presence without creating a publisher', () => {
-  const room = createFakeBackend({
+  const room = createFakeEngine({
     self: alice,
     page: 'board',
     users: [alice, bob],
@@ -68,7 +69,7 @@ test('observers resolve users and read presence without creating a publisher', (
     ]
   })
   let publications = 0
-  const backend: CollabBackend = {
+  const backend: CollabEngineApi = {
     ...room,
     setPresence: registration => {
       publications++
@@ -76,11 +77,11 @@ test('observers resolve users and read presence without creating a publisher', (
     }
   }
   const html = renderToStaticMarkup(
-    <CollabBackendProvider backend={backend}>
-      <AppletCollabProvider workspaceId="test" applet={{ kind: 'view', name: 'board' }}>
+    <CollabContext value={backend}>
+      <AppletScope surface="view:board">
         <Observer />
-      </AppletCollabProvider>
-    </CollabBackendProvider>
+      </AppletScope>
+    </CollabContext>
   )
   expect(html).toContain('connectionId')
   expect(html).toContain('title')
@@ -103,7 +104,7 @@ test('hooks are safe without a backend or applet and resolve missing users to nu
 test('workspace users include self and offline members with workspace-wide status filters', () => {
   const carol = { id: 'carol', name: 'Carol', color: '#2563eb' }
   const david = { id: 'david', name: 'David', color: '#0f766e' }
-  const room = createFakeBackend({
+  const room = createFakeEngine({
     self: alice,
     page: 'board',
     users: [alice, bob, carol, david],
@@ -128,9 +129,9 @@ test('workspace users include self and offline members with workspace-wide statu
     JSON.parse(
       decodeURIComponent(
         renderToStaticMarkup(
-          <CollabBackendProvider backend={room}>
+          <CollabContext value={room}>
             <Directory />
-          </CollabBackendProvider>
+          </CollabContext>
         )
       )
     ) as Record<string, CollabUser[]>
@@ -160,4 +161,76 @@ test('workspace users include self and offline members with workspace-wide statu
 
   room.setUsers([])
   expect(render().all).toEqual([])
+})
+
+test('directory loading is distinguishable from an empty authoritative directory', () => {
+  const engine = createFakeEngine({ self: alice, directoryStatus: 'loading' })
+  function Directory() {
+    return encodeURIComponent(
+      JSON.stringify({
+        status: useWorkspaceUsersStatus(),
+        users: useWorkspaceUsers(),
+        me: useMe()
+      })
+    )
+  }
+  const render = () =>
+    JSON.parse(
+      decodeURIComponent(
+        renderToStaticMarkup(
+          <CollabContext value={engine}>
+            <Directory />
+          </CollabContext>
+        )
+      )
+    )
+  expect(render()).toEqual({ status: 'loading', users: [], me: null })
+  engine.setUsers([])
+  expect(render()).toEqual({ status: 'ready', users: [], me: null })
+  engine.setUsers([alice])
+  expect(render()).toEqual({
+    status: 'ready',
+    users: [{ ...alice, status: 'active' }],
+    me: { ...alice, status: 'active' }
+  })
+})
+
+test('away peers remain on the page while their focus presence is hidden', () => {
+  const engine = createFakeEngine({
+    self: alice,
+    page: 'board',
+    users: [alice, bob],
+    others: [
+      {
+        connectionId: 'b',
+        userId: bob.id,
+        location: { page: 'board', away: true },
+        presence: [
+          {
+            registrationId: 'focus',
+            surface: 'view:board',
+            channel: 'custom:editing',
+            value: 'title'
+          }
+        ]
+      }
+    ]
+  })
+  function Away() {
+    return encodeURIComponent(
+      JSON.stringify({ peers: usePeers({ status: 'away' }), presence: usePresence('editing') })
+    )
+  }
+  const result = JSON.parse(
+    decodeURIComponent(
+      renderToStaticMarkup(
+        <CollabContext value={engine}>
+          <AppletScope surface="view:board">
+            <Away />
+          </AppletScope>
+        </CollabContext>
+      )
+    )
+  )
+  expect(result).toEqual({ peers: [{ ...bob, status: 'away' }], presence: [] })
 })

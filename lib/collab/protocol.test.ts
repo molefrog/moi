@@ -65,6 +65,19 @@ test('presence bounds JSON bytes, nesting and finite numbers', () => {
   expect(isCollabClientMessage({ ...presence, value: nested })).toBe(false)
 })
 
+test('away locations retain their page and reject invalid activity flags', () => {
+  for (const away of [undefined, false, true]) {
+    const location = { page: 'view:board', away }
+    expect(isCollabClientMessage({ type: 'location', location })).toBe(true)
+    expect(isCollabClientMessage({ type: 'join', version: 2, identity, location })).toBe(true)
+  }
+  for (const away of [null, 0, 1, 'true']) {
+    const location = { page: 'view:board', away }
+    expect(isCollabClientMessage({ type: 'location', location })).toBe(false)
+    expect(isCollabClientMessage({ type: 'join', version: 2, identity, location })).toBe(false)
+  }
+})
+
 test('storage operations are no longer part of the protocol', () => {
   for (const type of ['subscribe', 'unsubscribe', 'mutate', 'receipts', 'snapshot', 'export']) {
     expect(

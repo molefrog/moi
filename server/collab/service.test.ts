@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 
+import { COLLAB_MAX_CONNECTIONS, COLLAB_MAX_REGISTRATIONS } from '@/lib/collab/protocol'
 import type { CollabServerMessage } from '@/lib/collab/types'
 
 import { CollabService } from './service'
@@ -108,7 +109,7 @@ describe('collab service', () => {
   test('presence and location updates are coalesced and deletion clears a registration', async () => {
     join('one')
     messages = []
-    service.receive('one', { type: 'location', location: null })
+    service.receive('one', { type: 'location', location: { page: 'view:board', away: true } })
     service.receive('one', {
       type: 'presence:set',
       registrationId: 'cursor',
@@ -127,7 +128,7 @@ describe('collab service', () => {
     await Bun.sleep(60)
     expect(messages).toHaveLength(1)
     expect(latest().participants[0]).toMatchObject({
-      location: null,
+      location: { page: 'view:board', away: true },
       presence: [{ value: { x: 20 } }]
     })
     service.receive('one', { type: 'presence:delete', registrationId: 'cursor' })
@@ -135,21 +136,42 @@ describe('collab service', () => {
     expect(latest().participants[0]?.presence).toEqual([])
   })
 
-  test('bounds live connections and presence registrations', () => {
-    for (let index = 0; index < 32; index++) join(String(index))
+  test('accepts 64 connections, rejects the next join, and reuses a freed slot', () => {
+    for (let index = 0; index < COLLAB_MAX_CONNECTIONS; index++) join(String(index))
+    expect(latest().participants).toHaveLength(64)
     expect(() => join('overflow')).toThrow('too many connections')
+    service.leave('0')
+    expect(() => join('replacement')).not.toThrow()
+    expect(latest().participants).toHaveLength(64)
+    expect(latest().participants.some(participant => participant.connectionId === '0')).toBe(false)
+  })
+
+  test('accepts 128 registrations, permits updates at capacity, and reuses a freed slot', async () => {
+    join('one')
     const registration = {
       type: 'presence:set' as const,
       surface: 'board',
       channel: 'focus',
       value: true
     }
-    for (let index = 0; index < 64; index++)
-      service.receive('0', { ...registration, registrationId: String(index) })
-    expect(() => service.receive('0', { ...registration, registrationId: 'overflow' })).toThrow(
+    for (let index = 0; index < COLLAB_MAX_REGISTRATIONS; index++)
+      service.receive('one', { ...registration, registrationId: String(index) })
+    expect(() => service.receive('one', { ...registration, registrationId: 'overflow' })).toThrow(
       'Too many presence'
     )
-    expect(() => service.receive('0', { ...registration, registrationId: '0' })).not.toThrow()
+    expect(() =>
+      service.receive('one', { ...registration, registrationId: '0', value: false })
+    ).not.toThrow()
+    await Bun.sleep(60)
+    expect(latest().participants[0]?.presence).toHaveLength(128)
+    expect(latest().participants[0]?.presence[0]?.value).toBe(false)
+    service.receive('one', { type: 'presence:delete', registrationId: '0' })
+    expect(() =>
+      service.receive('one', { ...registration, registrationId: 'replacement' })
+    ).not.toThrow()
+    await Bun.sleep(60)
+    expect(latest().participants[0]?.presence).toHaveLength(128)
+    expect(latest().participants[0]?.presence.at(-1)?.registrationId).toBe('replacement')
   })
 
   test('heartbeat replies immediately and closing the room clears pending broadcasts', async () => {

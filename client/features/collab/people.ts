@@ -10,7 +10,7 @@ export type UsersSource = {
 
 export function userStatus(participants: readonly CollabParticipant[], id: string): UserStatus {
   const connections = participants.filter(participant => participant.userId === id)
-  return connections.some(connection => connection.location !== null)
+  return connections.some(connection => connection.location !== null && !connection.location.away)
     ? 'active'
     : connections.length
       ? 'away'

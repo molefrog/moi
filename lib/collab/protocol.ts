@@ -1,6 +1,8 @@
 import type { CollabClientMessage, CollabIdentity, CollabJsonValue, CollabLocation } from './types'
 
 export const COLLAB_PROTOCOL_VERSION = 2
+export const COLLAB_MAX_CONNECTIONS = 64
+export const COLLAB_MAX_REGISTRATIONS = 128
 export const COLLAB_MAX_MESSAGE_BYTES = 256 * 1024
 export const COLLAB_MAX_PRESENCE_BYTES = 4 * 1024
 export const COLLAB_MAX_AVATAR_BYTES = 8 * 1024
@@ -44,7 +46,8 @@ function isLocation(value: unknown): value is CollabLocation | null {
     value === null ||
     (isRecord(value) &&
       isCollabString(value.page, 1024) &&
-      (value.title === undefined || isCollabString(value.title)))
+      (value.title === undefined || isCollabString(value.title)) &&
+      (value.away === undefined || typeof value.away === 'boolean'))
   )
 }
 

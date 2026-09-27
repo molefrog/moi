@@ -1,4 +1,8 @@
-import { COLLAB_PROTOCOL_VERSION } from '@/lib/collab/protocol'
+import {
+  COLLAB_MAX_CONNECTIONS,
+  COLLAB_MAX_REGISTRATIONS,
+  COLLAB_PROTOCOL_VERSION
+} from '@/lib/collab/protocol'
 import type {
   CollabClientMessage,
   CollabIdentity,
@@ -53,7 +57,8 @@ export class CollabService {
   receive(connectionId: string, message: CollabClientMessage) {
     if (message.type === 'join') {
       if (this.clients.has(connectionId)) throw new Error('This connection already joined')
-      if (this.clients.size >= 32) throw new Error('This workspace has too many connections')
+      if (this.clients.size >= COLLAB_MAX_CONNECTIONS)
+        throw new Error('This workspace has too many connections')
       const identity = cleanIdentity(message.identity)
       // Keep one current profile across a user's tabs, without sharing their presence.
       for (const client of this.clients.values()) {
@@ -99,7 +104,8 @@ export class CollabService {
       case 'presence:set': {
         const presence = participant.presence
         const index = presence.findIndex(item => item.registrationId === message.registrationId)
-        if (index < 0 && presence.length >= 64) throw new Error('Too many presence registrations')
+        if (index < 0 && presence.length >= COLLAB_MAX_REGISTRATIONS)
+          throw new Error('Too many presence registrations')
         const { registrationId, surface, channel, value } = message
         const registration = { registrationId, surface, channel, value }
         if (index >= 0) presence[index] = registration

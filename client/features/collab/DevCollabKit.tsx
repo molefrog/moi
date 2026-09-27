@@ -34,11 +34,11 @@ import {
   User,
   presenceChildTarget
 } from './components'
-import { createFakeBackend } from './fake-backend'
-import type { FakeCollabBackend } from './fake-backend'
+import { createFakeEngine } from './fake-engine'
+import type { FakeCollabEngine } from './fake-engine'
 import {
-  AppletCollabProvider,
-  CollabBackendProvider,
+  AppletScope,
+  CollabContext,
   presenceChannels,
   useMe,
   usePeers,
@@ -58,7 +58,6 @@ const USERS: CollabIdentity[] = [
   { id: 'david', name: 'David Tibbitts', color: '#10b981' }
 ]
 const PAGE = 'kit'
-const APPLET = { kind: 'view', name: 'kit' } as const
 const SURFACE = 'view:kit'
 const TARGETS = [
   ['First task', presenceChildTarget('tasks', 'launch')],
@@ -112,7 +111,7 @@ function peers(target: string, tick = 0): CollabParticipant[] {
   ]
 }
 
-function useBots(room: FakeCollabBackend, target: string) {
+function useBots(room: FakeCollabEngine, target: string) {
   useEffect(() => {
     let tick = 0
     room.setOthers(peers(target))
@@ -380,7 +379,7 @@ function HooksDemo() {
 
 export function DevCollabKit() {
   const [room] = useState(() =>
-    createFakeBackend({ self: YOU, page: PAGE, others: peers(TARGETS[0][1]), users: USERS })
+    createFakeEngine({ self: YOU, page: PAGE, others: peers(TARGETS[0][1]), users: USERS })
   )
   const [target, setTarget] = useState<string>(TARGETS[0][1])
   const [renamed, setRenamed] = useState(false)
@@ -394,8 +393,8 @@ export function DevCollabKit() {
     )
   }, [room, renamed, david])
   return (
-    <CollabBackendProvider backend={room}>
-      <AppletCollabProvider workspaceId="preview" applet={APPLET}>
+    <CollabContext value={room}>
+      <AppletScope surface={SURFACE}>
         <div className="flex flex-col gap-10 border-t border-border pt-8">
           <header>
             <h2 className="text-base font-medium">Presence playground</h2>
@@ -461,7 +460,7 @@ export function DevCollabKit() {
           </Cursors>
           <HooksDemo />
         </div>
-      </AppletCollabProvider>
-    </CollabBackendProvider>
+      </AppletScope>
+    </CollabContext>
   )
 }

@@ -1,4 +1,4 @@
-import { CollabGate, useCollabIdentityEnabled } from '@/client/features/collab/entry'
+import { CollabProvider, useCollabIdentityEnabled } from '@/client/features/collab/entry'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
@@ -36,9 +36,9 @@ export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
 function WorkspaceFeatures({ id }: WorkspaceRouteProps) {
   const { experimentalCollab } = useAppConfig()
   return (
-    <CollabGate workspaceId={id} enabled={experimentalCollab}>
+    <CollabProvider workspaceId={id} enabled={experimentalCollab}>
       <WorkspaceIdentity id={id} />
-    </CollabGate>
+    </CollabProvider>
   )
 }
 

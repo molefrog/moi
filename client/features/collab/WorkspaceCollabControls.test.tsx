@@ -6,8 +6,8 @@ import { TooltipProvider } from '@/client/components/ui/tooltip'
 import type { CollabIdentity, CollabParticipant } from '@/lib/collab/types'
 
 import { WorkspaceCollabControls } from './WorkspaceCollabControls'
-import { createFakeBackend } from './fake-backend'
-import { CollabBackendProvider } from './hooks'
+import { createFakeEngine } from './fake-engine'
+import { CollabContext } from './hooks'
 import { getIdentity, setIdentity } from './identity'
 
 const self = { id: 'self', name: 'Self', color: '#0f766e' }
@@ -35,15 +35,13 @@ function renderHeader(users: CollabIdentity[], others: CollabParticipant[]) {
     return renderToStaticMarkup(
       <Router ssrPath="/workspace/test/overview">
         <TooltipProvider>
-          <CollabBackendProvider
-            backend={createFakeBackend({ self, page: 'overview', users, others })}
-          >
+          <CollabContext value={createFakeEngine({ self, page: 'overview', users, others })}>
             <WorkspaceCollabControls
               workspaceId="test"
               describeTab={() => null}
               onOpenTab={() => {}}
             />
-          </CollabBackendProvider>
+          </CollabContext>
         </TooltipProvider>
       </Router>
     )

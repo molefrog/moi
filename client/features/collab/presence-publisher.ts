@@ -1,11 +1,11 @@
 import type { CollabJsonValue, CollabPresenceRegistration } from '@/lib/collab/types'
 
-import type { CollabBackend } from './backend'
+import type { CollabEngineApi } from './engine'
 
 // A mounted control owns a registration only while it has something to show.
 // Public custom publishers omit the predicate: false and null are valid values.
 export function createPresencePublisher<T extends CollabJsonValue>(
-  backend: Pick<CollabBackend, 'setPresence' | 'deletePresence'>,
+  engine: Pick<CollabEngineApi, 'setPresence' | 'deletePresence'>,
   registration: Omit<CollabPresenceRegistration, 'value'>,
   isPresent: (value: T) => boolean = () => true
 ) {
@@ -13,7 +13,7 @@ export function createPresencePublisher<T extends CollabJsonValue>(
   const clear = () => {
     if (!registered) return
     registered = false
-    backend.deletePresence(registration.registrationId)
+    engine.deletePresence(registration.registrationId)
   }
   return {
     publish(value: T, active: boolean) {
@@ -22,7 +22,7 @@ export function createPresencePublisher<T extends CollabJsonValue>(
         return
       }
       registered = true
-      backend.setPresence({ ...registration, value })
+      engine.setPresence({ ...registration, value })
     },
     clear
   }

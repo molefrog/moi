@@ -1,4 +1,5 @@
 import {
+  Component,
   createContext,
   useCallback,
   useContext,
@@ -13,22 +14,19 @@ import type { ReactNode } from 'react'
 import { useRouter } from 'wouter'
 import { usePathname } from 'wouter/use-browser-location'
 
-import type { AppletKind } from '@/lib/types'
 import type { CollabJsonValue } from '@/lib/collab/types'
 import { legacyTabFromPath, tabFromPath, workspacePath } from '@/lib/navigation'
 
-import { createLiveBackend, NO_BACKEND } from './backend'
-import type { CollabBackend } from './backend'
-import { CollabClient } from './client'
+import { CollabEngine, NO_ENGINE } from './engine'
+import type { CollabEngineApi } from './engine'
 import { installIdentityApi } from './identity'
 import { resolvePeers, resolveUser, workspaceProfiles } from './people'
 import type { CollabUser, PeersOptions, WorkspaceUsersOptions } from './people'
 import { createPresencePublisher } from './presence-publisher'
 
 export type { CollabUser, PeersOptions, WorkspaceUsersOptions } from './people'
-type AppletIdentity = { kind: AppletKind; name: string }
-type Mount = { applet: AppletIdentity; active: boolean; surface: string }
-const BackendContext = createContext<CollabBackend>(NO_BACKEND)
+type Mount = { active: boolean; surface: string }
+export const CollabContext = createContext<CollabEngineApi>(NO_ENGINE)
 const MountContext = createContext<Mount | null>(null)
 installIdentityApi()
 
@@ -38,87 +36,96 @@ export function pageFromPath(path: string, workspaceId: string, base = ''): stri
   return tabFromPath(page) ?? legacyTabFromPath(page) ?? (page || 'overview')
 }
 
-export type CollabWorkspaceProviderProps = {
+type CollabErrorBoundaryProps = { children: ReactNode }
+type CollabErrorBoundaryState = { error: boolean }
+class CollabErrorBoundary extends Component<CollabErrorBoundaryProps, CollabErrorBoundaryState> {
+  state: CollabErrorBoundaryState = { error: false }
+  static getDerivedStateFromError(): CollabErrorBoundaryState {
+    return { error: true }
+  }
+  render() {
+    return this.state.error ? (
+      <p role="alert" className="p-4 text-sm text-destructive">
+        Collaboration could not load. Refresh this page to try again.
+      </p>
+    ) : (
+      this.props.children
+    )
+  }
+}
+
+export type CollabProviderProps = {
   workspaceId: string
-  enabled?: boolean
+  enabled: boolean
   children: ReactNode
 }
-export function CollabWorkspaceProvider({
-  workspaceId,
-  enabled = true,
-  children
-}: CollabWorkspaceProviderProps) {
-  const client = useMemo(() => new CollabClient(workspaceId), [workspaceId])
-  const backend = useMemo(() => createLiveBackend(client, enabled), [client, enabled])
+export function CollabProvider({ workspaceId, enabled, children }: CollabProviderProps) {
+  const engine = useMemo(() => new CollabEngine(workspaceId, enabled), [workspaceId, enabled])
   const router = useRouter()
   const path = usePathname(router)
   const { base } = router
-  useEffect(() => {
-    window.dispatchEvent(new CustomEvent('moi:collab-ready'))
-    if (enabled) return client.start()
-  }, [client, enabled])
+  useEffect(() => engine.start(), [engine])
   useEffect(() => {
     const update = () =>
-      client.store.setLocation(
-        document.visibilityState === 'hidden'
-          ? null
-          : { page: pageFromPath(window.location.pathname, workspaceId, base) }
-      )
+      engine.setLocation({
+        page: pageFromPath(window.location.pathname, workspaceId, base),
+        away: document.visibilityState === 'hidden'
+      })
     update()
     document.addEventListener('visibilitychange', update)
     return () => document.removeEventListener('visibilitychange', update)
-  }, [base, client, path, workspaceId])
-  return <BackendContext value={backend}>{children}</BackendContext>
+  }, [base, engine, path, workspaceId])
+  return (
+    <CollabErrorBoundary key={workspaceId}>
+      <CollabContext value={engine}>{children}</CollabContext>
+    </CollabErrorBoundary>
+  )
 }
 
-export type CollabBackendProviderProps = { backend: CollabBackend; children: ReactNode }
-export function CollabBackendProvider({ backend, children }: CollabBackendProviderProps) {
-  return <BackendContext value={backend}>{children}</BackendContext>
-}
-export type AppletCollabProviderProps = {
-  workspaceId: string
-  applet: AppletIdentity
-  active?: boolean
-  children: ReactNode
-}
-export function AppletCollabProvider({
-  applet,
-  active = true,
-  children
-}: AppletCollabProviderProps) {
-  const { kind, name } = applet
-  const mount = useMemo(
-    () => ({ applet: { kind, name }, active, surface: `${kind}:${name}` }),
-    [kind, name, active]
-  )
+export type AppletScopeProps = { surface: string; active?: boolean; children: ReactNode }
+export function AppletScope({ surface, active = true, children }: AppletScopeProps) {
+  const { enabled } = useCollabEngine()
+  const mount = useMemo(() => ({ active: enabled && active, surface }), [enabled, active, surface])
   return <MountContext value={mount}>{children}</MountContext>
 }
 
-function useBackend(): CollabBackend {
-  return useContext(BackendContext)
+export function useCollabEngine(): CollabEngineApi {
+  return useContext(CollabContext)
 }
 export function useConnection() {
-  const backend = useBackend()
-  return useSyncExternalStore(backend.subscribe, backend.getSnapshot, backend.getSnapshot)
+  const engine = useCollabEngine()
+  return useSyncExternalStore(engine.subscribe, engine.getPeopleSnapshot, engine.getPeopleSnapshot)
+}
+function useWorkspaceDirectory() {
+  const engine = useCollabEngine()
+  return useSyncExternalStore(
+    engine.subscribeWorkspaceUsers,
+    engine.getWorkspaceDirectory,
+    engine.getWorkspaceDirectory
+  )
+}
+export function useWorkspaceUsersStatus() {
+  return useWorkspaceDirectory().status
 }
 function useUsersSource() {
-  const backend = useBackend()
+  const engine = useCollabEngine()
   const state = useConnection()
   const self = useSyncExternalStore(
-    backend.subscribeIdentity,
-    backend.getIdentity,
-    backend.getIdentity
+    engine.subscribeIdentity,
+    engine.getIdentity,
+    engine.getIdentity
   )
-  const directory = useSyncExternalStore(
-    backend.subscribeWorkspaceUsers,
-    backend.getWorkspaceUsers,
-    backend.getWorkspaceUsers
-  )
+  const directory = useWorkspaceDirectory()
   const users = useMemo(
-    () => workspaceProfiles(state.users, self, directory),
+    () =>
+      workspaceProfiles(
+        state.users,
+        self,
+        directory.status === 'unavailable' ? null : directory.users
+      ),
     [state.users, self, directory]
   )
-  return { state, self, users, backend }
+  return { state, self, users, engine }
 }
 export function useUser(id: string): CollabUser | null {
   const { state, users } = useUsersSource()
@@ -146,12 +153,12 @@ export function useMe(): CollabUser | null {
   )
 }
 export function usePeers(options: PeersOptions = {}): CollabUser[] {
-  const { state, self, users, backend } = useUsersSource()
+  const { state, self, users, engine } = useUsersSource()
   const { scope, status } = options
   return useMemo(
     () =>
-      resolvePeers({ ...state, users }, self?.id ?? null, backend.getLocation(), { scope, status }),
-    [state, self, users, backend, scope, status]
+      resolvePeers({ ...state, users }, self?.id ?? null, engine.getLocation(), { scope, status }),
+    [state, self, users, engine, scope, status]
   )
 }
 export function useMount(): Mount | null {
@@ -171,29 +178,25 @@ export function usePresence<T extends CollabJsonValue>(channel: string): Presenc
   return usePresenceChannel<T>(presenceChannels.custom(channel))
 }
 export function usePresenceChannel<T extends CollabJsonValue>(channel: string): PresenceValue<T>[] {
-  const { state, users, backend } = useUsersSource()
+  const { users, engine } = useUsersSource()
   const mount = useMount()
+  const surface = mount?.surface ?? ''
+  const snapshot = useCallback(
+    () => engine.getPresenceSnapshot(surface, channel),
+    [engine, surface, channel]
+  )
+  const entries = useSyncExternalStore(engine.subscribe, snapshot, snapshot)
   return useMemo(() => {
-    const location = backend.getLocation()
-    if (!mount?.active || !location) return []
+    if (!mount?.active) return []
     const known = new Set(users.map(user => user.id))
-    return state.participants.flatMap(participant =>
-      participant.connectionId === state.connectionId ||
-      participant.location?.page !== location.page ||
-      !known.has(participant.userId)
-        ? []
-        : participant.presence
-            .filter(
-              registration =>
-                registration.surface === mount.surface && registration.channel === channel
-            )
-            .map(registration => ({
-              connectionId: participant.connectionId,
-              userId: participant.userId,
-              value: registration.value as T
-            }))
-    )
-  }, [state, users, backend, mount, channel])
+    return entries
+      .filter(entry => known.has(entry.userId))
+      .map(entry => ({
+        connectionId: entry.connectionId,
+        userId: entry.userId,
+        value: entry.value as T
+      }))
+  }, [entries, users, mount])
 }
 
 // Internal imperative publisher for pointer/focus events. Ownership is per mount.
@@ -202,15 +205,15 @@ export function usePresencePublisher<T extends CollabJsonValue>(
   initialValue: T,
   isPresent?: (value: T) => boolean
 ): (value: T) => void {
-  const backend = useBackend()
+  const engine = useCollabEngine()
   const mount = useMount()
   const [registrationId] = useState(() => crypto.randomUUID())
   const valueRef = useRef(initialValue)
   const live = useRef(false)
   const surface = mount?.surface ?? ''
   const registration = useMemo(
-    () => createPresencePublisher<T>(backend, { registrationId, surface, channel }, isPresent),
-    [backend, registrationId, surface, channel, isPresent]
+    () => createPresencePublisher<T>(engine, { registrationId, surface, channel }, isPresent),
+    [engine, registrationId, surface, channel, isPresent]
   )
   const publish = useCallback(() => {
     registration.publish(

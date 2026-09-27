@@ -14,10 +14,11 @@ import {
   usePresence,
   usePublishPresence,
   useUser,
-  useWorkspaceUsers
+  useWorkspaceUsers,
+  useWorkspaceUsersStatus
 } from './hooks'
 
-export { CollabWorkspaceProvider, AppletCollabProvider, CollabBackendProvider } from './hooks'
+export { CollabProvider, AppletScope, CollabContext } from './hooks'
 export { WorkspaceCollabControls } from './WorkspaceCollabControls'
 export { getIdentity, subscribeIdentityStore } from './identity'
 
@@ -34,6 +35,7 @@ const appletApi = {
   usePeers,
   useUser,
   useWorkspaceUsers,
+  useWorkspaceUsersStatus,
   usePresence,
   usePublishPresence
 }

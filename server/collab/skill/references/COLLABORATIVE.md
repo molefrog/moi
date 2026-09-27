@@ -15,19 +15,31 @@ when their publisher leaves. Do not use them as a database, lock, or source of a
 ## Users
 
 ```tsx
-import { useMe, useUser, usePeers, useWorkspaceUsers, User, Facepile, Activity } from 'moi/collab'
+import {
+  useMe,
+  useUser,
+  usePeers,
+  useWorkspaceUsers,
+  useWorkspaceUsersStatus,
+  User,
+  Facepile,
+  Activity
+} from 'moi/collab'
 
 const me = useMe()
 const author = useUser(authorId)
 const peers = usePeers() // Other connected users on this page
 const workspacePeers = usePeers({ scope: 'workspace' })
 const members = useWorkspaceUsers() // Includes you and offline members
+const directoryStatus = useWorkspaceUsersStatus() // 'unavailable' | 'loading' | 'ready'
 const offlineMembers = useWorkspaceUsers({ status: 'offline' })
 ```
 
 A resolved user is `{ id, name, color, avatar?, email?, status }`. `useMe()` and `useUser(id)` return
 `null` if unavailable. Status is `active` (at least one visible workspace connection), `away` (all
-connections hidden), or `offline` (none). A user on another page is not offline.
+connections hidden or with no known page), or `offline` (none). A user on another page is not offline.
+Hidden users retain their page membership, so `usePeers({ status: 'away' })` lists away users on
+this page. Status tracks tab visibility, not idle time or whether a browser window has focus.
 
 `usePeers` returns connected users once each, excluding your own user across all your tabs.
 Its options are `{ scope?: 'page' | 'workspace', status?: 'active' | 'away' }`. It never lists offline
@@ -38,6 +50,12 @@ opened the workspace. Unknown or removed IDs return `null`.
 and offline members. Filter by `active`, `away`, or `offline`, or omit options for everyone. Use it
 for assignee pickers and member lists. Without a host directory, only the local identity and current
 connection profiles are available; this fallback cannot discover offline members.
+
+`useWorkspaceUsersStatus()` reports the host directory's readiness. `loading` means membership has
+not arrived; `ready` can include an empty member list; `unavailable` means there is no external directory
+and live/development profiles are used. `useMe()` resolves the global account through this workspace's
+membership and returns `null` while it loads or if the ready list omits that ID. The account is the
+same across all workspaces. Directory readiness is independent of presence connection state.
 
 Store user IDs in your application data and resolve current profiles at display time. Batiok or
 another outer host owns profiles; applets only read them. Workspace-specific metadata belongs in
@@ -82,7 +100,8 @@ separate value. It does not publish or require a matching publisher in this comp
 
 `usePublishPresence(channel, value)` returns nothing. Pass your current value; changes replace that
 registration's whole value. Each mounted hook owns its registration. Values must be JSON and at
-most 4 KiB. Channel names are scoped to the applet (`view:<name>` or `widget:<name>`).
+most 4 KiB. A workspace supports 64 browser connections, with at most 128 active registrations per
+connection. Inactive built-in focus and selection wrappers do not consume registrations. Channel names are scoped to the applet (`view:<name>` or `widget:<name>`).
 
 Presence is cleaned up when the applet is inactive, hidden, rebuilt, or unmounted. A hidden browser
 tab releases its registrations too. Live values are republished after reconnection. Avoid building

@@ -3,33 +3,42 @@ import type {
   CollabParticipant,
   CollabPresenceRegistration
 } from '@/lib/collab/types'
-import type { CollabBackend } from './backend'
+import type { CollabEngineApi } from './engine'
 import { normalizeWorkspaceUsers } from './identity'
+import type { WorkspaceDirectory } from './identity'
 import { CollabStore } from './store'
 
-export type FakeBackendOptions = {
+export type FakeEngineOptions = {
   self: CollabIdentity | null
   page?: string
   others?: CollabParticipant[]
   // Full fixture directory, including users who are offline.
   users?: readonly CollabIdentity[]
+  directoryStatus?: WorkspaceDirectory['status']
 }
-export type FakeCollabBackend = CollabBackend & {
+export type FakeCollabEngine = CollabEngineApi & {
   setOthers: (others: CollabParticipant[]) => void
   setUsers: (users: readonly CollabIdentity[] | null) => void
+  setDirectoryStatus: (status: WorkspaceDirectory['status']) => void
 }
 
-export function createFakeBackend({
+export function createFakeEngine({
   self,
   page = 'preview',
   others = [],
-  users
-}: FakeBackendOptions): FakeCollabBackend {
+  users,
+  directoryStatus = users === undefined ? 'unavailable' : 'ready'
+}: FakeEngineOptions): FakeCollabEngine {
   const store = new CollabStore()
   const presence = new Map<string, CollabPresenceRegistration>()
   const userListeners = new Set<() => void>()
   let directory = users === undefined ? null : normalizeWorkspaceUsers(users)
   let profiles = directory ?? (self ? [self] : [])
+  let directorySnapshot: WorkspaceDirectory = {
+    status: directoryStatus,
+    users: directoryStatus === 'ready' ? (directory ?? []) : []
+  }
+  directory = directoryStatus === 'unavailable' ? null : directorySnapshot.users
   let everyoneElse = others
   let location: CollabParticipant['location'] = { page }
   const participants = (): CollabParticipant[] => [
@@ -73,11 +82,17 @@ export function createFakeBackend({
     users: liveUsers()
   })
   return {
+    workspaceId: 'preview',
+    enabled: true,
+    start: () => () => {},
     getSnapshot: store.getSnapshot,
+    getPeopleSnapshot: store.getPeopleSnapshot,
+    getPresenceSnapshot: store.getPresenceSnapshot,
     subscribe: store.subscribe,
     getIdentity: () => self,
     subscribeIdentity: () => () => {},
     getWorkspaceUsers: () => directory,
+    getWorkspaceDirectory: () => directorySnapshot,
     subscribeWorkspaceUsers: listener => {
       userListeners.add(listener)
       return () => {
@@ -85,6 +100,7 @@ export function createFakeBackend({
       }
     },
     getLocation: () => store.getLocation(),
+    setLocation: location => store.setLocation(location),
     setPresence: registration => {
       if (self) store.setPresence(registration)
     },
@@ -97,9 +113,18 @@ export function createFakeBackend({
     },
     setUsers: next => {
       directory = next === null ? null : normalizeWorkspaceUsers(next)
+      directorySnapshot = {
+        status: next === null ? 'unavailable' : 'ready',
+        users: directory ?? []
+      }
       if (directory) profiles = directory
       userListeners.forEach(listener => listener())
       announce()
+    },
+    setDirectoryStatus: status => {
+      directorySnapshot = { status, users: status === 'ready' ? profiles : [] }
+      directory = status === 'unavailable' ? null : directorySnapshot.users
+      userListeners.forEach(listener => listener())
     }
   }
 }

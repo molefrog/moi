@@ -23,6 +23,7 @@ export class CollabClient {
   }
 
   start(): () => void {
+    if (!this.stopped) return () => {}
     this.stopped = false
     this.userId = getIdentity()?.id ?? null
     this.unsubscribeIdentity = subscribeIdentityStore(() => {

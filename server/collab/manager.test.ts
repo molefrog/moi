@@ -120,13 +120,13 @@ function localSocket() {
   }
 }
 
-function joinLocal(runtime: CollabManager, socket: CollabSocket) {
+function joinLocal(runtime: CollabManager, socket: CollabSocket, id = 'anna') {
   runtime.message(
     socket,
     JSON.stringify({
       type: 'join',
       version: 2,
-      identity: { id: 'anna', name: 'Anna', color: 'blue' }
+      identity: { id, name: id, color: 'blue' }
     })
   )
 }
@@ -175,10 +175,10 @@ describe('collab process and socket integration', () => {
         item => item.userId === 'anna' && item.presence.length === 1
       )
     )
-    a.send({ type: 'location', location: null })
+    a.send({ type: 'location', location: { page: 'view:board', away: true } })
     await until(() =>
       latestParticipants(b.messages).participants.some(
-        item => item.userId === 'anna' && item.location === null
+        item => item.userId === 'anna' && item.location?.page === 'view:board' && item.location.away
       )
     )
     expect(runtime.debugSnapshot()[0]?.connections).toBe(2)
@@ -266,25 +266,33 @@ describe('collab process and socket integration', () => {
     expect(latestParticipants(b.messages).users[0]?.id).toBe('boris')
   })
 
-  test('backpressure drops transient snapshots and disconnects when heartbeat cannot be delivered', async () => {
+  test('a missed departure snapshot forces reconnect even when the buffer drains before ping', async () => {
     const runtime = manager()
+    const workspace = directory()
     const client = localSocket()
-    runtime.open(client.socket, directory())
+    const peer = localSocket()
+    runtime.open(client.socket, workspace)
     joinLocal(runtime, client.socket)
     await until(() => client.messages.some(item => item.type === 'welcome'))
+    runtime.open(peer.socket, workspace)
+    joinLocal(runtime, peer.socket, 'boris')
+    await until(() => latestParticipants(client.messages).users.length === 2)
     const count = client.messages.length
     client.buffered = 1024 * 1024 + 1
-    runtime.message(
-      client.socket,
-      JSON.stringify({ type: 'location', location: { page: 'view:board' } })
-    )
-    await Bun.sleep(100)
-    expect(client.messages).toHaveLength(count)
-    expect(client.reason).toBeUndefined()
-    runtime.message(client.socket, JSON.stringify({ type: 'ping' }))
+    runtime.close(peer.socket)
     await until(() => client.reason !== undefined)
+    expect(client.messages).toHaveLength(count)
     expect(client.reason).toContain('fresh connection')
+    client.buffered = 0
+    runtime.message(client.socket, JSON.stringify({ type: 'ping' }))
     expect(runtime.debugSnapshot()[0]?.connections).toBe(0)
+    expect(client.messages.some(message => message.type === 'pong')).toBe(false)
+
+    const replacement = localSocket()
+    runtime.open(replacement.socket, workspace)
+    joinLocal(runtime, replacement.socket)
+    await until(() => replacement.messages.some(message => message.type === 'welcome'))
+    expect(latestParticipants(replacement.messages).users.map(user => user.id)).toEqual(['anna'])
   })
 
   test('heartbeats keep active sockets live and silent peers time out', async () => {

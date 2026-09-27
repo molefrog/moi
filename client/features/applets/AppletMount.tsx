@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react'
 
-import { AppletCollabMount } from '@/client/features/collab/entry'
+import { AppletScope } from '@/client/features/collab/entry'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 
 import { type AppletSegment, appletScope, appletStyleKey } from './applet-cache'
@@ -26,13 +26,9 @@ export function AppletMount({ segment, name, version, children }: AppletMountPro
 
   return (
     <div data-applet={appletScope(segment, name)} className="size-full">
-      <AppletCollabMount
-        workspaceId={workspaceId}
-        applet={{ kind: segment === 'views' ? 'view' : 'widget', name }}
-        active
-      >
+      <AppletScope surface={`${segment === 'views' ? 'view' : 'widget'}:${name}`}>
         {children}
-      </AppletCollabMount>
+      </AppletScope>
     </div>
   )
 }

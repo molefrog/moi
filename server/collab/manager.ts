@@ -70,7 +70,8 @@ export class CollabManager {
     if (binding.closed) return
     const buffered = binding.socket.getBufferedAmount?.() ?? 0
     if (buffered > 1024 * 1024) {
-      if (message.type === 'participants') return
+      // A final leave or focus-clear snapshot might never be followed by another
+      // update. Rejoining must repair state even if the buffer drains before ping.
       this.disconnect(binding, 'Collab updates need a fresh connection')
       return
     }

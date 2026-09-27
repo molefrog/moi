@@ -25,7 +25,7 @@ import { tabFromPath } from '@/lib/navigation'
 import { Avatar, AvatarFallback } from '@/ui-components/avatar'
 
 import { User } from './primitives'
-import { pageFromPath, useConnection, useWorkspaceUsers } from './hooks'
+import { pageFromPath, useConnection, useWorkspaceUsers, useWorkspaceUsersStatus } from './hooks'
 import { getIdentity, getIdentitySource, shareWorkspace, subscribeIdentityStore } from './identity'
 import { groupPeople } from './people'
 import type { PresentPerson } from './people'
@@ -49,6 +49,7 @@ export function WorkspaceCollabControls({
 }: WorkspaceCollabControlsProps) {
   const state = useConnection()
   const users = useWorkspaceUsers()
+  const directoryStatus = useWorkspaceUsersStatus()
   const identity = useSyncExternalStore(subscribeIdentityStore, getIdentity, getIdentity)
   const router = useRouter()
   const path = usePathname(router)
@@ -143,7 +144,9 @@ export function WorkspaceCollabControls({
             </ul>
           ) : (
             <p className="px-2 pb-1 text-xs text-muted-foreground">
-              No one else is here yet. Share the link to bring people in.
+              {directoryStatus === 'loading'
+                ? 'Loading workspace members…'
+                : 'No one else is here yet. Share the link to bring people in.'}
             </p>
           )}
         </PopoverContent>
@@ -160,14 +163,17 @@ function placeOf(person: PresentPerson, page: string, describeTab: DescribeTab):
     const tab = tabFromPath(candidate)
     return { tab, info: tab ? describeTab(tab) : null }
   })
-  const away = tabs.length === 0
+  const away = person.status !== 'active'
+  const pages = tabs.map(({ tab, info }) => info?.label ?? tab ?? 'Another tab').join(', ')
   return {
     away,
     where: away
       ? person.status === 'offline'
         ? 'Offline'
-        : 'Away'
-      : tabs.map(({ tab, info }) => info?.label ?? tab ?? 'Another tab').join(', '),
+        : pages
+          ? `Away · ${pages}`
+          : 'Away'
+      : pages || 'Another tab',
     Icon: tabs[0]?.info?.Icon,
     // The first tab of theirs that you are not already on.
     target: tabs.find(({ tab, info }) => tab !== null && info !== null && tab !== page)?.tab ?? null
