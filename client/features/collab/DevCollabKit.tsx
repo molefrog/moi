@@ -49,14 +49,19 @@ import {
 } from './hooks'
 import { presenceTarget } from './presence-target'
 
-const YOU: CollabIdentity = { id: 'you', name: 'You', color: '#8b5cf6' }
+const YOU: CollabIdentity = {
+  id: 'you',
+  name: 'You',
+  email: 'you@example.com',
+  color: '#8b5cf6'
+}
 const USERS: CollabIdentity[] = [
   YOU,
-  { id: 'fig', name: 'Fig', color: '#f59e0b' },
-  { id: 'alex', name: 'Alex Hao', color: '#3b82f6' },
-  { id: 'andrea', name: 'Andrea Lim', color: '#ec4899' },
-  { id: 'pierre', name: 'Pierre', color: '#f97316' },
-  { id: 'david', name: 'David Tibbitts', color: '#10b981' }
+  { id: 'fig', name: 'Fig', email: 'fig@example.com', color: '#f59e0b' },
+  { id: 'alex', name: 'Alex Hao', email: 'alex@example.com', color: '#3b82f6' },
+  { id: 'andrea', name: 'Andrea Lim', email: 'andrea@example.com', color: '#ec4899' },
+  { id: 'pierre', name: 'Pierre', email: 'pierre@example.com', color: '#f97316' },
+  { id: 'david', name: 'David Tibbitts', email: 'david@example.com', color: '#10b981' }
 ]
 const PAGE = 'kit'
 const SURFACE = 'view:kit'
