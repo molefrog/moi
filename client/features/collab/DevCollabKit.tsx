@@ -433,9 +433,7 @@ export function DevCollabKit() {
           <Section
             title="Users and directory updates"
             hint="Changing a profile updates every avatar and label. Removing an offline user makes their ID unknown."
-            code={
-              '<User id="fig" />\n<Facepile ids={watcherIds} />\n<Activity scope="workspace" />'
-            }
+            code={'<User id="fig" />\n<Facepile ids={watcherIds} />'}
           >
             <div className="flex flex-wrap items-center gap-5">
               <User id="fig" /> <User id="andrea" detail="Away" />{' '}
@@ -447,12 +445,6 @@ export function DevCollabKit() {
               <User id="alex" avatarOnly size="md" />
               <User id="alex" avatarOnly size="lg" />
               <Facepile ids={USERS.map(user => user.id)} />
-              <span className="flex items-center gap-2 text-sm">
-                This page <Activity />
-              </span>
-              <span className="flex items-center gap-2 text-sm">
-                Workspace <Activity scope="workspace" />
-              </span>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="secondary" onClick={() => setRenamed(value => !value)}>
@@ -461,6 +453,22 @@ export function DevCollabKit() {
               <Button size="sm" variant="secondary" onClick={() => setDavid(value => !value)}>
                 {david ? 'Remove David' : 'Restore David'}
               </Button>
+            </div>
+          </Section>
+          <Section
+            title="Activity"
+            hint="Includes you and connected users. Workspace scope also includes Pierre on another page and Andrea while away. Offline users are excluded."
+            code={'<Activity />\n<Activity scope="workspace" />'}
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="flex flex-col items-start gap-2">
+                <p className="text-sm text-muted-foreground">This page</p>
+                <Activity />
+              </div>
+              <div className="flex flex-col items-start gap-2">
+                <p className="text-sm text-muted-foreground">Workspace</p>
+                <Activity scope="workspace" />
+              </div>
             </div>
           </Section>
           <Section
