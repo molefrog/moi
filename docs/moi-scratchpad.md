@@ -188,6 +188,28 @@ open in an older one. That's the invariant everything below defends.
   save after a schema change also keeps the previous file as `.scratchpad.json.bak` — the
   manual escape hatch after a downgrade. Detection lives in `lib/scratchpad-skew.ts`.
 
+## License key
+
+tldraw requires a license key in production. moi inlines one into the client at build time
+from `PUBLIC_TLDRAW_LICENSE_KEY`: from your shell or `.env` for the dev bundler (bunfig
+`[serve.static] env`), and from the repo's `PUBLIC_TLDRAW_LICENSE_KEY` Actions variable for
+releases (`scripts/build-client.ts` at prepack). tldraw picks its behavior from the key:
+
+- **No key**: the canvas works and shows a "Get a license for production" link in the corner,
+  because moi serves it from `http://localhost`, which tldraw treats as development (served
+  over HTTPS on a real domain, it would count as production and blank the canvas). tldraw's
+  license covers keyless use in development environments only, so treat a keyless release
+  as a stopgap until a key is in place.
+- **Valid key**: the canvas works, with no watermark unless the license includes one.
+- **Expired key**: worse than none. tldraw blanks the canvas 5 seconds after load, even on
+  localhost. Evaluation keys stop working on their expiry date and annual keys 30 days after
+  it; perpetual keys keep working for the tldraw versions they cover.
+
+The key is baked into each published `dist/`, so when it expires, **every installed version
+built with it** loses the canvas. Installed versions can't be fixed in place: ship a release
+built with a new key (or none) and have users run `moi update`. Replace or delete the Actions
+variable before the key expires; never leave an expired key in it.
+
 ## Building it
 
 Lean on what's already here rather than inventing plumbing. The canvas is a `<Tldraw>` mounted
