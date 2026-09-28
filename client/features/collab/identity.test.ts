@@ -8,6 +8,8 @@ import type { CollabHostState, CollabIdentityApi, WorkspaceDirectory } from './i
 const PROFILE_KEY = 'moi:collab:dev-profile'
 const alice = { id: 'alice', name: 'Alice', color: '#0f766e' }
 const bob = { id: 'bob', name: 'Bob', color: '#2563eb' }
+const carol = { id: 'cf-carol', color: '#10b981', email: 'carol@example.com' }
+const accessed = { provider: 'cloudflare-access', identity: carol } as const
 const descriptors = new Map(
   ['window', 'location', 'navigator', 'sessionStorage'].map(key => [
     key,
@@ -23,7 +25,11 @@ afterEach(() => {
   }
 })
 
-async function setup(getHostState?: () => CollabHostState | null, profile?: CollabIdentity) {
+async function setup(
+  getHostState?: () => CollabHostState | null,
+  profile?: CollabIdentity,
+  beforeInstall?: (identity: typeof Identity) => void
+) {
   const host: { moi?: { collab?: Partial<CollabIdentityApi> } } = getHostState
     ? { moi: { collab: { getHostState } } }
     : {}
@@ -42,6 +48,7 @@ async function setup(getHostState?: () => CollabHostState | null, profile?: Coll
   // Each bridge starts fresh without changing the singleton used by client.test.ts.
   const path = `./identity.ts?identity-test=${++instance}`
   const identity: typeof Identity = await import(path)
+  beforeInstall?.(identity)
   identity.installIdentityApi()
   return { ...identity, host, saved }
 }
@@ -87,6 +94,35 @@ test.each([
   expect(JSON.parse(identity.saved.get(PROFILE_KEY) ?? 'null')).toEqual(alice)
   identity.host.moi?.collab?.setHostState?.({ identity: bob, workspaces: {} })
   expect(identity.getIdentity()).toEqual(bob)
+})
+
+test('Cloudflare Access replaces a saved dev profile, locks dev edits, and ignores repeats', async () => {
+  const identity = await setup(undefined, alice)
+  let notifications = 0
+  identity.subscribeIdentityStore(() => notifications++)
+  identity.setProxyIdentity(accessed)
+  identity.setProxyIdentity({ ...accessed, identity: { ...carol } })
+  identity.setDevIdentity(bob)
+  expect(identity.getIdentity()).toEqual(carol)
+  expect(identity.getIdentitySource()).toBe('cloudflare-access')
+  expect(notifications).toBe(1)
+  // An unverified request signs out; a server without Access drops the stale identity.
+  identity.setProxyIdentity({ provider: 'cloudflare-access', identity: null })
+  expect(identity.getIdentity()).toBeNull()
+  identity.setProxyIdentity({ provider: null, identity: null })
+  expect(identity.getIdentitySource()).toBeNull()
+})
+
+test('Access arriving before install beats a saved dev profile, and an outer host beats Access', async () => {
+  const early = await setup(undefined, alice, bridge => bridge.setProxyIdentity(accessed))
+  expect(early.getIdentity()).toEqual(carol)
+  const hosted = await setup(
+    () => ({ identity: bob, workspaces: {} }),
+    undefined,
+    bridge => bridge.setProxyIdentity(accessed)
+  )
+  hosted.setProxyIdentity(accessed)
+  expect([hosted.getIdentity(), hosted.getIdentitySource()]).toEqual([bob, 'external'])
 })
 
 test('preloaded state exposes stable copied identity and directories across later workspace visits', async () => {

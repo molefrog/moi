@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 import { COLLAB_MAX_MESSAGE_BYTES, isCollabClientMessage } from '@/lib/collab/protocol'
-import type { CollabServerMessage } from '@/lib/collab/types'
+import type { CollabClientMessage, CollabIdentity, CollabServerMessage } from '@/lib/collab/types'
 
 import { isCollabEnabled } from './config'
 import type { ParentMessage, WorkerMessage } from './ipc'
@@ -21,6 +21,8 @@ type Binding = {
   closed: boolean
   lastSeen: number
   joined: boolean
+  // Set when a proxy (Cloudflare Access) verified who opened this socket.
+  identity?: CollabIdentity
   slot?: Slot
   queue: Promise<void>
 }
@@ -54,6 +56,17 @@ export class CollabRuntimeError extends Error {
   ) {
     super(message)
   }
+}
+
+// A proxy-verified socket speaks only as the verified viewer. Another id, such
+// as an outer host's own identity, is refused rather than rewritten, so peers
+// never see someone other than the person the browser shows.
+function verifiedMessage(
+  message: CollabClientMessage,
+  identity: CollabIdentity | undefined
+): CollabClientMessage | null {
+  if (!identity || (message.type !== 'join' && message.type !== 'identity')) return message
+  return message.identity.id === identity.id ? { ...message, identity } : null
 }
 
 // One owner map per moi server. No LRU: active workspaces cannot be evicted.
@@ -234,7 +247,7 @@ export class CollabManager {
     binding.socket.close(1012, reason.slice(0, 120))
   }
 
-  open(socket: CollabSocket, workspacePath: string) {
+  open(socket: CollabSocket, workspacePath: string, identity?: CollabIdentity) {
     const binding: Binding = {
       socket,
       workspacePaths: new Set([resolve(workspacePath)]),
@@ -242,6 +255,7 @@ export class CollabManager {
       closed: false,
       lastSeen: Date.now(),
       joined: false,
+      identity,
       queue: Promise.resolve()
     }
     this.bindings.set(socket, binding)
@@ -294,7 +308,16 @@ export class CollabManager {
       return
     }
     binding.lastSeen = Date.now()
-    const validated = message
+    const validated = verifiedMessage(message, binding.identity)
+    if (!validated) {
+      this.emit(binding, {
+        type: 'error',
+        code: 'identity_mismatch',
+        message: 'Presence here uses your Cloudflare Access identity'
+      })
+      this.disconnect(binding, 'Identity does not match Cloudflare Access')
+      return
+    }
     binding.queue = binding.queue
       .then(() => {
         if (binding.closed || !binding.slot) return

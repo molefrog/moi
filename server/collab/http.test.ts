@@ -138,6 +138,13 @@ describe('collab HTTP integration', () => {
     expect(await (await api.request(workspaceUrl)).json()).not.toHaveProperty('collabReference')
   })
 
+  test('the identity endpoint is never cached and ignores Access headers without Access', async () => {
+    const headers = { 'Cf-Access-Jwt-Assertion': 'forged.token.value' }
+    const response = await api.request('/api/identity', { headers })
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store')
+    expect(await response.json()).toEqual({ provider: null, identity: null })
+  })
+
   test('persistent commands remain absent even when presence is enabled', async () => {
     enable()
     for (const commandType of ['snapshot', 'mutate', 'receipts', 'export']) {

@@ -19,7 +19,8 @@ test('defaults apply when no config file exists', () => {
   expect(config).toEqual({
     cloudDemo: false,
     experimental: { collab: false },
-    demoInstallUrl: 'https://moi.computer'
+    demoInstallUrl: 'https://moi.computer',
+    cloudflareAccess: null
   })
 })
 
@@ -110,4 +111,35 @@ test('the resolved config is frozen', () => {
   const config = loadAppConfig('/nonexistent', NO_ENV)
   expect(Object.isFrozen(config)).toBe(true)
   expect(Object.isFrozen(config.experimental)).toBe(true)
+})
+
+const TEAM = 'MOI_CLOUDFLARE_ACCESS_TEAM_DOMAIN'
+const AUD = 'MOI_CLOUDFLARE_ACCESS_AUD'
+const access = (env: Record<string, string>) => loadAppConfig('/nonexistent', env).cloudflareAccess
+
+test('Cloudflare Access reads config.json, normalizes the team domain, and env wins per field', async () => {
+  const cloudflareAccess = { teamDomain: 'other', audience: ['aud-1', ' aud-2 '] }
+  const file = await configFile(JSON.stringify({ cloudflareAccess }))
+  expect(loadAppConfig(file, NO_ENV).cloudflareAccess).toEqual({
+    teamDomain: 'https://other.cloudflareaccess.com',
+    audience: ['aud-1', 'aud-2']
+  })
+  for (const team of ['acme', 'acme.cloudflareaccess.com', 'https://acme.cloudflareaccess.com/']) {
+    expect(loadAppConfig(file, { [TEAM]: team, [AUD]: 'a, b' }).cloudflareAccess).toEqual({
+      teamDomain: 'https://acme.cloudflareaccess.com',
+      audience: ['a', 'b']
+    })
+  }
+})
+
+test('an invalid or partial Cloudflare Access config trusts no proxy and warns', () => {
+  const warn = spyOn(console, 'error').mockImplementation(() => {})
+  try {
+    for (const team of ['http://acme.cloudflareaccess.com', 'acme.cloudflareaccess.com/certs'])
+      expect(access({ [TEAM]: team, [AUD]: 'aud' })).toBeNull()
+    expect(access({ [TEAM]: 'acme' })).toBeNull()
+    expect(warn.mock.calls.join('\n')).toContain('needs both a team domain and an audience')
+  } finally {
+    warn.mockRestore()
+  }
 })

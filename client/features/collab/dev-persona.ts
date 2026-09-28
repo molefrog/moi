@@ -1,22 +1,10 @@
+import { PERSONA_COLORS } from '@/lib/collab/colors'
 import type { CollabIdentity } from '@/lib/collab/types'
 
 import { facehashDataUrl } from './facehash-avatar'
 import { userDisplayName } from './people'
 
 // Test profiles are activated only by explicit setup on /dev/collab.
-
-// Backgrounds that keep the black face readable and still work as a cursor
-// color on light and dark surfaces.
-export const PERSONA_COLORS = [
-  ['Pink', '#ec4899'],
-  ['Orange', '#f97316'],
-  ['Amber', '#f59e0b'],
-  ['Lime', '#84cc16'],
-  ['Emerald', '#10b981'],
-  ['Cyan', '#06b6d4'],
-  ['Blue', '#3b82f6'],
-  ['Violet', '#8b5cf6']
-] as const
 
 export const PERSONA_NAMES = [
   'Ada',

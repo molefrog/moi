@@ -295,6 +295,26 @@ describe('collab process and socket integration', () => {
     expect(latestParticipants(replacement.messages).users.map(user => user.id)).toEqual(['anna'])
   })
 
+  test('a proxy-verified socket joins only with its verified id and keeps its verified profile', async () => {
+    const runtime = manager()
+    const workspace = directory()
+    const verified = { id: 'cf-user-1', color: '#3b82f6', email: 'alex@example.com' }
+    const [client, peer, other] = [localSocket(), localSocket(), localSocket()]
+    runtime.open(other.socket, workspace, verified)
+    joinLocal(runtime, other.socket, 'host-user')
+    expect(other.messages).toContainEqual(expect.objectContaining({ code: 'identity_mismatch' }))
+    expect(other.reason).toContain('Cloudflare Access')
+    runtime.open(client.socket, workspace, verified)
+    joinLocal(runtime, client.socket, 'cf-user-1')
+    const renamed = { type: 'identity', identity: { ...verified, name: 'Boris' } }
+    runtime.message(client.socket, JSON.stringify(renamed))
+    await until(() => client.messages.some(item => item.type === 'welcome'))
+    runtime.open(peer.socket, workspace)
+    joinLocal(runtime, peer.socket, 'carla')
+    await until(() => peer.messages.some(item => item.type === 'welcome'))
+    expect(latestParticipants(peer.messages).users).toEqual([verified, expect.anything()])
+  })
+
   test('heartbeats keep active sockets live and silent peers time out', async () => {
     const runtime = manager({ livenessTimeoutMs: 500 })
     const url = serve(runtime, directory())
