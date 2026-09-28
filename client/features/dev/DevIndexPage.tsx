@@ -10,7 +10,7 @@ const DEV_ROUTES: DevRouteEntry[] = [
   {
     path: '/dev/collab',
     title: 'Collab',
-    description: 'Collaboration components, live hook previews, and optional dev identity setup.'
+    description: 'Collaboration components, live hook previews, and optional local test user setup.'
   },
   {
     path: '/dev/blobatar-shapes',

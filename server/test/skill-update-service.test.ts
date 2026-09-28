@@ -5,7 +5,10 @@ import { join } from 'node:path'
 
 import type { WorkspaceType } from '@/lib/types'
 
-import { APPLET_ENV_DTS } from '../moi-scaffold'
+import {
+  BASE_DECLARATION_SOURCE_PATH,
+  COLLAB_DECLARATION_SOURCE_PATH
+} from '../applets/declarations'
 import { readSkillVersion } from '../skill-version'
 import {
   getWorkspaceSkillsStatus,
@@ -85,15 +88,28 @@ describe('workspace skill update service', () => {
   // existed keeps declaring a `moi` module without it until something rewrites
   // the file. `moi skill update` and the UI's update button both land here.
   test('regenerates the ambient applet types, replacing a stale copy', async () => {
-    tempRoot = await mkdtemp(join(tmpdir(), 'moi-skill-applet-env-'))
+    tempRoot = await mkdtemp(join(tmpdir(), 'moi-skill-base-types-'))
     await writeInstalledVersion(tempRoot, 'codex', '0.7.1')
-    const dts = join(tempRoot, '.moi', 'applet-env.d.ts')
+    const dts = join(tempRoot, '.moi', 'base.d.ts')
     await Bun.write(dts, "declare module 'moi' { export function fileUrl(p: string): string }\n")
 
     const result = await updateWorkspaceSkills(tempRoot, 'codex')
 
-    expect(result.appletTypesWritten).toBe(true)
-    expect(await Bun.file(dts).text()).toBe(APPLET_ENV_DTS)
+    expect(result.updatedAppletTypes).toEqual(['base.d.ts'])
+    expect(await Bun.file(dts).text()).toBe(await Bun.file(BASE_DECLARATION_SOURCE_PATH).text())
+    expect(await Bun.file(join(tempRoot, '.moi', 'collab.d.ts')).exists()).toBe(false)
+  })
+
+  test('refreshes an installed collab declaration without opting in other workspaces', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'moi-skill-collab-types-'))
+    const dts = join(tempRoot, '.moi', 'collab.d.ts')
+    await Bun.write(dts, "declare module 'moi/collab' {}\n")
+
+    const result = await updateWorkspaceSkills(tempRoot, 'codex')
+
+    expect(result.updatedAppletTypes).toEqual(['base.d.ts', 'collab.d.ts'])
+    expect(await Bun.file(dts).text()).toBe(await Bun.file(COLLAB_DECLARATION_SOURCE_PATH).text())
+    expect((await updateWorkspaceSkills(tempRoot, 'codex')).updatedAppletTypes).toEqual([])
   })
 
   // Skills install anywhere, applet types only belong to a scaffolded
@@ -105,7 +121,7 @@ describe('workspace skill update service', () => {
 
     const result = await updateWorkspaceSkills(tempRoot, 'codex')
 
-    expect(result.appletTypesWritten).toBe(false)
+    expect(result.updatedAppletTypes).toEqual([])
     expect(await exists(join(tempRoot, '.moi'))).toBe(false)
   })
 })

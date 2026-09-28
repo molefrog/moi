@@ -5,24 +5,24 @@ import {
 } from '@/lib/collab/protocol'
 import type {
   CollabClientMessage,
-  CollabIdentity,
-  CollabParticipant,
-  CollabServerMessage
+  CollabServerMessage,
+  Connection,
+  UserProfile
 } from '@/lib/collab/types'
 
 type Emit = (connectionId: string, message: CollabServerMessage) => void
 type Client = {
-  identity: CollabIdentity
-  participant: CollabParticipant
+  profile: UserProfile
+  connection: Connection
 }
 
-function cleanIdentity(identity: CollabIdentity): CollabIdentity {
+function cleanProfile(profile: UserProfile): UserProfile {
   return {
-    id: identity.id,
-    ...(identity.name !== undefined ? { name: identity.name } : {}),
-    color: identity.color,
-    ...(identity.avatar !== undefined ? { avatar: identity.avatar } : {}),
-    ...(identity.email !== undefined ? { email: identity.email } : {})
+    id: profile.id,
+    ...(profile.name !== undefined ? { name: profile.name } : {}),
+    color: profile.color,
+    ...(profile.avatar !== undefined ? { avatar: profile.avatar } : {}),
+    ...(profile.email !== undefined ? { email: profile.email } : {})
   }
 }
 
@@ -34,24 +34,24 @@ export class CollabService {
   constructor(private emit: Emit) {}
 
   private snapshot() {
-    const users = new Map<string, CollabIdentity>()
-    const participants: CollabParticipant[] = []
-    for (const { identity, participant } of this.clients.values()) {
-      users.set(identity.id, identity)
-      participants.push(participant)
+    const users = new Map<string, UserProfile>()
+    const connections: Connection[] = []
+    for (const { profile, connection } of this.clients.values()) {
+      users.set(profile.id, profile)
+      connections.push(connection)
     }
-    return { participants, users: [...users.values()] }
+    return { connections, users: [...users.values()] }
   }
 
-  private publishParticipants() {
+  private publishConnections() {
     if (this.presenceTimer) clearTimeout(this.presenceTimer)
     this.presenceTimer = null
-    const message: CollabServerMessage = { type: 'participants', ...this.snapshot() }
+    const message: CollabServerMessage = { type: 'connections', ...this.snapshot() }
     for (const id of this.clients.keys()) this.emit(id, message)
   }
 
-  private scheduleParticipants() {
-    this.presenceTimer ??= setTimeout(() => this.publishParticipants(), 50)
+  private scheduleConnections() {
+    this.presenceTimer ??= setTimeout(() => this.publishConnections(), 50)
   }
 
   receive(connectionId: string, message: CollabClientMessage) {
@@ -59,16 +59,16 @@ export class CollabService {
       if (this.clients.has(connectionId)) throw new Error('This connection already joined')
       if (this.clients.size >= COLLAB_MAX_CONNECTIONS)
         throw new Error('This workspace has too many connections')
-      const identity = cleanIdentity(message.identity)
+      const profile = cleanProfile(message.profile)
       // Keep one current profile across a user's tabs, without sharing their presence.
       for (const client of this.clients.values()) {
-        if (client.identity.id === identity.id) client.identity = identity
+        if (client.profile.id === profile.id) client.profile = profile
       }
       this.clients.set(connectionId, {
-        identity,
-        participant: {
+        profile,
+        connection: {
           connectionId,
-          userId: identity.id,
+          userId: profile.id,
           location: message.location ?? null,
           presence: []
         }
@@ -79,30 +79,29 @@ export class CollabService {
         connectionId,
         ...this.snapshot()
       })
-      this.publishParticipants()
+      this.publishConnections()
       return
     }
 
     const client = this.clients.get(connectionId)
     if (!client) throw new Error('Join the workspace before sending collab messages')
-    const { participant } = client
+    const { connection } = client
     switch (message.type) {
-      case 'identity': {
-        if (message.identity.id !== participant.userId)
-          throw new Error('Reconnect to change identity')
-        const identity = cleanIdentity(message.identity)
+      case 'profile': {
+        if (message.profile.id !== connection.userId) throw new Error('Reconnect to change user ID')
+        const profile = cleanProfile(message.profile)
         for (const other of this.clients.values()) {
-          if (other.identity.id === identity.id) other.identity = identity
+          if (other.profile.id === profile.id) other.profile = profile
         }
-        this.publishParticipants()
+        this.publishConnections()
         return
       }
       case 'location':
-        participant.location = message.location
-        this.scheduleParticipants()
+        connection.location = message.location
+        this.scheduleConnections()
         return
       case 'presence:set': {
-        const presence = participant.presence
+        const presence = connection.presence
         const index = presence.findIndex(item => item.registrationId === message.registrationId)
         if (index < 0 && presence.length >= COLLAB_MAX_REGISTRATIONS)
           throw new Error('Too many presence registrations')
@@ -110,14 +109,14 @@ export class CollabService {
         const registration = { registrationId, surface, channel, value }
         if (index >= 0) presence[index] = registration
         else presence.push(registration)
-        this.scheduleParticipants()
+        this.scheduleConnections()
         return
       }
       case 'presence:delete':
-        participant.presence = participant.presence.filter(
+        connection.presence = connection.presence.filter(
           item => item.registrationId !== message.registrationId
         )
-        this.scheduleParticipants()
+        this.scheduleConnections()
         return
       case 'ping':
         this.emit(connectionId, { type: 'pong' })
@@ -126,7 +125,7 @@ export class CollabService {
   }
 
   leave(connectionId: string) {
-    if (this.clients.delete(connectionId)) this.publishParticipants()
+    if (this.clients.delete(connectionId)) this.publishConnections()
   }
 
   close() {

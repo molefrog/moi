@@ -13,11 +13,11 @@ import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import { mergeLayoutForSave } from '@/server/layout'
 
 import {
-  readPersonalSession,
-  readPersonalTabs,
-  writePersonalSession,
-  writePersonalTabs
-} from './personal-state'
+  readBrowserTabSelectedSession,
+  readWorkspaceTabs,
+  writeBrowserTabSelectedSession,
+  writeWorkspaceTabs
+} from './browser-tab-state'
 
 const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage')
 
@@ -50,36 +50,37 @@ afterEach(() => {
 
 const defaults: WorkspaceTabsState = { open: ['overview', 'views/board'], active: 'overview' }
 
-describe('collab personal state', () => {
+describe('collab browser tab state', () => {
   test('two browser tabs select chats independently, including New chat', () => {
     const anna = browserTab()
     const boris = browserTab()
     useBrowserTab(anna)
-    writePersonalSession('workspace', 'annas-chat')
+    writeBrowserTabSelectedSession('workspace', 'annas-chat')
+    expect(anna.getItem('moi:collab:workspace:session')).toBe('annas-chat')
     useBrowserTab(boris)
-    expect(readPersonalSession('workspace')).toBeNull()
-    writePersonalSession('workspace', 'boris-chat')
+    expect(readBrowserTabSelectedSession('workspace')).toBeNull()
+    writeBrowserTabSelectedSession('workspace', 'boris-chat')
     useBrowserTab(anna)
-    expect(readPersonalSession('workspace')).toBe('annas-chat')
-    writePersonalSession('workspace', null)
-    expect(readPersonalSession('workspace')).toBeNull()
+    expect(readBrowserTabSelectedSession('workspace')).toBe('annas-chat')
+    writeBrowserTabSelectedSession('workspace', null)
+    expect(readBrowserTabSelectedSession('workspace')).toBeNull()
     useBrowserTab(boris)
-    expect(readPersonalSession('workspace')).toBe('boris-chat')
+    expect(readBrowserTabSelectedSession('workspace')).toBe('boris-chat')
   })
 
-  test('personal chat and view choices survive reads and stay partitioned by workspace', () => {
+  test('browser tab chat and view choices survive reads and stay partitioned by workspace', () => {
     useBrowserTab(browserTab())
     const selected: WorkspaceTabsState = {
       open: ['overview', 'views/board'],
       active: 'views/board'
     }
-    writePersonalSession('one', 'chat-one')
-    writePersonalSession('two', 'chat-two')
-    writePersonalTabs('one', selected)
-    expect(readPersonalSession('one')).toBe('chat-one')
-    expect(readPersonalSession('two')).toBe('chat-two')
-    expect(readPersonalTabs('one', defaults)).toEqual(selected)
-    expect(readPersonalTabs('two', defaults)).toEqual(defaults)
+    writeBrowserTabSelectedSession('one', 'chat-one')
+    writeBrowserTabSelectedSession('two', 'chat-two')
+    writeWorkspaceTabs('one', selected)
+    expect(readBrowserTabSelectedSession('one')).toBe('chat-one')
+    expect(readBrowserTabSelectedSession('two')).toBe('chat-two')
+    expect(readWorkspaceTabs('one', defaults)).toEqual(selected)
+    expect(readWorkspaceTabs('two', defaults)).toEqual(defaults)
     expect(defaults.active).toBe('overview')
   })
 
@@ -87,12 +88,18 @@ describe('collab personal state', () => {
     const anna = browserTab()
     const boris = browserTab()
     useBrowserTab(anna)
-    writePersonalTabs('workspace', { open: ['overview', 'views/board'], active: 'views/board' })
+    writeWorkspaceTabs('workspace', {
+      open: ['overview', 'views/board'],
+      active: 'views/board'
+    })
     useBrowserTab(boris)
-    expect(readPersonalTabs('workspace', defaults)).toEqual(defaults)
-    writePersonalTabs('workspace', { open: ['overview', 'scratchpad'], active: 'scratchpad' })
+    expect(readWorkspaceTabs('workspace', defaults)).toEqual(defaults)
+    writeWorkspaceTabs('workspace', {
+      open: ['overview', 'scratchpad'],
+      active: 'scratchpad'
+    })
     useBrowserTab(anna)
-    expect(readPersonalTabs('workspace', defaults).active).toBe('views/board')
+    expect(readWorkspaceTabs('workspace', defaults).active).toBe('views/board')
     expect(defaults).toEqual({ open: ['overview', 'views/board'], active: 'overview' })
   })
 
@@ -100,7 +107,7 @@ describe('collab personal state', () => {
     const storage = browserTab()
     useBrowserTab(storage)
     storage.setItem('moi:collab:workspace:tabs', '{broken')
-    expect(readPersonalTabs('workspace', defaults)).toEqual(defaults)
+    expect(readWorkspaceTabs('workspace', defaults)).toEqual(defaults)
     storage.setItem(
       'moi:collab:workspace:tabs',
       JSON.stringify({
@@ -108,43 +115,43 @@ describe('collab personal state', () => {
         active: 'not-a-tab'
       })
     )
-    expect(readPersonalTabs('workspace', defaults)).toEqual({
+    expect(readWorkspaceTabs('workspace', defaults)).toEqual({
       open: ['overview', 'views/board'],
       active: 'overview'
     })
   })
 
-  test('denied browser storage does not crash personal selection', () => {
+  test('denied browser storage does not crash browser tab selection', () => {
     Object.defineProperty(globalThis, 'sessionStorage', {
       configurable: true,
       get: () => {
         throw new Error('Storage disabled')
       }
     })
-    expect(readPersonalSession('workspace')).toBeNull()
-    expect(readPersonalTabs('workspace', defaults)).toEqual(defaults)
-    expect(() => writePersonalSession('workspace', 'chat')).not.toThrow()
-    expect(() => writePersonalTabs('workspace', defaults)).not.toThrow()
+    expect(readBrowserTabSelectedSession('workspace')).toBeNull()
+    expect(readWorkspaceTabs('workspace', defaults)).toEqual(defaults)
+    expect(() => writeBrowserTabSelectedSession('workspace', 'chat')).not.toThrow()
+    expect(() => writeWorkspaceTabs('workspace', defaults)).not.toThrow()
   })
 })
 
 describe('collab authored layout preservation', () => {
-  test('saving shared layout after personal navigation preserves authored tab defaults', () => {
+  test('saving shared layout after browser tab navigation preserves authored tab defaults', () => {
     useBrowserTab(browserTab())
     const existing = {
       ...createDefaultWorkspaceLayout(),
       tabs: defaults
     }
-    const personal: WorkspaceTabsState = {
+    const localTabs: WorkspaceTabsState = {
       open: ['overview', 'scratchpad'],
       active: 'scratchpad'
     }
-    writePersonalTabs('workspace', personal)
+    writeWorkspaceTabs('workspace', localTabs)
     const { tabs: _tabs, ...layout } = existing
     const merged = mergeLayoutForSave(existing, { ...layout, layoutMode: 'fullscreen' })
     expect(merged.tabs).toEqual(defaults)
     expect(merged.layoutMode).toBe('fullscreen')
-    expect(readPersonalTabs('workspace', defaults)).toEqual(personal)
+    expect(readWorkspaceTabs('workspace', defaults)).toEqual(localTabs)
   })
 
   test('ordinary workspace saves retain their existing shared tab behavior', () => {
@@ -155,9 +162,9 @@ describe('collab authored layout preservation', () => {
 })
 
 describe('collab selected chat cache transitions', () => {
-  test('supplying an identity switches the mounted chat observer to the saved tab chat', async () => {
+  test('supplying a current user switches the mounted chat observer to the saved tab chat', async () => {
     useBrowserTab(browserTab())
-    writePersonalSession('workspace', 'saved-tab-chat')
+    writeBrowserTabSelectedSession('workspace', 'saved-tab-chat')
     const client = new QueryClient()
     const sharedKey = selectedSessionKey('workspace')
     client.setQueryData(sharedKey, { sessionId: 'old-shared-chat' })
@@ -173,10 +180,10 @@ describe('collab selected chat cache transitions', () => {
     try {
       selection.setOptions({
         ...options,
-        queryKey: selectedSessionKey('workspace', true),
+        queryKey: selectedSessionKey('workspace', 'browser-tab'),
         queryFn: async () => {
           reads++
-          return { sessionId: readPersonalSession('workspace') }
+          return { sessionId: readBrowserTabSelectedSession('workspace') }
         }
       })
       expect(selection.getCurrentResult().data).toBeUndefined()
@@ -197,7 +204,7 @@ describe('collab selected chat cache transitions', () => {
     }
   })
 
-  test('a late shared save and remote selection event cannot replace the current personal chat', () => {
+  test('a late shared save and remote selection event cannot replace the current browser tab chat', () => {
     const client = new QueryClient()
     try {
       client.setQueryData(selectedSessionKey('workspace'), { sessionId: 'old-shared-chat' })
@@ -206,8 +213,13 @@ describe('collab selected chat cache transitions', () => {
         'workspace',
         'in-flight-shared-chat'
       )
-      const personal = optimisticallySetSelectedSession(client, 'workspace', 'personal-chat', true)
-      if (!pendingShared || !personal) throw new Error('Expected pending selections')
+      const pendingBrowserTab = optimisticallySetSelectedSession(
+        client,
+        'workspace',
+        'browser-tab-chat',
+        'browser-tab'
+      )
+      if (!pendingShared || !pendingBrowserTab) throw new Error('Expected pending selections')
       settleSelectedSessionSave(
         client,
         'workspace',
@@ -216,35 +228,43 @@ describe('collab selected chat cache transitions', () => {
       )
       applySelectedSessionEvent(client, 'workspace', 'remote-chat', false)
       expect(
-        client.getQueryData<SelectedSessionState>(selectedSessionKey('workspace', true))
+        client.getQueryData<SelectedSessionState>(selectedSessionKey('workspace', 'browser-tab'))
       ).toEqual({
-        sessionId: 'personal-chat'
+        sessionId: 'browser-tab-chat'
       })
       expect(client.getQueryData<SelectedSessionState>(selectedSessionKey('workspace'))).toEqual({
         sessionId: 'remote-chat'
       })
-      settleSelectedSessionSave(client, 'workspace', { sessionId: 'personal-chat' }, personal, true)
+      settleSelectedSessionSave(
+        client,
+        'workspace',
+        { sessionId: 'browser-tab-chat' },
+        pendingBrowserTab,
+        'browser-tab'
+      )
       expect(
-        client.getQueryData<SelectedSessionState>(selectedSessionKey('workspace', true))
+        client.getQueryData<SelectedSessionState>(selectedSessionKey('workspace', 'browser-tab'))
       ).toEqual({
-        sessionId: 'personal-chat'
+        sessionId: 'browser-tab-chat'
       })
     } finally {
       client.clear()
     }
   })
 
-  test('a session id replacement follows the selected personal chat into saved tab state', () => {
+  test('a session id replacement follows the selected browser tab chat into saved tab state', () => {
     useBrowserTab(browserTab())
     const client = new QueryClient()
     try {
-      writePersonalSession('workspace', 'temporary-id')
-      client.setQueryData(selectedSessionKey('workspace', true), { sessionId: 'temporary-id' })
+      writeBrowserTabSelectedSession('workspace', 'temporary-id')
+      client.setQueryData(selectedSessionKey('workspace', 'browser-tab'), {
+        sessionId: 'temporary-id'
+      })
       client.setQueryData(selectedSessionKey('workspace'), { sessionId: 'different-shared-chat' })
       renameSelectedSessionInCache(client, 'workspace', 'temporary-id', 'provider-id')
-      expect(readPersonalSession('workspace')).toBe('provider-id')
+      expect(readBrowserTabSelectedSession('workspace')).toBe('provider-id')
       expect(
-        client.getQueryData<SelectedSessionState>(selectedSessionKey('workspace', true))
+        client.getQueryData<SelectedSessionState>(selectedSessionKey('workspace', 'browser-tab'))
       ).toEqual({
         sessionId: 'provider-id'
       })

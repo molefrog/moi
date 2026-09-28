@@ -6,8 +6,8 @@ import { usePathname, useSearch } from 'wouter/use-browser-location'
 import { toast } from '@/client/components/ui/toast'
 import { reportAppletError } from '@/client/features/applets/applet-log'
 import { useAppletEvent } from '@/client/features/applets/applet-runtime'
-import { useCollabIdentityEnabled } from '@/client/features/collab/entry'
-import { usePersonalTabs } from '@/client/features/collab/personal-state'
+import { useCollabEnabled } from '@/client/features/collab/entry'
+import { useWorkspaceTabs } from '@/client/features/collab/browser-tab-state'
 import { normalizeTabsState, resolveActiveTab, tabAvailable } from './tab-resolution'
 import { useWorkspaceLayoutCtx } from './WorkspaceLayoutContext'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
@@ -33,7 +33,7 @@ type UseWorkspaceNavigationOptions = { views: ViewInfo[]; builders: ViewBuilder[
 
 export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceNavigationOptions) {
   const { layout, setLayout, workspaceId } = useWorkspaceLayoutCtx()
-  const personal = useCollabIdentityEnabled()
+  const collabEnabled = useCollabEnabled()
   const [, navigate] = useLocation()
   const router = useRouter()
   const { base } = router
@@ -42,12 +42,12 @@ export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceN
   const path = usePathname(router).slice(workspacePath(workspaceId, base).length + 1)
   const search = canonicalSearch(useSearch(router))
   const appletParams = useMemo(() => readViewParams(search), [search])
-  const [personalTabs, setPersonalTabs] = usePersonalTabs(
+  const [workspaceTabs, setLocalTabs] = useWorkspaceTabs(
     workspaceId,
-    personal,
+    collabEnabled,
     normalizeTabsState(layout.tabs)
   )
-  const tabsState = normalizeTabsState(personalTabs)
+  const tabsState = normalizeTabsState(workspaceTabs)
   const tabsStateRef = useLatestRef(tabsState)
   const remembered = useMemo(() => {
     let entries = rememberedAddresses.get(workspaceId)
@@ -64,10 +64,10 @@ export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceN
   const setTabs = useCallback(
     (tabs: WorkspaceTabsState) => {
       tabsStateRef.current = tabs
-      if (personal) setPersonalTabs(tabs)
+      if (collabEnabled) setLocalTabs(tabs)
       else setLayout({ tabs })
     },
-    [setLayout, tabsStateRef, personal, setPersonalTabs]
+    [setLayout, tabsStateRef, collabEnabled, setLocalTabs]
   )
 
   const go = useCallback(

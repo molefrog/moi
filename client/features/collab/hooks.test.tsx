@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { CollabEngineApi } from './engine'
 import { createFakeEngine } from './fake-engine'
-import { setIdentity } from './identity'
+import { setCurrentUser } from './host-state'
 import {
   AppletScope,
   CollabContext,
@@ -13,9 +13,9 @@ import {
   usePublishPresence,
   useUser,
   useWorkspaceUsers,
-  useWorkspaceUsersStatus
+  useWorkspaceUsersAvailability
 } from './hooks'
-import type { CollabUser } from './hooks'
+import type { WorkspaceUser } from './hooks'
 
 const alice = { id: 'alice', name: 'Alice', color: '#0f766e' }
 const bob = { id: 'bob', name: 'Bob', color: '#2563eb' }
@@ -52,7 +52,7 @@ test('observers resolve users and read presence without creating a publisher', (
     self: alice,
     page: 'board',
     users: [alice, bob],
-    others: [
+    otherConnections: [
       {
         connectionId: 'b',
         userId: 'bob',
@@ -87,7 +87,7 @@ test('observers resolve users and read presence without creating a publisher', (
   expect(html).toContain('title')
   expect(html).toContain('Bob')
   expect(publications).toBe(0)
-  expect(room.getSnapshot().participants[0]?.presence).toEqual([])
+  expect(room.getSnapshot().connections[0]?.presence).toEqual([])
 })
 
 function Disabled() {
@@ -95,7 +95,7 @@ function Disabled() {
   return <Observer />
 }
 test('hooks are safe without a backend or applet and resolve missing users to null', () => {
-  setIdentity(null)
+  setCurrentUser(null)
   const html = renderToStaticMarkup(<Disabled />)
   expect(html).toContain('null')
   expect(html).toContain('[]')
@@ -109,7 +109,9 @@ test('user hooks preserve missing and empty names for self, peers, and offline m
     self,
     page: 'board',
     users: [self, peer, offline],
-    others: [{ connectionId: 'b', userId: peer.id, location: { page: 'board' }, presence: [] }]
+    otherConnections: [
+      { connectionId: 'b', userId: peer.id, location: { page: 'board' }, presence: [] }
+    ]
   })
   function Users() {
     return encodeURIComponent(
@@ -129,7 +131,7 @@ test('user hooks preserve missing and empty names for self, peers, and offline m
         </CollabContext>
       )
     )
-  ) as { me: CollabUser; user: CollabUser; peers: CollabUser[]; users: CollabUser[] }
+  ) as { me: WorkspaceUser; user: WorkspaceUser; peers: WorkspaceUser[]; users: WorkspaceUser[] }
   expect(snapshot).toEqual({
     me: { ...self, status: 'active' },
     user: { ...peer, status: 'active' },
@@ -149,7 +151,7 @@ test('workspace users include self and offline members with workspace-wide statu
     self: alice,
     page: 'board',
     users: [alice, bob, carol, david],
-    others: [
+    otherConnections: [
       { connectionId: 'b1', userId: 'bob', location: { page: 'other-page' }, presence: [] },
       { connectionId: 'b2', userId: 'bob', location: null, presence: [] },
       { connectionId: 'c', userId: 'carol', location: null, presence: [] }
@@ -175,7 +177,7 @@ test('workspace users include self and offline members with workspace-wide statu
           </CollabContext>
         )
       )
-    ) as Record<string, CollabUser[]>
+    ) as Record<string, WorkspaceUser[]>
 
   const snapshot = render()
   expect(snapshot.all).toEqual([
@@ -209,7 +211,7 @@ test('directory loading is distinguishable from an empty authoritative directory
   function Directory() {
     return encodeURIComponent(
       JSON.stringify({
-        status: useWorkspaceUsersStatus(),
+        status: useWorkspaceUsersAvailability(),
         users: useWorkspaceUsers(),
         me: useMe()
       })
@@ -241,7 +243,7 @@ test('away peers remain on the page while their focus presence is hidden', () =>
     self: alice,
     page: 'board',
     users: [alice, bob],
-    others: [
+    otherConnections: [
       {
         connectionId: 'b',
         userId: bob.id,

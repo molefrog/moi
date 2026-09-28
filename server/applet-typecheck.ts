@@ -4,7 +4,7 @@ import ts from 'typescript'
 
 import type { AppletSelector } from '@/lib/applet-selector'
 
-import { writeAppletEnvDts } from './moi-scaffold'
+import { appletDeclarationPath, syncAppletDeclarations } from './applets/declarations'
 
 export type AppletTypecheckResult = {
   files: string[]
@@ -63,11 +63,11 @@ export async function typecheckApplets(
         .sort()
   if (files.length === 0) return { files, diagnostics: [] }
 
-  await writeAppletEnvDts(workspaceRoot)
-  const collabTypes = join(moiRoot, 'collab-env.d.ts')
+  await syncAppletDeclarations(workspaceRoot)
+  const collabTypes = appletDeclarationPath(workspaceRoot, 'collab.d.ts')
   const program = ts.createProgram({
     rootNames: [
-      join(moiRoot, 'applet-env.d.ts'),
+      appletDeclarationPath(workspaceRoot, 'base.d.ts'),
       ...(existsSync(collabTypes) ? [collabTypes] : []),
       ...files
     ],

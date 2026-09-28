@@ -12,19 +12,19 @@ const field = {
 
 test('fixture directory includes offline users while live state contains only connections', () => {
   const room = createFakeEngine({ self: alice, users: [alice, bob] })
-  expect(room.getSnapshot().participants[0]?.userId).toBe('alice')
+  expect(room.getSnapshot().connections[0]?.userId).toBe('alice')
   expect(room.getSnapshot().users).toEqual([alice])
   expect(room.getWorkspaceUsers()).toEqual([alice, bob])
 })
 
-test('presence publication and deletion belong to the caller and others can be replaced', () => {
+test('presence publication and deletion belong to the caller and other connections can be replaced', () => {
   const room = createFakeEngine({ self: alice, users: [alice, bob] })
   room.setPresence(field)
-  expect(room.getSnapshot().participants[0]?.presence).toEqual([field])
+  expect(room.getSnapshot().connections[0]?.presence).toEqual([field])
   room.deletePresence(field.registrationId)
-  expect(room.getSnapshot().participants[0]?.presence).toEqual([])
-  room.setOthers([{ connectionId: 'b', userId: 'bob', location: null, presence: [] }])
-  expect(room.getSnapshot().participants).toHaveLength(2)
+  expect(room.getSnapshot().connections[0]?.presence).toEqual([])
+  room.setOtherConnections([{ connectionId: 'b', userId: 'bob', location: null, presence: [] }])
+  expect(room.getSnapshot().connections).toHaveLength(2)
 })
 
 test('directory replacement notifies observers without retaining removed users', () => {
@@ -50,7 +50,7 @@ test('reactive inline JSON values do not feed publication back into an endless r
   })
   room.setPresence({ ...field, value: { target: 'title', selection: [1, 2] } })
   expect(notifications).toBe(1)
-  expect(room.getSnapshot().participants[0]?.presence).toHaveLength(1)
+  expect(room.getSnapshot().connections[0]?.presence).toHaveLength(1)
 })
 
 test('loading fixtures expose no directory until the complete ready snapshot arrives', () => {
@@ -67,25 +67,29 @@ test('loading fixtures expose no directory until the complete ready snapshot arr
 })
 
 test('fake updates share the live engine selection rules and stable snapshots', () => {
-  const participant = {
+  const connection = {
     connectionId: 'b',
     userId: 'bob',
     location: { page: 'preview' },
     presence: [field]
   }
-  const room = createFakeEngine({ self: alice, users: [alice, bob], others: [participant] })
-  const people = room.getPeopleSnapshot()
+  const room = createFakeEngine({
+    self: alice,
+    users: [alice, bob],
+    otherConnections: [connection]
+  })
+  const users = room.getUsersSnapshot()
   const title = room.getPresenceSnapshot('view:board', 'field:title')
-  room.setOthers([
+  room.setOtherConnections([
     {
-      ...participant,
+      ...connection,
       presence: [
         field,
         { ...field, registrationId: 'cursor', channel: 'cursor:board', value: { x: 4, y: 8 } }
       ]
     }
   ])
-  expect(room.getPeopleSnapshot()).toBe(people)
+  expect(room.getUsersSnapshot()).toBe(users)
   expect(room.getPresenceSnapshot('view:board', 'field:title')).toBe(title)
   room.setLocation({ page: 'preview', away: true })
   expect(room.getLocation()).toEqual({ page: 'preview', away: true })

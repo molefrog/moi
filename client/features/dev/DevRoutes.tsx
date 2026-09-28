@@ -9,12 +9,11 @@ import { TextureLabPage } from './TextureLabPage'
 import { ToolCallsPage } from './ToolCallsPage'
 import { UiComponentsPage } from './UiComponentsPage'
 
-// All /dev/* routes, colocated with their pages so the whole dev playground
-// (and its dependencies) lives in this folder and loads as one lazy chunk —
+// All /dev/* routes live with their pages here and load only in development;
 // see the dynamic import in AppRouter. /dev itself is the index; list new
 // routes there too.
 const DevCollabPage = lazy(() =>
-  import('../collab/DevCollabPage').then(module => ({ default: module.DevCollabPage }))
+  import('./collab/DevCollabPage').then(module => ({ default: module.DevCollabPage }))
 )
 
 export default function DevRoutes() {

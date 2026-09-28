@@ -127,7 +127,7 @@ streamable file → `.server.ts` returns the **path**, render with `fileUrl()`.
 ## Types (editor DX only — the build needs none)
 
 The bundler resolves asset imports and `moi` without any declarations; types are
-only for the agent's editor / `tsc`. One ambient `.moi/applet-env.d.ts`, scaffolded
+only for the agent's editor / `tsc`. The base `.moi/base.d.ts`, scaffolded
 by `moi init`:
 
 ```ts

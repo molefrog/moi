@@ -12,24 +12,24 @@ export { AppletScope, CollabProvider } from './hooks'
 
 export const getAppletCollabApi = createAppletCollabApi
 
-// Identity controls personal navigation and host UI independently of storage.
-export function useCollabIdentityEnabled(): boolean {
+// Collab controls and browser-tab selection require both runtime support and a current user.
+export function useCollabEnabled(): boolean {
   const engine = useCollabEngine()
-  const identity = useSyncExternalStore(
-    engine.subscribeIdentity,
-    engine.getIdentity,
-    engine.getIdentity
+  const currentUser = useSyncExternalStore(
+    engine.subscribeCurrentUser,
+    engine.getCurrentUser,
+    engine.getCurrentUser
   )
-  return engine.enabled && identity !== null
+  return engine.enabled && currentUser !== null
 }
 
 export type CollabControlsProps = {
   workspaceId: string
-  // Resolves a participant's tab to the label and icon the tab strip uses.
+  // Resolves a connection's tab to the label and icon the tab strip uses.
   describeTab: (tab: WorkspaceTabId) => CollabTabInfo | null
   onOpenTab: (tab: WorkspaceTabId) => void
 }
 export function CollabControls(props: CollabControlsProps) {
-  const enabled = useCollabIdentityEnabled()
+  const enabled = useCollabEnabled()
   return enabled ? <WorkspaceCollabControls {...props} /> : null
 }

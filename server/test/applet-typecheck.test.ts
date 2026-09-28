@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { resolvePackageTypeRoot, typecheckApplets } from '../applet-typecheck'
+import { COLLAB_DECLARATION_SOURCE_PATH } from '../applets/declarations'
 
 let workspaceRoot = ''
 
@@ -36,6 +37,22 @@ export default function Notes() { return null }
 
     expect(result.files).toHaveLength(2)
     expect(result.diagnostics).toEqual([])
+  })
+
+  test('refreshes installed collab types before checking an applet', async () => {
+    const dts = join(workspaceRoot, '.moi', 'collab.d.ts')
+    await Bun.write(dts, "declare module 'moi/collab' {}\n")
+    await Bun.write(
+      join(workspaceRoot, '.moi', 'views', 'users.tsx'),
+      `import { useMe } from 'moi/collab'
+export default function Users() { return useMe()?.id ?? null }
+`
+    )
+
+    const result = await typecheckApplets(workspaceRoot, 'views')
+
+    expect(result.diagnostics).toEqual([])
+    expect(await Bun.file(dts).text()).toBe(await Bun.file(COLLAB_DECLARATION_SOURCE_PATH).text())
   })
 
   test('uses the @types/bun shipped with moi, not one installed in the workspace', async () => {

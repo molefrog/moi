@@ -3,7 +3,7 @@ import { Fragment } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-import type { CollabIdentity } from '@/lib/collab/types'
+import type { UserProfile } from '@/lib/collab/types'
 
 import {
   Cursors,
@@ -18,17 +18,17 @@ import type { FakeCollabEngine } from './fake-engine'
 import { AppletScope, CollabContext, presenceChannels } from './hooks'
 import { presenceTarget } from './presence-target'
 
-const me: CollabIdentity = { id: 'me', name: 'Me', color: '#123456' }
-const peer: CollabIdentity = { id: 'peer', name: 'Ada', color: '#234567' }
-function room(target = presenceTarget('task:42:title'), person: CollabIdentity = peer) {
+const me: UserProfile = { id: 'me', name: 'Me', color: '#123456' }
+const peer: UserProfile = { id: 'peer', name: 'Ada', color: '#234567' }
+function room(target = presenceTarget('task:42:title'), profile: UserProfile = peer) {
   return createFakeEngine({
     self: me,
     page: 'board',
-    users: [me, person],
-    others: [
+    users: [me, profile],
+    otherConnections: [
       {
         connectionId: 'remote',
-        userId: person.id,
+        userId: profile.id,
         location: { page: 'board' },
         presence: [
           {
@@ -65,24 +65,24 @@ test('user rendering follows authoritative profile updates and removal', () => {
 })
 
 test.each([
-  [{ id: 'member-id', color: '#234567' }, 'member-id'],
-  [{ id: 'member-id', name: '', color: '#234567' }, 'member-id'],
+  [{ id: 'user-id', color: '#234567' }, 'user-id'],
+  [{ id: 'user-id', name: '', color: '#234567' }, 'user-id'],
   [
-    { id: 'member-id', name: '   ', email: 'person@example.test', color: '#234567' },
-    'person@example.test'
+    { id: 'user-id', name: '   ', email: 'user@example.test', color: '#234567' },
+    'user@example.test'
   ],
-  [{ id: 'member-id', email: 'person@example.test', color: '#234567' }, 'person@example.test']
-] satisfies Array<[CollabIdentity, string]>)(
+  [{ id: 'user-id', email: 'user@example.test', color: '#234567' }, 'user@example.test']
+] satisfies Array<[UserProfile, string]>)(
   'nameless user UI resolves a usable label for %j',
-  (person: CollabIdentity, label: string) => {
-    const engine = room(presenceTarget('task:42:title'), person)
-    const user = render(engine, <User id={person.id} />)
+  (profile: UserProfile, label: string) => {
+    const engine = room(presenceTarget('task:42:title'), profile)
+    const user = render(engine, <User id={profile.id} />)
     expect(user).toContain(`aria-label="${label}"`)
     expect(user).toContain(`title="${label}"`)
     expect(user).toContain(`>${label}<`)
     expect(user).toContain(`>${label.slice(0, 2).toUpperCase()}<`)
     expect(user).not.toContain('Unknown user')
-    expect(engine.getWorkspaceUsers()?.[1]?.name).toBe(person.name?.trim())
+    expect(engine.getWorkspaceUsers()?.[1]?.name).toBe(profile.name?.trim())
 
     const frame = render(
       engine,
@@ -99,10 +99,10 @@ test.each([
     )
     expect(gutter).toContain(`aria-label="${label}"`)
 
-    engine.setOthers([
+    engine.setOtherConnections([
       {
         connectionId: 'remote',
-        userId: person.id,
+        userId: profile.id,
         location: { page: 'board' },
         presence: [
           {
@@ -229,15 +229,15 @@ test('nested groups scope composed children and keep sibling groups independent'
     )
   }
   const html = render(
-    room(presenceTarget('people', 'person:42', 'address')),
-    <PresenceGroup id="people">
+    room(presenceTarget('users', 'user:42', 'address')),
+    <PresenceGroup id="users">
       <div className="grid gap-4">
-        <PresenceGroup id="person:42">
+        <PresenceGroup id="user:42">
           <PresenceGutter id="address">
             <Address />
           </PresenceGutter>
         </PresenceGroup>
-        <PresenceGroup id="person:43">
+        <PresenceGroup id="user:43">
           <PresenceGutter id="address">
             <Address />
           </PresenceGutter>
@@ -248,9 +248,9 @@ test('nested groups scope composed children and keep sibling groups independent'
   expect(html).toContain('class="grid gap-4"')
   const children = html.split('data-presence-target=')
   expect(children).toHaveLength(3)
-  expect(children[1]).toStartWith('"people/person%3A42/address"')
+  expect(children[1]).toStartWith('"users/user%3A42/address"')
   expect(children[1]).toContain('Ada')
-  expect(children[2]).toStartWith('"people/person%3A43/address"')
+  expect(children[2]).toStartWith('"users/user%3A43/address"')
   expect(children[2]).not.toContain('Ada')
   expect(html).toContain('Street')
   expect(html).toContain('City')
@@ -315,12 +315,12 @@ test('groups add neither DOM nor presence publications', () => {
     )
   ).toBe(render(engine, child))
   expect(publications).toBe(0)
-  expect(engine.getSnapshot().participants[0]?.presence).toEqual([])
+  expect(engine.getSnapshot().connections[0]?.presence).toEqual([])
 })
 
 test('selection uses group scope while preserving flexible children', () => {
   const engine = room()
-  engine.setOthers([
+  engine.setOtherConnections([
     {
       connectionId: 'remote',
       userId: peer.id,

@@ -14,6 +14,7 @@ import type {
   AppSettings,
   HarnessAvailability,
   SessionInfo,
+  SelectedSessionScope,
   UploadInfo,
   ViewBuilderInput,
   WorkspaceAgent,
@@ -302,7 +303,7 @@ one.post('/view-builders/:builderId/submit', async c => {
   const body = await c.req.json<{
     input?: Partial<ViewBuilderInput>
     optimisticId?: string
-    personalSelection?: boolean
+    selectedSessionScope?: SelectedSessionScope
     model?: string
     effort?: string
     fastMode?: boolean
@@ -316,8 +317,12 @@ one.post('/view-builders/:builderId/submit', async c => {
   if (body.optimisticId !== undefined && typeof body.optimisticId !== 'string') {
     return c.text('Invalid optimisticId', 400)
   }
-  if (body.personalSelection !== undefined && typeof body.personalSelection !== 'boolean') {
-    return c.text('Invalid personalSelection', 400)
+  if (
+    body.selectedSessionScope !== undefined &&
+    body.selectedSessionScope !== 'shared' &&
+    body.selectedSessionScope !== 'browser-tab'
+  ) {
+    return c.text('Invalid selectedSessionScope', 400)
   }
   const availableIcons = parseAvailableViewIcons(body.availableIcons)
   if (!availableIcons) return c.text('Available view icons are required', 400)
@@ -354,7 +359,7 @@ one.post('/view-builders/:builderId/submit', async c => {
       ]
     }
     try {
-      await selectChatSession(ws, builder.sessionId, body.personalSelection)
+      await selectChatSession(ws, builder.sessionId, body.selectedSessionScope)
       await harnessFor(ws).sendMessage({
         workspaceId: ws.id,
         workspacePath: ws.path,

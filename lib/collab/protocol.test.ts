@@ -5,10 +5,10 @@ import {
   COLLAB_MAX_EMAIL_BYTES,
   COLLAB_MAX_PRESENCE_BYTES,
   isCollabClientMessage,
-  isCollabIdentity
+  isUserProfile
 } from './protocol'
 
-const identity = { id: 'anna', name: 'Anna', color: '#7c3aed' }
+const profile = { id: 'anna', name: 'Anna', color: '#7c3aed' }
 const presence = {
   type: 'presence:set',
   registrationId: 'field',
@@ -17,42 +17,38 @@ const presence = {
 }
 
 test('profiles have bounded identifiers and optional avatar and email data', () => {
-  expect(isCollabIdentity(identity)).toBe(true)
+  expect(isUserProfile(profile)).toBe(true)
   expect(
-    isCollabIdentity({
-      ...identity,
+    isUserProfile({
+      ...profile,
       email: 'anna@example.com',
       avatar: 'https://example.com/avatar'
     })
   ).toBe(true)
-  expect(isCollabIdentity({ ...identity, id: '🙂'.repeat(100) })).toBe(false)
-  expect(isCollabIdentity({ ...identity, id: 'a\0b' })).toBe(false)
-  expect(isCollabIdentity({ ...identity, email: 'x'.repeat(COLLAB_MAX_EMAIL_BYTES) })).toBe(true)
-  expect(isCollabIdentity({ ...identity, email: 'x'.repeat(COLLAB_MAX_EMAIL_BYTES + 1) })).toBe(
-    false
-  )
-  expect(isCollabIdentity({ ...identity, email: '🙂'.repeat(81) })).toBe(false)
-  expect(isCollabIdentity({ ...identity, email: null })).toBe(false)
-  expect(isCollabIdentity({ ...identity, avatar: 'x'.repeat(COLLAB_MAX_AVATAR_BYTES + 1) })).toBe(
-    false
-  )
+  expect(isUserProfile({ ...profile, id: '🙂'.repeat(100) })).toBe(false)
+  expect(isUserProfile({ ...profile, id: 'a\0b' })).toBe(false)
+  expect(isUserProfile({ ...profile, email: 'x'.repeat(COLLAB_MAX_EMAIL_BYTES) })).toBe(true)
+  expect(isUserProfile({ ...profile, email: 'x'.repeat(COLLAB_MAX_EMAIL_BYTES + 1) })).toBe(false)
+  expect(isUserProfile({ ...profile, email: '🙂'.repeat(81) })).toBe(false)
+  expect(isUserProfile({ ...profile, email: null })).toBe(false)
+  expect(isUserProfile({ ...profile, avatar: 'x'.repeat(COLLAB_MAX_AVATAR_BYTES + 1) })).toBe(false)
 })
 
-test('only identified protocol v2 clients can join', () => {
-  expect(isCollabClientMessage({ type: 'join', version: 2, identity })).toBe(true)
-  expect(isCollabClientMessage({ type: 'join', version: 1, identity })).toBe(false)
+test('only protocol v2 clients with a user profile can join', () => {
+  expect(isCollabClientMessage({ type: 'join', version: 2, profile })).toBe(true)
+  expect(isCollabClientMessage({ type: 'join', version: 1, profile })).toBe(false)
   expect(
-    isCollabClientMessage({ type: 'join', version: 2, identity: null, anonymousId: 'tab' })
+    isCollabClientMessage({ type: 'join', version: 2, profile: null, anonymousId: 'tab' })
   ).toBe(false)
   expect(
-    isCollabClientMessage({ type: 'join', version: 2, identity, location: { page: 'view:board' } })
+    isCollabClientMessage({ type: 'join', version: 2, profile, location: { page: 'view:board' } })
   ).toBe(true)
-  expect(
-    isCollabClientMessage({ type: 'join', version: 2, identity, location: { page: '' } })
-  ).toBe(false)
+  expect(isCollabClientMessage({ type: 'join', version: 2, profile, location: { page: '' } })).toBe(
+    false
+  )
 })
 
-test('join and profile updates accept missing or empty names but retain identity validation', () => {
+test('join and profile updates accept missing or empty names but retain profile validation', () => {
   const unnamed = { id: 'anna', color: '#7c3aed' }
   for (const profile of [
     unnamed,
@@ -60,9 +56,9 @@ test('join and profile updates accept missing or empty names but retain identity
     { ...unnamed, name: ' \t ' },
     { ...unnamed, email: 'anna@example.com', avatar: 'https://example.com/avatar' }
   ]) {
-    expect(isCollabIdentity(profile)).toBe(true)
-    expect(isCollabClientMessage({ type: 'join', version: 2, identity: profile })).toBe(true)
-    expect(isCollabClientMessage({ type: 'identity', identity: profile })).toBe(true)
+    expect(isUserProfile(profile)).toBe(true)
+    expect(isCollabClientMessage({ type: 'join', version: 2, profile: profile })).toBe(true)
+    expect(isCollabClientMessage({ type: 'profile', profile: profile })).toBe(true)
   }
   for (const profile of [
     { color: unnamed.color },
@@ -75,11 +71,11 @@ test('join and profile updates accept missing or empty names but retain identity
     { ...unnamed, name: '🙂'.repeat(65) },
     { id: unnamed.id }
   ]) {
-    expect(isCollabIdentity(profile)).toBe(false)
-    expect(isCollabClientMessage({ type: 'join', version: 2, identity: profile })).toBe(false)
-    expect(isCollabClientMessage({ type: 'identity', identity: profile })).toBe(false)
+    expect(isUserProfile(profile)).toBe(false)
+    expect(isCollabClientMessage({ type: 'join', version: 2, profile: profile })).toBe(false)
+    expect(isCollabClientMessage({ type: 'profile', profile: profile })).toBe(false)
   }
-  expect(isCollabIdentity({ ...unnamed, name: '🙂'.repeat(64) })).toBe(true)
+  expect(isUserProfile({ ...unnamed, name: '🙂'.repeat(64) })).toBe(true)
 })
 
 test('presence bounds JSON bytes, nesting and finite numbers', () => {
@@ -99,12 +95,12 @@ test('away locations retain their page and reject invalid activity flags', () =>
   for (const away of [undefined, false, true]) {
     const location = { page: 'view:board', away }
     expect(isCollabClientMessage({ type: 'location', location })).toBe(true)
-    expect(isCollabClientMessage({ type: 'join', version: 2, identity, location })).toBe(true)
+    expect(isCollabClientMessage({ type: 'join', version: 2, profile, location })).toBe(true)
   }
   for (const away of [null, 0, 1, 'true']) {
     const location = { page: 'view:board', away }
     expect(isCollabClientMessage({ type: 'location', location })).toBe(false)
-    expect(isCollabClientMessage({ type: 'join', version: 2, identity, location })).toBe(false)
+    expect(isCollabClientMessage({ type: 'join', version: 2, profile, location })).toBe(false)
   }
 })
 

@@ -101,19 +101,19 @@ test('requests get a nameless Access profile only when Access is configured', as
   try {
     expect(await proxyIdentity(request({ [ACCESS_TOKEN_HEADER]: valid }))).toEqual({
       provider: null,
-      identity: null
+      profile: null
     })
     process.env.MOI_CLOUDFLARE_ACCESS_TEAM_DOMAIN = 'acme'
     process.env.MOI_CLOUDFLARE_ACCESS_AUD = 'aud-moi'
     resetAppConfig()
-    const identity = { id: SUB, color: colorForId(SUB), email: 'alex@example.com' }
+    const profile = { id: SUB, color: colorForId(SUB), email: 'alex@example.com' }
     expect(await proxyIdentity(request({ [ACCESS_TOKEN_HEADER]: valid }))).toEqual({
       provider: 'cloudflare-access',
-      identity
+      profile
     })
     const cookie = { cookie: `${ACCESS_TOKEN_COOKIE}=${valid}` }
-    expect((await proxyIdentity(request(cookie))).identity).toEqual(identity)
-    expect((await proxyIdentity(request({}))).identity).toBeNull()
+    expect((await proxyIdentity(request(cookie))).profile).toEqual(profile)
+    expect((await proxyIdentity(request({}))).profile).toBeNull()
   } finally {
     fetch.mockRestore()
     delete process.env.MOI_CLOUDFLARE_ACCESS_TEAM_DOMAIN

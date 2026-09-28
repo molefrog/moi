@@ -1,6 +1,7 @@
 import type { WorkspaceSkillsStatus, WorkspaceSkillStatus, WorkspaceType } from '@/lib/types'
 
-import { writeAppletEnvDts } from './moi-scaffold'
+import type { AppletDeclarationFile } from './applets/declarations'
+import { syncAppletDeclarations } from './applets/declarations'
 import { isBehind, skillStatuses } from './skill-version'
 import { installBundledSkills } from './skills-template'
 import { skillsDirFor } from './workspace-init'
@@ -9,8 +10,7 @@ export type WorkspaceSkillUpdateResult = {
   before: WorkspaceSkillStatus[]
   status: WorkspaceSkillsStatus
   changedSkills: string[]
-  // False when the workspace has no `.moi/` to refresh — nothing was written.
-  appletTypesWritten: boolean
+  updatedAppletTypes: AppletDeclarationFile[]
 }
 
 export function summarizeSkillStatuses(skills: WorkspaceSkillStatus[]): WorkspaceSkillsStatus {
@@ -33,17 +33,15 @@ export async function updateWorkspaceSkills(
 ): Promise<WorkspaceSkillUpdateResult> {
   const before = await skillStatuses(workspaceRoot, type)
   const changedSkills = await installBundledSkills(skillsDirFor(workspaceRoot, type))
-  // The ambient applet types ship with the CLI just like the skills do, and go
-  // stale the same way — refresh both in one operation so `moi skill update`
-  // (and the UI's update button) leaves nothing behind. Skipped when the
-  // workspace has no `.moi/`: skills stand on their own, applet types don't.
-  const appletTypesWritten = await writeAppletEnvDts(workspaceRoot)
+  // Applet declarations ship with the CLI, so refresh installed copies along
+  // with skills. The optional collab declaration is only updated if present.
+  const updatedAppletTypes = await syncAppletDeclarations(workspaceRoot)
   const skills = await skillStatuses(workspaceRoot, type)
 
   return {
     before,
     status: summarizeSkillStatuses(skills),
     changedSkills,
-    appletTypesWritten
+    updatedAppletTypes
   }
 }

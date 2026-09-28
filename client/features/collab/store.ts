@@ -1,9 +1,9 @@
 import type {
   CollabClientMessage,
-  CollabIdentity,
+  UserProfile,
   CollabJsonValue,
   CollabLocation,
-  CollabParticipant,
+  Connection,
   CollabPresenceRegistration,
   CollabServerMessage
 } from '@/lib/collab/types'
@@ -11,16 +11,16 @@ import type {
 export type CollabConnectionState = {
   status: 'connecting' | 'connected' | 'disconnected'
   connectionId: string | null
-  participants: CollabParticipant[]
+  connections: Connection[]
   // Current live profiles only. The host owns the full workspace directory.
-  users: readonly CollabIdentity[]
+  users: readonly UserProfile[]
   error: string | null
 }
 
 export const DISCONNECTED_STATE: CollabConnectionState = {
   status: 'disconnected',
   connectionId: null,
-  participants: [],
+  connections: [],
   users: [],
   error: null
 }
@@ -38,7 +38,7 @@ const channelKey = (surface: string, channel: string) => JSON.stringify([surface
 // Sockets and timers live in client.ts; this model owns ephemeral registrations.
 export class CollabStore {
   private state: CollabConnectionState = DISCONNECTED_STATE
-  private peopleState: CollabConnectionState = DISCONNECTED_STATE
+  private usersState: CollabConnectionState = DISCONNECTED_STATE
   private channels = new Map<string, readonly CollabPresenceEntry[]>()
   private listeners = new Set<() => void>()
   private registrations = new Map<string, CollabPresenceRegistration>()
@@ -47,7 +47,7 @@ export class CollabStore {
 
   getSnapshot = (): CollabConnectionState => this.state
   // User hooks never need cursor coordinates or other publication payloads.
-  getPeopleSnapshot = (): CollabConnectionState => this.peopleState
+  getUsersSnapshot = (): CollabConnectionState => this.usersState
   getPresenceSnapshot = (surface: string, channel: string): readonly CollabPresenceEntry[] =>
     this.channels.get(channelKey(surface, channel)) ?? EMPTY_PRESENCE
   subscribe = (listener: () => void): (() => void) => {
@@ -91,7 +91,7 @@ export class CollabStore {
         this.publish({
           status: 'connected',
           connectionId: message.connectionId,
-          participants: message.participants,
+          connections: message.connections,
           users: message.users,
           error: null
         })
@@ -99,8 +99,8 @@ export class CollabStore {
           this.send({ type: 'presence:set', ...registration })
         }
         break
-      case 'participants':
-        this.publish({ participants: message.participants, users: message.users })
+      case 'connections':
+        this.publish({ connections: message.connections, users: message.users })
         break
       case 'error':
         this.publish({ error: message.message })
@@ -111,29 +111,29 @@ export class CollabStore {
   }
   private publish(patch: Partial<CollabConnectionState>, locationChanged = false): void {
     this.state = { ...this.state, ...patch }
-    const people = {
+    const users = {
       ...this.state,
-      participants: this.state.participants.map(participant => ({ ...participant, presence: [] }))
+      connections: this.state.connections.map(connection => ({ ...connection, presence: [] }))
     }
-    if (locationChanged || JSON.stringify(people) !== JSON.stringify(this.peopleState)) {
-      this.peopleState = people
+    if (locationChanged || JSON.stringify(users) !== JSON.stringify(this.usersState)) {
+      this.usersState = users
     }
     const channels = new Map<string, CollabPresenceEntry[]>()
     if (this.location && !this.location.away) {
-      for (const participant of this.state.participants) {
+      for (const connection of this.state.connections) {
         if (
-          participant.connectionId === this.state.connectionId ||
-          participant.location?.page !== this.location.page ||
-          participant.location.away
+          connection.connectionId === this.state.connectionId ||
+          connection.location?.page !== this.location.page ||
+          connection.location.away
         )
           continue
-        for (const registration of participant.presence) {
+        for (const registration of connection.presence) {
           const key = channelKey(registration.surface, registration.channel)
           const entries = channels.get(key) ?? []
           entries.push({
             registrationId: registration.registrationId,
-            connectionId: participant.connectionId,
-            userId: participant.userId,
+            connectionId: connection.connectionId,
+            userId: connection.userId,
             value: registration.value
           })
           channels.set(key, entries)

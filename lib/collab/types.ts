@@ -6,7 +6,7 @@ export type CollabJsonValue =
   | CollabJsonValue[]
   | { [key: string]: CollabJsonValue }
 
-export type CollabIdentity = {
+export type UserProfile = {
   id: string
   name?: string
   color: string
@@ -14,14 +14,14 @@ export type CollabIdentity = {
   email?: string
 }
 
-// An authenticating proxy in front of the deployment that moi trusts for identity.
-export type CollabIdentityProvider = 'cloudflare-access'
+// An authenticating proxy in front of the deployment that moi trusts.
+export type IdentityProvider = 'cloudflare-access'
 
-// GET /api/identity. `identity` is the profile the proxy verified for this
+// GET /api/identity. `profile` is the user the proxy verified for this
 // request: null without a configured provider or without a valid proxy token.
 export type ProxyIdentity = {
-  provider: CollabIdentityProvider | null
-  identity: CollabIdentity | null
+  provider: IdentityProvider | null
+  profile: UserProfile | null
 }
 
 export type CollabLocation = { page: string; title?: string; away?: boolean }
@@ -33,7 +33,7 @@ export type CollabPresenceRegistration = {
   value: CollabJsonValue
 }
 
-export type CollabParticipant = {
+export type Connection = {
   connectionId: string
   userId: string
   location: CollabLocation | null
@@ -41,8 +41,8 @@ export type CollabParticipant = {
 }
 
 export type CollabClientMessage =
-  | { type: 'join'; version: 2; identity: CollabIdentity; location?: CollabLocation | null }
-  | { type: 'identity'; identity: CollabIdentity }
+  | { type: 'join'; version: 2; profile: UserProfile; location?: CollabLocation | null }
+  | { type: 'profile'; profile: UserProfile }
   | { type: 'location'; location: CollabLocation | null }
   | ({ type: 'presence:set' } & CollabPresenceRegistration)
   | { type: 'presence:delete'; registrationId: string }
@@ -53,11 +53,11 @@ export type CollabServerMessage =
       type: 'welcome'
       version: 2
       connectionId: string
-      participants: CollabParticipant[]
+      connections: Connection[]
       // Profile fallback for currently connected users only. The host owns
       // the full workspace directory, including users who are offline.
-      users: CollabIdentity[]
+      users: UserProfile[]
     }
-  | { type: 'participants'; participants: CollabParticipant[]; users: CollabIdentity[] }
+  | { type: 'connections'; connections: Connection[]; users: UserProfile[] }
   | { type: 'error'; code: string; message: string }
   | { type: 'pong' }

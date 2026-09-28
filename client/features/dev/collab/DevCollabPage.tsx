@@ -1,6 +1,6 @@
 import { Link } from 'wouter'
 
-import { DevCollabIdentity } from './DevCollabIdentity'
+import { DevUserSetup } from './DevUserSetup'
 import { DevCollabKit } from './DevCollabKit'
 
 export function DevCollabPage() {
@@ -13,12 +13,12 @@ export function DevCollabPage() {
         <header className="mt-5">
           <h1 className="text-xl font-medium">Collab</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Try collaboration components and hooks, and set up a local identity for workspace
+            Try collaboration components and hooks, and set up a local test user for workspace
             testing.
           </p>
         </header>
       </div>
-      <DevCollabIdentity />
+      <DevUserSetup />
       <DevCollabKit />
     </main>
   )

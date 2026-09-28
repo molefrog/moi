@@ -19,16 +19,16 @@ import { legacyTabFromPath, tabFromPath, workspacePath } from '@/lib/navigation'
 
 import { CollabEngine, NO_ENGINE } from './engine'
 import type { CollabEngineApi } from './engine'
-import { installIdentityApi } from './identity'
-import { resolvePeers, resolveUser, workspaceProfiles } from './people'
-import type { CollabUser, PeersOptions, WorkspaceUsersOptions } from './people'
+import { installHostApi } from './host-state'
+import { resolvePeers, resolveUser, workspaceProfiles } from './users'
+import type { WorkspaceUser, UsePeersOptions, UseWorkspaceUsersOptions } from './users'
 import { createPresencePublisher } from './presence-publisher'
 
-export type { CollabUser, PeersOptions, WorkspaceUsersOptions } from './people'
+export type { WorkspaceUser, UsePeersOptions, UseWorkspaceUsersOptions } from './users'
 type Mount = { active: boolean; surface: string }
 export const CollabContext = createContext<CollabEngineApi>(NO_ENGINE)
 const MountContext = createContext<Mount | null>(null)
-installIdentityApi()
+installHostApi()
 
 export function pageFromPath(path: string, workspaceId: string, base = ''): string {
   const prefix = workspacePath(workspaceId, base) + '/'
@@ -92,9 +92,9 @@ export function AppletScope({ surface, active = true, children }: AppletScopePro
 export function useCollabEngine(): CollabEngineApi {
   return useContext(CollabContext)
 }
-export function useConnection() {
+export function useConnectionState() {
   const engine = useCollabEngine()
-  return useSyncExternalStore(engine.subscribe, engine.getPeopleSnapshot, engine.getPeopleSnapshot)
+  return useSyncExternalStore(engine.subscribe, engine.getUsersSnapshot, engine.getUsersSnapshot)
 }
 function useWorkspaceDirectory() {
   const engine = useCollabEngine()
@@ -104,16 +104,16 @@ function useWorkspaceDirectory() {
     engine.getWorkspaceDirectory
   )
 }
-export function useWorkspaceUsersStatus() {
+export function useWorkspaceUsersAvailability() {
   return useWorkspaceDirectory().status
 }
 function useUsersSource() {
   const engine = useCollabEngine()
-  const state = useConnection()
+  const state = useConnectionState()
   const self = useSyncExternalStore(
-    engine.subscribeIdentity,
-    engine.getIdentity,
-    engine.getIdentity
+    engine.subscribeCurrentUser,
+    engine.getCurrentUser,
+    engine.getCurrentUser
   )
   const directory = useWorkspaceDirectory()
   const users = useMemo(
@@ -127,15 +127,15 @@ function useUsersSource() {
   )
   return { state, self, users, engine }
 }
-export function useUser(id: string): CollabUser | null {
+export function useUser(id: string): WorkspaceUser | null {
   const { state, users } = useUsersSource()
   return useMemo(() => resolveUser({ ...state, users }, id), [state, users, id])
 }
-export function useUsers(ids: readonly string[]): (CollabUser | null)[] {
+export function useUsers(ids: readonly string[]): (WorkspaceUser | null)[] {
   const { state, users } = useUsersSource()
   return ids.map(id => resolveUser({ ...state, users }, id))
 }
-export function useWorkspaceUsers({ status }: WorkspaceUsersOptions = {}): CollabUser[] {
+export function useWorkspaceUsers({ status }: UseWorkspaceUsersOptions = {}): WorkspaceUser[] {
   const { state, users } = useUsersSource()
   return useMemo(
     () =>
@@ -145,14 +145,14 @@ export function useWorkspaceUsers({ status }: WorkspaceUsersOptions = {}): Colla
     [state, users, status]
   )
 }
-export function useMe(): CollabUser | null {
+export function useMe(): WorkspaceUser | null {
   const { state, self, users } = useUsersSource()
   return useMemo(
     () => (self ? resolveUser({ ...state, users }, self.id) : null),
     [state, self, users]
   )
 }
-export function usePeers(options: PeersOptions = {}): CollabUser[] {
+export function usePeers(options: UsePeersOptions = {}): WorkspaceUser[] {
   const { state, self, users, engine } = useUsersSource()
   const { scope, status } = options
   return useMemo(

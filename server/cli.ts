@@ -2480,7 +2480,7 @@ async function runSkillUpdate(cwd: string): Promise<void> {
   // Type-aware: an OpenClaw workspace keeps its skills in `skills/`, so the
   // update must target the same dir the agent actually loads from.
   const { root, type } = await resolveWorkspace(cwd)
-  const { before, status, changedSkills, appletTypesWritten } = await updateWorkspaceSkills(
+  const { before, status, changedSkills, updatedAppletTypes } = await updateWorkspaceSkills(
     root,
     type ?? 'claude-code'
   )
@@ -2489,8 +2489,8 @@ async function runSkillUpdate(cwd: string): Promise<void> {
 
   console.log('\n' + pc.green('✓') + ' ' + heading + pc.bold(root) + '\n')
   printSkillUpdateTable(before, after, changedSkills)
-  if (appletTypesWritten) {
-    console.log(pc.dim('  Ambient applet types regenerated: ') + pc.bold('.moi/applet-env.d.ts\n'))
+  for (const file of updatedAppletTypes) {
+    console.log(pc.dim('  Applet types regenerated: ') + pc.bold(`.moi/${file}\n`))
   }
 }
 

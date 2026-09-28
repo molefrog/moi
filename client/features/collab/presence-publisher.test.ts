@@ -9,7 +9,7 @@ const welcome = {
   type: 'welcome' as const,
   version: 2 as const,
   connectionId: 'self',
-  participants: [],
+  connections: [],
   users: []
 }
 const hasPresence = (value: CollabJsonValue) => value !== false && value !== null

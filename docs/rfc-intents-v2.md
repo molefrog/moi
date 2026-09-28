@@ -165,7 +165,7 @@ sendChatMessage(message: string, context?: Record<string, unknown>): void
   `sendChatMessage` self-attributes with the applet's `<kind>:<name>`, derived by the runtime —
   never passed by the caller.
 - The bridge wiring (`__attachBridge` / `__getBridge`, re-exported by every bundle entry) is host
-  plumbing: it stays out of the author-facing ambient types (`.moi/applet-env.d.ts`), which
+  plumbing: it stays out of the author-facing ambient types (`.moi/base.d.ts`), which
   declare only the public API — `fileUrl`, `focusTab`, and the config types.
 - `focusTab` from an applet is client-local navigation (replace) — no server round-trip.
 - `sendChatMessage` always targets the **active chat**. Envelope discipline: `message` is the

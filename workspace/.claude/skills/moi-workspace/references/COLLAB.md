@@ -1,4 +1,4 @@
-# Collaborative applets
+# Collab
 
 moi workspaces can be shared with multiple users. This guide explains the primitives in
 `moi/collab` that make views and widgets ready for real-time collaboration: user lookup,
@@ -6,7 +6,7 @@ connected users, cursors, focus, and selections.
 
 ## Concepts
 
-### User identity
+### User profiles
 
 Every user has a unique, stable `id` and a `color`. A profile can also include `name`, `email`,
 and `avatar`; these fields are optional, and a name can be empty.
@@ -25,19 +25,19 @@ import { User, Facepile } from 'moi/collab'
 
 These components resolve profiles and handle missing names and unknown IDs for you.
 
-### Workspace members and connected users
+### Workspace users and connected users
 
-Workspace members are registered users, including people who are offline. Use the full member
-list for assignee pickers and other user references. Query connected users to show who is here
+Workspace users include users who are offline. Use the full user directory for assignee pickers
+and other user references. Query connected users to show who is here
 or working on the same page.
 
 | Hook                                       | Returns                                                              |
 | ------------------------------------------ | -------------------------------------------------------------------- |
 | `useMe()`                                  | The current user.                                                    |
-| `useUser(id)`                              | A user by ID, including an offline member.                           |
-| `useWorkspaceUsers()`                      | All available workspace members, including you.                      |
-| `useWorkspaceUsers({ status: 'offline' })` | Members who are offline. The filter also accepts `active` or `away`. |
-| `useWorkspaceUsersStatus()`                | Whether the member list is `loading`, `ready`, or `unavailable`.     |
+| `useUser(id)`                              | A user by ID, including an offline user.                             |
+| `useWorkspaceUsers()`                      | All available workspace users, including you.                        |
+| `useWorkspaceUsers({ status: 'offline' })` | Users who are offline. The filter also accepts `active` or `away`.  |
+| `useWorkspaceUsersAvailability()`         | Whether the user directory is `loading`, `ready`, or `unavailable`.  |
 | `usePeers()`                               | Other connected users on the current page.                           |
 | `usePeers({ scope: 'workspace' })`         | Other connected users anywhere in the workspace.                     |
 
@@ -46,21 +46,21 @@ page, `away` when connected without a visible page, or `offline` when disconnect
 another page can still be active. `usePeers` excludes your own user, combines multiple tabs
 into one user, and can filter by `status: 'active'` or `'away'`.
 
-`useMe()` and `useUser(id)` return `null` when the user cannot be resolved. When the member list
-is unavailable, user enumeration falls back to your identity and connected users; it cannot
-discover offline members.
+`useMe()` and `useUser(id)` return `null` when the user cannot be resolved. When the user directory
+is unavailable, enumeration falls back to your profile and connected users; it cannot
+discover offline users.
 
 ### Provided by moi
 
-moi supplies identity, the user directory, and the connection between applets. You do not need
+moi supplies the current user, the user directory, and the connection between applets. You do not need
 to set up transport, sockets, or providers. Use the exports from `moi/collab` directly; applets
 read user profiles rather than creating or updating them.
 
 ## Presence
 
-Presence is ephemeral state that describes what connected people are doing: where their pointer
+Presence is ephemeral state that describes what connected users are doing: where their pointer
 is, which field they are editing, or which item they selected. It is not persisted and only
-works while people are connected. Registrations are removed when their applet becomes inactive,
+works while users are connected. Registrations are removed when their applet becomes inactive,
 the browser tab is hidden, or the publishing component unmounts.
 
 Presence does not save or synchronize application content. Continue saving documents, tasks,
@@ -148,4 +148,4 @@ lists optional props, with defaults where applicable.
 - Only `User` and `Facepile` accept `size`. `Activity` shows all matching users and has no
   `size` or `max` prop.
 
-See `.moi/collab-env.d.ts` for the complete public types and component props.
+See `.moi/collab.d.ts` for the complete public types and component props.

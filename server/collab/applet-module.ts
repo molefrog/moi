@@ -10,7 +10,7 @@ const fallback = {
   useUser: nothing,
   usePeers: empty,
   useWorkspaceUsers: empty,
-  useWorkspaceUsersStatus: () => 'unavailable',
+  useWorkspaceUsersAvailability: () => 'unavailable',
   usePresence: empty,
   usePublishPresence() {},
   Cursors: nothing,
@@ -36,7 +36,7 @@ export function useMe(...args) { return api().useMe(...args); }
 export function usePeers(...args) { return api().usePeers(...args); }
 export function useUser(...args) { return api().useUser(...args); }
 export function useWorkspaceUsers(...args) { return api().useWorkspaceUsers(...args); }
-export function useWorkspaceUsersStatus(...args) { return api().useWorkspaceUsersStatus(...args); }
+export function useWorkspaceUsersAvailability(...args) { return api().useWorkspaceUsersAvailability(...args); }
 export function usePresence(...args) { return api().usePresence(...args); }
 export function usePublishPresence(...args) { return api().usePublishPresence(...args); }
 export function Cursors(props) { return createElement(api().Cursors, props); }

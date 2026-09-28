@@ -214,11 +214,11 @@ describe('view builder availability', () => {
 
 describe('view builder chat selection', () => {
   test.each([
-    { personalSelection: true, previous: null },
-    { personalSelection: true, previous: 'other-chat' },
-    { personalSelection: false, previous: 'other-chat' },
-    { personalSelection: undefined, previous: 'other-chat' }
-  ])('respects selection ownership %j', async ({ personalSelection, previous }) => {
+    { selectedSessionScope: 'browser-tab', previous: null },
+    { selectedSessionScope: 'browser-tab', previous: 'other-chat' },
+    { selectedSessionScope: 'shared', previous: 'other-chat' },
+    { selectedSessionScope: undefined, previous: 'other-chat' }
+  ] as const)('respects selection ownership %j', async ({ selectedSessionScope, previous }) => {
     const workspace = await registerWorkspace(join(tempDir, 'workspace'), { type: 'codex' })
     await initializeSelectedSession(workspace.path, previous)
     const createResponse = await api.request(`/api/workspaces/${workspace.id}/view-builders`, {
@@ -238,7 +238,7 @@ describe('view builder chat selection', () => {
         body: JSON.stringify({
           input: { requirements: 'Build a dashboard' },
           availableIcons: ['chart'],
-          personalSelection
+          selectedSessionScope
         })
       }
     )
@@ -247,10 +247,10 @@ describe('view builder chat selection', () => {
     expect(sent).toHaveLength(1)
     expect(sent[0]).toMatchObject({ sessionId: draft.sessionId, isNew: true })
     expect(await getSelectedSession(workspace.path)).toBe(
-      personalSelection ? previous : draft.sessionId
+      selectedSessionScope === 'browser-tab' ? previous : draft.sessionId
     )
     expect(events.filter(event => event.type === 'selected-session:updated')).toEqual(
-      personalSelection
+      selectedSessionScope === 'browser-tab'
         ? []
         : [
             {
@@ -262,7 +262,7 @@ describe('view builder chat selection', () => {
     )
   })
 
-  test('rejects a malformed selection flag before starting a builder', async () => {
+  test('rejects a malformed selection scope before starting a builder', async () => {
     const workspace = await registerWorkspace(join(tempDir, 'workspace'), { type: 'codex' })
     const createResponse = await api.request(`/api/workspaces/${workspace.id}/view-builders`, {
       method: 'POST'
@@ -276,13 +276,13 @@ describe('view builder chat selection', () => {
         body: JSON.stringify({
           input: { requirements: 'Build a dashboard' },
           availableIcons: ['chart'],
-          personalSelection: 'true'
+          selectedSessionScope: 'tab'
         })
       }
     )
 
     expect(response.status).toBe(400)
-    expect(await response.text()).toBe('Invalid personalSelection')
+    expect(await response.text()).toBe('Invalid selectedSessionScope')
     const listResponse = await api.request(`/api/workspaces/${workspace.id}/view-builders`)
     const { builders } = (await listResponse.json()) as { builders: ViewBuilder[] }
     expect(builders[0].status).toBe('draft')

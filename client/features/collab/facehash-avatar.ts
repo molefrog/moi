@@ -3,7 +3,7 @@ import { stringHash } from 'facehash'
 import { COLLAB_MAX_AVATAR_BYTES } from '@/lib/collab/protocol'
 
 // Rasterizes a facehash face (https://facehash.dev) into a small PNG data URL,
-// so a test avatar travels inside the identity instead of pointing at a URL.
+// so a test avatar travels inside the user profile instead of pointing at a URL.
 // The library paints its faces with React and CSS, which a canvas cannot
 // consume, so the eye shapes and their selection are mirrored here: a name gets
 // the same face it gets from the library. This is the library's solid variant;

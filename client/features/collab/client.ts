@@ -1,22 +1,22 @@
 import { wsUrl } from '@/client/lib/ws-url'
 import type { CollabClientMessage, CollabServerMessage } from '@/lib/collab/types'
 
-import { getIdentity, subscribeIdentityStore } from './identity'
+import { getCurrentUser, subscribeCurrentUserStore } from './host-state'
 import { CollabStore } from './store'
 
-// One presence connection per mounted workspace with an explicit identity.
+// One presence connection per mounted workspace with an explicit profile.
 export class CollabClient {
   readonly store = new CollabStore()
   private socket: WebSocket | null = null
   private retry: ReturnType<typeof setTimeout> | undefined
   private heartbeat: ReturnType<typeof setInterval> | undefined
-  private unsubscribeIdentity: (() => void) | undefined
+  private unsubscribeCurrentUser: (() => void) | undefined
   private presenceTimer: ReturnType<typeof setTimeout> | undefined
   private queuedPresence = new Map<string, CollabClientMessage>()
   private stopped = true
   private attempts = 0
   private lastMessageAt = 0
-  private userId = getIdentity()?.id ?? null
+  private userId = getCurrentUser()?.id ?? null
 
   constructor(readonly workspaceId: string) {
     this.store.setSender(message => this.send(message))
@@ -25,23 +25,23 @@ export class CollabClient {
   start(): () => void {
     if (!this.stopped) return () => {}
     this.stopped = false
-    this.userId = getIdentity()?.id ?? null
-    this.unsubscribeIdentity = subscribeIdentityStore(() => {
-      const identity = getIdentity()
-      if ((identity?.id ?? null) !== this.userId) {
-        this.userId = identity?.id ?? null
+    this.userId = getCurrentUser()?.id ?? null
+    this.unsubscribeCurrentUser = subscribeCurrentUserStore(() => {
+      const profile = getCurrentUser()
+      if ((profile?.id ?? null) !== this.userId) {
+        this.userId = profile?.id ?? null
         this.store.disconnect()
         clearTimeout(this.retry)
         if (this.socket) this.socket.close()
         else this.connect()
-      } else if (identity) this.send({ type: 'identity', identity })
+      } else if (profile) this.send({ type: 'profile', profile })
     })
     this.connect()
     return () => this.stop()
   }
 
   private wantsConnection(): boolean {
-    return !this.stopped && getIdentity() !== null
+    return !this.stopped && getCurrentUser() !== null
   }
 
   private connect(): void {
@@ -59,12 +59,12 @@ export class CollabClient {
     socket.onopen = () => {
       if (socket !== this.socket) return
       this.lastMessageAt = Date.now()
-      const identity = getIdentity()
-      if (!identity) {
+      const profile = getCurrentUser()
+      if (!profile) {
         socket.close()
         return
       }
-      this.rawSend({ type: 'join', version: 2, identity, location: this.store.getLocation() })
+      this.rawSend({ type: 'join', version: 2, profile, location: this.store.getLocation() })
       this.heartbeat = setInterval(() => {
         if (Date.now() - this.lastMessageAt > 45_000) socket.close()
         else this.rawSend({ type: 'ping' })
@@ -100,7 +100,7 @@ export class CollabClient {
 
   private send(message: CollabClientMessage): void {
     if (
-      !getIdentity() &&
+      !getCurrentUser() &&
       (message.type === 'location' ||
         message.type === 'presence:set' ||
         message.type === 'presence:delete')
@@ -133,7 +133,7 @@ export class CollabClient {
 
   private stop(): void {
     this.stopped = true
-    this.unsubscribeIdentity?.()
+    this.unsubscribeCurrentUser?.()
     clearTimeout(this.retry)
     clearTimeout(this.presenceTimer)
     this.presenceTimer = undefined

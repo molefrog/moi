@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 import { COLLAB_MAX_MESSAGE_BYTES, isCollabClientMessage } from '@/lib/collab/protocol'
-import type { CollabClientMessage, CollabIdentity, CollabServerMessage } from '@/lib/collab/types'
+import type { CollabClientMessage, CollabServerMessage, UserProfile } from '@/lib/collab/types'
 
 import { isCollabEnabled } from './config'
 import type { ParentMessage, WorkerMessage } from './ipc'
@@ -22,7 +22,7 @@ type Binding = {
   lastSeen: number
   joined: boolean
   // Set when a proxy (Cloudflare Access) verified who opened this socket.
-  identity?: CollabIdentity
+  verifiedProfile?: UserProfile
   slot?: Slot
   queue: Promise<void>
 }
@@ -63,10 +63,10 @@ export class CollabRuntimeError extends Error {
 // never see someone other than the person the browser shows.
 function verifiedMessage(
   message: CollabClientMessage,
-  identity: CollabIdentity | undefined
+  verifiedProfile: UserProfile | undefined
 ): CollabClientMessage | null {
-  if (!identity || (message.type !== 'join' && message.type !== 'identity')) return message
-  return message.identity.id === identity.id ? { ...message, identity } : null
+  if (!verifiedProfile || (message.type !== 'join' && message.type !== 'profile')) return message
+  return message.profile.id === verifiedProfile.id ? { ...message, profile: verifiedProfile } : null
 }
 
 // One owner map per moi server. No LRU: active workspaces cannot be evicted.
@@ -247,7 +247,7 @@ export class CollabManager {
     binding.socket.close(1012, reason.slice(0, 120))
   }
 
-  open(socket: CollabSocket, workspacePath: string, identity?: CollabIdentity) {
+  open(socket: CollabSocket, workspacePath: string, verifiedProfile?: UserProfile) {
     const binding: Binding = {
       socket,
       workspacePaths: new Set([resolve(workspacePath)]),
@@ -255,7 +255,7 @@ export class CollabManager {
       closed: false,
       lastSeen: Date.now(),
       joined: false,
-      identity,
+      verifiedProfile,
       queue: Promise.resolve()
     }
     this.bindings.set(socket, binding)
@@ -308,14 +308,14 @@ export class CollabManager {
       return
     }
     binding.lastSeen = Date.now()
-    const validated = verifiedMessage(message, binding.identity)
+    const validated = verifiedMessage(message, binding.verifiedProfile)
     if (!validated) {
       this.emit(binding, {
         type: 'error',
         code: 'identity_mismatch',
-        message: 'Presence here uses your Cloudflare Access identity'
+        message: 'Presence here uses your Cloudflare Access user'
       })
-      this.disconnect(binding, 'Identity does not match Cloudflare Access')
+      this.disconnect(binding, 'User does not match Cloudflare Access')
       return
     }
     binding.queue = binding.queue

@@ -4,44 +4,53 @@ import { IconArrowsShuffle } from '@tabler/icons-react'
 
 import { Button } from '@/client/components/ui/button'
 import { Input } from '@/client/components/ui/input'
-import { PERSONA_COLORS } from '@/lib/collab/colors'
-import type { CollabIdentity } from '@/lib/collab/types'
+import { USER_COLORS } from '@/lib/collab/colors'
+import type { UserProfile } from '@/lib/collab/types'
 import { Avatar, AvatarFallback, AvatarImage } from '@/ui-components/avatar'
 
-import { createDevIdentity, personaIdentity, randomPersona } from './dev-persona'
-import type { Persona } from './dev-persona'
-import { facehashDataUrl } from './facehash-avatar'
-import { getIdentity, getIdentitySource, setDevIdentity, subscribeIdentityStore } from './identity'
-import { userDisplayName } from './people'
+import { facehashDataUrl } from '@/client/features/collab/facehash-avatar'
+import { userDisplayName } from '@/client/features/collab/users'
+import { createDevUser, devUserProfile, randomDevUser } from './dev-user'
+import type { DevUserDraft } from './dev-user'
+import {
+  getCurrentUser,
+  getCurrentUserSource,
+  setDevUser,
+  subscribeCurrentUserStore
+} from '@/client/features/collab/host-state'
 
-export function DevCollabIdentity() {
-  const source = useSyncExternalStore(subscribeIdentityStore, getIdentitySource, getIdentitySource)
-  const identity = useSyncExternalStore(subscribeIdentityStore, getIdentity, getIdentity)
+export function DevUserSetup() {
+  const source = useSyncExternalStore(
+    subscribeCurrentUserStore,
+    getCurrentUserSource,
+    getCurrentUserSource
+  )
+  const profile = useSyncExternalStore(subscribeCurrentUserStore, getCurrentUser, getCurrentUser)
   if (source === 'external') return null
-  if (source === 'cloudflare-access') return <AccessIdentity identity={identity} />
-  return <DevIdentityForm key={identity?.id ?? 'setup'} savedIdentity={identity} />
+  if (source === 'cloudflare-access') return <AccessUser profile={profile} />
+  return <DevUserForm key={profile?.id ?? 'setup'} savedUser={profile} />
 }
 
-type AccessIdentityProps = { identity: CollabIdentity | null }
+type AccessUserProps = { profile: UserProfile | null }
 
 // Behind Cloudflare Access the profile is inherited, so there is nothing to edit.
 // Access profiles carry no name, so the label is the email, as in workspaces.
-function AccessIdentity({ identity }: AccessIdentityProps) {
-  const label = identity ? userDisplayName(identity) : null
+function AccessUser({ profile }: AccessUserProps) {
+  const label = profile ? userDisplayName(profile) : null
   const avatar = useMemo(
-    () => (identity && label ? (identity.avatar ?? facehashDataUrl(label, identity.color)) : null),
-    [identity, label]
+    () => (profile && label ? (profile.avatar ?? facehashDataUrl(label, profile.color)) : null),
+    [profile, label]
   )
   return (
-    <section aria-labelledby="dev-identity-title" className="flex flex-col gap-5">
+    <section aria-labelledby="access-user-title" className="flex flex-col gap-5">
       <header>
-        <h2 id="dev-identity-title" className="text-base font-medium">
-          Cloudflare Access identity
+        <h2 id="access-user-title" className="text-base font-medium">
+          Cloudflare Access user
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          {identity
-            ? 'This server inherits identities from Cloudflare Access. You appear by your email, with a color picked from your Access user ID.'
-            : 'This server inherits identities from Cloudflare Access, but this page wasn’t opened through it. Open moi at its Cloudflare Access address to appear in workspaces.'}
+          {profile
+            ? 'This server uses your Cloudflare Access account. You appear by your email, with a color picked from your Access user ID.'
+            : 'This server uses Cloudflare Access, but this page wasn’t opened through it. Open moi at its Cloudflare Access address to appear in workspaces.'}
         </p>
       </header>
       {label && (
@@ -57,44 +66,44 @@ function AccessIdentity({ identity }: AccessIdentityProps) {
   )
 }
 
-type DevIdentityFormProps = { savedIdentity: CollabIdentity | null }
+type DevUserFormProps = { savedUser: UserProfile | null }
 
-function DevIdentityForm({ savedIdentity }: DevIdentityFormProps) {
-  const [initial] = useState(() => savedIdentity ?? createDevIdentity())
-  const [persona, setPersona] = useState<Persona>({
+function DevUserForm({ savedUser }: DevUserFormProps) {
+  const [initial] = useState(() => savedUser ?? createDevUser())
+  const [draft, setDraft] = useState<DevUserDraft>({
     name: initial.name ?? '',
     color: initial.color
   })
-  const name = persona.name.trim()
-  const identity = useMemo(
-    () => personaIdentity(initial.id, { name, color: persona.color }),
-    [initial.id, name, persona.color]
+  const name = draft.name.trim()
+  const profile = useMemo(
+    () => devUserProfile(initial.id, { name, color: draft.color }),
+    [initial.id, name, draft.color]
   )
-  const changed = name !== (savedIdentity?.name ?? '') || persona.color !== savedIdentity?.color
+  const changed = name !== (savedUser?.name ?? '') || draft.color !== savedUser?.color
 
   return (
-    <section aria-labelledby="dev-identity-title" className="flex flex-col gap-5">
+    <section aria-labelledby="dev-user-title" className="flex flex-col gap-5">
       <header>
-        <h2 id="dev-identity-title" className="text-base font-medium">
-          Dev identity
+        <h2 id="dev-user-title" className="text-base font-medium">
+          Local test user
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Use a local profile in real workspaces. To test with two people, set up another profile in
-          a second browser tab.
+          Set up a local test user for this browser tab. To test with two users, set up another test
+          user in a second browser tab.
         </p>
       </header>
       <form
         className="flex flex-col gap-5"
         onSubmit={event => {
           event.preventDefault()
-          setDevIdentity(identity)
+          setDevUser(profile)
         }}
       >
         <div className="flex flex-col items-start gap-5 sm:flex-row">
-          {identity.avatar ? (
+          {profile.avatar ? (
             <img
-              src={identity.avatar}
-              alt="Identity preview"
+              src={profile.avatar}
+              alt="Test user preview"
               className="size-16 shrink-0 rounded-full"
             />
           ) : (
@@ -104,12 +113,12 @@ function DevIdentityForm({ savedIdentity }: DevIdentityFormProps) {
             <label className="flex flex-col gap-1.5 text-sm">
               Name (optional)
               <Input
-                value={persona.name}
+                value={draft.name}
                 maxLength={80}
                 placeholder="Type a name"
                 autoComplete="off"
                 spellCheck={false}
-                onChange={event => setPersona({ ...persona, name: event.target.value })}
+                onChange={event => setDraft({ ...draft, name: event.target.value })}
               />
             </label>
             <div className="flex flex-col gap-1.5 text-sm">
@@ -119,15 +128,15 @@ function DevIdentityForm({ savedIdentity }: DevIdentityFormProps) {
                 aria-labelledby="collab-color-label"
                 className="flex flex-wrap gap-2"
               >
-                {PERSONA_COLORS.map(([label, hex]) => (
+                {USER_COLORS.map(([label, hex]) => (
                   <label key={hex} className="cursor-pointer">
                     <input
                       type="radio"
                       name="color"
                       value={hex}
                       aria-label={label}
-                      checked={persona.color === hex}
-                      onChange={() => setPersona({ ...persona, color: hex })}
+                      checked={draft.color === hex}
+                      onChange={() => setDraft({ ...draft, color: hex })}
                       className="peer sr-only"
                     />
                     <svg
@@ -143,13 +152,13 @@ function DevIdentityForm({ savedIdentity }: DevIdentityFormProps) {
             </div>
             <div className="flex flex-wrap gap-2">
               <Button type="submit" size="sm" disabled={!changed}>
-                {savedIdentity ? 'Save identity' : 'Use dev identity'}
+                {savedUser ? 'Save test user' : 'Use test user'}
               </Button>
               <Button
                 type="button"
                 variant="secondary"
                 size="sm"
-                onClick={() => setPersona(randomPersona(persona))}
+                onClick={() => setDraft(randomDevUser(draft))}
               >
                 <IconArrowsShuffle stroke={1.75} />
                 Randomize
@@ -158,11 +167,11 @@ function DevIdentityForm({ savedIdentity }: DevIdentityFormProps) {
           </div>
         </div>
         <p className="text-sm text-muted-foreground">
-          {savedIdentity
-            ? 'Your dev identity is saved in this browser tab. '
-            : 'Creating a profile is optional. '}
+          {savedUser
+            ? 'Your test user is saved in this browser tab. '
+            : 'Setting up a test user is optional. '}
           Start moi with <code className="font-mono">--experimental-collab</code> to use it in
-          workspaces. The playground below uses its own sample people.
+          workspaces. The playground below uses its own sample users.
         </p>
       </form>
     </section>

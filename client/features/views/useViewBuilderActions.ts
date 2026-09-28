@@ -9,7 +9,7 @@ import {
 } from '@/client/features/chat/chat-send'
 import { liveStore } from '@/client/features/chat/chat-store'
 import { useSelectedSession } from '@/client/features/chat/sessions/useSelectedSession'
-import { useCollabIdentityEnabled } from '@/client/features/collab/entry'
+import { useCollabEnabled } from '@/client/features/collab/entry'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import {
@@ -24,7 +24,7 @@ export function useViewBuilderActions() {
   const queryClient = useQueryClient()
   const { workspaceId, layout } = useWorkspaceLayoutCtx()
   const [, selectSession] = useSelectedSession()
-  const personalSelection = useCollabIdentityEnabled()
+  const collabEnabled = useCollabEnabled()
   const modelData = useWorkspaceAgent(workspaceId).data
   const createMutation = useCreateViewBuilder(workspaceId)
   const saveMutation = useSaveViewBuilder(workspaceId)
@@ -72,7 +72,7 @@ export function useViewBuilderActions() {
         builderId: builder.id,
         requirements: text,
         optimisticId,
-        personalSelection,
+        selectedSessionScope: collabEnabled ? 'browser-tab' : 'shared',
         ...(attachments.length > 0
           ? {
               attachments: prepared.attachments

@@ -21,14 +21,14 @@ describe('collab service', () => {
     service.receive(connectionId, {
       type: 'join',
       version: 2,
-      identity: { id, name: id, color: '#336699' },
+      profile: { id, name: id, color: '#336699' },
       location: { page: 'view:board' }
     })
   }
 
   function latest() {
-    const message = messages.findLast(item => item.message.type === 'participants')?.message
-    if (message?.type !== 'participants') throw new Error('Missing participants')
+    const message = messages.findLast(item => item.message.type === 'connections')?.message
+    if (message?.type !== 'connections') throw new Error('Missing connections')
     return message
   }
 
@@ -42,7 +42,7 @@ describe('collab service', () => {
       type: 'welcome',
       version: 2,
       connectionId: 'b',
-      participants: [
+      connections: [
         { connectionId: 'a', userId: 'anna', location: { page: 'view:board' }, presence: [] },
         { connectionId: 'b', userId: 'boris', location: { page: 'view:board' }, presence: [] }
       ],
@@ -67,12 +67,12 @@ describe('collab service', () => {
     }
     service.receive('tab-one', { type: 'presence:delete', registrationId: 'field-a' })
     await Bun.sleep(60)
-    expect(latest().participants).toHaveLength(2)
-    expect(latest().participants[0]?.presence.map(item => item.registrationId)).toEqual(['field-b'])
+    expect(latest().connections).toHaveLength(2)
+    expect(latest().connections[0]?.presence.map(item => item.registrationId)).toEqual(['field-b'])
     expect(latest().users).toHaveLength(1)
     service.leave('tab-one')
-    expect(latest().participants.map(item => item.connectionId)).toEqual(['tab-two'])
-    expect(latest().participants[0]?.presence).toEqual([])
+    expect(latest().connections.map(item => item.connectionId)).toEqual(['tab-two'])
+    expect(latest().connections[0]?.presence).toEqual([])
     expect(latest().users).toHaveLength(1)
   })
 
@@ -88,18 +88,18 @@ describe('collab service', () => {
     expect(latest().users.map(user => user.id)).toEqual(['observer', 'new-observer'])
   })
 
-  test('profile updates reach other tabs while identity changes require reconnecting', () => {
+  test('profile updates reach other tabs while user ID changes require reconnecting', () => {
     join('one', 'anna')
     join('two', 'anna')
-    const identity = { id: 'anna', name: 'Anna updated', color: 'blue', email: 'anna@example.com' }
-    service.receive('one', { type: 'identity', identity })
-    expect(latest().users).toEqual([identity])
+    const profile = { id: 'anna', name: 'Anna updated', color: 'blue', email: 'anna@example.com' }
+    service.receive('one', { type: 'profile', profile })
+    expect(latest().users).toEqual([profile])
     service.leave('one')
-    expect(latest().users).toEqual([identity])
+    expect(latest().users).toEqual([profile])
     expect(() =>
       service.receive('two', {
-        type: 'identity',
-        identity: { id: 'boris', name: 'Boris', color: 'red' }
+        type: 'profile',
+        profile: { id: 'boris', name: 'Boris', color: 'red' }
       })
     ).toThrow('Reconnect')
     expect(() => service.receive('missing', { type: 'ping' })).toThrow('Join')
@@ -113,18 +113,18 @@ describe('collab service', () => {
       email: 'anna@example.com',
       avatar: 'https://example.com/avatar'
     }
-    service.receive('one', { type: 'join', version: 2, identity: nameless })
+    service.receive('one', { type: 'join', version: 2, profile: nameless })
     const welcome = messages.find(item => item.message.type === 'welcome')?.message
     if (welcome?.type !== 'welcome') throw new Error('Missing welcome')
     expect(welcome.users).toEqual([nameless])
     expect(Object.hasOwn(welcome.users[0]!, 'name')).toBe(false)
-    service.receive('two', { type: 'join', version: 2, identity: nameless })
-    service.receive('one', { type: 'identity', identity: { ...nameless, name: '' } })
+    service.receive('two', { type: 'join', version: 2, profile: nameless })
+    service.receive('one', { type: 'profile', profile: { ...nameless, name: '' } })
     expect(latest().users).toEqual([{ ...nameless, name: '' }])
     service.leave('one')
     expect(latest().users).toEqual([{ ...nameless, name: '' }])
     const minimal = { id: 'anna', color: '#336699' }
-    service.receive('two', { type: 'identity', identity: minimal })
+    service.receive('two', { type: 'profile', profile: minimal })
     expect(latest().users).toEqual([minimal])
     expect(Object.hasOwn(latest().users[0]!, 'name')).toBe(false)
     expect(Object.hasOwn(latest().users[0]!, 'email')).toBe(false)
@@ -152,23 +152,23 @@ describe('collab service', () => {
     expect(messages).toEqual([])
     await Bun.sleep(60)
     expect(messages).toHaveLength(1)
-    expect(latest().participants[0]).toMatchObject({
+    expect(latest().connections[0]).toMatchObject({
       location: { page: 'view:board', away: true },
       presence: [{ value: { x: 20 } }]
     })
     service.receive('one', { type: 'presence:delete', registrationId: 'cursor' })
     await Bun.sleep(60)
-    expect(latest().participants[0]?.presence).toEqual([])
+    expect(latest().connections[0]?.presence).toEqual([])
   })
 
   test('accepts 64 connections, rejects the next join, and reuses a freed slot', () => {
     for (let index = 0; index < COLLAB_MAX_CONNECTIONS; index++) join(String(index))
-    expect(latest().participants).toHaveLength(64)
+    expect(latest().connections).toHaveLength(64)
     expect(() => join('overflow')).toThrow('too many connections')
     service.leave('0')
     expect(() => join('replacement')).not.toThrow()
-    expect(latest().participants).toHaveLength(64)
-    expect(latest().participants.some(participant => participant.connectionId === '0')).toBe(false)
+    expect(latest().connections).toHaveLength(64)
+    expect(latest().connections.some(connection => connection.connectionId === '0')).toBe(false)
   })
 
   test('accepts 128 registrations, permits updates at capacity, and reuses a freed slot', async () => {
@@ -188,15 +188,15 @@ describe('collab service', () => {
       service.receive('one', { ...registration, registrationId: '0', value: false })
     ).not.toThrow()
     await Bun.sleep(60)
-    expect(latest().participants[0]?.presence).toHaveLength(128)
-    expect(latest().participants[0]?.presence[0]?.value).toBe(false)
+    expect(latest().connections[0]?.presence).toHaveLength(128)
+    expect(latest().connections[0]?.presence[0]?.value).toBe(false)
     service.receive('one', { type: 'presence:delete', registrationId: '0' })
     expect(() =>
       service.receive('one', { ...registration, registrationId: 'replacement' })
     ).not.toThrow()
     await Bun.sleep(60)
-    expect(latest().participants[0]?.presence).toHaveLength(128)
-    expect(latest().participants[0]?.presence.at(-1)?.registrationId).toBe('replacement')
+    expect(latest().connections[0]?.presence).toHaveLength(128)
+    expect(latest().connections[0]?.presence.at(-1)?.registrationId).toBe('replacement')
   })
 
   test('heartbeat replies immediately and closing the room clears pending broadcasts', async () => {

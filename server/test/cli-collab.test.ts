@@ -133,15 +133,8 @@ describe('collab runtime CLI flag', () => {
 describe('collab init CLI flag', () => {
   test('plain init omits the guide; flagged init adds it and plain refresh preserves it', async () => {
     const args = ['init', '--harness=codex']
-    const guide = join(
-      workspace,
-      '.agents',
-      'skills',
-      'moi-workspace',
-      'references',
-      'COLLABORATIVE.md'
-    )
-    const types = join(workspace, '.moi', 'collab-env.d.ts')
+    const guide = join(workspace, '.agents', 'skills', 'moi-workspace', 'references', 'COLLAB.md')
+    const types = join(workspace, '.moi', 'collab.d.ts')
     expect((await runCli(args)).code).toBe(0)
     expect(await Bun.file(guide).exists()).toBe(false)
     expect(await Bun.file(types).exists()).toBe(false)
@@ -159,7 +152,7 @@ describe('collab init CLI flag', () => {
   test('init --web --experimental-collab installs docs without enabling the runtime', async () => {
     spawnCli(['init', '--harness=codex', '--web', '--experimental-collab'])
     expect((await capturedServerLaunch()).flag).toBe('')
-    expect(await Bun.file(join(workspace, '.moi', 'collab-env.d.ts')).exists()).toBe(true)
+    expect(await Bun.file(join(workspace, '.moi', 'collab.d.ts')).exists()).toBe(true)
   }, 15_000)
 
   test('both commands explain their separate flags in help', async () => {

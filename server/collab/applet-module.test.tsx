@@ -1,7 +1,8 @@
 import { expect, mock, spyOn, test } from 'bun:test'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { join } from 'node:path'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { join } from 'path'
 import type * as CollabApi from 'moi/collab'
 
 import { COLLAB_MODULE_SOURCE } from './applet-module'
@@ -42,8 +43,14 @@ async function loadModule(): Promise<TestModule> {
   if (!result.success) throw new Error(result.logs.join('\n'))
   const source = await result.outputs[0]!.text()
   // Each test gets the same generated module with fresh warning/bridge state.
-  const url = `data:text/javascript;base64,${Buffer.from(source + `\n// ${crypto.randomUUID()}`).toString('base64')}`
-  return (await import(url)) as TestModule
+  const directory = await mkdtemp(join(import.meta.dir, '.collab-module-test-'))
+  try {
+    const path = join(directory, 'entry.mjs')
+    await Bun.write(path, source)
+    return (await import(path)) as TestModule
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
 }
 
 test('missing collaboration bridge returns empty hook values and warns once', async () => {
@@ -56,7 +63,7 @@ test('missing collaboration bridge returns empty hook values and warns once', as
       expect(api.useUser('alice')).toBeNull()
       expect(api.usePeers()).toEqual([])
       expect(api.useWorkspaceUsers()).toEqual([])
-      expect(api.useWorkspaceUsersStatus()).toBe('unavailable')
+      expect(api.useWorkspaceUsersAvailability()).toBe('unavailable')
       expect(api.usePresence('editing')).toEqual([])
       expect(api.usePublishPresence('editing', true)).toBeUndefined()
     }
@@ -97,7 +104,7 @@ test('every collaboration component renders nothing without its bridge, includin
 test('the bridge delegates when attached and falls back again when disposed', async () => {
   const api = await loadModule()
   const warning = spyOn(console, 'warn').mockImplementation(() => {})
-  const user: CollabApi.CollabUser = {
+  const user: CollabApi.WorkspaceUser = {
     id: 'alice',
     name: 'Alice',
     color: '#123456',
@@ -105,7 +112,7 @@ test('the bridge delegates when attached and falls back again when disposed', as
   }
   const host = {
     useUser: mock((_id: string) => user),
-    useWorkspaceUsersStatus: mock(() => 'loading' as const),
+    useWorkspaceUsersAvailability: mock(() => 'loading' as const),
     usePublishPresence: mock((_channel: string, _value: unknown) => {}),
     User: mock(() => createElement('span', null, 'Alice'))
   }
@@ -117,7 +124,7 @@ test('the bridge delegates when attached and falls back again when disposed', as
       }
     })
     expect(api.useUser('alice')).toBe(user)
-    expect(api.useWorkspaceUsersStatus()).toBe('loading')
+    expect(api.useWorkspaceUsersAvailability()).toBe('loading')
     expect(host.useUser.mock.calls).toEqual([['alice']])
     api.usePublishPresence('editing', { field: 'title' })
     expect(host.usePublishPresence.mock.calls).toEqual([['editing', { field: 'title' }]])

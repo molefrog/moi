@@ -10,7 +10,8 @@ import {
 } from 'node:fs'
 import { join } from 'path'
 
-import { ensureMoiGitignore, scaffoldMoiDir, writeAppletEnvDts } from '../moi-scaffold'
+import { syncAppletDeclarations } from '../applets/declarations'
+import { ensureMoiGitignore, scaffoldMoiDir } from '../moi-scaffold'
 import { silenceConsole } from './quiet'
 
 // The scaffold backstop: `scaffoldMoiDir` must refuse to create a `.moi/` inside
@@ -52,7 +53,7 @@ describe('scaffoldMoiDir install', () => {
     expect(result).toBe(137)
     expect(existsSync(join(moiDir, 'package.json'))).toBe(true)
     expect(existsSync(join(moiDir, 'widgets'))).toBe(true)
-    expect(await Bun.file(join(moiDir, 'applet-env.d.ts')).text()).toContain('icon?: string')
+    expect(await Bun.file(join(moiDir, 'base.d.ts')).text()).toContain('icon?: string')
     // Machine-local state must never end up committed in a workspace repo.
     const gitignore = await Bun.file(join(moiDir, '.gitignore')).text()
     for (const entry of ['.build/', '.cache/', 'node_modules/']) {
@@ -113,16 +114,16 @@ describe('ensureMoiGitignore', () => {
   })
 })
 
-describe('writeAppletEnvDts', () => {
+describe('syncAppletDeclarations', () => {
   test('leaves a current ambient type file untouched', async () => {
     mkdirSync(join(WS, '.moi'), { recursive: true })
-    expect(await writeAppletEnvDts(WS)).toBe(true)
-    const path = join(WS, '.moi', 'applet-env.d.ts')
+    expect(await syncAppletDeclarations(WS)).toEqual(['base.d.ts'])
+    const path = join(WS, '.moi', 'base.d.ts')
     const fixedTime = new Date('2000-01-01T00:00:00.000Z')
     utimesSync(path, fixedTime, fixedTime)
     const before = statSync(path).mtimeMs
 
-    expect(await writeAppletEnvDts(WS)).toBe(false)
+    expect(await syncAppletDeclarations(WS)).toEqual([])
     expect(statSync(path).mtimeMs).toBe(before)
   })
 })

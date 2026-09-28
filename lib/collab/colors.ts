@@ -1,6 +1,6 @@
 // Backgrounds that keep the black face readable and still work as a cursor
 // color on light and dark surfaces.
-export const PERSONA_COLORS = [
+export const USER_COLORS = [
   ['Pink', '#ec4899'],
   ['Orange', '#f97316'],
   ['Amber', '#f59e0b'],
@@ -19,6 +19,6 @@ export function colorForId(id: string): string {
     hash ^= id.charCodeAt(index)
     hash = Math.imul(hash, 0x01000193)
   }
-  const [, color] = PERSONA_COLORS[(hash >>> 0) % PERSONA_COLORS.length] ?? PERSONA_COLORS[0]
+  const [, color] = USER_COLORS[(hash >>> 0) % USER_COLORS.length] ?? USER_COLORS[0]
   return color
 }

@@ -1,31 +1,27 @@
-import type {
-  CollabIdentity,
-  CollabParticipant,
-  CollabPresenceRegistration
-} from '@/lib/collab/types'
+import type { UserProfile, Connection, CollabPresenceRegistration } from '@/lib/collab/types'
 import type { CollabEngineApi } from './engine'
-import { normalizeWorkspaceUsers } from './identity'
-import type { WorkspaceDirectory } from './identity'
+import { normalizeWorkspaceUsers } from './host-state'
+import type { WorkspaceDirectory } from './host-state'
 import { CollabStore } from './store'
 
 export type FakeEngineOptions = {
-  self: CollabIdentity | null
+  self: UserProfile | null
   page?: string
-  others?: CollabParticipant[]
+  otherConnections?: Connection[]
   // Full fixture directory, including users who are offline.
-  users?: readonly CollabIdentity[]
+  users?: readonly UserProfile[]
   directoryStatus?: WorkspaceDirectory['status']
 }
 export type FakeCollabEngine = CollabEngineApi & {
-  setOthers: (others: CollabParticipant[]) => void
-  setUsers: (users: readonly CollabIdentity[] | null) => void
+  setOtherConnections: (otherConnections: Connection[]) => void
+  setUsers: (users: readonly UserProfile[] | null) => void
   setDirectoryStatus: (status: WorkspaceDirectory['status']) => void
 }
 
 export function createFakeEngine({
   self,
   page = 'preview',
-  others = [],
+  otherConnections = [],
   users,
   directoryStatus = users === undefined ? 'unavailable' : 'ready'
 }: FakeEngineOptions): FakeCollabEngine {
@@ -39,20 +35,20 @@ export function createFakeEngine({
     users: directoryStatus === 'ready' ? (directory ?? []) : []
   }
   directory = directoryStatus === 'unavailable' ? null : directorySnapshot.users
-  let everyoneElse = others
-  let location: CollabParticipant['location'] = { page }
-  const participants = (): CollabParticipant[] => [
+  let currentOtherConnections = otherConnections
+  let location: Connection['location'] = { page }
+  const connections = (): Connection[] => [
     ...(self
       ? [{ connectionId: 'local', userId: self.id, location, presence: [...presence.values()] }]
       : []),
-    ...everyoneElse
+    ...currentOtherConnections
   ]
   const liveUsers = () => {
-    const connected = new Set(participants().map(participant => participant.userId))
+    const connected = new Set(connections().map(connection => connection.userId))
     return profiles.filter(user => connected.has(user.id))
   }
   const announce = () =>
-    store.receive({ type: 'participants', participants: participants(), users: liveUsers() })
+    store.receive({ type: 'connections', connections: connections(), users: liveUsers() })
   store.setSender(message => {
     switch (message.type) {
       case 'location':
@@ -78,7 +74,7 @@ export function createFakeEngine({
     type: 'welcome',
     version: 2,
     connectionId: 'local',
-    participants: participants(),
+    connections: connections(),
     users: liveUsers()
   })
   return {
@@ -86,11 +82,11 @@ export function createFakeEngine({
     enabled: true,
     start: () => () => {},
     getSnapshot: store.getSnapshot,
-    getPeopleSnapshot: store.getPeopleSnapshot,
+    getUsersSnapshot: store.getUsersSnapshot,
     getPresenceSnapshot: store.getPresenceSnapshot,
     subscribe: store.subscribe,
-    getIdentity: () => self,
-    subscribeIdentity: () => () => {},
+    getCurrentUser: () => self,
+    subscribeCurrentUser: () => () => {},
     getWorkspaceUsers: () => directory,
     getWorkspaceDirectory: () => directorySnapshot,
     subscribeWorkspaceUsers: listener => {
@@ -107,8 +103,8 @@ export function createFakeEngine({
     deletePresence: registrationId => {
       if (self) store.deletePresence(registrationId)
     },
-    setOthers: next => {
-      everyoneElse = next
+    setOtherConnections: next => {
+      currentOtherConnections = next
       announce()
     },
     setUsers: next => {

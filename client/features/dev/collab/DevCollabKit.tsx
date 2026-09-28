@@ -18,9 +18,9 @@ import {
 import { Input } from '@/client/components/ui/input'
 import { Textarea } from '@/client/components/ui/textarea'
 import type {
-  CollabIdentity,
+  UserProfile,
   CollabJsonValue,
-  CollabParticipant,
+  Connection,
   CollabPresenceRegistration
 } from '@/lib/collab/types'
 
@@ -33,9 +33,9 @@ import {
   PresenceGutter,
   Selection,
   User
-} from './components'
-import { createFakeEngine } from './fake-engine'
-import type { FakeCollabEngine } from './fake-engine'
+} from '@/client/features/collab/components'
+import { createFakeEngine } from '@/client/features/collab/fake-engine'
+import type { FakeCollabEngine } from '@/client/features/collab/fake-engine'
 import {
   AppletScope,
   CollabContext,
@@ -46,16 +46,16 @@ import {
   usePublishPresence,
   useUser,
   useWorkspaceUsers
-} from './hooks'
-import { presenceTarget } from './presence-target'
+} from '@/client/features/collab/hooks'
+import { presenceTarget } from '@/client/features/collab/presence-target'
 
-const YOU: CollabIdentity = {
+const YOU: UserProfile = {
   id: 'you',
   name: 'You',
   email: 'you@example.com',
   color: '#8b5cf6'
 }
-const USERS: CollabIdentity[] = [
+const USERS: UserProfile[] = [
   YOU,
   { id: 'fig', name: 'Fig', email: 'fig@example.com', color: '#f59e0b' },
   { id: 'alex', name: 'Alex Hao', email: 'alex@example.com', color: '#3b82f6' },
@@ -80,7 +80,7 @@ function registration(
   return { registrationId: `${userId}:${channel}`, surface: SURFACE, channel, value }
 }
 
-function peers(target: string, tick = 0): CollabParticipant[] {
+function sampleConnections(target: string, tick = 0): Connection[] {
   return [
     {
       connectionId: 'bot-fig',
@@ -124,8 +124,11 @@ function peers(target: string, tick = 0): CollabParticipant[] {
 function useBots(room: FakeCollabEngine, target: string) {
   useEffect(() => {
     let tick = 0
-    room.setOthers(peers(target))
-    const timer = setInterval(() => room.setOthers(peers(target, ++tick)), 100)
+    room.setOtherConnections(sampleConnections(target))
+    const timer = setInterval(
+      () => room.setOtherConnections(sampleConnections(target, ++tick)),
+      100
+    )
     return () => clearInterval(timer)
   }, [room, target])
 }
@@ -356,7 +359,7 @@ function Output({ value }: OutputProps) {
 function HooksDemo() {
   const me = useMe()
   const peers = usePeers({ scope: 'workspace' })
-  const members = useWorkspaceUsers()
+  const workspaceUsers = useWorkspaceUsers()
   const offline = useWorkspaceUsers({ status: 'offline' })
   const user = useUser('david')
   const [mood, setMood] = useState('Exploring')
@@ -367,7 +370,7 @@ function HooksDemo() {
       title="Hooks"
       hint="Profiles and connection status are separate from ephemeral channel values. Reading a channel does not publish to it."
       code={
-        "const me = useMe()\nconst peers = usePeers({ scope: 'workspace', status: 'active' })\nconst members = useWorkspaceUsers() // Includes you and offline members\nconst offline = useWorkspaceUsers({ status: 'offline' })\nconst user = useUser(assigneeId)\nusePublishPresence('mood', mood)\nconst others = usePresence<string>('mood')"
+        "const me = useMe()\nconst peers = usePeers({ scope: 'workspace', status: 'active' })\nconst workspaceUsers = useWorkspaceUsers() // Includes you and offline users\nconst offline = useWorkspaceUsers({ status: 'offline' })\nconst user = useUser(assigneeId)\nusePublishPresence('mood', mood)\nconst presence = usePresence<string>('mood')"
       }
     >
       <div className="grid gap-4 sm:grid-cols-2">
@@ -381,7 +384,7 @@ function HooksDemo() {
         </div>
         <div className="flex flex-col gap-2">
           <code className="font-mono text-xs">useWorkspaceUsers()</code>
-          <Output value={members} />
+          <Output value={workspaceUsers} />
         </div>
         <div className="flex flex-col gap-2">
           <code className="font-mono text-xs">useWorkspaceUsers({'{ status: "offline" }'})</code>
@@ -406,7 +409,12 @@ function HooksDemo() {
 
 export function DevCollabKit() {
   const [room] = useState(() =>
-    createFakeEngine({ self: YOU, page: PAGE, others: peers(TARGETS[0][1]), users: USERS })
+    createFakeEngine({
+      self: YOU,
+      page: PAGE,
+      otherConnections: sampleConnections(TARGETS[0][1]),
+      users: USERS
+    })
   )
   const [target, setTarget] = useState<string>(TARGETS[0][1])
   const [renamed, setRenamed] = useState(false)

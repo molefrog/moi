@@ -256,6 +256,8 @@ export type MessageAttachment =
   | ({ type: 'upload'; uploadId: string; purpose?: DrawingPurpose } & Partial<AttachmentOrigin>)
 
 // Client → server messages, routed by workspaceId over the shared WebSocket.
+export type SelectedSessionScope = 'shared' | 'browser-tab'
+
 export type ClientMessage =
   | {
       type: 'chat'
@@ -263,9 +265,9 @@ export type ClientMessage =
       content: string
       sessionId: string
       isNew: boolean
-      // The browser owns its selected session; creating this chat must not
-      // update the installation's shared selection or switch other tabs.
-      personalSelection?: boolean
+      // Where this tab keeps its selected session. Browser-tab selection must
+      // not update the workspace's shared selection or switch other tabs.
+      selectedSessionScope?: SelectedSessionScope
       // Text and upload references for this turn. The server resolves uploads
       // and describes all attachments together, preserving their order.
       attachments?: MessageAttachment[]

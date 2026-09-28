@@ -14,7 +14,7 @@ Existing experimental `.moi/data/collab.sqlite` files are left untouched and are
 
 ```mermaid
 flowchart TB
-  Host["Batiok / outer host"] -->|"Current identity + workspace users"| Directory["Browser user directory"]
+  Host["Batiok / outer host"] -->|"Current user + workspace users"| Directory["Browser user directory"]
   Applets["Widgets and views: moi/collab"] --> Hooks["Hooks and connected components"]
   Directory --> Hooks
   Hooks --> Engine["CollabEngine: lifecycle + selected snapshots"]
@@ -25,7 +25,7 @@ flowchart TB
 The existing applet bridge passes the host's actual hook and component functions into each
 separately compiled bundle. Those functions read the host's workspace and applet React contexts.
 React receives one `CollabEngine` per mounted workspace through `CollabProvider`. The engine owns
-transport lifecycle and exposes stable people and channel snapshots, so cursor-only traffic does not
+transport lifecycle and exposes stable user and channel snapshots, so cursor-only traffic does not
 rerender profile readers or unrelated channels. Transport and registration storage remain private
 implementation details. `AppletScope` supplies only the surface and active mount lifetime. There is
 no separate enabled context or backend adapter; the playground supplies the same engine contract.
@@ -53,9 +53,9 @@ bundle. User lookup returns `null`, list hooks return `[]`, publication does not
 collaboration component renders nothing, including wrapper children. A disabled runtime still
 provides a bridge and keeps ordinary applet rendering available.
 
-Identity starts as `null`. Local development uses an explicit profile from `/dev/collab`, stored
-in that browser tab's `sessionStorage`. An outer provider owns identity once injected, including
-when it signs out. Applets cannot set identity. Without an identity there is no presence connection.
+The current user starts as `null`. Local development uses an explicit test user from `/dev/collab`,
+stored in that browser tab's `sessionStorage`. An outer provider owns the current user once injected,
+including when it signs out. Applets cannot set the current user. Without one there is no presence connection.
 
 ## Cloudflare Access identity
 
@@ -79,14 +79,14 @@ an unknown key id at most every 30 seconds, so a key Cloudflare stops publishing
 Failed key fetches are logged and verify nothing. Service tokens carry no user and resolve to no
 identity. The profile takes `id` from the token's `sub` and `email` from its `email`.
 Tokens carry no display name, so the profile has no `name` and built-in labels show the email.
-`color` is a stable pick from the persona palette, hashed from the id. There is no avatar, so
+`color` is a stable pick from the user color palette, hashed from the id. There is no avatar, so
 components draw the usual generated face.
 
-`GET /api/identity` returns `{ provider, identity }` and is never cached. The app loads it before
+`GET /api/identity` returns `{ provider, profile }` and is never cached. The app loads it before
 mounting and again after a reconnect. The inherited profile replaces a saved dev profile and locks
 the dev form. A request without a valid token leaves the tab signed out. The presence socket
 upgrade verifies the token too: without it the upgrade fails with 401. With it, `join` and
-`identity` messages must carry the verified id, and the server replaces their profile with the
+`profile` messages must carry the verified id, and the server replaces their profile with the
 verified one, so a browser cannot appear as someone else. An outer host that injects state still
 owns identity in the browser, but a socket joining with the host's different id is refused rather
 than shown to peers as someone else. Access supplies no membership, so the workspace directory
@@ -94,16 +94,17 @@ keeps the live fallback.
 
 ## Users and connections
 
-A user profile is `{ id, name?, color, avatar?, email? }`. ID and color are required. Names may be
+A `UserProfile` is `{ id, name?, color, avatar?, email? }`. ID and color are required. Names may be
 omitted or empty; built-in labels fall back from a nonblank name to email, then ID, without changing
 the profile returned by hooks. IDs are stable attribution identifiers;
 profiles and browser injection do not provide authentication or workspace access enforcement.
 Those policies remain the outer host's responsibility.
 
-A connection is `{ connectionId, userId, location, presence }`. One user can have multiple browser
-tabs. The server assigns connection IDs. `location` is `{ page, title?, away? } | null`. Hidden tabs retain their page with
-`away: true`; `null` means the connection has no known page. A page is the route segment within the workspace. Status is aggregated across a
-user's workspace connections:
+A `Connection` is `{ connectionId, userId, location, presence }`. One user can have multiple browser
+tabs. The server assigns connection IDs. `location` is `{ page, title?, away? } | null`. Hidden
+tabs retain their page with `away: true`; `null` means the connection has no known page. A page is
+the route segment within the workspace. Status is aggregated across a user's workspace connections.
+Hooks return a `WorkspaceUser`, which adds this status to the profile:
 
 - `active`: at least one connection with a known page and `away` absent or false.
 - `away`: connected, but no visible connection with a known page.
@@ -111,25 +112,25 @@ user's workspace connections:
 
 Being on a different page does not make someone offline. `usePeers()` defaults to the current
 page, deduplicates by user ID, and excludes the current user across all their connections.
-Hidden peers remain members of their page, so `usePeers({ status: 'away' })` works with the default
+Hidden peers remain on their page, so `usePeers({ status: 'away' })` works with the default
 page scope. `scope: 'workspace'` includes other pages too. Status reflects tab visibility, not idle time
 or window focus. Hidden connections have no visible cursor/focus/selection markers.
 Presence values remain per connection and exclude only the observing connection, so another tab
 of the same user can still have its own pointer.
 
-Batiok atomically publishes `{ identity, workspaces }` through `window.moi.collab.setHostState`.
-Identity is global across all workspaces; each directory has an explicit `loading` or `ready` state.
-The global identity profile replaces its own row in every ready directory which includes that ID,
+Batiok atomically publishes `{ currentUser, workspaces }` through `window.moi.collab.setHostState`.
+The current user is global across all workspaces; each directory has an explicit `loading` or `ready` state.
+The current user profile replaces its own row in every ready directory which includes that ID,
 without adding missing membership. Sign-out clears all directories in the same update.
 
 Batiok's full workspace directory is authoritative when supplied. It allows resolving an offline
 user, including someone who has never opened the workspace. Profile replacement and removal take
 effect immediately; live connections cannot resurrect removed directory entries. With no host
-directory, current connection profiles and the local identity provide a development fallback.
+directory, current connection profiles and the local test user provide a development fallback.
 This fallback is transient and makes no promise of resolving users after they leave.
 
-`useMe()` resolves the global identity through the current workspace membership. It returns `null`
-while membership loads or when a ready directory omits the viewer. `useWorkspaceUsersStatus()`
+`useMe()` resolves the current user through the current workspace membership. It returns `null`
+while membership loads or when a ready directory omits the viewer. `useWorkspaceUsersAvailability()`
 distinguishes loading from a ready empty directory; readiness does not imply a live connection.
 
 The complete host integration contract and bootstrap example are in
@@ -137,15 +138,15 @@ The complete host integration contract and bootstrap example are in
 
 ## Applet API
 
-| Hook                                 | Contract                                                                                                          |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| `useMe()`                            | Current user profile plus `status`, or `null`.                                                                    |
-| `useUser(id)`                        | A profile plus `status`, including offline users; `null` for unknown IDs.                                         |
-| `useWorkspaceUsersStatus()`          | Host directory readiness: `unavailable` (live/dev fallback), `loading`, or `ready` (possibly empty).              |
-| `useWorkspaceUsers({ status? })`     | Complete workspace directory, including self and offline members; optional `active`, `away`, or `offline` filter. |
-| `usePeers({ scope?, status? })`      | Other connected users; `scope` is `page` or `workspace`, `status` is `active` or `away`.                          |
-| `usePresence(channel)`               | Read-only array of `{ connectionId, userId, value }` for other connections on this page and applet surface.       |
-| `usePublishPresence(channel, value)` | Publish the current JSON value reactively while mounted and visible. Returns nothing.                             |
+| Hook                                 | Contract                                                                                                        |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `useMe()`                            | Current user profile plus `status`, or `null`.                                                                  |
+| `useUser(id)`                        | A profile plus `status`, including offline users; `null` for unknown IDs.                                       |
+| `useWorkspaceUsersAvailability()`    | Directory availability: `unavailable` (live/dev fallback), `loading`, or `ready` (possibly empty).              |
+| `useWorkspaceUsers({ status? })`     | Complete workspace directory, including self and offline users; optional `active`, `away`, or `offline` filter. |
+| `usePeers({ scope?, status? })`      | Other connected users; `scope` is `page` or `workspace`, `status` is `active` or `away`.                        |
+| `usePresence(channel)`               | Read-only array of `{ connectionId, userId, value }` for other connections on this page and applet surface.     |
+| `usePublishPresence(channel, value)` | Publish the current JSON value reactively while mounted and visible. Returns nothing.                           |
 
 Reading presence never creates a presence registration. Publication owns one registration per
 mounted hook and replaces that registration's whole value. Hidden views, browser tabs, outgoing
@@ -157,7 +158,7 @@ a persistent key/value store. Channel values must be JSON and fit within 4 KiB.
 | ---------------- | --------------------------------------------------------------------------------------- |
 | `User`           | Resolve a profile by `id`; name/avatar, sizes, optional status and detail.              |
 | `Facepile`       | Resolve `ids` and render stacked avatars with an overflow count.                        |
-| `Activity`       | Show current-page or workspace participants.                                            |
+| `Activity`       | Show the current user and other connected users on the page or in the workspace.        |
 | `Cursors`        | Wrap a cursor surface; optional stable `surface` name.                                  |
 | `PresenceFrame`  | Wrap one element with a stable local `id`; outline it when another user focuses inside. |
 | `PresenceGutter` | The same single-element focus contract, with avatars beside it.                         |
@@ -184,30 +185,32 @@ scope frame, gutter, and selection targets; custom presence channels and cursor 
 their existing applet scope. Built-in target wrappers also provide the resolved cursor anchor.
 
 `useWorkspaceUsers` enumerates the full host directory, while `usePeers` enumerates connections
-deduplicated by user. The workspace header shows connected users (active or away) only; its member
+deduplicated by user. The workspace header shows connected users (active or away) only; its user
 popover can list offline users too. Without a host directory, enumeration falls back to the local
-identity and currently connected profiles, so it cannot discover offline members.
+current user and currently connected profiles, so it cannot discover offline users.
 
 `Cursors` is the public cursor component; the singular cursor renderer is internal. Pointer updates
 are coalesced to 50 ms. Optional `data-collab-target` anchors allow pointers to follow an element
 when layouts or scroll positions differ; arbitrary canvas coordinate mapping is not implemented.
 
-Public declarations: [collab-env.d.ts](../server/collab/skill/collab-env.d.ts).
-Authoring guide: [COLLABORATIVE.md](../workspace/.claude/skills/moi-workspace/references/COLLABORATIVE.md).
+Public declarations: [collab.d.ts](../server/applets/declarations/collab.d.ts).
+Authoring guide: [COLLAB.md](../workspace/.claude/skills/moi-workspace/references/COLLAB.md).
 
 ## Transport and lifecycle
 
-Protocol version 2 accepts an identified `join`, profile updates, location updates, presence registration
-updates/removals, and ping. It sends welcome, participant/profile snapshots, errors, and pong.
+Protocol version 2 accepts a `join` with a user profile, profile updates, location updates,
+presence registration updates/removals, and ping. It sends welcome, connection/profile snapshots,
+errors, and pong.
 Profiles in socket snapshots are only a fallback for current connections; the full host directory
 is never sent through this socket.
 
 The main server owns sockets, validates messages, enforces payload limits, and supervises one
-subprocess per canonical workspace path. The process owns participants and temporary registrations.
-No persistent storage is opened. Each workspace supports up to 64 browser connections and each connection supports up to 128 active
-presence registrations, with a 4 KiB value limit per registration. Unfocused controls do not consume
-registrations. Limits count browser connections and active publishers, not directory members.
-Slow sockets are disconnected when reliable delivery cannot be maintained, including when a participant
+subprocess per canonical workspace path. The process owns connections and temporary registrations.
+No persistent storage is opened. Each workspace supports up to 64 browser connections, and each
+connection supports up to 128 active presence registrations, with a 4 KiB value limit per registration.
+Unfocused controls do not consume registrations. Limits count browser connections and active
+publishers, not directory users.
+Slow sockets are disconnected when reliable delivery cannot be maintained, including when a connection
 snapshot cannot be delivered. Reconnect repairs the full snapshot so a dropped final departure cannot
 leave ghost presence alive behind healthy heartbeats.
 
@@ -215,16 +218,18 @@ Worker failure closes its sockets. Clients reconnect with backoff, join afresh, 
 presence. Shutdown and parent IPC loss terminate children. Applet rebuilds and function-worker
 restarts do not restart presence. Idle workers can exit; active rooms are preserved.
 
-With runtime and identity enabled, selected chats and open/current tabs are browser-tab-local.
-Local applet navigation and main's targeted navigation relay update the selected browser. Personal
-selection does not write shared tab/chat selection. Ordinary navigation behavior remains when no
-identity is supplied. Share invokes the outer host's handler,
-or copies the workspace URL if none exists; copying does not grant access or publish a workspace.
+With runtime and a current user, selected chats and open/current tabs are browser-tab-local.
+Chat requests mark their selected session scope as `browser-tab`; otherwise the scope is `shared`.
+Local applet navigation and main's targeted navigation relay update the selected browser. Browser
+tab selections do not update the shared tab or chat selection. They do not switch other tabs.
+Ordinary navigation remains when no current user is supplied. Share invokes the outer host's
+handler, or copies the workspace URL if none exists; copying does not grant access or publish a
+workspace.
 
 ## Development and verification
 
-`/dev/collab` combines explicit dev identity setup with an isolated presence playground. The
-playground works without enabling runtime, opening a workspace, or creating an identity. It uses
+`/dev/collab` combines local test user setup with an isolated presence playground. The
+playground works without enabling runtime, opening a workspace, or setting up a test user. It uses
 the same hooks, components, and selected snapshots with a fake engine and fixture directory. Reopening
 it resets its state; other browser tabs have independent fake rooms.
 

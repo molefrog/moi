@@ -226,7 +226,7 @@ describe('loadLayout', () => {
         ...base,
         experimental: { collab: true },
         collab: { enabled: true },
-        collabReference: '/workspace/references/COLLABORATIVE.md'
+        collabReference: '/workspace/references/COLLAB.md'
       },
       async dir => {
         const loaded = await loadLayout(dir)
@@ -347,13 +347,13 @@ describe('mergeLayoutForSave', () => {
       ...base,
       experimental: { collab: true },
       collab: { enabled: true },
-      collabReference: '/workspace/references/COLLABORATIVE.md'
+      collabReference: '/workspace/references/COLLAB.md'
     }
     expect(mergeLayoutForSave(stale, stale)).toEqual(base)
     // Filtering the save must not mutate either caller-owned object.
     expect(stale.experimental).toEqual({ collab: true })
     expect(stale.collab).toEqual({ enabled: true })
-    expect(stale.collabReference).toBe('/workspace/references/COLLABORATIVE.md')
+    expect(stale.collabReference).toBe('/workspace/references/COLLAB.md')
   })
 
   test('drops the old Widgets tab id from stale client saves', () => {

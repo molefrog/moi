@@ -2,8 +2,8 @@ import { createRemoteJWKSet, customFetch, errors, jwtVerify } from 'jose'
 import type { FetchImplementation } from 'jose'
 
 import { colorForId } from '@/lib/collab/colors'
-import { isCollabIdentity } from '@/lib/collab/protocol'
-import type { CollabIdentity, ProxyIdentity } from '@/lib/collab/types'
+import { isUserProfile } from '@/lib/collab/protocol'
+import type { ProxyIdentity, UserProfile } from '@/lib/collab/types'
 
 import { type CloudflareAccessConfig, getAppConfig } from '../app-config'
 
@@ -54,9 +54,9 @@ export function accessVerifier(
 
 // Access tokens carry an id and an email but no display name, so the profile
 // has none and labels fall back to the email. The color is a stable pick from the id.
-export function accessProfile({ id, email }: AccessUser): CollabIdentity | null {
-  const profile: CollabIdentity = { id, color: colorForId(id), email }
-  return isCollabIdentity(profile) ? profile : null
+export function accessProfile({ id, email }: AccessUser): UserProfile | null {
+  const profile: UserProfile = { id, color: colorForId(id), email }
+  return isUserProfile(profile) ? profile : null
 }
 
 // The verifier and its key cache live as long as the resolved config object.
@@ -66,12 +66,12 @@ let current: { config: CloudflareAccessConfig; verify: AccessVerifier } | null =
 // configured, moi trusts no proxy and every request resolves to no provider.
 export async function proxyIdentity(req: Request): Promise<ProxyIdentity> {
   const config = getAppConfig().cloudflareAccess
-  if (!config) return { provider: null, identity: null }
+  if (!config) return { provider: null, profile: null }
   if (current?.config !== config) current = { config, verify: accessVerifier(config) }
   // The header Access adds wins; the cookie covers proxies that drop it.
   const token =
     req.headers.get(ACCESS_TOKEN_HEADER) ??
     new Bun.CookieMap(req.headers.get('cookie') ?? '').get(ACCESS_TOKEN_COOKIE)
   const user = token ? await current.verify(token) : null
-  return { provider: 'cloudflare-access', identity: user ? accessProfile(user) : null }
+  return { provider: 'cloudflare-access', profile: user ? accessProfile(user) : null }
 }

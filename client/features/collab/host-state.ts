@@ -1,40 +1,39 @@
-import { isCollabIdentity } from '@/lib/collab/protocol'
-import type { CollabIdentity, CollabIdentityProvider, ProxyIdentity } from '@/lib/collab/types'
+import { isUserProfile } from '@/lib/collab/protocol'
+import type { IdentityProvider, ProxyIdentity, UserProfile } from '@/lib/collab/types'
 
 export type CollabShareContext = { workspaceId: string; url: string }
 export type CollabShareHandler = (context: CollabShareContext) => Promise<{ url: string }>
 export type CollabHostDirectory =
   | { readonly status: 'loading' }
-  | { readonly status: 'ready'; readonly users: readonly CollabIdentity[] }
+  | { readonly status: 'ready'; readonly users: readonly UserProfile[] }
 export type CollabHostState = {
-  readonly identity: CollabIdentity | null
+  readonly currentUser: UserProfile | null
   readonly workspaces: Readonly<Record<string, CollabHostDirectory>>
 }
 export type WorkspaceDirectory = {
   readonly status: 'unavailable' | 'loading' | 'ready'
-  readonly users: readonly CollabIdentity[]
+  readonly users: readonly UserProfile[]
 }
-export type CollabIdentityApi = {
+export type CollabHostApi = {
   getHostState: () => CollabHostState | null
   setHostState: (state: CollabHostState) => void
   subscribeHostState: (listener: (state: CollabHostState | null) => void) => () => void
   setShareHandler: (handler: CollabShareHandler | null) => void
 }
-// Who owns the viewer's identity: a tab-local dev profile, an outer browser
-// host, or a proxy in front of the deployment such as Cloudflare Access.
-export type IdentitySource = 'dev' | 'external' | CollabIdentityProvider
+// Who supplies the current user: local setup, an outer host, or an auth proxy.
+export type CurrentUserSource = 'dev' | 'external' | IdentityProvider
 
-// Earlier development builds generated dev-identity automatically. Only this
-// explicit profile key opts a tab into identity and workspace controls.
+// Earlier development builds generated a dev user automatically. Only this
+// explicit profile key opts a tab into collaboration and workspace controls.
 const PROFILE_KEY = 'moi:collab:dev-profile'
-let identity: CollabIdentity | null = null
+let currentUser: UserProfile | null = null
 let installed = false
 let shareHandler: CollabShareHandler | null = null
-let identitySource: IdentitySource | null = null
+let currentUserSource: CurrentUserSource | null = null
 const listeners = new Set<() => void>()
 const workspaceListeners = new Map<string, Set<() => void>>()
 const hostListeners = new Set<() => void>()
-const EMPTY_USERS: readonly CollabIdentity[] = Object.freeze([])
+const EMPTY_USERS: readonly UserProfile[] = Object.freeze([])
 const EMPTY_WORKSPACES = Object.freeze({})
 const LOADING_HOST_DIRECTORY = Object.freeze({ status: 'loading' as const })
 const UNAVAILABLE_DIRECTORY: WorkspaceDirectory = Object.freeze({
@@ -47,29 +46,27 @@ const LOADING_DIRECTORY: WorkspaceDirectory = Object.freeze({
 })
 let hostState: CollabHostState | null = null
 
-export function normalizeIdentity(value: CollabIdentity): CollabIdentity {
+export function normalizeUserProfile(value: UserProfile): UserProfile {
   if (!value || typeof value.id !== 'string' || !value.id.trim())
-    throw new Error('An identity needs an id.')
+    throw new Error('A user profile needs an id.')
   if (value.name !== undefined && typeof value.name !== 'string')
-    throw new Error('An identity name must be a string when provided.')
-  const normalized: CollabIdentity = {
+    throw new Error('A user profile name must be a string when provided.')
+  const normalized: UserProfile = {
     id: value.id.trim(),
     ...(value.name !== undefined ? { name: value.name.trim() } : {}),
     color: /^#[0-9a-f]{6}$/i.test(value.color) ? value.color : '#0f766e',
     ...(value.avatar !== undefined ? { avatar: value.avatar } : {}),
     ...(value.email !== undefined ? { email: value.email } : {})
   }
-  if (!isCollabIdentity(normalized)) throw new Error('Invalid user profile.')
+  if (!isUserProfile(normalized)) throw new Error('Invalid user profile.')
   return Object.freeze(normalized)
 }
 
-export function normalizeWorkspaceUsers(
-  users: readonly CollabIdentity[]
-): readonly CollabIdentity[] {
+export function normalizeWorkspaceUsers(users: readonly UserProfile[]): readonly UserProfile[] {
   if (!Array.isArray(users)) throw new Error('Workspace users must be an array.')
   const ids = new Set<string>()
   const snapshot = users.map(user => {
-    const normalized = normalizeIdentity(user)
+    const normalized = normalizeUserProfile(user)
     if (ids.has(normalized.id)) throw new Error('Workspace users must have unique ids.')
     ids.add(normalized.id)
     return normalized
@@ -79,7 +76,7 @@ export function normalizeWorkspaceUsers(
 
 function normalizeHostState(value: CollabHostState): CollabHostState {
   if (!value || typeof value !== 'object') throw new Error('Invalid host state.')
-  const current = value.identity === null ? null : normalizeIdentity(value.identity)
+  const current = value.currentUser === null ? null : normalizeUserProfile(value.currentUser)
   if (!value.workspaces || typeof value.workspaces !== 'object' || Array.isArray(value.workspaces))
     throw new Error('Host workspaces must be a record.')
   const entries = Object.entries(value.workspaces).map(([id, directory]) => {
@@ -96,7 +93,7 @@ function normalizeHostState(value: CollabHostState): CollabHostState {
   })
   // Validate everything before discarding directories on sign-out.
   return Object.freeze({
-    identity: current,
+    currentUser: current,
     workspaces: current ? Object.freeze(Object.fromEntries(entries)) : EMPTY_WORKSPACES
   })
 }
@@ -113,7 +110,7 @@ export function getWorkspaceDirectory(workspaceId: string): WorkspaceDirectory {
   return directory?.status === 'ready' ? directory : LOADING_DIRECTORY
 }
 
-export function getWorkspaceUsers(workspaceId: string): readonly CollabIdentity[] | null {
+export function getWorkspaceUsers(workspaceId: string): readonly UserProfile[] | null {
   const directory = getWorkspaceDirectory(workspaceId)
   return directory.status === 'unavailable' ? null : directory.users
 }
@@ -125,8 +122,8 @@ export function setHostState(next: CollabHostState): void {
   )
   // Publish every field before notifying any observer, including transport listeners.
   hostState = normalized
-  identitySource = 'external'
-  identity = normalized.identity
+  currentUserSource = 'external'
+  currentUser = normalized.currentUser
   listeners.forEach(listener => listener())
   for (const [id, subscriptions] of workspaceListeners) {
     if (getWorkspaceDirectory(id) !== previousDirectories.get(id))
@@ -149,12 +146,9 @@ export function subscribeHostState(listener: (state: CollabHostState | null) => 
 }
 
 // Internal compatibility helpers. External hosts replace the complete state atomically.
-export function setWorkspaceUsers(
-  workspaceId: string,
-  users: readonly CollabIdentity[] | null
-): void {
+export function setWorkspaceUsers(workspaceId: string, users: readonly UserProfile[] | null): void {
   setHostState({
-    identity,
+    currentUser,
     workspaces: {
       ...hostState?.workspaces,
       [workspaceId]: users === null ? { status: 'loading' } : { status: 'ready', users }
@@ -180,7 +174,7 @@ export function subscribeWorkspaceUsersStore(
 
 export function subscribeWorkspaceUsers(
   workspaceId: string,
-  listener: (users: readonly CollabIdentity[] | null) => void
+  listener: (users: readonly UserProfile[] | null) => void
 ): () => void {
   const unsubscribe = subscribeWorkspaceUsersStore(workspaceId, () =>
     listener(getWorkspaceUsers(workspaceId))
@@ -189,64 +183,68 @@ export function subscribeWorkspaceUsers(
   return unsubscribe
 }
 
-export function getIdentity(): CollabIdentity | null {
-  return identity
+export function getCurrentUser(): UserProfile | null {
+  return currentUser
 }
 
-export function setIdentity(next: CollabIdentity | null): void {
-  setHostState({ identity: next, workspaces: hostState?.workspaces ?? EMPTY_WORKSPACES })
+export function setCurrentUser(next: UserProfile | null): void {
+  setHostState({ currentUser: next, workspaces: hostState?.workspaces ?? EMPTY_WORKSPACES })
 }
 
-export function subscribeIdentityStore(listener: () => void): () => void {
+export function subscribeCurrentUserStore(listener: () => void): () => void {
   listeners.add(listener)
   return () => {
     listeners.delete(listener)
   }
 }
 
-export function subscribeIdentity(listener: (identity: CollabIdentity | null) => void): () => void {
-  listener(identity)
-  return subscribeIdentityStore(() => listener(identity))
+export function subscribeCurrentUser(
+  listener: (currentUser: UserProfile | null) => void
+): () => void {
+  listener(currentUser)
+  return subscribeCurrentUserStore(() => listener(currentUser))
 }
 
-export function getIdentitySource(): IdentitySource | null {
-  return identitySource
+export function getCurrentUserSource(): CurrentUserSource | null {
+  return currentUserSource
 }
 
-// A deployment proxy owns identity unless an outer host already claimed it.
-// Dev profiles never override it; a proxy that verified nobody signs the tab out.
-export function setProxyIdentity({ provider, identity: next }: ProxyIdentity): void {
-  if (identitySource === 'external') return
+// An auth proxy takes precedence over local test users; an outer host takes
+// precedence over the proxy. A configured proxy with no user signs this tab out.
+export function setProxyIdentity({ provider, profile }: ProxyIdentity): void {
+  if (currentUserSource === 'external') return
   if (provider === null) {
-    // The server no longer trusts a proxy (restarted without one).
-    if (identitySource === null || identitySource === 'dev') return
-    identitySource = null
-    identity = null
+    if (currentUserSource === null || currentUserSource === 'dev') return
+    currentUserSource = null
+    currentUser = null
   } else {
-    const normalized = next === null ? null : normalizeIdentity(next)
-    if (identitySource === provider && JSON.stringify(identity) === JSON.stringify(normalized))
+    const normalized = profile === null ? null : normalizeUserProfile(profile)
+    if (
+      currentUserSource === provider &&
+      JSON.stringify(currentUser) === JSON.stringify(normalized)
+    )
       return
-    identitySource = provider
-    identity = normalized
+    currentUserSource = provider
+    currentUser = normalized
   }
   listeners.forEach(listener => listener())
 }
 
-function persistDevIdentity(): void {
+function persistDevUser(): void {
   try {
-    sessionStorage.setItem(PROFILE_KEY, JSON.stringify(identity))
+    sessionStorage.setItem(PROFILE_KEY, JSON.stringify(currentUser))
   } catch {
     /* Private browsing. */
   }
 }
 
-export function setDevIdentity(next: CollabIdentity): void {
+export function setDevUser(next: UserProfile): void {
   // A provider may take over between rendering the dev form and handling input.
-  if (identitySource !== null && identitySource !== 'dev') return
-  const normalized = normalizeIdentity(next)
-  identitySource = 'dev'
-  identity = normalized
-  persistDevIdentity()
+  if (currentUserSource !== null && currentUserSource !== 'dev') return
+  const normalized = normalizeUserProfile(next)
+  currentUserSource = 'dev'
+  currentUser = normalized
+  persistDevUser()
   listeners.forEach(listener => listener())
 }
 
@@ -265,29 +263,29 @@ export async function shareWorkspace(workspaceId: string): Promise<'copied'> {
 }
 
 // A host supplies one initial atomic snapshot before loading moi's modules.
-export function installIdentityApi(): void {
+export function installHostApi(): void {
   if (typeof window === 'undefined' || installed) return
   installed = true
   const host = window as unknown as {
-    moi?: { collab?: Partial<CollabIdentityApi>; [key: string]: unknown }
+    moi?: { collab?: Partial<CollabHostApi>; [key: string]: unknown }
   }
   const previous = host.moi?.collab
   if (previous?.getHostState) {
     try {
-      setHostState(previous.getHostState() ?? { identity: null, workspaces: {} })
+      setHostState(previous.getHostState() ?? { currentUser: null, workspaces: {} })
     } catch {
       // An unavailable host remains authoritative; never restore a dev profile.
-      setHostState({ identity: null, workspaces: {} })
+      setHostState({ currentUser: null, workspaces: {} })
     }
-  } else if (identitySource === null) {
+  } else if (currentUserSource === null) {
     try {
       const saved = sessionStorage.getItem(PROFILE_KEY)
       if (saved) {
-        identity = normalizeIdentity(JSON.parse(saved) as CollabIdentity)
-        identitySource = 'dev'
+        currentUser = normalizeUserProfile(JSON.parse(saved) as UserProfile)
+        currentUserSource = 'dev'
       }
     } catch {
-      /* Missing, invalid, or unavailable storage leaves identity unset. */
+      /* Missing, invalid, or unavailable storage leaves the current user unset. */
     }
   }
   host.moi ??= {}

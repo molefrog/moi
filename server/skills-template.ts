@@ -18,7 +18,7 @@ export const COLLAB_REFERENCE_SOURCE_PATH = join(
   BUNDLED_SKILLS_DIR,
   'moi-workspace',
   'references',
-  'COLLABORATIVE.md'
+  'COLLAB.md'
 )
 
 // The guide lives beside the other references, but only explicit collab init installs it.

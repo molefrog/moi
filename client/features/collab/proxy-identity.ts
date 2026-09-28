@@ -3,10 +3,10 @@ import type { ProxyIdentity } from '@/lib/collab/types'
 import { requestJson } from '@/client/api/http'
 import { onWorkspaceEventsReconnect } from '@/client/runtime/useWorkspaceEvents'
 
-import { setProxyIdentity } from './identity'
+import { setProxyIdentity } from './host-state'
 
 // GET /api/identity: the viewer as verified by a proxy in front of moi, such as
-// Cloudflare Access. A failed request keeps the current identity.
+// Cloudflare Access. A failed request keeps the current user.
 async function fetchProxyIdentity(): Promise<void> {
   try {
     setProxyIdentity(await requestJson<ProxyIdentity>('/api/identity'))
@@ -14,7 +14,7 @@ async function fetchProxyIdentity(): Promise<void> {
 }
 
 // Loaded before the app mounts, like startup config, so workspaces choose
-// between shared and personal navigation with the inherited identity already
+// between shared and browser-tab navigation with the inherited user already
 // in place. A server restart can change the proxy config, so reconnects refetch.
 export async function loadProxyIdentity(): Promise<void> {
   await fetchProxyIdentity()

@@ -3,21 +3,20 @@ import { dirname, join } from 'node:path'
 
 import type { WorkspaceType } from '@/lib/types'
 
+import { appletDeclarationPath, installCollabDeclaration } from '../../applets/declarations'
 import { COLLAB_REFERENCE_SOURCE_PATH } from '../../skills-template'
 import { skillsDirFor } from '../../workspace-init'
-
-const TYPES_SOURCE_PATH = join(import.meta.dir, 'collab-env.d.ts')
 
 export type CollabSkillPaths = { referencePath: string; typesPath: string }
 
 export function collabSkillReferencePath(workspacePath: string, type?: WorkspaceType): string {
-  return join(skillsDirFor(workspacePath, type), 'moi-workspace', 'references', 'COLLABORATIVE.md')
+  return join(skillsDirFor(workspacePath, type), 'moi-workspace', 'references', 'COLLAB.md')
 }
 
 function targetPaths(workspacePath: string, type?: WorkspaceType): CollabSkillPaths {
   return {
     referencePath: collabSkillReferencePath(workspacePath, type),
-    typesPath: join(workspacePath, '.moi', 'collab-env.d.ts')
+    typesPath: appletDeclarationPath(workspacePath, 'collab.d.ts')
   }
 }
 
@@ -35,17 +34,12 @@ export async function installCollabSkill(
 ): Promise<CollabSkillPaths> {
   const source = Bun.file(COLLAB_REFERENCE_SOURCE_PATH)
   if (!(await source.exists())) {
-    throw new Error(
-      'The collaboration guide is unavailable in this build: COLLABORATIVE.md is missing.'
-    )
+    throw new Error('The collab guide is unavailable in this build: COLLAB.md is missing.')
   }
-  const [reference, declarations] = await Promise.all([
-    source.text(),
-    Bun.file(TYPES_SOURCE_PATH).text()
-  ])
+  const reference = await source.text()
   const paths = targetPaths(workspacePath, type)
   await writeChanged(paths.referencePath, reference)
-  await writeChanged(paths.typesPath, declarations)
+  await installCollabDeclaration(workspacePath)
   return paths
 }
 

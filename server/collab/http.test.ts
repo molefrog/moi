@@ -92,7 +92,7 @@ describe('collab HTTP integration', () => {
     expect(await Bun.file(join(directory, '.moi', 'data', 'collab.sqlite')).exists()).toBe(false)
   })
 
-  test('runtime flag does not install documents, identity or workspace configuration', async () => {
+  test('runtime flag does not install documents, profile or workspace configuration', async () => {
     const referencePath = collabSkillReferencePath(directory, workspace.type)
     const defaultSkillPath = join(dirname(dirname(referencePath)), 'SKILL.md')
     const defaultSkill = '# moi workspace\nExisting workspace instructions.\n'
@@ -103,7 +103,7 @@ describe('collab HTTP integration', () => {
     expect(await Bun.file(join(directory, '.moi', '.workspace.json')).exists()).toBe(false)
     expect(await Bun.file(defaultSkillPath).text()).toBe(defaultSkill)
     expect(await Bun.file(referencePath).exists()).toBe(false)
-    expect(await Bun.file(join(directory, '.moi', 'collab-env.d.ts')).exists()).toBe(false)
+    expect(await Bun.file(join(directory, '.moi', 'collab.d.ts')).exists()).toBe(false)
     expect(await Bun.file(join(directory, '.moi', 'data', 'collab.sqlite')).exists()).toBe(false)
   })
 
@@ -142,7 +142,7 @@ describe('collab HTTP integration', () => {
     const headers = { 'Cf-Access-Jwt-Assertion': 'forged.token.value' }
     const response = await api.request('/api/identity', { headers })
     expect(response.headers.get('Cache-Control')).toBe('private, no-store')
-    expect(await response.json()).toEqual({ provider: null, identity: null })
+    expect(await response.json()).toEqual({ provider: null, profile: null })
   })
 
   test('persistent commands remain absent even when presence is enabled', async () => {
@@ -188,7 +188,7 @@ describe('collab HTTP integration', () => {
           JSON.stringify({
             type: 'join',
             version: 2,
-            identity: { id: 'anna', name: 'Anna', color: 'blue' }
+            profile: { id: 'anna', name: 'Anna', color: 'blue' }
           })
         )
         await until(() => messages.some(message => message.type === 'welcome'))
@@ -245,7 +245,7 @@ describe('collab HTTP integration', () => {
       JSON.stringify({
         type: 'join',
         version: 2,
-        identity: { id: 'anna', name: 'Anna', color: 'blue' }
+        profile: { id: 'anna', name: 'Anna', color: 'blue' }
       })
     )
     await until(() => messages.some(message => message.type === 'welcome'))

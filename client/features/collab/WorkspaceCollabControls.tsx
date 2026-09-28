@@ -25,10 +25,20 @@ import { tabFromPath } from '@/lib/navigation'
 import { Avatar, AvatarFallback } from '@/ui-components/avatar'
 
 import { User } from './primitives'
-import { pageFromPath, useConnection, useWorkspaceUsers, useWorkspaceUsersStatus } from './hooks'
-import { getIdentity, getIdentitySource, shareWorkspace, subscribeIdentityStore } from './identity'
-import { groupPeople, userDisplayName } from './people'
-import type { PresentPerson } from './people'
+import {
+  pageFromPath,
+  useConnectionState,
+  useWorkspaceUsers,
+  useWorkspaceUsersAvailability
+} from './hooks'
+import {
+  getCurrentUser,
+  getCurrentUserSource,
+  shareWorkspace,
+  subscribeCurrentUserStore
+} from './host-state'
+import { summarizeWorkspaceUsers, userDisplayName } from './users'
+import type { WorkspaceUserInfo } from './users'
 
 export type CollabTabInfo = { label: string; Icon: TabIcon }
 type DescribeTab = (tab: WorkspaceTabId) => CollabTabInfo | null
@@ -47,39 +57,43 @@ export function WorkspaceCollabControls({
   describeTab,
   onOpenTab
 }: WorkspaceCollabControlsProps) {
-  const state = useConnection()
-  const users = useWorkspaceUsers()
-  const directoryStatus = useWorkspaceUsersStatus()
-  const identity = useSyncExternalStore(subscribeIdentityStore, getIdentity, getIdentity)
+  const state = useConnectionState()
+  const workspaceUsers = useWorkspaceUsers()
+  const directoryStatus = useWorkspaceUsersAvailability()
+  const currentUser = useSyncExternalStore(
+    subscribeCurrentUserStore,
+    getCurrentUser,
+    getCurrentUser
+  )
   const router = useRouter()
   const path = usePathname(router)
   const page = pageFromPath(path, workspaceId, router.base)
-  const people = groupPeople(state.participants, {
-    identity,
+  const userInfo = summarizeWorkspaceUsers(state.connections, {
+    currentUser,
     connectionId: state.connectionId,
-    users,
+    users: workspaceUsers,
     page
   })
-  const self = people.find(person => person.self)
-  const others = people.filter(person => !person.self)
-  const connected = others.filter(person => person.status !== 'offline')
+  const self = userInfo.find(user => user.self)
+  const others = userInfo.filter(user => !user.self)
+  const connected = others.filter(user => user.status !== 'offline')
   const hidden = Math.max(0, connected.length - MAX_FACES)
   const [open, setOpen] = useState(false)
   const jump = (tab: WorkspaceTabId) => {
     setOpen(false)
     onOpenTab(tab)
   }
-  const canEdit = getIdentitySource() === 'dev'
-  if (!identity) return null
+  const canEdit = getCurrentUserSource() === 'dev'
+  if (!currentUser) return null
   return (
     <div className="flex items-center gap-1">
       <Popover open={open} onOpenChange={setOpen}>
         <span className="flex items-center -space-x-2">
-          {connected.slice(0, MAX_FACES).map(person => (
+          {connected.slice(0, MAX_FACES).map(user => (
             <Face
-              key={person.identity.id}
-              person={person}
-              place={placeOf(person, page, describeTab)}
+              key={user.profile.id}
+              user={user}
+              place={placeOf(user, page, describeTab)}
               onJump={jump}
             />
           ))}
@@ -101,9 +115,9 @@ export function WorkspaceCollabControls({
             {self && (
               <User
                 avatarOnly
-                id={self.identity.id}
+                id={self.profile.id}
                 showStatus={false}
-                label={`${userDisplayName(self.identity)} (you)`}
+                label={`${userDisplayName(self.profile)} (you)`}
                 className="ring-2 ring-background"
               />
             )}
@@ -114,9 +128,9 @@ export function WorkspaceCollabControls({
           <PopoverTitle className="sr-only">Users in this workspace</PopoverTitle>
           {self && (
             <div className="flex items-center gap-3 px-2 pt-1">
-              <User avatarOnly id={self.identity.id} size="lg" showStatus={false} />
+              <User avatarOnly id={self.profile.id} size="lg" showStatus={false} />
               <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                {userDisplayName(self.identity)}{' '}
+                {userDisplayName(self.profile)}{' '}
                 <span className="font-normal text-muted-foreground">(you)</span>
               </span>
             </div>
@@ -133,11 +147,11 @@ export function WorkspaceCollabControls({
           <div className="border-t border-border" />
           {others.length > 0 ? (
             <ul className="flex flex-col">
-              {others.map(person => (
-                <PersonRow
-                  key={person.identity.id}
-                  person={person}
-                  place={placeOf(person, page, describeTab)}
+              {others.map(user => (
+                <UserRow
+                  key={user.profile.id}
+                  user={user}
+                  place={placeOf(user, page, describeTab)}
                   onJump={jump}
                 />
               ))}
@@ -145,8 +159,8 @@ export function WorkspaceCollabControls({
           ) : (
             <p className="px-2 pb-1 text-xs text-muted-foreground">
               {directoryStatus === 'loading'
-                ? 'Loading workspace members…'
-                : 'No one else is here yet. Share the link to bring people in.'}
+                ? 'Loading workspace users…'
+                : 'No other workspace users to show.'}
             </p>
           )}
         </PopoverContent>
@@ -158,17 +172,17 @@ export function WorkspaceCollabControls({
 
 type Place = { where: string; Icon?: TabIcon; target: WorkspaceTabId | null; away: boolean }
 
-function placeOf(person: PresentPerson, page: string, describeTab: DescribeTab): Place {
-  const tabs = person.pages.map(candidate => {
+function placeOf(user: WorkspaceUserInfo, page: string, describeTab: DescribeTab): Place {
+  const tabs = user.pages.map(candidate => {
     const tab = tabFromPath(candidate)
     return { tab, info: tab ? describeTab(tab) : null }
   })
-  const away = person.status !== 'active'
+  const away = user.status !== 'active'
   const pages = tabs.map(({ tab, info }) => info?.label ?? tab ?? 'Another tab').join(', ')
   return {
     away,
     where: away
-      ? person.status === 'offline'
+      ? user.status === 'offline'
         ? 'Offline'
         : pages
           ? `Away · ${pages}`
@@ -180,10 +194,10 @@ function placeOf(person: PresentPerson, page: string, describeTab: DescribeTab):
   }
 }
 
-// A face in the header stack: hover names the person and where they are,
+// A face in the header stack: hover names the user and where they are,
 // and a click opens the tab they are on.
-type FaceProps = { person: PresentPerson; place: Place; onJump: (tab: WorkspaceTabId) => void }
-function Face({ person, place, onJump }: FaceProps) {
+type FaceProps = { user: WorkspaceUserInfo; place: Place; onJump: (tab: WorkspaceTabId) => void }
+function Face({ user, place, onJump }: FaceProps) {
   const target = place.target
   const hint = place.away
     ? place.where
@@ -207,14 +221,14 @@ function Face({ person, place, onJump }: FaceProps) {
       >
         <User
           avatarOnly
-          id={person.identity.id}
+          id={user.profile.id}
           showStatus={false}
           className="ring-2 ring-background"
         />
       </TooltipTrigger>
       <TooltipContent side="bottom">
         <span className="flex flex-col">
-          <span>{userDisplayName(person.identity)}</span>
+          <span>{userDisplayName(user.profile)}</span>
           <span className="font-normal text-muted-foreground">{hint}</span>
         </span>
       </TooltipContent>
@@ -222,14 +236,14 @@ function Face({ person, place, onJump }: FaceProps) {
   )
 }
 
-type PersonRowProps = { person: PresentPerson; place: Place; onJump: (tab: WorkspaceTabId) => void }
-function PersonRow({ person, place, onJump }: PersonRowProps) {
+type UserRowProps = { user: WorkspaceUserInfo; place: Place; onJump: (tab: WorkspaceTabId) => void }
+function UserRow({ user, place, onJump }: UserRowProps) {
   const { Icon, where, target } = place
   const content = (
     <>
-      <User avatarOnly id={person.identity.id} size="md" />
+      <User avatarOnly id={user.profile.id} size="md" />
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-sm">{userDisplayName(person.identity)}</span>
+        <span className="truncate text-sm">{userDisplayName(user.profile)}</span>
         <span className="flex items-center gap-1 text-xs text-muted-foreground">
           {Icon && <Icon size={12} stroke={1.75} className="shrink-0" />}
           <span className="truncate">{where}</span>
@@ -304,9 +318,7 @@ function ShareButton({ workspaceId }: ShareButtonProps) {
               ? 'Couldn’t share workspace'
               : (result ?? 'Share workspace')}
         </PopoverTitle>
-        <p className="text-sm text-muted-foreground">
-          {error ?? 'Share the workspace link with your collaborators.'}
-        </p>
+        <p className="text-sm text-muted-foreground">{error ?? 'Copy a link to this workspace.'}</p>
       </PopoverContent>
     </Popover>
   )

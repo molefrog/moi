@@ -66,7 +66,7 @@ describe('appletSendBlockedReason', () => {
 
 // Exercise the actual async handler with deferred uploads and the real selection
 // cache, including changes that happen without an intervening React render.
-describe.each([false, true])('applet sends, personal=%p', personalSelection => {
+describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope=%p', scope => {
   const workspaceId = 'immediate-send-test'
   const originalFetch = globalThis.fetch
   let handler: ReturnType<typeof createAppletMessageHandler>
@@ -79,7 +79,9 @@ describe.each([false, true])('applet sends, personal=%p', personalSelection => {
   let log: ReturnType<typeof spyOn<typeof appletLog, 'reportAppletError'>>
 
   function select(sessionId: string | null) {
-    queryClient.setQueryData(selectedSessionKey(workspaceId, personalSelection), { sessionId })
+    queryClient.setQueryData(selectedSessionKey(workspaceId, scope), {
+      sessionId
+    })
   }
   function deferredUpload() {
     const deferred = Promise.withResolvers<Response>()
@@ -113,14 +115,13 @@ describe.each([false, true])('applet sends, personal=%p', personalSelection => {
       queryClient,
       () => ({
         sessionId:
-          queryClient.getQueryData<SelectedSessionState>(
-            selectedSessionKey(workspaceId, personalSelection)
-          )?.sessionId ?? null,
+          queryClient.getQueryData<SelectedSessionState>(selectedSessionKey(workspaceId, scope))
+            ?.sessionId ?? null,
         send,
         revealChat: reveal,
         agentAvailability: availability
       }),
-      personalSelection
+      scope
     )
   })
   afterEach(() => {
@@ -146,9 +147,12 @@ describe.each([false, true])('applet sends, personal=%p', personalSelection => {
   test('ignores selection changes in the other scope while attachments are prepared', async () => {
     const deferred = deferredUpload()
     const pending = handler.handle(event)
-    queryClient.setQueryData(selectedSessionKey(workspaceId, !personalSelection), {
-      sessionId: 'another-chat'
-    })
+    queryClient.setQueryData(
+      selectedSessionKey(workspaceId, scope === 'shared' ? 'browser-tab' : 'shared'),
+      {
+        sessionId: 'another-chat'
+      }
+    )
     deferred.resolve(Response.json(upload))
     await pending
     expect(send).toHaveBeenCalledTimes(1)
@@ -318,7 +322,7 @@ describe.each([false, true])('applet sends, personal=%p', personalSelection => {
         revealChat: reveal,
         agentAvailability: availability
       }),
-      personalSelection
+      scope
     )
     const fetch = mock(() => Promise.reject(new Error('unexpected upload')))
     globalThis.fetch = fetch as unknown as typeof globalThis.fetch

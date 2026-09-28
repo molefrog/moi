@@ -1,4 +1,4 @@
-import { CollabProvider, useCollabIdentityEnabled } from '@/client/features/collab/entry'
+import { CollabProvider, useCollabEnabled } from '@/client/features/collab/entry'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
@@ -38,7 +38,7 @@ export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
 }
 
 function WorkspaceContent({ id }: WorkspaceRouteProps) {
-  const personal = useCollabIdentityEnabled()
+  const collabEnabled = useCollabEnabled()
   const queryClient = useQueryClient()
   const [selectedSessionId] = useSelectedSession()
   const { isLoading: layoutLoading } = useWorkspaceLayoutCtx()
@@ -75,10 +75,10 @@ function WorkspaceContent({ id }: WorkspaceRouteProps) {
           <LedLogo sprite="moi" effect="chaos" />
         </div>
       ) : (
-        // Personal tabs are read when the screen mounts; reset that state when
-        // navigation switches between the shared layout and this browser tab.
+        // Browser tab state is read when the screen mounts. Reset the screen
+        // when it switches between shared workspace tabs and browser tab state.
         <WorkspaceScreen
-          key={personal ? 'personal' : 'shared'}
+          key={collabEnabled ? 'browser-tab' : 'shared'}
           widgets={widgets.data}
           views={views.data ?? []}
           builders={builders.data ?? []}

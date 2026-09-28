@@ -10,7 +10,7 @@ import {
 } from '@/client/features/chat/sessions/api'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import { useSelectedSession } from '@/client/features/chat/sessions/useSelectedSession'
-import { useCollabIdentityEnabled } from '@/client/features/collab/entry'
+import { useCollabEnabled } from '@/client/features/collab/entry'
 import {
   type WorkspaceTabAddress,
   useMoiUserMessageContext
@@ -54,7 +54,7 @@ export function useChat(address: WorkspaceTabAddress) {
   const qc = useQueryClient()
   const { layout } = useWorkspaceLayoutCtx()
   const [selectedSession, selectSession] = useSelectedSession()
-  const personalSelection = useCollabIdentityEnabled()
+  const collabEnabled = useCollabEnabled()
   const modelsData = useWorkspaceAgent(workspaceId).data
   const sessions = useWorkspaceSessions(workspaceId).data
   const selectedSessionMissing =
@@ -175,7 +175,7 @@ export function useChat(address: WorkspaceTabAddress) {
         content: text,
         sessionId: sid,
         isNew,
-        personalSelection,
+        selectedSessionScope: collabEnabled ? 'browser-tab' : 'shared',
         optimisticId,
         model,
         effort,
@@ -208,7 +208,7 @@ export function useChat(address: WorkspaceTabAddress) {
       sessionConfig?.effort,
       sessionConfig?.fastMode,
       selectSession,
-      personalSelection,
+      collabEnabled,
       modelsData
     ]
   )

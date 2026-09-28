@@ -32,25 +32,25 @@ afterEach(async () => {
 
 describe('automatic chat selection', () => {
   test.each([null, 'someone-elses-chat'])(
-    'a personal chat preserves shared selection %p',
+    'a browser tab chat preserves shared selection %p',
     async previous => {
       await initializeSelectedSession(workspace.path, previous)
 
-      await selectChatSession(workspace, 'personal-chat', true, null)
+      await selectChatSession(workspace, 'browser-tab-chat', 'browser-tab', null)
       // A provider's replacement id must not create a shared selection either.
-      await renameSelectedSession(workspace.path, 'personal-chat', 'provider-id')
+      await renameSelectedSession(workspace.path, 'browser-tab-chat', 'provider-id')
 
       expect(await getSelectedSession(workspace.path)).toBe(previous)
       expect(events).toEqual([])
     }
   )
 
-  test.each([undefined, false])(
-    'a new shared chat selects and broadcasts with personalSelection=%p',
-    async personalSelection => {
+  test.each([undefined, 'shared'] as const)(
+    'a new chat follows selectedSessionScope=%p',
+    async selectedSessionScope => {
       await initializeSelectedSession(workspace.path, null)
 
-      await selectChatSession(workspace, 'new-chat', personalSelection, null)
+      await selectChatSession(workspace, 'new-chat', selectedSessionScope, null)
 
       expect(await getSelectedSession(workspace.path)).toBe('new-chat')
       expect(events).toEqual([
@@ -63,8 +63,8 @@ describe('automatic chat selection', () => {
     await initializeSelectedSession(workspace.path, null)
     await renameSelectedSession(workspace.path, 'temporary', 'provider-id')
 
-    await selectChatSession(workspace, 'temporary', false, null)
-    await selectChatSession(workspace, 'late-chat', false, null)
+    await selectChatSession(workspace, 'temporary', 'shared', null)
+    await selectChatSession(workspace, 'late-chat', 'shared', null)
 
     expect(await getSelectedSession(workspace.path)).toBe('provider-id')
     expect(events).toEqual([

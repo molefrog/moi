@@ -5,7 +5,7 @@ import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { APP_ICON_IDS } from '@/client/lib/app-icon-registry'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
-import type { MessageAttachment, ViewBuilder, ViewInfo } from '@/lib/types'
+import type { MessageAttachment, SelectedSessionScope, ViewBuilder, ViewInfo } from '@/lib/types'
 
 export function useViews(workspaceId: string) {
   return useQuery<ViewInfo[]>({
@@ -113,7 +113,7 @@ export type SubmitViewBuilderInput = {
   builderId: string
   requirements: string
   optimisticId: string
-  personalSelection?: boolean
+  selectedSessionScope?: SelectedSessionScope
   attachments?: MessageAttachment[]
   model?: string
   effort?: string

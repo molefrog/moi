@@ -3,12 +3,12 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { Router } from 'wouter'
 
 import { TooltipProvider } from '@/client/components/ui/tooltip'
-import type { CollabIdentity, CollabParticipant } from '@/lib/collab/types'
+import type { UserProfile, Connection } from '@/lib/collab/types'
 
 import { WorkspaceCollabControls } from './WorkspaceCollabControls'
 import { createFakeEngine } from './fake-engine'
 import { CollabContext } from './hooks'
-import { getIdentity, setIdentity } from './identity'
+import { getCurrentUser, setCurrentUser } from './host-state'
 
 const self = { id: 'self', name: 'Self', color: '#0f766e' }
 const active = { id: 'active', name: 'Active colleague', color: '#2563eb' }
@@ -19,7 +19,7 @@ const offline = Array.from({ length: 100 }, (_, index) => ({
   color: '#2563eb'
 }))
 
-function connection(user: CollabIdentity, page: string | null): CollabParticipant {
+function connection(user: UserProfile, page: string | null): Connection {
   return {
     connectionId: user.id,
     userId: user.id,
@@ -29,18 +29,18 @@ function connection(user: CollabIdentity, page: string | null): CollabParticipan
 }
 
 function renderHeader(
-  users: CollabIdentity[],
-  others: CollabParticipant[],
-  viewer: CollabIdentity = self
+  users: UserProfile[],
+  otherConnections: Connection[],
+  viewer: UserProfile = self
 ) {
-  const previous = getIdentity()
-  setIdentity(viewer)
+  const previous = getCurrentUser()
+  setCurrentUser(viewer)
   try {
     return renderToStaticMarkup(
       <Router ssrPath="/workspace/test/overview">
         <TooltipProvider>
           <CollabContext
-            value={createFakeEngine({ self: viewer, page: 'overview', users, others })}
+            value={createFakeEngine({ self: viewer, page: 'overview', users, otherConnections })}
           >
             <WorkspaceCollabControls
               workspaceId="test"
@@ -52,11 +52,11 @@ function renderHeader(
       </Router>
     )
   } finally {
-    setIdentity(previous)
+    setCurrentUser(previous)
   }
 }
 
-test('header shows active and away colleagues without offline directory members', () => {
+test('header shows active and away users without offline workspace users', () => {
   const html = renderHeader(
     [self, ...offline, active, away],
     [connection(active, 'overview'), connection(away, null)]
@@ -69,7 +69,7 @@ test('header shows active and away colleagues without offline directory members'
   expect(html).not.toMatch(/title="\d+ more"/)
 })
 
-test('header overflow counts connected people once, excluding offline members and own tabs', () => {
+test('header overflow counts connected users once, excluding offline users and own tabs', () => {
   const third = { id: 'third', name: 'Third colleague', color: '#2563eb' }
   const fourth = { id: 'fourth', name: 'Fourth colleague', color: '#2563eb' }
   const html = renderHeader(
@@ -93,17 +93,17 @@ test('header overflow counts connected people once, excluding offline members an
   expect(html).not.toContain('aria-label="Fourth colleague"')
 })
 
-test('header gives nameless viewers and connected members nonempty accessible labels', () => {
+test('header gives nameless viewers and connected users nonempty accessible labels', () => {
   const viewer = { id: 'nameless-self', color: '#0f766e' }
-  const member = { id: 'member-id', name: '', email: 'person@example.test', color: '#2563eb' }
+  const user = { id: 'user-id', name: '', email: 'user@example.test', color: '#2563eb' }
   const noEmail = { id: 'another-member', name: '  ', color: '#2563eb' }
   const html = renderHeader(
-    [viewer, member, noEmail],
-    [connection(member, 'overview'), connection(noEmail, 'overview')],
+    [viewer, user, noEmail],
+    [connection(user, 'overview'), connection(noEmail, 'overview')],
     viewer
   )
   expect(html).toContain('aria-label="nameless-self (you)"')
-  expect(html).toContain('aria-label="person@example.test"')
+  expect(html).toContain('aria-label="user@example.test"')
   expect(html).toContain('aria-label="another-member"')
   expect(html).not.toContain('undefined')
   expect(html).not.toContain('aria-label=""')

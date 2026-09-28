@@ -5,7 +5,7 @@ import { normalizeWorkspaceTabs } from '@/lib/workspace-layout'
 
 const keyFor = (workspaceId: string, field: string) => `moi:collab:${workspaceId}:${field}`
 
-export function readPersonalSession(workspaceId: string): string | null {
+export function readBrowserTabSelectedSession(workspaceId: string): string | null {
   try {
     return sessionStorage.getItem(keyFor(workspaceId, 'session'))
   } catch {
@@ -13,7 +13,10 @@ export function readPersonalSession(workspaceId: string): string | null {
   }
 }
 
-export function writePersonalSession(workspaceId: string, sessionId: string | null): void {
+export function writeBrowserTabSelectedSession(
+  workspaceId: string,
+  sessionId: string | null
+): void {
   try {
     if (sessionId === null) sessionStorage.removeItem(keyFor(workspaceId, 'session'))
     else sessionStorage.setItem(keyFor(workspaceId, 'session'), sessionId)
@@ -22,7 +25,7 @@ export function writePersonalSession(workspaceId: string, sessionId: string | nu
   }
 }
 
-export function readPersonalTabs(
+export function readWorkspaceTabs(
   workspaceId: string,
   defaults: WorkspaceTabsState
 ): WorkspaceTabsState {
@@ -34,7 +37,7 @@ export function readPersonalTabs(
   }
 }
 
-export function writePersonalTabs(workspaceId: string, tabs: WorkspaceTabsState): void {
+export function writeWorkspaceTabs(workspaceId: string, tabs: WorkspaceTabsState): void {
   try {
     sessionStorage.setItem(keyFor(workspaceId, 'tabs'), JSON.stringify(tabs))
   } catch {
@@ -42,18 +45,18 @@ export function writePersonalTabs(workspaceId: string, tabs: WorkspaceTabsState)
   }
 }
 
-export function usePersonalTabs(
+export function useWorkspaceTabs(
   workspaceId: string,
   enabled: boolean,
   defaults: WorkspaceTabsState
 ) {
   const [local, setLocal] = useState<WorkspaceTabsState>(() =>
-    enabled ? readPersonalTabs(workspaceId, defaults) : defaults
+    enabled ? readWorkspaceTabs(workspaceId, defaults) : defaults
   )
   const setTabs = useCallback(
     (tabs: WorkspaceTabsState) => {
       setLocal(tabs)
-      writePersonalTabs(workspaceId, tabs)
+      writeWorkspaceTabs(workspaceId, tabs)
     },
     [workspaceId]
   )

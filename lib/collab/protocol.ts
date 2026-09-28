@@ -1,4 +1,4 @@
-import type { CollabClientMessage, CollabIdentity, CollabJsonValue, CollabLocation } from './types'
+import type { CollabClientMessage, CollabJsonValue, CollabLocation, UserProfile } from './types'
 
 export const COLLAB_PROTOCOL_VERSION = 2
 export const COLLAB_MAX_CONNECTIONS = 64
@@ -30,7 +30,7 @@ export function isCollabJson(value: unknown, depth = 0): value is CollabJsonValu
   return Object.values(value).every(item => isCollabJson(item, depth + 1))
 }
 
-export function isCollabIdentity(value: unknown): value is CollabIdentity {
+export function isUserProfile(value: unknown): value is UserProfile {
   return (
     isRecord(value) &&
     isCollabString(value.id, 240) &&
@@ -58,11 +58,11 @@ export function isCollabClientMessage(value: unknown): value is CollabClientMess
     case 'join':
       return (
         value.version === COLLAB_PROTOCOL_VERSION &&
-        isCollabIdentity(value.identity) &&
+        isUserProfile(value.profile) &&
         (value.location === undefined || isLocation(value.location))
       )
-    case 'identity':
-      return isCollabIdentity(value.identity)
+    case 'profile':
+      return isUserProfile(value.profile)
     case 'location':
       return isLocation(value.location)
     case 'presence:set':

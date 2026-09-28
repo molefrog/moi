@@ -8,7 +8,7 @@ import { updateWorkspaceSkills } from '../skill-update'
 
 const SKILL_MD = join('moi-workspace', 'SKILL.md')
 const CHEAT_SHEET = join('moi-workspace', 'references', 'UI-COMPONENTS.md')
-const COLLAB_GUIDE = join('moi-workspace', 'references', 'COLLABORATIVE.md')
+const COLLAB_GUIDE = join('moi-workspace', 'references', 'COLLAB.md')
 
 async function withTempDir(run: (dir: string) => Promise<void>): Promise<void> {
   const dir = mkdtempSync(join(tmpdir(), 'moi-skills-'))

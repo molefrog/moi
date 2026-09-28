@@ -1,17 +1,16 @@
-import type { WorkspaceEntry } from '@/lib/types'
+import type { SelectedSessionScope, WorkspaceEntry } from '@/lib/types'
 
 import { publishEvent } from './events'
 import { saveSelectedSession } from './selected-session'
 
-// Starting a chat can select it for this installation, but a browser with
-// personal selection has already selected it locally and must not move peers.
+// A new chat updates the shared selection only when this tab uses that scope.
 export async function selectChatSession(
   workspace: Pick<WorkspaceEntry, 'id' | 'path'>,
   sessionId: string,
-  personalSelection = false,
+  selectedSessionScope: SelectedSessionScope = 'shared',
   previousSessionId?: string | null
 ): Promise<void> {
-  if (personalSelection) return
+  if (selectedSessionScope === 'browser-tab') return
   const selection = await saveSelectedSession(workspace.path, sessionId, previousSessionId)
   if (selection.changed) {
     publishEvent({

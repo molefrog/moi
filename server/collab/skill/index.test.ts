@@ -6,9 +6,10 @@ import type * as CollabApi from 'moi/collab'
 
 import type * as Components from '@/client/features/collab/components'
 import type * as Hooks from '@/client/features/collab/hooks'
-import type { CollabIdentity } from '@/lib/collab/types'
+import type { UserProfile } from '@/lib/collab/types'
 import type { WorkspaceType } from '@/lib/types'
 
+import { COLLAB_DECLARATION_SOURCE_PATH } from '../../applets/declarations'
 import { COLLAB_REFERENCE_SOURCE_PATH } from '../../skills-template'
 import { provisionWorkspace, skillsDirFor } from '../../workspace-init'
 import { installCollabSkill, removeCollabSkill } from './index'
@@ -19,7 +20,7 @@ type ActualHooks = Pick<
   | 'usePeers'
   | 'useUser'
   | 'useWorkspaceUsers'
-  | 'useWorkspaceUsersStatus'
+  | 'useWorkspaceUsersAvailability'
   | 'usePresence'
   | 'usePublishPresence'
 >
@@ -37,8 +38,8 @@ type ActualComponents = Pick<
 // This assignment is checked by tsc without importing React into the server.
 const declarationsMatch: ActualHooks & ActualComponents extends typeof CollabApi ? true : false =
   true
-const profileDeclarationsMatch: CollabIdentity extends CollabApi.CollabIdentity
-  ? CollabApi.CollabIdentity extends CollabIdentity
+const profileDeclarationsMatch: UserProfile extends CollabApi.UserProfile
+  ? CollabApi.UserProfile extends UserProfile
     ? true
     : false
   : false = true
@@ -55,11 +56,14 @@ test('optional collab reference installs beside the default skill without changi
   directories.push(workspace)
   const installed = await installCollabSkill(workspace, 'codex')
   expect(installed.referencePath).toBe(
-    join(workspace, '.agents', 'skills', 'moi-workspace', 'references', 'COLLABORATIVE.md')
+    join(workspace, '.agents', 'skills', 'moi-workspace', 'references', 'COLLAB.md')
   )
-  expect(installed.typesPath).toBe(join(workspace, '.moi', 'collab-env.d.ts'))
+  expect(installed.typesPath).toBe(join(workspace, '.moi', 'collab.d.ts'))
   expect(await readFile(installed.referencePath, 'utf8')).toBe(
     await readFile(COLLAB_REFERENCE_SOURCE_PATH, 'utf8')
+  )
+  expect(await readFile(installed.typesPath, 'utf8')).toBe(
+    await readFile(COLLAB_DECLARATION_SOURCE_PATH, 'utf8')
   )
   const defaultSkill = join(dirname(dirname(installed.referencePath)), 'SKILL.md')
   const marker = '# Existing workspace skill\nLeave its authored instructions alone.\n'
@@ -86,7 +90,7 @@ test('optional guide uses each harness skill directory', async () => {
     directories.push(workspace)
     const { referencePath } = await installCollabSkill(workspace, type)
     expect(referencePath).toBe(
-      join(skillsDirFor(workspace, type), 'moi-workspace', 'references', 'COLLABORATIVE.md')
+      join(skillsDirFor(workspace, type), 'moi-workspace', 'references', 'COLLAB.md')
     )
     expect(await Bun.file(referencePath).exists()).toBe(true)
   }
@@ -103,9 +107,9 @@ test('ordinary workspace provisioning omits collab and preserves a manually inst
     skillsDirFor(workspace, 'codex'),
     'moi-workspace',
     'references',
-    'COLLABORATIVE.md'
+    'COLLAB.md'
   )
-  const typesPath = join(workspace, '.moi', 'collab-env.d.ts')
+  const typesPath = join(workspace, '.moi', 'collab.d.ts')
   expect(await Bun.file(referencePath).exists()).toBe(false)
   expect(await Bun.file(typesPath).exists()).toBe(false)
   await installCollabSkill(workspace, 'codex')

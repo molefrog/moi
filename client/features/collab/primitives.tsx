@@ -10,7 +10,7 @@ import { Badge } from '@/ui-components/badge'
 
 import { facehashDataUrl } from './facehash-avatar'
 import { useUser, useUsers } from './hooks'
-import { userDisplayName } from './people'
+import { userDisplayName } from './users'
 import { motion } from 'motion/react'
 
 // User components resolve IDs through the current workspace directory,
@@ -21,14 +21,14 @@ const AVATAR_SIZE = { xs: 'xs', sm: 'sm', md: 'default', lg: 'lg' } as const
 // Shown for an id nobody in this workspace has ever used.
 const UNKNOWN_NAME = 'Unknown user'
 
-// Black or white, whichever reads on the person's color.
+// Black or white, whichever reads on the user's color.
 export function readableOn(color: string): string {
   return (wcagLuminance(color) ?? 0) > 0.3 ? 'oklch(0 0 0)' : 'oklch(1 0 0)'
 }
 
-// Identity colors are data. They land on the node as custom properties
+// User colors are data. They land on the node as custom properties
 // instead of stylesheet rules; classes read `--collab-color` and
-// `--collab-contrast` from there. An unknown person gets quiet theme tones.
+// `--collab-contrast` from there. An unknown user gets quiet theme tones.
 export function useUserColor(color: string | undefined) {
   return useCallback(
     (node: HTMLElement | null) => {
@@ -49,8 +49,8 @@ export type UserProps = {
   // A quiet second line: where they are, what they are doing. The compact
   // `xs` size keeps it on the same line.
   detail?: ReactNode
-  // The green dot: this person has the workspace open in a visible tab right
-  // now. Away (every tab hidden) and offline people never get one.
+  // The green dot: this user has the workspace open in a visible tab right
+  // now. Away (every tab hidden) and offline users never get one.
   showStatus?: boolean
   label?: string
   className?: string
@@ -65,13 +65,13 @@ export function User({
   label,
   className
 }: UserProps) {
-  const identity = useUser(id)
-  const name = identity ? userDisplayName(identity) : UNKNOWN_NAME
+  const user = useUser(id)
+  const name = user ? userDisplayName(user) : UNKNOWN_NAME
   // A profile without a picture gets the same generated face on every client,
   // so nobody shows up as bare initials.
-  const picture = identity?.avatar
-  const faceName = identity ? name : undefined
-  const faceColor = identity?.color
+  const picture = user?.avatar
+  const faceName = user ? name : undefined
+  const faceColor = user?.color
   const face = useMemo(
     () => (faceName && faceColor ? (picture ?? facehashDataUrl(faceName, faceColor)) : undefined),
     [picture, faceName, faceColor]
@@ -86,13 +86,13 @@ export function User({
     >
       {face && <AvatarImage src={face} alt="" />}
       <AvatarFallback>
-        {identity ? (
+        {user ? (
           name.slice(0, 2).toUpperCase()
         ) : (
           <IconUser size={size === 'xs' || size === 'sm' ? 12 : 16} stroke={1.75} />
         )}
       </AvatarFallback>
-      {showStatus && identity?.status === 'active' && <AvatarBadge className="bg-success" />}
+      {showStatus && user?.status === 'active' && <AvatarBadge className="bg-success" />}
     </Avatar>
   )
   if (avatarOnly) return avatar
@@ -110,7 +110,7 @@ export function User({
           className={cn(
             'truncate text-sm',
             size === 'lg' && 'font-medium',
-            !identity && 'text-muted-foreground'
+            !user && 'text-muted-foreground'
           )}
         >
           {name}
@@ -152,7 +152,7 @@ export function Facepile({
         size === 'xs' ? '-space-x-1.5' : '-space-x-2',
         className
       )}
-      aria-label={`${unique.length} people`}
+      aria-label={`${unique.length} users`}
     >
       {shown.map(id => (
         <User
@@ -183,7 +183,7 @@ type UserTagProps = {
   icon?: ReactNode
   className?: string
 }
-// The kit's badge in the person's color, wherever a name marks a place.
+// The kit's badge in the user's color, wherever a name marks a place.
 function UserTag({ name, color, icon, className }: UserTagProps) {
   return (
     <Badge
@@ -207,9 +207,9 @@ export type CursorProps = {
   ref?: Ref<HTMLSpanElement>
 }
 export function Cursor({ id, x, y, label = true, className, ref }: CursorProps) {
-  const identity = useUser(id)
+  const user = useUser(id)
   const node = useRef<HTMLSpanElement | null>(null)
-  const setColor = useUserColor(identity?.color)
+  const setColor = useUserColor(user?.color)
   const attach = useCallback(
     (element: HTMLSpanElement | null) => {
       node.current = element
@@ -238,8 +238,8 @@ export function Cursor({ id, x, y, label = true, className, ref }: CursorProps) 
         </svg>
         {label && (
           <UserTag
-            name={identity ? userDisplayName(identity) : 'Someone'}
-            color={identity?.color}
+            name={user ? userDisplayName(user) : 'Someone'}
+            color={user?.color}
             className="absolute top-4 left-3.5"
           />
         )}
@@ -250,7 +250,7 @@ export function Cursor({ id, x, y, label = true, className, ref }: CursorProps) 
 
 export type PresenceFramePrimitiveProps = HTMLAttributes<HTMLDivElement> & {
   ref?: Ref<HTMLDivElement>
-  // Everyone at this element; the first person's color draws the frame.
+  // Everyone at this element; the first user's color draws the frame.
   ids: readonly string[]
   icon?: ReactNode
   children: ReactNode

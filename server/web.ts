@@ -1,4 +1,4 @@
-import type { CollabIdentity } from '@/lib/collab/types'
+import type { UserProfile } from '@/lib/collab/types'
 import { isMessageAttachments } from '@/lib/message-attachments'
 import type { ClientMessage, StatusSnapshotMessage } from '@/lib/types'
 import { isMoiContext, type MoiContext } from '@/lib/moi-context'
@@ -38,7 +38,7 @@ type WsData = {
   workspaceId: string
   workspacePath?: string
   // The collab profile a proxy (Cloudflare Access) verified for the upgrade.
-  identity?: CollabIdentity
+  verifiedProfile?: UserProfile
 }
 
 function isClientMessage(value: unknown): value is ClientMessage {
@@ -49,7 +49,7 @@ function isClientMessage(value: unknown): value is ClientMessage {
     sessionId?: unknown
     content?: unknown
     isNew?: unknown
-    personalSelection?: unknown
+    selectedSessionScope?: unknown
     optimisticId?: unknown
     model?: unknown
     effort?: unknown
@@ -65,7 +65,9 @@ function isClientMessage(value: unknown): value is ClientMessage {
       typeof v.content === 'string' &&
       typeof v.sessionId === 'string' &&
       typeof v.isNew === 'boolean' &&
-      (v.personalSelection === undefined || typeof v.personalSelection === 'boolean') &&
+      (v.selectedSessionScope === undefined ||
+        v.selectedSessionScope === 'shared' ||
+        v.selectedSessionScope === 'browser-tab') &&
       (v.optimisticId === undefined || typeof v.optimisticId === 'string') &&
       (v.model === undefined || typeof v.model === 'string') &&
       (v.effort === undefined || typeof v.effort === 'string') &&
@@ -151,15 +153,15 @@ export const app = Bun.serve<WsData>({
         return new Response('Collab is not enabled for this workspace', { status: 403 })
       }
       // Behind Cloudflare Access, presence is joined only as the verified viewer.
-      const { provider, identity } = await proxyIdentity(req)
-      if (provider && !identity) {
+      const { provider, profile } = await proxyIdentity(req)
+      if (provider && !profile) {
         return new Response('Sign in through Cloudflare Access to join', { status: 401 })
       }
       return upgrade(server, req, {
         channel: 'collab',
         workspaceId,
         workspacePath: workspace.path,
-        ...(identity ? { identity } : {})
+        ...(profile ? { verifiedProfile: profile } : {})
       })
     }
   },
@@ -169,7 +171,8 @@ export const app = Bun.serve<WsData>({
   websocket: {
     open(ws) {
       if (ws.data.channel === 'collab') {
-        if (ws.data.workspacePath) collabManager.open(ws, ws.data.workspacePath, ws.data.identity)
+        if (ws.data.workspacePath)
+          collabManager.open(ws, ws.data.workspacePath, ws.data.verifiedProfile)
         else ws.close(1008, 'Missing workspace')
       } else if (ws.data.channel === 'chat') {
         addClient(ws)
@@ -209,7 +212,7 @@ export const app = Bun.serve<WsData>({
                 }
               : undefined
           if (data.isNew) {
-            await selectChatSession(workspace, data.sessionId, data.personalSelection, null)
+            await selectChatSession(workspace, data.sessionId, data.selectedSessionScope, null)
           }
           // Harnesses ignore fields they don't support (see SendMessageInput).
           // Their failures surface internally; attachment resolution happens
