@@ -24,30 +24,21 @@ type WorkspaceRouteProps = {
 // Navigation reads the raw browser address so encoded paths and query params
 // are decoded exactly once; the route only owns the workspace ID.
 export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
+  const { experimental } = useAppConfig()
+
   return (
     <Workspace id={id}>
       <WorkspaceLayoutProvider id={id}>
-        <WorkspaceFeatures id={id} />
+        <CollabProvider workspaceId={id} enabled={experimental.collab}>
+          <WorkspaceContent id={id} />
+        </CollabProvider>
       </WorkspaceLayoutProvider>
     </Workspace>
   )
 }
 
-function WorkspaceFeatures({ id }: WorkspaceRouteProps) {
-  const { experimental } = useAppConfig()
-  return (
-    <CollabProvider workspaceId={id} enabled={experimental.collab}>
-      <WorkspaceIdentity id={id} />
-    </CollabProvider>
-  )
-}
-
-function WorkspaceIdentity({ id }: WorkspaceRouteProps) {
+function WorkspaceContent({ id }: WorkspaceRouteProps) {
   const personal = useCollabIdentityEnabled()
-  return <WorkspaceLoader key={`${id}:${personal}`} id={id} />
-}
-
-function WorkspaceLoader({ id }: WorkspaceRouteProps) {
   const queryClient = useQueryClient()
   const [selectedSessionId] = useSelectedSession()
   const { isLoading: layoutLoading } = useWorkspaceLayoutCtx()
@@ -78,20 +69,21 @@ function WorkspaceLoader({ id }: WorkspaceRouteProps) {
     builders.isLoading
 
   return (
-    <>
-      <SidebarLayout>
-        {fresh ? (
-          <div className="flex h-full items-center justify-center">
-            <LedLogo sprite="moi" effect="chaos" />
-          </div>
-        ) : (
-          <WorkspaceScreen
-            widgets={widgets.data}
-            views={views.data ?? []}
-            builders={builders.data ?? []}
-          />
-        )}
-      </SidebarLayout>
-    </>
+    <SidebarLayout>
+      {fresh ? (
+        <div className="flex h-full items-center justify-center">
+          <LedLogo sprite="moi" effect="chaos" />
+        </div>
+      ) : (
+        // Personal tabs are read when the screen mounts; reset that state when
+        // navigation switches between the shared layout and this browser tab.
+        <WorkspaceScreen
+          key={personal ? 'personal' : 'shared'}
+          widgets={widgets.data}
+          views={views.data ?? []}
+          builders={builders.data ?? []}
+        />
+      )}
+    </SidebarLayout>
   )
 }
