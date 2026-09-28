@@ -26,7 +26,7 @@ type WorkspaceRouteProps = {
 export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
   return (
     <Workspace id={id}>
-      <WorkspaceLayoutProvider key={id} id={id}>
+      <WorkspaceLayoutProvider id={id}>
         <WorkspaceFeatures id={id} />
       </WorkspaceLayoutProvider>
     </Workspace>
