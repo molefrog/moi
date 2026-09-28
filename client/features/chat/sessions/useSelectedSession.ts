@@ -112,7 +112,7 @@ export function useSelectedSession(): SelectedSessionResult {
   )
   const pendingSaves = useIsMutating({ mutationKey, exact: true })
 
-  // WorkspaceLoader remains an observer for the active workspace. Nested hook
+  // WorkspaceContent remains an observer for the active workspace. Nested hook
   // users reuse its result without refetching; once the route unmounts, dropping
   // the cache makes the next visit load the server-owned selection again.
   const query = useQuery<SelectedSessionState>({

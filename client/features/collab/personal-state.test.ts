@@ -155,45 +155,44 @@ describe('collab authored layout preservation', () => {
 })
 
 describe('collab selected chat cache transitions', () => {
-  test('supplying an identity immediately remounts onto the saved tab chat before shared cache GC', async () => {
+  test('supplying an identity switches the mounted chat observer to the saved tab chat', async () => {
     useBrowserTab(browserTab())
     writePersonalSession('workspace', 'saved-tab-chat')
     const client = new QueryClient()
     const sharedKey = selectedSessionKey('workspace')
     client.setQueryData(sharedKey, { sessionId: 'old-shared-chat' })
     const options = { staleTime: Infinity, gcTime: 0, refetchOnMount: false as const }
-    const shared = new QueryObserver<SelectedSessionState>(client, {
+    const selection = new QueryObserver<SelectedSessionState>(client, {
       ...options,
       queryKey: sharedKey,
       queryFn: async () => ({ sessionId: 'old-shared-chat' })
     })
-    const stopShared = shared.subscribe(() => {})
-    stopShared()
+    const stop = selection.subscribe(() => {})
+    let stopInspect = () => {}
     let reads = 0
-    const personal = new QueryObserver<SelectedSessionState>(client, {
-      ...options,
-      queryKey: selectedSessionKey('workspace', true),
-      queryFn: async () => {
-        reads++
-        return { sessionId: readPersonalSession('workspace') }
-      }
-    })
-    let stopPersonal = () => {}
     try {
-      // Do not wait for gcTime: a keyed React remount adds its new observer in
-      // the same commit, before the old cache's zero-delay GC timer can run.
+      selection.setOptions({
+        ...options,
+        queryKey: selectedSessionKey('workspace', true),
+        queryFn: async () => {
+          reads++
+          return { sessionId: readPersonalSession('workspace') }
+        }
+      })
+      expect(selection.getCurrentResult().data).toBeUndefined()
       const selected = await new Promise<SelectedSessionState | undefined>(resolve => {
         const inspect = () => {
-          const result = personal.getCurrentResult()
+          const result = selection.getCurrentResult()
           if (result.isSuccess) resolve(result.data)
         }
-        stopPersonal = personal.subscribe(inspect)
+        stopInspect = selection.subscribe(inspect)
         inspect()
       })
       expect(selected).toEqual({ sessionId: 'saved-tab-chat' })
       expect(reads).toBe(1)
     } finally {
-      stopPersonal()
+      stopInspect()
+      stop()
       client.clear()
     }
   })
