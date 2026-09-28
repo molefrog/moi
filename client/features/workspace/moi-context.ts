@@ -113,7 +113,7 @@ export function useMoiUserMessageContext({
   appletParams
 }: WorkspaceTabAddress): (options?: MoiUserMessageOptions) => MoiContext {
   const workspaceId = useWorkspaceId()
-  const { experimentalCollab } = useAppConfig()
+  const { experimental } = useAppConfig()
   const collabReference = useContext(WorkspaceLayoutContext)?.collabReference
   const views = useViews(workspaceId).data
   const builders = useViewBuilders(workspaceId).data
@@ -123,13 +123,13 @@ export function useMoiUserMessageContext({
       const tabParams = envelopeTabParams(activeTab, appletParams)
       return {
         activeTab,
-        ...(experimentalCollab && collabReference ? { collabReference } : {}),
+        ...(experimental.collab && collabReference ? { collabReference } : {}),
         tabTitle: activeTabTitle(activeTab, views, builders),
         ...(tabParams ? { tabParams } : {}),
         ...(options.applet ? { applet: options.applet } : {}),
         ...(directives.length > 0 ? { directives } : {})
       }
     },
-    [workspaceId, activeTab, appletParams, views, builders, experimentalCollab, collabReference]
+    [workspaceId, activeTab, appletParams, views, builders, experimental.collab, collabReference]
   )
 }

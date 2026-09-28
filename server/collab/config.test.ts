@@ -25,7 +25,7 @@ afterEach(async () => {
   await rm(workspacePath, { recursive: true, force: true })
 })
 
-describe('collab process opt-in', () => {
+describe('collab startup configuration', () => {
   test('dev mode, old environment settings and legacy workspace flags do not enable runtime', async () => {
     process.env.MOI_DEV = '1'
     process.env.MOI_COLLAB = '1'
@@ -35,14 +35,14 @@ describe('collab process opt-in', () => {
       JSON.stringify({ version: 1, experimental: { collab: true } })
     )
     expect(isCollabEnabled()).toBe(false)
-    expect(clientAppConfig().experimentalCollab).toBe(false)
+    expect(clientAppConfig().experimental.collab).toBe(false)
     expect(await getCollabReferencePath(workspacePath)).toBeUndefined()
   })
 
   test('the process flag enables every workspace without configuration or files', async () => {
-    initializeAppConfig({ experimentalCollab: true })
+    initializeAppConfig({ collab: true })
     expect(isCollabEnabled()).toBe(true)
-    expect(clientAppConfig().experimentalCollab).toBe(true)
+    expect(clientAppConfig().experimental.collab).toBe(true)
     expect(await getCollabReferencePath(workspacePath)).toBeUndefined()
     expect(await getCollabReferencePath(join(workspacePath, 'another'))).toBeUndefined()
     expect(await Bun.file(join(workspacePath, '.moi', '.workspace.json')).exists()).toBe(false)
@@ -50,25 +50,25 @@ describe('collab process opt-in', () => {
   })
 
   test('runtime and client flag stay in agreement across initialization and reset', () => {
-    initializeAppConfig({ experimentalCollab: true })
+    initializeAppConfig({ collab: true })
     expect(isCollabEnabled()).toBe(true)
-    expect(clientAppConfig().experimentalCollab).toBe(true)
-    initializeAppConfig({ experimentalCollab: false })
+    expect(clientAppConfig().experimental.collab).toBe(true)
+    initializeAppConfig({ collab: false })
     expect(isCollabEnabled()).toBe(false)
-    expect(clientAppConfig().experimentalCollab).toBe(false)
-    initializeAppConfig({ experimentalCollab: true })
+    expect(clientAppConfig().experimental.collab).toBe(false)
+    initializeAppConfig({ collab: true })
     expect(isCollabEnabled()).toBe(true)
-    expect(clientAppConfig().experimentalCollab).toBe(true)
+    expect(clientAppConfig().experimental.collab).toBe(true)
     resetAppConfig()
     expect(isCollabEnabled()).toBe(false)
-    expect(clientAppConfig().experimentalCollab).toBe(false)
+    expect(clientAppConfig().experimental.collab).toBe(false)
   })
 
   test('only advertises an already installed guide when runtime is enabled', async () => {
     const referencePath = collabSkillReferencePath(workspacePath)
     await Bun.write(referencePath, '# Collaborative applets')
     expect(await getCollabReferencePath(workspacePath)).toBeUndefined()
-    initializeAppConfig({ experimentalCollab: true })
+    initializeAppConfig({ collab: true })
     expect(await getCollabReferencePath(workspacePath)).toBe(referencePath)
   })
 })

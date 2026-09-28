@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'path'
 
-import type { ClientAppConfig } from '@/lib/types'
+import type { ClientAppConfig, ExperimentalFeatures } from '@/lib/types'
+import { EXPERIMENTAL_DEFAULTS } from '@/lib/experimental'
 
 import { DATA_DIR } from './data-dir'
 
@@ -11,7 +12,8 @@ import { DATA_DIR } from './data-dir'
 // runtime): config.json describes the deployment itself — nothing here changes
 // without a server restart, and no API writes it.
 //
-// Resolution: defaults < config.json < env; CLI-only flags are supplied separately.
+// Resolution: defaults < config.json < env. Experimental features are enabled
+// only by explicit CLI flags.
 // A missing file is the normal local case; a malformed file or wrong-typed key
 // warns on stderr and falls back per-key, so a broken config never takes the
 // CLI or server down with it.
@@ -19,18 +21,16 @@ export type AppConfig = {
   // Cloud demo deployment: workspace creation is blocked (UI shows the
   // cloud-demo promo dialog instead) and `moi` system commands are disabled.
   cloudDemo: boolean
-  // Gated experimental features, checked by slug.
-  experiments: string[]
-  // CLI-owned startup flag; never read from config.json or experiment slugs.
-  experimentalCollab: boolean
+  experimental: ExperimentalFeatures
   // Link target for the cloud-demo promo dialog.
   demoInstallUrl: string
 }
 
+type DeploymentConfig = Omit<AppConfig, 'experimental'>
+
 const DEFAULTS: AppConfig = {
   cloudDemo: false,
-  experiments: [],
-  experimentalCollab: false,
+  experimental: { ...EXPERIMENTAL_DEFAULTS },
   demoInstallUrl: 'https://moi.computer'
 }
 
@@ -50,22 +50,12 @@ function parseBool(raw: string | undefined): boolean | undefined {
   return undefined
 }
 
-// "a, b,c" → ['a','b','c']; empty entries dropped. An empty string clears the
-// list (explicitly setting MOI_EXPERIMENTS= disables file-set experiments).
-function parseList(raw: string | undefined): string[] | undefined {
-  if (raw === undefined) return undefined
-  return raw
-    .split(',')
-    .map(item => item.trim())
-    .filter(Boolean)
-}
-
 function parseString(raw: string | undefined): string | undefined {
   if (raw === undefined || raw.trim() === '') return undefined
   return raw.trim()
 }
 
-function fileValues(file: string): Partial<AppConfig> {
+function fileValues(file: string): Partial<DeploymentConfig> {
   let text: string
   try {
     text = readFileSync(file, 'utf8')
@@ -92,15 +82,10 @@ function fileValues(file: string): Partial<AppConfig> {
     return {}
   }
   const raw = parsed as Record<string, unknown>
-  const out: Partial<AppConfig> = {}
+  const out: Partial<DeploymentConfig> = {}
   if (raw.cloudDemo !== undefined) {
     if (typeof raw.cloudDemo === 'boolean') out.cloudDemo = raw.cloudDemo
     else warn('ignoring "cloudDemo" — expected a boolean')
-  }
-  if (raw.experiments !== undefined) {
-    if (Array.isArray(raw.experiments) && raw.experiments.every(item => typeof item === 'string')) {
-      out.experiments = raw.experiments
-    } else warn('ignoring "experiments" — expected an array of strings')
   }
   if (raw.demoInstallUrl !== undefined) {
     if (typeof raw.demoInstallUrl === 'string') out.demoInstallUrl = raw.demoInstallUrl
@@ -113,26 +98,29 @@ function fileValues(file: string): Partial<AppConfig> {
 export function loadAppConfig(
   file: string = APP_CONFIG_FILE,
   env: Record<string, string | undefined> = process.env,
-  flags: Pick<AppConfig, 'experimentalCollab'> = { experimentalCollab: false }
+  cliExperimental: Partial<ExperimentalFeatures> = {}
 ): AppConfig {
   const fromFile = fileValues(file)
-  const fromEnv: Partial<AppConfig> = {
+  const fromEnv: Partial<DeploymentConfig> = {
     cloudDemo: parseBool(env.MOI_CLOUD_DEMO),
-    experiments: parseList(env.MOI_EXPERIMENTS),
     demoInstallUrl: parseString(env.MOI_DEMO_INSTALL_URL)
   }
   const merged = { ...DEFAULTS, ...fromFile }
-  for (const key of Object.keys(fromEnv) as (keyof AppConfig)[]) {
+  for (const key of Object.keys(fromEnv) as (keyof DeploymentConfig)[]) {
     if (fromEnv[key] === undefined) delete fromEnv[key]
   }
-  return Object.freeze({ ...merged, ...fromEnv, ...flags })
+  const experimental = Object.freeze({
+    ...DEFAULTS.experimental,
+    ...cliExperimental
+  })
+  return Object.freeze({ ...merged, ...fromEnv, experimental })
 }
 
 let _config: AppConfig | null = null
 
-// The CLI supplies parsed startup flags before importing the web server.
-export function initializeAppConfig(flags: Pick<AppConfig, 'experimentalCollab'>): void {
-  _config = loadAppConfig(undefined, undefined, flags)
+// The CLI supplies explicit startup flags before importing the web server.
+export function initializeAppConfig(experimental: Partial<ExperimentalFeatures> = {}): void {
+  _config = loadAppConfig(undefined, undefined, experimental)
 }
 
 export function getAppConfig(): AppConfig {
@@ -149,6 +137,6 @@ export function resetAppConfig(): void {
 // The only shape that reaches the browser (GET /api/config). Server-only keys
 // added to AppConfig later stay out unless explicitly forwarded here.
 export function clientAppConfig(): ClientAppConfig {
-  const { cloudDemo, experiments, experimentalCollab, demoInstallUrl } = getAppConfig()
-  return { cloudDemo, experiments: [...experiments], experimentalCollab, demoInstallUrl }
+  const { cloudDemo, experimental, demoInstallUrl } = getAppConfig()
+  return { cloudDemo, experimental: { ...experimental }, demoInstallUrl }
 }

@@ -1,5 +1,6 @@
 import type { PreviewBlock, StreamEvent } from './format'
 import type { AppIconId } from './app-icons'
+import type { ExperimentalFeatures } from './experimental'
 import type { MoiContext } from './moi-context'
 import type { WorkspaceTheme } from './themes'
 
@@ -337,21 +338,19 @@ export type AppSettings = {
   autoUpdateSkills: boolean
 }
 
-// Client-safe subset of the startup config (`config.json` in the data dir +
-// `MOI_*` env overrides), served by GET /api/config. Frozen for the process
-// lifetime — changing it requires a server restart, so clients may cache it
-// forever. See server/app-config.ts.
+// Client-safe startup config, served by GET /api/config. Deployment settings
+// come from config.json and MOI_* env overrides; experimental flags come from
+// explicit CLI options. See server/app-config.ts.
 export type ClientAppConfig = {
   // Cloud demo deployment: workspace creation is blocked; the UI offers the
   // cloud-demo promo dialog instead.
   cloudDemo: boolean
-  // Enabled experimental features, checked by slug.
-  experiments: string[]
-  // Enabled only by the CLI's collaboration runtime startup flag.
-  experimentalCollab: boolean
+  experimental: ExperimentalFeatures
   // Link target for the cloud-demo promo dialog.
   demoInstallUrl: string
 }
+
+export type { ExperimentalFeatures } from './experimental'
 
 export type UpdateStatus = {
   runningVersion: string

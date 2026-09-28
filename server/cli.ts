@@ -23,6 +23,8 @@ import {
 } from '@/lib/themes'
 import type { AgentTheme, ColorTheme, FontTheme, RadiusTheme } from '@/lib/themes'
 import { parseMoiHref } from '@/lib/navigation'
+import { EXPERIMENTAL_FEATURES, experimentalFlagName } from '@/lib/experimental'
+import type { ExperimentalFeatures } from '@/lib/experimental'
 import type {
   AppletLogEntry,
   ScratchArrowEnd,
@@ -159,10 +161,9 @@ async function openBrowser(url: string) {
 function spawnServer(
   cwd: string,
   env: Record<string, string | undefined> = process.env,
-  experimentalCollab = false
+  experimentalFlags: string[] = []
 ): ReturnType<typeof Bun.spawn> {
-  const argv = ['bun', import.meta.filename, 'start']
-  if (experimentalCollab) argv.push('--experimental-collab')
+  const argv = ['bun', import.meta.filename, 'start', ...experimentalFlags]
   return Bun.spawn(argv, {
     stdin: 'inherit',
     stdout: 'inherit',
@@ -183,11 +184,11 @@ function spawnServer(
 async function runDevSupervisor(
   projectRoot: string,
   env: Record<string, string | undefined>,
-  experimentalCollab: boolean
+  experimentalFlags: string[]
 ): Promise<void> {
   const { watch } = await import('node:fs')
 
-  let child = spawnServer(projectRoot, env, experimentalCollab)
+  let child = spawnServer(projectRoot, env, experimentalFlags)
   let restarting = false
   let debounce: ReturnType<typeof setTimeout> | undefined
 
@@ -206,7 +207,7 @@ async function runDevSupervisor(
     await child.exited
     clearTimeout(sigkill)
     restarting = false
-    child = spawnServer(projectRoot, env, experimentalCollab)
+    child = spawnServer(projectRoot, env, experimentalFlags)
   }
 
   for (const dir of ['server', 'lib']) {
@@ -486,6 +487,14 @@ const init = defineCommand({
   }
 })
 
+const experimentalArgs = Object.fromEntries(
+  EXPERIMENTAL_FEATURES.map(feature => {
+    const name = experimentalFlagName(feature)
+    const label = name.slice('experimental-'.length).replaceAll('-', ' ')
+    return [name, { type: 'boolean' as const, description: `Enable experimental ${label}` }]
+  })
+)
+
 const start = defineCommand({
   meta: { name: 'start', description: 'Start the moi web server' },
   args: {
@@ -493,13 +502,23 @@ const start = defineCommand({
       type: 'string',
       description: 'HTTP port to listen on (default: 13337)'
     },
-    'experimental-collab': {
-      type: 'boolean',
-      default: false,
-      description: 'Enable the collaboration runtime for views (no identity or workspace UI)'
-    }
+    ...experimentalArgs
   },
-  async run({ args }) {
+  async run({ args, rawArgs }) {
+    const knownFlags = new Set(EXPERIMENTAL_FEATURES.map(experimentalFlagName))
+    for (const arg of rawArgs) {
+      if (arg.startsWith('--experimental-') && !knownFlags.has(arg.slice(2))) {
+        throw new Error(`Unknown experimental feature: ${arg.slice('--experimental-'.length)}`)
+      }
+    }
+    const experimental: Partial<ExperimentalFeatures> = {}
+    const experimentalFlags: string[] = []
+    for (const feature of EXPERIMENTAL_FEATURES) {
+      const flag = experimentalFlagName(feature)
+      if (args[flag] !== true) continue
+      experimental[feature] = true
+      experimentalFlags.push(`--${flag}`)
+    }
     const projectRoot = join(import.meta.dir, '..')
     // Undocumented: --dev runs the watch-and-full-restart dev supervisor.
     const dev = process.argv.includes('--dev')
@@ -552,20 +571,20 @@ const start = defineCommand({
         ...(debug ? { MOI_DEBUG: '1' } : {})
       }
       if (dev) {
-        await runDevSupervisor(projectRoot, env, args['experimental-collab'])
+        await runDevSupervisor(projectRoot, env, experimentalFlags)
         return
       }
       const cwd = serverCwd(projectRoot, dev)
-      const proc = spawnServer(cwd, env, args['experimental-collab'])
+      const proc = spawnServer(cwd, env, experimentalFlags)
       process.exit(
-        await superviseServerUpdates(proc, () => spawnServer(cwd, env, args['experimental-collab']))
+        await superviseServerUpdates(proc, () => spawnServer(cwd, env, experimentalFlags))
       )
     }
 
     // This IS the server process (MOI_SERVER=1). cwd is the package root when the
     // dev bundler runs (bunfig loaded at Bun startup) or a neutral dir for a
     // prebuilt install — see serverCwd().
-    initializeAppConfig({ experimentalCollab: args['experimental-collab'] })
+    initializeAppConfig(experimental)
     try {
       await import('./web')
     } catch (err) {

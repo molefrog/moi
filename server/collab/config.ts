@@ -3,9 +3,9 @@ import type { WorkspaceType } from '@/lib/types'
 import { getAppConfig } from '../app-config'
 import { collabSkillReferencePath } from './skill'
 
-// The CLI owns this process setting. Workspace files and dev mode never enable it.
+// Only an explicit startup CLI flag enables this process setting.
 export function isCollabEnabled(): boolean {
-  return getAppConfig().experimentalCollab
+  return getAppConfig().experimental.collab
 }
 
 export async function getCollabReferencePath(

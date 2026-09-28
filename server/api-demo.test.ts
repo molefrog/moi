@@ -9,7 +9,7 @@ import { resetAppConfig } from './app-config'
 import { claudeCodeHarness } from './harness/claude-code'
 
 const originalClaudeAvailability = claudeCodeHarness.availability
-const envKeys = ['MOI_CLOUD_DEMO', 'MOI_EXPERIMENTS', 'MOI_DEMO_INSTALL_URL']
+const envKeys = ['MOI_CLOUD_DEMO', 'MOI_DEMO_INSTALL_URL']
 let savedEnv: Record<string, string | undefined>
 
 // Deployment env vars are pinned so a real config.json on the machine running the
@@ -19,7 +19,6 @@ let savedEnv: Record<string, string | undefined>
 beforeEach(() => {
   savedEnv = Object.fromEntries(envKeys.map(key => [key, process.env[key]]))
   process.env.MOI_CLOUD_DEMO = '1'
-  process.env.MOI_EXPERIMENTS = ''
   process.env.MOI_DEMO_INSTALL_URL = 'https://moi.computer'
   resetAppConfig()
   claudeCodeHarness.availability = async () => ({ status: 'available' })
@@ -63,8 +62,7 @@ test('GET /api/config reports the demo flag and install url', async () => {
   expect(response.status).toBe(200)
   expect(body).toEqual({
     cloudDemo: true,
-    experiments: [],
-    experimentalCollab: false,
+    experimental: { collab: false },
     demoInstallUrl: 'https://moi.computer'
   })
 })
