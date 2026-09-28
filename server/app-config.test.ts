@@ -18,8 +18,7 @@ test('defaults apply when no config file exists', () => {
   const config = loadAppConfig('/nonexistent/config.json', NO_ENV)
   expect(config).toEqual({
     cloudDemo: false,
-    experiments: [],
-    experimentalCollab: false,
+    experimental: { collab: false },
     demoInstallUrl: 'https://moi.computer',
     cloudflareAccess: null
   })
@@ -29,24 +28,23 @@ test('config file values override defaults', async () => {
   const file = await configFile(
     JSON.stringify({
       cloudDemo: true,
-      experiments: ['new-chat-ui'],
+      experimental: { collab: true },
       demoInstallUrl: 'https://moi.computer/download'
     })
   )
   const config = loadAppConfig(file, NO_ENV)
   expect(config.cloudDemo).toBe(true)
-  expect(config.experiments).toEqual(['new-chat-ui'])
+  expect(config.experimental.collab).toBe(false)
   expect(config.demoInstallUrl).toBe('https://moi.computer/download')
 })
 
 test('env vars override the config file', async () => {
-  const file = await configFile(JSON.stringify({ cloudDemo: true, experiments: ['from-file'] }))
+  const file = await configFile(JSON.stringify({ cloudDemo: true, experimental: { collab: true } }))
   const config = loadAppConfig(file, {
-    MOI_CLOUD_DEMO: '0',
-    MOI_EXPERIMENTS: ' a, b ,,c '
+    MOI_CLOUD_DEMO: '0'
   })
   expect(config.cloudDemo).toBe(false)
-  expect(config.experiments).toEqual(['a', 'b', 'c'])
+  expect(config.experimental.collab).toBe(false)
 })
 
 test('boolean env accepts 1/true/0/false and ignores anything else', () => {
@@ -57,13 +55,7 @@ test('boolean env accepts 1/true/0/false and ignores anything else', () => {
   expect(on('maybe')).toBe(false) // unparseable → default
 })
 
-test('empty MOI_EXPERIMENTS clears file-set experiments', async () => {
-  const file = await configFile(JSON.stringify({ experiments: ['from-file'] }))
-  const config = loadAppConfig(file, { MOI_EXPERIMENTS: '' })
-  expect(config.experiments).toEqual([])
-})
-
-test('collab ignores config files, experiment slugs and legacy environment settings', async () => {
+test('legacy experiment names and collab settings do not enable collaboration', async () => {
   const file = await configFile(
     JSON.stringify({ experimentalCollab: true, experiments: ['collab'], collab: { enabled: true } })
   )
@@ -73,15 +65,13 @@ test('collab ignores config files, experiment slugs and legacy environment setti
     MOI_DEV: '1',
     MOI_COLLAB_IDENTITY: 'local'
   })
-  expect(config.experimentalCollab).toBe(false)
-  expect(config.experiments).toEqual(['collab'])
+  expect(config.experimental.collab).toBe(false)
 })
 
-test('collab accepts only explicit startup flags', async () => {
-  const file = await configFile(JSON.stringify({ experimentalCollab: false }))
-  expect(loadAppConfig(file, NO_ENV).experimentalCollab).toBe(false)
-  expect(loadAppConfig(file, NO_ENV, { experimentalCollab: true }).experimentalCollab).toBe(true)
-  expect(loadAppConfig(file, NO_ENV, { experimentalCollab: false }).experimentalCollab).toBe(false)
+test('only an explicit CLI flag enables collaboration', async () => {
+  const file = await configFile(JSON.stringify({ experimental: { collab: true } }))
+  expect(loadAppConfig(file, NO_ENV).experimental.collab).toBe(false)
+  expect(loadAppConfig(file, NO_ENV, { collab: true }).experimental.collab).toBe(true)
 })
 
 test('invalid JSON falls back to defaults without throwing', async () => {
@@ -109,17 +99,18 @@ test('a read failure other than a missing file warns instead of staying silent',
 
 test('wrong-typed keys are dropped individually, valid keys survive', async () => {
   const file = await configFile(
-    JSON.stringify({ cloudDemo: 'yes', experiments: ['kept'], demoInstallUrl: 42 })
+    JSON.stringify({ cloudDemo: 'yes', experimental: { collab: true }, demoInstallUrl: 42 })
   )
   const config = loadAppConfig(file, NO_ENV)
   expect(config.cloudDemo).toBe(false)
-  expect(config.experiments).toEqual(['kept'])
+  expect(config.experimental.collab).toBe(false)
   expect(config.demoInstallUrl).toBe('https://moi.computer')
 })
 
 test('the resolved config is frozen', () => {
   const config = loadAppConfig('/nonexistent', NO_ENV)
   expect(Object.isFrozen(config)).toBe(true)
+  expect(Object.isFrozen(config.experimental)).toBe(true)
 })
 
 const TEAM = 'MOI_CLOUDFLARE_ACCESS_TEAM_DOMAIN'

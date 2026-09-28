@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 
 import type { ClientAppConfig } from '@/lib/types'
+import { EXPERIMENTAL_DEFAULTS } from '@/lib/experimental'
 
 import { onWorkspaceEventsReconnect } from '@/client/runtime/useWorkspaceEvents'
 
@@ -14,8 +15,7 @@ import { requestJson } from './http'
 
 const DEFAULTS: ClientAppConfig = {
   cloudDemo: false,
-  experimentalCollab: false,
-  experiments: [],
+  experimental: { ...EXPERIMENTAL_DEFAULTS },
   demoInstallUrl: 'https://moi.computer'
 }
 

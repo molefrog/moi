@@ -32,14 +32,16 @@ no separate enabled context or backend adapter; the playground supplies the same
 
 ## Enable and install
 
+The shared startup flag pattern is described in [Experimental features](experimental-features.md).
+
 - `moi start --experimental-collab` enables live presence for this server process.
 - `moi start --dev --experimental-collab` enables it under the dev supervisor.
-- `moi start` disables live presence, even after a previously enabled start.
+- A server started with `moi start` has live presence disabled.
 - `moi init --experimental-collab` separately installs the optional applet guide and types.
 
-Only command-line flags enable collaboration; environment variables and config files cannot enable it.
-The launcher forwards the runtime flag to its child server, including after development and update restarts.
-Startup configuration exposes `experimentalCollab` through `/api/config`. The app loads it before
+Only the `moi start --experimental-collab` flag enables live presence. The launcher forwards it to
+its child server, including after development and update restarts.
+Startup configuration exposes `experimental.collab` through `/api/config`. The app loads it before
 React mounts and refreshes it on workspace-event reconnect. Workers start lazily.
 
 The API remains available with presence disabled: applets still render, user profiles can resolve,

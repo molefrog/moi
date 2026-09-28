@@ -122,10 +122,11 @@ describe('collab runtime CLI flag', () => {
     }
   }
 
-  test('an explicitly negated runtime flag stays disabled', async () => {
-    const child = spawnCli(['start', '--experimental-collab', '--no-experimental-collab'])
-    expect((await capturedServerLaunch()).flag).toBe('')
-    expect(await child.exited).toBe(0)
+  test('an unregistered experimental flag fails before starting the server', async () => {
+    const result = await runCli(['start', '--experimental-unknown'])
+    expect(result.code).not.toBe(0)
+    expect(result.stderr).toContain('Unknown experimental feature: unknown')
+    expect(await Bun.file(capturePath).exists()).toBe(false)
   }, 15_000)
 })
 
@@ -165,7 +166,7 @@ describe('collab init CLI flag', () => {
     const start = await runCli(['start', '--help'])
     expect(start.code).toBe(0)
     expect(start.stdout).toContain('--experimental-collab')
-    expect(start.stdout).toContain('no identity or workspace UI')
+    expect(start.stdout).toContain('Enable experimental collab')
     const init = await runCli(['init', '--help'])
     expect(init.code).toBe(0)
     expect(init.stdout).toContain('--experimental-collab')

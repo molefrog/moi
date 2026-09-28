@@ -74,19 +74,19 @@ function command(command: unknown, id = 'agent') {
 }
 
 function enable() {
-  initializeAppConfig({ experimentalCollab: true })
-  expect(clientAppConfig().experimentalCollab).toBe(true)
+  initializeAppConfig({ collab: true })
+  expect(clientAppConfig().experimental.collab).toBe(true)
 }
 
 describe('collab HTTP integration', () => {
   test('ordinary and dev starts remain disabled without creating data', async () => {
     expect((await api.request(`/api/workspaces/${workspace.id}/collab`)).status).toBe(404)
-    expect(clientAppConfig().experimentalCollab).toBe(false)
+    expect(clientAppConfig().experimental.collab).toBe(false)
     expect((await post('/collab', { enabled: true })).status).toBe(404)
     expect((await command({ type: 'snapshot', scope: 'board' })).status).toBe(404)
     process.env.MOI_DEV = '1'
     resetAppConfig()
-    expect(clientAppConfig().experimentalCollab).toBe(false)
+    expect(clientAppConfig().experimental.collab).toBe(false)
     expect((await command({ type: 'snapshot', scope: 'board' })).status).toBe(404)
     expect(await Bun.file(collabSkillReferencePath(directory, workspace.type)).exists()).toBe(false)
     expect(await Bun.file(join(directory, '.moi', 'data', 'collab.sqlite')).exists()).toBe(false)
@@ -122,19 +122,19 @@ describe('collab HTTP integration', () => {
     for (const enabled of [false, true]) {
       if (enabled) enable()
       const startup = await api.request('/api/config')
-      expect((await startup.json()).experimentalCollab).toBe(enabled)
+      expect((await startup.json()).experimental.collab).toBe(enabled)
       const response = await api.request(workspaceUrl)
       expect(response.status).toBe(200)
       const info = await response.json()
       expect(info).not.toHaveProperty('collab')
       expect(info).not.toHaveProperty('enabled')
-      expect(info).not.toHaveProperty('experimentalCollab')
+      expect(info).not.toHaveProperty('experimental')
       expect(info).not.toHaveProperty('collabReference')
       expect((await api.request(`${workspaceUrl}/collab`)).status).toBe(404)
     }
     await Bun.write(referencePath, '# Manually installed guide')
     expect((await (await api.request(workspaceUrl)).json()).collabReference).toBe(referencePath)
-    initializeAppConfig({ experimentalCollab: false })
+    initializeAppConfig({ collab: false })
     expect(await (await api.request(workspaceUrl)).json()).not.toHaveProperty('collabReference')
   })
 
@@ -250,7 +250,7 @@ describe('collab HTTP integration', () => {
     )
     await until(() => messages.some(message => message.type === 'welcome'))
     await collabManager.stopWorkspace(directory)
-    initializeAppConfig({ experimentalCollab: false })
+    initializeAppConfig({ collab: false })
     expect(closed).toBe(true)
     expect(await Bun.file(referencePath).text()).toBe('# Manually installed guide')
     expect(new Uint8Array(await Bun.file(databasePath).arrayBuffer())).toEqual(previousDatabase)

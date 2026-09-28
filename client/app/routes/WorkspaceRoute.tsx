@@ -26,7 +26,7 @@ type WorkspaceRouteProps = {
 export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
   return (
     <Workspace id={id}>
-      <WorkspaceLayoutProvider key={id} id={id}>
+      <WorkspaceLayoutProvider id={id}>
         <WorkspaceFeatures id={id} />
       </WorkspaceLayoutProvider>
     </Workspace>
@@ -34,9 +34,9 @@ export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
 }
 
 function WorkspaceFeatures({ id }: WorkspaceRouteProps) {
-  const { experimentalCollab } = useAppConfig()
+  const { experimental } = useAppConfig()
   return (
-    <CollabProvider workspaceId={id} enabled={experimentalCollab}>
+    <CollabProvider workspaceId={id} enabled={experimental.collab}>
       <WorkspaceIdentity id={id} />
     </CollabProvider>
   )
