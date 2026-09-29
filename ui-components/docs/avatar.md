@@ -299,7 +299,7 @@ export function AvatarGroupCountIconExample() {
 
 ## Sizes
 
-Use the `size` prop to change the size of the avatar. `xs` is 20px for dense lists and inline mentions.
+Use the `size` prop to change the size of the avatar.
 
 ```tsx
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
