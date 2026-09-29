@@ -1,5 +1,4 @@
 import {
-  Component,
   createContext,
   useCallback,
   useContext,
@@ -36,24 +35,6 @@ export function pageFromPath(path: string, workspaceId: string, base = ''): stri
   return tabFromPath(page) ?? legacyTabFromPath(page) ?? (page || 'overview')
 }
 
-type CollabErrorBoundaryProps = { children: ReactNode }
-type CollabErrorBoundaryState = { error: boolean }
-class CollabErrorBoundary extends Component<CollabErrorBoundaryProps, CollabErrorBoundaryState> {
-  state: CollabErrorBoundaryState = { error: false }
-  static getDerivedStateFromError(): CollabErrorBoundaryState {
-    return { error: true }
-  }
-  render() {
-    return this.state.error ? (
-      <p role="alert" className="p-4 text-sm text-destructive">
-        Collaboration could not load. Refresh this page to try again.
-      </p>
-    ) : (
-      this.props.children
-    )
-  }
-}
-
 export type CollabProviderProps = {
   workspaceId: string
   enabled: boolean
@@ -75,11 +56,7 @@ export function CollabProvider({ workspaceId, enabled, children }: CollabProvide
     document.addEventListener('visibilitychange', update)
     return () => document.removeEventListener('visibilitychange', update)
   }, [base, engine, path, workspaceId])
-  return (
-    <CollabErrorBoundary key={workspaceId}>
-      <CollabContext value={engine}>{children}</CollabContext>
-    </CollabErrorBoundary>
-  )
+  return <CollabContext value={engine}>{children}</CollabContext>
 }
 
 export type AppletScopeProps = { surface: string; active?: boolean; children: ReactNode }
