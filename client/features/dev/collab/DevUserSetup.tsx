@@ -8,7 +8,7 @@ import { USER_COLORS } from '@/lib/collab/colors'
 import type { UserProfile } from '@/lib/collab/types'
 import { Avatar, AvatarFallback, AvatarImage } from '@/ui-components/avatar'
 
-import { facehashDataUrl } from '@/client/features/collab/facehash-avatar'
+import { UserFace } from '@/client/features/collab/user-face'
 import { userDisplayName } from '@/client/features/collab/users'
 import { createDevUser, devUserProfile, randomDevUser } from './dev-user'
 import type { DevUserDraft } from './dev-user'
@@ -37,10 +37,6 @@ type AccessUserProps = { profile: UserProfile | null }
 // Access profiles carry no name, so the label is the email, as in workspaces.
 function AccessUser({ profile }: AccessUserProps) {
   const label = profile ? userDisplayName(profile) : null
-  const avatar = useMemo(
-    () => (profile && label ? (profile.avatar ?? facehashDataUrl(label, profile.color)) : null),
-    [profile, label]
-  )
   return (
     <section aria-labelledby="access-user-title" className="flex flex-col gap-5">
       <header>
@@ -55,9 +51,11 @@ function AccessUser({ profile }: AccessUserProps) {
       </header>
       {label && (
         <div className="flex items-center gap-3">
-          <Avatar size="lg">
-            {avatar && <AvatarImage src={avatar} alt="" />}
-            <AvatarFallback>{label.slice(0, 2).toUpperCase()}</AvatarFallback>
+          <Avatar size="lg" data-collab-color={profile?.color ?? 'unknown'}>
+            {profile?.avatar && <AvatarImage src={profile.avatar} alt="" />}
+            <AvatarFallback>
+              <UserFace name={label} />
+            </AvatarFallback>
           </Avatar>
           <span className="min-w-0 truncate text-sm font-medium">{label}</span>
         </div>
@@ -100,15 +98,14 @@ function DevUserForm({ savedUser }: DevUserFormProps) {
         }}
       >
         <div className="flex flex-col items-start gap-5 sm:flex-row">
-          {profile.avatar ? (
-            <img
-              src={profile.avatar}
-              alt="Test user preview"
-              className="size-16 shrink-0 rounded-full"
-            />
-          ) : (
-            <div aria-hidden="true" className="size-16 shrink-0 rounded-full bg-muted" />
-          )}
+          <div
+            data-collab-color={profile.color}
+            role="img"
+            aria-label="Test user preview"
+            className="size-16 shrink-0 overflow-hidden rounded-full"
+          >
+            <UserFace name={userDisplayName(profile)} />
+          </div>
           <div className="flex w-full max-w-sm min-w-0 flex-col gap-4">
             <label className="flex flex-col gap-1.5 text-sm">
               Name (optional)
@@ -128,15 +125,15 @@ function DevUserForm({ savedUser }: DevUserFormProps) {
                 aria-labelledby="collab-color-label"
                 className="flex flex-wrap gap-2"
               >
-                {USER_COLORS.map(([label, hex]) => (
-                  <label key={hex} className="cursor-pointer">
+                {USER_COLORS.map(color => (
+                  <label key={color} data-collab-color={color} className="cursor-pointer">
                     <input
                       type="radio"
                       name="color"
-                      value={hex}
-                      aria-label={label}
-                      checked={draft.color === hex}
-                      onChange={() => setDraft({ ...draft, color: hex })}
+                      value={color}
+                      aria-label={color[0].toUpperCase() + color.slice(1)}
+                      checked={draft.color === color}
+                      onChange={() => setDraft({ ...draft, color })}
                       className="peer sr-only"
                     />
                     <svg
@@ -144,7 +141,7 @@ function DevUserForm({ savedUser }: DevUserFormProps) {
                       aria-hidden="true"
                       className="size-6 rounded-full ring-foreground ring-offset-2 ring-offset-background transition-shadow peer-checked:ring-2 peer-focus-visible:ring-2 peer-focus-visible:ring-ring"
                     >
-                      <circle cx="12" cy="12" r="12" fill={hex} />
+                      <circle cx="12" cy="12" r="12" className="fill-collab" />
                     </svg>
                   </label>
                 ))}

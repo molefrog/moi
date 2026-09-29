@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test'
 import type { CollabClientMessage, Connection } from '@/lib/collab/types'
 import { CollabStore } from './store'
 
-const alice = { id: 'alice', name: 'Alice', color: '#0f766e' }
+const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
 const connection: Connection = {
   connectionId: 'a',
   userId: 'alice',
@@ -71,7 +71,7 @@ test('location changes notify page observers immediately and identical presence 
   expect(sent.filter(message => message.type === 'presence:set')).toHaveLength(1)
 })
 
-const bob = { id: 'bob', name: 'Bob', color: '#2563eb' }
+const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
 const remote: Connection = {
   connectionId: 'b',
   userId: 'bob',

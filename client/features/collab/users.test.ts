@@ -8,9 +8,9 @@ import {
   workspaceProfiles
 } from './users'
 
-const alice = { id: 'alice', name: 'Alice', color: '#0f766e' }
-const bob = { id: 'bob', name: 'Bob', color: '#2563eb' }
-const eve = { id: 'eve', name: 'Eve', color: '#2563eb' }
+const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
+const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
+const eve = { id: 'eve', name: 'Eve', color: 'blue' } as const
 function connection(
   connectionId: string,
   userId: string,
@@ -31,14 +31,14 @@ const source = { connections, users: [alice, bob, eve] }
 test('display names fall back to email or stable id without changing profile fields', () => {
   const nameless = {
     id: 'user-id',
-    color: '#0f766e',
+    color: 'emerald',
     name: '  ',
     email: '  user@example.test  '
-  }
+  } as const
   expect(userDisplayName({ ...nameless, name: '  Named user  ' })).toBe('Named user')
   expect(userDisplayName(nameless)).toBe('user@example.test')
   expect(userDisplayName({ ...nameless, email: '  ' })).toBe('user-id')
-  expect(userDisplayName({ id: 'only-id', color: '#0f766e' })).toBe('only-id')
+  expect(userDisplayName({ id: 'only-id', color: 'emerald' })).toBe('only-id')
   expect(nameless.name).toBe('  ')
   expect(nameless.email).toBe('  user@example.test  ')
 })
@@ -59,9 +59,9 @@ test('host directory resolves offline users and removals remain authoritative ov
   const offline = {
     id: 'offline',
     name: 'Offline user',
-    color: '#0f766e',
+    color: 'emerald',
     email: 'user@example.test'
-  }
+  } as const
   const profiles = workspaceProfiles([alice, bob], alice, [offline])
   expect(resolveUser({ connections, users: profiles }, offline.id)).toEqual({
     ...offline,

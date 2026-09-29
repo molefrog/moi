@@ -21,7 +21,7 @@ describe('collab service', () => {
     service.receive(connectionId, {
       type: 'join',
       version: 2,
-      profile: { id, name: id, color: '#336699' },
+      profile: { id, name: id, color: 'blue' },
       location: { page: 'view:board' }
     })
   }
@@ -47,8 +47,8 @@ describe('collab service', () => {
         { connectionId: 'b', userId: 'boris', location: { page: 'view:board' }, presence: [] }
       ],
       users: [
-        { id: 'anna', name: 'anna', color: '#336699' },
-        { id: 'boris', name: 'boris', color: '#336699' }
+        { id: 'anna', name: 'anna', color: 'blue' },
+        { id: 'boris', name: 'boris', color: 'blue' }
       ]
     })
   })
@@ -91,7 +91,12 @@ describe('collab service', () => {
   test('profile updates reach other tabs while user ID changes require reconnecting', () => {
     join('one', 'anna')
     join('two', 'anna')
-    const profile = { id: 'anna', name: 'Anna updated', color: 'blue', email: 'anna@example.com' }
+    const profile = {
+      id: 'anna',
+      name: 'Anna updated',
+      color: 'blue',
+      email: 'anna@example.com'
+    } as const
     service.receive('one', { type: 'profile', profile })
     expect(latest().users).toEqual([profile])
     service.leave('one')
@@ -99,7 +104,7 @@ describe('collab service', () => {
     expect(() =>
       service.receive('two', {
         type: 'profile',
-        profile: { id: 'boris', name: 'Boris', color: 'red' }
+        profile: { id: 'boris', name: 'Boris', color: 'pink' }
       })
     ).toThrow('Reconnect')
     expect(() => service.receive('missing', { type: 'ping' })).toThrow('Join')
@@ -109,10 +114,10 @@ describe('collab service', () => {
   test('nameless profiles and clearing a name preserve supplied optional data across tabs', () => {
     const nameless = {
       id: 'anna',
-      color: '#336699',
+      color: 'blue',
       email: 'anna@example.com',
       avatar: 'https://example.com/avatar'
-    }
+    } as const
     service.receive('one', { type: 'join', version: 2, profile: nameless })
     const welcome = messages.find(item => item.message.type === 'welcome')?.message
     if (welcome?.type !== 'welcome') throw new Error('Missing welcome')
@@ -123,7 +128,7 @@ describe('collab service', () => {
     expect(latest().users).toEqual([{ ...nameless, name: '' }])
     service.leave('one')
     expect(latest().users).toEqual([{ ...nameless, name: '' }])
-    const minimal = { id: 'anna', color: '#336699' }
+    const minimal = { id: 'anna', color: 'blue' } as const
     service.receive('two', { type: 'profile', profile: minimal })
     expect(latest().users).toEqual([minimal])
     expect(Object.hasOwn(latest().users[0]!, 'name')).toBe(false)

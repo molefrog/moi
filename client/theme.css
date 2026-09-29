@@ -39,6 +39,8 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-collab: var(--collab);
+  --color-collab-foreground: var(--collab-foreground);
 
   /* shadcn compatibility: secondary surfaces and chart palettes. */
   --color-secondary: var(--secondary);

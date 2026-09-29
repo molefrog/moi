@@ -88,7 +88,7 @@ test('runtime without a current user stays idle and never joins anonymously', ()
 test('an explicit user enables workspace presence without an applet and clearing it disconnects', () => {
   const engine = new CollabEngine('workspace')
   stop = engine.start()
-  const profile = { id: 'alice', name: 'Alice', color: '#0f766e' }
+  const profile = { id: 'alice', name: 'Alice', color: 'emerald' } as const
   setCurrentUser(profile)
   expect(sockets).toHaveLength(1)
   const socket = sockets[0]!
@@ -124,7 +124,7 @@ test('two tabs send the same resolved color for a host user without one', () => 
 })
 
 test('reconnecting restores current presence and removed registrations stay gone', async () => {
-  setCurrentUser({ id: 'alice', name: 'Alice', color: '#0f766e' })
+  setCurrentUser({ id: 'alice', name: 'Alice', color: 'emerald' })
   const engine = new CollabEngine('workspace')
   stop = engine.start()
   sockets[0]!.open()
@@ -158,11 +158,11 @@ test('reconnecting restores current presence and removed registrations stay gone
 })
 
 test('changing user reconnects and never sends the host directory over the socket', async () => {
-  setCurrentUser({ id: 'alice', name: 'Alice', color: '#0f766e' })
+  setCurrentUser({ id: 'alice', name: 'Alice', color: 'emerald' })
   const engine = new CollabEngine('workspace')
   stop = engine.start()
   sockets[0]!.open()
-  setCurrentUser({ id: 'bob', name: 'Bob', color: '#2563eb' })
+  setCurrentUser({ id: 'bob', name: 'Bob', color: 'blue' })
   expect(sockets[0]!.readyState).toBe(3)
   await Bun.sleep(550)
   sockets[1]!.open()
@@ -171,7 +171,7 @@ test('changing user reconnects and never sends the host directory over the socke
 })
 
 test('disabled engine exposes host profiles and readiness without starting a transport', () => {
-  const alice = { id: 'alice', name: 'Alice', color: '#0f766e' }
+  const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
   setHostState({
     currentUser: alice,
     workspaces: { workspace: { status: 'loading' } }
@@ -207,7 +207,7 @@ test('disabled engine exposes host profiles and readiness without starting a tra
 })
 
 test('engine cleanup survives remounting and does not leave user listeners or retry sockets', async () => {
-  const alice = { id: 'alice', name: 'Alice', color: '#0f766e' }
+  const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
   setCurrentUser(alice)
   const engine = new CollabEngine('workspace')
   stop = engine.start()
@@ -226,7 +226,7 @@ test('engine cleanup survives remounting and does not leave user listeners or re
 })
 
 test('the default engine keeps the current user readable while workspace operations stay inert', () => {
-  const alice = { id: 'alice', name: 'Alice', color: '#0f766e' }
+  const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
   setCurrentUser(alice)
   expect(NO_ENGINE.getCurrentUser()).toEqual(alice)
   expect(NO_ENGINE.getWorkspaceDirectory()).toEqual({ status: 'unavailable', users: [] })

@@ -107,7 +107,7 @@ test('the bridge delegates when attached and falls back again when disposed', as
   const user: CollabApi.WorkspaceUser = {
     id: 'alice',
     name: 'Alice',
-    color: '#123456',
+    color: 'blue',
     status: 'active'
   }
   const host = {

@@ -10,14 +10,18 @@ import { createFakeEngine } from './fake-engine'
 import { CollabContext } from './hooks'
 import { getCurrentUser, setCurrentUser } from './host-state'
 
-const self = { id: 'self', name: 'Self', color: '#0f766e' }
-const active = { id: 'active', name: 'Active colleague', color: '#2563eb' }
-const away = { id: 'away', name: 'Away colleague', color: '#2563eb' }
-const offline = Array.from({ length: 100 }, (_, index) => ({
-  id: `offline-${index}`,
-  name: `Offline colleague ${index}`,
-  color: '#2563eb'
-}))
+const self = { id: 'self', name: 'Self', color: 'emerald' } as const
+const active = { id: 'active', name: 'Active colleague', color: 'blue' } as const
+const away = { id: 'away', name: 'Away colleague', color: 'blue' } as const
+const offline = Array.from(
+  { length: 100 },
+  (_, index) =>
+    ({
+      id: `offline-${index}`,
+      name: `Offline colleague ${index}`,
+      color: 'blue'
+    }) as const
+)
 
 function connection(user: UserProfile, page: string | null): Connection {
   return {
@@ -70,8 +74,8 @@ test('header shows active and away users without offline workspace users', () =>
 })
 
 test('header overflow counts connected users once, excluding offline users and own tabs', () => {
-  const third = { id: 'third', name: 'Third colleague', color: '#2563eb' }
-  const fourth = { id: 'fourth', name: 'Fourth colleague', color: '#2563eb' }
+  const third = { id: 'third', name: 'Third colleague', color: 'blue' } as const
+  const fourth = { id: 'fourth', name: 'Fourth colleague', color: 'blue' } as const
   const html = renderHeader(
     [self, ...offline, active, away, third, fourth],
     [
@@ -94,9 +98,9 @@ test('header overflow counts connected users once, excluding offline users and o
 })
 
 test('header gives nameless viewers and connected users nonempty accessible labels', () => {
-  const viewer = { id: 'nameless-self', color: '#0f766e' }
-  const user = { id: 'user-id', name: '', email: 'user@example.test', color: '#2563eb' }
-  const noEmail = { id: 'another-member', name: '  ', color: '#2563eb' }
+  const viewer = { id: 'nameless-self', color: 'emerald' } as const
+  const user = { id: 'user-id', name: '', email: 'user@example.test', color: 'blue' } as const
+  const noEmail = { id: 'another-member', name: '  ', color: 'blue' } as const
   const html = renderHeader(
     [viewer, user, noEmail],
     [connection(user, 'overview'), connection(noEmail, 'overview')],

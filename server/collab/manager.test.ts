@@ -230,7 +230,7 @@ describe('collab process and socket integration', () => {
       JSON.stringify({
         type: 'join',
         version: 1,
-        profile: { id: 'old', name: 'Old', color: 'red' }
+        profile: { id: 'old', name: 'Old', color: 'blue' }
       }),
       JSON.stringify({
         type: 'mutate',
@@ -298,7 +298,7 @@ describe('collab process and socket integration', () => {
   test('a proxy-verified socket joins only with its verified id and keeps its verified profile', async () => {
     const runtime = manager()
     const workspace = directory()
-    const verified = { id: 'cf-user-1', color: '#3b82f6', email: 'alex@example.com' }
+    const verified = { id: 'cf-user-1', color: 'blue', email: 'alex@example.com' } as const
     const [client, peer, other] = [localSocket(), localSocket(), localSocket()]
     runtime.open(other.socket, workspace, verified)
     joinLocal(runtime, other.socket, 'host-user')

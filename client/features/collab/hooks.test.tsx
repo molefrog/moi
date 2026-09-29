@@ -17,8 +17,8 @@ import {
 } from './hooks'
 import type { WorkspaceUser } from './hooks'
 
-const alice = { id: 'alice', name: 'Alice', color: '#0f766e' }
-const bob = { id: 'bob', name: 'Bob', color: '#2563eb' }
+const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
+const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
 
 test('presence pages follow nested navigation paths and deployment bases, decoding once', () => {
   expect(pageFromPath('/workspace/test/views/board', 'test')).toBe('views/board')
@@ -102,9 +102,9 @@ test('hooks are safe without a backend or applet and resolve missing users to nu
 })
 
 test('user hooks preserve missing and empty names for self, peers, and offline members', () => {
-  const self = { id: 'self', color: '#0f766e', email: 'self@example.test' }
-  const peer = { id: 'bob', name: '', color: '#2563eb', email: 'bob@example.test' }
-  const offline = { id: 'offline', color: '#336699' }
+  const self = { id: 'self', color: 'emerald', email: 'self@example.test' } as const
+  const peer = { id: 'bob', name: '', color: 'blue', email: 'bob@example.test' } as const
+  const offline = { id: 'offline', color: 'blue' } as const
   const room = createFakeEngine({
     self,
     page: 'board',
@@ -145,8 +145,8 @@ test('user hooks preserve missing and empty names for self, peers, and offline m
 })
 
 test('workspace users include self and offline members with workspace-wide status filters', () => {
-  const carol = { id: 'carol', name: 'Carol', color: '#2563eb' }
-  const david = { id: 'david', name: 'David', color: '#0f766e' }
+  const carol = { id: 'carol', name: 'Carol', color: 'blue' } as const
+  const david = { id: 'david', name: 'David', color: 'emerald' } as const
   const room = createFakeEngine({
     self: alice,
     page: 'board',

@@ -1,8 +1,8 @@
 import { expect, test } from 'bun:test'
 import { createFakeEngine } from './fake-engine'
 
-const alice = { id: 'alice', name: 'Alice', color: '#0f766e' }
-const bob = { id: 'bob', name: 'Bob', color: '#2563eb' }
+const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
+const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
 const field = {
   registrationId: 'field',
   surface: 'view:board',

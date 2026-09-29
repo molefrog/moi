@@ -1,3 +1,5 @@
+import type { UserColor } from './colors'
+
 export type CollabJsonValue =
   | null
   | boolean
@@ -9,7 +11,7 @@ export type CollabJsonValue =
 export type UserProfile = {
   id: string
   name?: string
-  color: string
+  color: UserColor
   avatar?: string
   email?: string
 }

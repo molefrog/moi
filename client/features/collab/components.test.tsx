@@ -18,8 +18,8 @@ import type { FakeCollabEngine } from './fake-engine'
 import { AppletScope, CollabContext, presenceChannels } from './hooks'
 import { presenceTarget } from './presence-target'
 
-const me: UserProfile = { id: 'me', name: 'Me', color: '#123456' }
-const peer: UserProfile = { id: 'peer', name: 'Ada', color: '#234567' }
+const me: UserProfile = { id: 'me', name: 'Me', color: 'blue' }
+const peer: UserProfile = { id: 'peer', name: 'Ada', color: 'cyan' }
 function room(target = presenceTarget('task:42:title'), profile: UserProfile = peer) {
   return createFakeEngine({
     self: me,
@@ -65,13 +65,10 @@ test('user rendering follows authoritative profile updates and removal', () => {
 })
 
 test.each([
-  [{ id: 'user-id', color: '#234567' }, 'user-id'],
-  [{ id: 'user-id', name: '', color: '#234567' }, 'user-id'],
-  [
-    { id: 'user-id', name: '   ', email: 'user@example.test', color: '#234567' },
-    'user@example.test'
-  ],
-  [{ id: 'user-id', email: 'user@example.test', color: '#234567' }, 'user@example.test']
+  [{ id: 'user-id', color: 'cyan' }, 'user-id'],
+  [{ id: 'user-id', name: '', color: 'cyan' }, 'user-id'],
+  [{ id: 'user-id', name: '   ', email: 'user@example.test', color: 'cyan' }, 'user@example.test'],
+  [{ id: 'user-id', email: 'user@example.test', color: 'cyan' }, 'user@example.test']
 ] satisfies Array<[UserProfile, string]>)(
   'nameless user UI resolves a usable label for %j',
   (profile: UserProfile, label: string) => {
@@ -80,7 +77,8 @@ test.each([
     expect(user).toContain(`aria-label="${label}"`)
     expect(user).toContain(`title="${label}"`)
     expect(user).toContain(`>${label}<`)
-    expect(user).toContain(`>${label.slice(0, 2).toUpperCase()}<`)
+    expect(user).toContain('data-facehash')
+    expect(user).toContain(`>${label.charAt(0).toUpperCase()}<`)
     expect(user).not.toContain('Unknown user')
     expect(engine.getWorkspaceUsers()?.[1]?.name).toBe(profile.name?.trim())
 

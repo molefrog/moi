@@ -1,10 +1,10 @@
 import { isUserProfile } from '@/lib/collab/protocol'
-import { colorForId } from '@/lib/collab/colors'
+import { colorForId, isUserColor } from '@/lib/collab/colors'
 import type { AuthProvider, ProxyUserState, UserProfile } from '@/lib/collab/types'
 
 export type CollabShareContext = { workspaceId: string; url: string }
 export type CollabShareHandler = (context: CollabShareContext) => Promise<{ url: string }>
-export type UserProfileInput = Omit<UserProfile, 'color'> & { color?: string }
+export type UserProfileInput = Omit<UserProfile, 'color'> & { color?: UserProfile['color'] }
 type HostState<Profile> = {
   readonly currentUser: Profile | null
   readonly workspaces: Readonly<
@@ -58,8 +58,8 @@ export function normalizeUserProfile(value: UserProfileInput): UserProfile {
     throw new Error('A user profile needs an id.')
   if (value.name !== undefined && typeof value.name !== 'string')
     throw new Error('A user profile name must be a string when provided.')
-  if (value.color !== undefined && !/^#[0-9a-f]{6}$/i.test(value.color))
-    throw new Error('A user profile color must be a six-digit hex value when provided.')
+  if (value.color !== undefined && !isUserColor(value.color))
+    throw new Error('A user profile color must be one of the user palette names.')
   const id = value.id.trim()
   const normalized: UserProfile = {
     id,

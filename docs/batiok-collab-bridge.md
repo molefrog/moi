@@ -52,9 +52,10 @@ function workspaceUsersChanged(workspaceId, users) {
 }
 ```
 
-Each user needs an `id`. Name, email, avatar, and color are optional; moi derives a stable color when
-one is missing. `currentUser` is global. To update that user's profile, replace `currentUser` in the
-snapshot. For another user, update each ready workspace list that contains them.
+Each user needs an `id`. Name, email, avatar, and color are optional. A supplied color must be one of
+`pink`, `orange`, `amber`, `lime`, `emerald`, `cyan`, `blue`, or `violet`; moi picks a stable name from
+the ID when it is omitted. `currentUser` is global. To update that user's profile, replace
+`currentUser` in the snapshot. For another user, update each ready workspace list that contains them.
 
 Use `{ status: 'loading' }` until a workspace directory arrives. Use
 `{ status: 'ready', users: [] }` when it is known to be empty. Omitting a workspace also means

@@ -1,8 +1,6 @@
 import { USER_COLORS } from '@/lib/collab/colors'
+import type { UserColor } from '@/lib/collab/colors'
 import type { UserProfile } from '@/lib/collab/types'
-
-import { facehashDataUrl } from '@/client/features/collab/facehash-avatar'
-import { userDisplayName } from '@/client/features/collab/users'
 
 // Test profiles are activated only by explicit setup on /dev/collab.
 
@@ -37,7 +35,7 @@ export const DEV_USER_NAMES = [
   'Leslie'
 ]
 
-export type DevUserDraft = { name: string; color: string }
+export type DevUserDraft = { name: string; color: UserColor }
 
 function pick<T>(items: readonly T[], except?: T): T {
   const pool = items.filter(item => item !== except)
@@ -47,17 +45,12 @@ function pick<T>(items: readonly T[], except?: T): T {
 export function randomDevUser(current?: DevUserDraft): DevUserDraft {
   return {
     name: pick(DEV_USER_NAMES, current?.name),
-    color: pick(
-      USER_COLORS.map(([, hex]) => hex),
-      current?.color
-    )
+    color: pick(USER_COLORS, current?.color)
   }
 }
 
 export function devUserProfile(id: string, draft: DevUserDraft): UserProfile {
-  const profile = { id, name: draft.name, color: draft.color }
-  const avatar = facehashDataUrl(userDisplayName(profile), draft.color)
-  return { ...profile, ...(avatar ? { avatar } : {}) }
+  return { id, name: draft.name, color: draft.color }
 }
 
 // The id stays with the tab through renames, so peers keep seeing one user.

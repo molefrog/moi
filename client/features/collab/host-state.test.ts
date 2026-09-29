@@ -12,9 +12,9 @@ import type {
 } from './host-state'
 
 const PROFILE_KEY = 'moi:collab:dev-profile'
-const alice = { id: 'alice', name: 'Alice', color: '#0f766e' }
-const bob = { id: 'bob', name: 'Bob', color: '#2563eb' }
-const carol = { id: 'cf-carol', color: '#10b981', email: 'carol@example.com' }
+const alice = { id: 'alice', name: 'Alice', color: 'emerald' } satisfies UserProfile
+const bob = { id: 'bob', name: 'Bob', color: 'blue' } satisfies UserProfile
+const carol = { id: 'cf-carol', color: 'emerald', email: 'carol@example.com' } as const
 const accessed = { provider: 'cloudflare-access', profile: carol } as const
 const descriptors = new Map(
   ['window', 'location', 'navigator', 'sessionStorage'].map(key => [
@@ -180,14 +180,14 @@ test('host profiles without colors resolve consistently, while supplied colors w
   expect(collab.getWorkspaceUsers('first')?.[0]).toBe(collab.getCurrentUser()!)
   expect(collab.getWorkspaceUsers('second')?.[0]).toBe(collab.getCurrentUser()!)
   collab.setHostState({
-    currentUser: { id: 'alice', color: '#123456' },
+    currentUser: { id: 'alice', color: 'blue' },
     workspaces: {
-      first: { status: 'ready', users: [{ id: 'alice' }, { id: 'bob', color: '#654321' }] }
+      first: { status: 'ready', users: [{ id: 'alice' }, { id: 'bob', color: 'amber' }] }
     }
   })
   expect(collab.getWorkspaceUsers('first')).toEqual([
-    { id: 'alice', color: '#123456' },
-    { id: 'bob', color: '#654321' }
+    { id: 'alice', color: 'blue' },
+    { id: 'bob', color: 'amber' }
   ])
 })
 
@@ -260,13 +260,13 @@ test('the current user supplies the same own profile in every membership list wi
 
 test('host snapshots preserve nameless current and other users without inventing profile names', async () => {
   const collab = await setup()
-  const self = { id: 'viewer', color: '#0f766e' }
+  const self = { id: 'viewer', color: 'emerald' } as const
   const other = {
     id: 'other',
-    color: '#2563eb',
+    color: 'blue',
     email: 'other@example.test',
     avatar: 'https://example.test/avatar'
-  }
+  } as const
   collab.setHostState({
     currentUser: self,
     workspaces: {
@@ -275,8 +275,8 @@ test('host snapshots preserve nameless current and other users without inventing
         users: [
           { ...self, name: 'Old viewer name' },
           other,
-          { id: 'empty', name: '', color: '#0f766e' },
-          { id: 'whitespace', name: ' \t ', color: '#2563eb' }
+          { id: 'empty', name: '', color: 'emerald' },
+          { id: 'whitespace', name: ' \t ', color: 'blue' }
         ]
       }
     }
@@ -287,8 +287,8 @@ test('host snapshots preserve nameless current and other users without inventing
   expect(users).toEqual([
     self,
     other,
-    { id: 'empty', name: '', color: '#0f766e' },
-    { id: 'whitespace', name: '', color: '#2563eb' }
+    { id: 'empty', name: '', color: 'emerald' },
+    { id: 'whitespace', name: '', color: 'blue' }
   ])
   expect(Object.hasOwn(users[0]!, 'name')).toBe(false)
   expect(Object.hasOwn(users[1]!, 'name')).toBe(false)
@@ -316,7 +316,9 @@ test('optional names and colors still reject invalid values, while ids remain re
     { ...alice, name: 'a\0b' },
     { ...alice, color: null },
     { ...alice, color: '' },
+    { ...alice, color: 'red' },
     { ...alice, color: 'invalid' },
+    { ...alice, color: '#123456' },
     { ...alice, color: '#12345' },
     { ...alice, color: 42 }
   ]) {

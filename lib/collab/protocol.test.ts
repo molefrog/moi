@@ -8,7 +8,7 @@ import {
   isUserProfile
 } from './protocol'
 
-const profile = { id: 'anna', name: 'Anna', color: '#7c3aed' }
+const profile = { id: 'anna', name: 'Anna', color: 'violet' } as const
 const presence = {
   type: 'presence:set',
   registrationId: 'field',
@@ -18,6 +18,8 @@ const presence = {
 
 test('profiles have bounded identifiers and optional avatar and email data', () => {
   expect(isUserProfile(profile)).toBe(true)
+  expect(isUserProfile({ ...profile, color: '#7c3aed' })).toBe(false)
+  expect(isUserProfile({ ...profile, color: 'red' })).toBe(false)
   expect(
     isUserProfile({
       ...profile,
@@ -49,7 +51,7 @@ test('only protocol v2 clients with a user profile can join', () => {
 })
 
 test('join and profile updates accept missing or empty names but retain profile validation', () => {
-  const unnamed = { id: 'anna', color: '#7c3aed' }
+  const unnamed = { id: 'anna', color: 'violet' } as const
   for (const profile of [
     unnamed,
     { ...unnamed, name: '' },

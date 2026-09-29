@@ -1,15 +1,15 @@
-import { useCallback, useLayoutEffect, useMemo, useRef } from 'react'
+import { useCallback, useLayoutEffect, useRef } from 'react'
 import type { HTMLAttributes, ReactNode, Ref } from 'react'
 
 import { IconUser } from '@tabler/icons-react'
-import { wcagLuminance } from 'culori'
 
 import { cn } from '@/client/lib/cn'
+import type { UserColor } from '@/lib/collab/colors'
 import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from '@/ui-components/avatar'
 import { Badge } from '@/ui-components/badge'
 
-import { facehashDataUrl } from './facehash-avatar'
 import { useUser, useUsers } from './hooks'
+import { UserFace } from './user-face'
 import { userDisplayName } from './users'
 import { motion } from 'motion/react'
 
@@ -20,25 +20,6 @@ export type UserSize = 'xs' | 'sm' | 'md' | 'lg'
 const AVATAR_SIZE = { xs: 'xs', sm: 'sm', md: 'default', lg: 'lg' } as const
 // Shown for an id nobody in this workspace has ever used.
 const UNKNOWN_NAME = 'Unknown user'
-
-// Black or white, whichever reads on the user's color.
-export function readableOn(color: string): string {
-  return (wcagLuminance(color) ?? 0) > 0.3 ? 'oklch(0 0 0)' : 'oklch(1 0 0)'
-}
-
-// User colors are data. They land on the node as custom properties
-// instead of stylesheet rules; classes read `--collab-color` and
-// `--collab-contrast` from there. An unknown user gets quiet theme tones.
-export function useUserColor(color: string | undefined) {
-  return useCallback(
-    (node: HTMLElement | null) => {
-      if (!node) return
-      node.style.setProperty('--collab-color', color ?? 'var(--muted-foreground)')
-      node.style.setProperty('--collab-contrast', color ? readableOn(color) : 'var(--background)')
-    },
-    [color]
-  )
-}
 
 export type UserProps = {
   id: string
@@ -69,25 +50,19 @@ export function User({
   const name = user ? userDisplayName(user) : UNKNOWN_NAME
   // A profile without a picture gets the same generated face on every client,
   // so nobody shows up as bare initials.
-  const picture = user?.avatar
-  const faceName = user ? name : undefined
-  const faceColor = user?.color
-  const face = useMemo(
-    () => (faceName && faceColor ? (picture ?? facehashDataUrl(faceName, faceColor)) : undefined),
-    [picture, faceName, faceColor]
-  )
   const compact = size === 'xs'
   const avatar = (
     <Avatar
       size={AVATAR_SIZE[size]}
       title={label ?? name}
       aria-label={label ?? name}
+      data-collab-color={user?.color ?? 'unknown'}
       className={avatarOnly ? className : undefined}
     >
-      {face && <AvatarImage src={face} alt="" />}
+      {user?.avatar && <AvatarImage src={user.avatar} alt="" />}
       <AvatarFallback>
         {user ? (
-          name.slice(0, 2).toUpperCase()
+          <UserFace name={name} />
         ) : (
           <IconUser size={size === 'xs' || size === 'sm' ? 12 : 16} stroke={1.75} />
         )}
@@ -179,7 +154,7 @@ export function Facepile({
 
 type UserTagProps = {
   name: string
-  color: string | undefined
+  color: UserColor | undefined
   icon?: ReactNode
   className?: string
 }
@@ -187,8 +162,8 @@ type UserTagProps = {
 function UserTag({ name, color, icon, className }: UserTagProps) {
   return (
     <Badge
-      ref={useUserColor(color)}
-      className={cn('bg-(--collab-color) text-(--collab-contrast)', className)}
+      data-collab-color={color ?? 'unknown'}
+      className={cn('bg-collab text-collab-foreground', className)}
     >
       {icon}
       <span className="truncate">{name}</span>
@@ -209,15 +184,13 @@ export type CursorProps = {
 export function Cursor({ id, x, y, label = true, className, ref }: CursorProps) {
   const user = useUser(id)
   const node = useRef<HTMLSpanElement | null>(null)
-  const setColor = useUserColor(user?.color)
   const attach = useCallback(
     (element: HTMLSpanElement | null) => {
       node.current = element
-      setColor(element)
       if (typeof ref === 'function') ref(element)
       else if (ref) ref.current = element
     },
-    [ref, setColor]
+    [ref]
   )
   useLayoutEffect(() => {
     if (node.current && x !== undefined && y !== undefined)
@@ -227,13 +200,14 @@ export function Cursor({ id, x, y, label = true, className, ref }: CursorProps) 
     <span
       ref={attach}
       aria-hidden="true"
+      data-collab-color={user?.color ?? 'unknown'}
       className={cn(
         'pointer-events-none absolute top-0 left-0 transition-transform duration-100 ease-linear motion-reduce:transition-none',
         className
       )}
     >
       <span className="relative block animate-in duration-200 zoom-in-75 fade-in">
-        <svg viewBox="0 0 20 20" className="size-5 drop-shadow-sm" fill="var(--collab-color)">
+        <svg viewBox="0 0 20 20" className="size-5 fill-collab drop-shadow-sm">
           <path d="M1 1 17.5 10.5 9.8 12.2 6 19.5Z" />
         </svg>
         {label && (
@@ -291,17 +265,9 @@ const CORNERS = [
   'borderBottomLeftRadius'
 ] as const
 
-type FrameOutlineProps = { names: string; color: string | undefined; icon?: ReactNode }
+type FrameOutlineProps = { names: string; color: UserColor | undefined; icon?: ReactNode }
 function FrameOutline({ names, color, icon }: FrameOutlineProps) {
   const node = useRef<HTMLDivElement | null>(null)
-  const setColor = useUserColor(color)
-  const attach = useCallback(
-    (element: HTMLDivElement | null) => {
-      node.current = element
-      setColor(element)
-    },
-    [setColor]
-  )
   // Runs after every render, because whatever is wrapped may have changed shape
   // in the same render, and again whenever the wrapped element resizes.
   useLayoutEffect(() => {
@@ -348,8 +314,9 @@ function FrameOutline({ names, color, icon }: FrameOutlineProps) {
   })
   return (
     <div
-      ref={attach}
-      className="group/frame pointer-events-none absolute inset-0 animate-in rounded-sm outline-2 outline-(--collab-color) duration-150 fade-in data-[shape=rounded]:outline-offset-2 data-[shape=square]:outline-offset-4"
+      ref={node}
+      data-collab-color={color ?? 'unknown'}
+      className="group/frame pointer-events-none absolute inset-0 animate-in rounded-sm outline-2 outline-collab duration-150 fade-in data-[shape=rounded]:outline-offset-2 data-[shape=square]:outline-offset-4"
     >
       <UserTag
         name={names}

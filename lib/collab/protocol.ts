@@ -1,3 +1,4 @@
+import { isUserColor } from './colors'
 import type { CollabClientMessage, CollabJsonValue, CollabLocation, UserProfile } from './types'
 
 export const COLLAB_PROTOCOL_VERSION = 2
@@ -36,7 +37,7 @@ export function isUserProfile(value: unknown): value is UserProfile {
     isCollabString(value.id, 240) &&
     value.id.trim().length > 0 &&
     (value.name === undefined || value.name === '' || isCollabString(value.name)) &&
-    isCollabString(value.color, 64) &&
+    isUserColor(value.color) &&
     (value.avatar === undefined || isCollabString(value.avatar, COLLAB_MAX_AVATAR_BYTES)) &&
     (value.email === undefined || isCollabString(value.email, COLLAB_MAX_EMAIL_BYTES))
   )

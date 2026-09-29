@@ -53,15 +53,15 @@ const YOU: UserProfile = {
   id: 'you',
   name: 'You',
   email: 'you@example.com',
-  color: '#8b5cf6'
+  color: 'violet'
 }
 const USERS: UserProfile[] = [
   YOU,
-  { id: 'fig', name: 'Fig', email: 'fig@example.com', color: '#f59e0b' },
-  { id: 'alex', name: 'Alex Hao', email: 'alex@example.com', color: '#3b82f6' },
-  { id: 'andrea', name: 'Andrea Lim', email: 'andrea@example.com', color: '#ec4899' },
-  { id: 'pierre', name: 'Pierre', email: 'pierre@example.com', color: '#f97316' },
-  { id: 'david', name: 'David Tibbitts', email: 'david@example.com', color: '#10b981' }
+  { id: 'fig', name: 'Fig', email: 'fig@example.com', color: 'amber' },
+  { id: 'alex', name: 'Alex Hao', email: 'alex@example.com', color: 'blue' },
+  { id: 'andrea', name: 'Andrea Lim', email: 'andrea@example.com', color: 'pink' },
+  { id: 'pierre', name: 'Pierre', email: 'pierre@example.com', color: 'orange' },
+  { id: 'david', name: 'David Tibbitts', email: 'david@example.com', color: 'emerald' }
 ]
 const PAGE = 'kit'
 const SURFACE = 'view:kit'
@@ -423,7 +423,7 @@ export function DevCollabKit() {
   useEffect(() => {
     room.setUsers(
       USERS.filter(user => david || user.id !== 'david').map(user =>
-        user.id === 'fig' && renamed ? { ...user, name: 'Fig Newton', color: '#10b981' } : user
+        user.id === 'fig' && renamed ? { ...user, name: 'Fig Newton', color: 'emerald' } : user
       )
     )
   }, [room, renamed, david])

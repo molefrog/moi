@@ -79,7 +79,7 @@ an unknown key id at most every 30 seconds, so a key Cloudflare stops publishing
 Failed key fetches are logged and verify nothing. Service tokens carry no user. The profile takes
 `id` from the token's `sub` and `email` from its `email`.
 Tokens carry no display name, so the profile has no `name` and built-in labels show the email.
-`color` is a stable pick from the user color palette, hashed from the id. There is no avatar, so
+`color` is a stable palette name picked from the id. There is no avatar, so
 components draw the usual generated face.
 
 `GET /api/proxy-user` returns `{ provider, profile }` and is never cached. The app loads it before
@@ -93,9 +93,12 @@ is refused. Access supplies no membership, so the workspace directory keeps the 
 
 ## Users and connections
 
-A `UserProfile` returned to applets is `{ id, name?, color, avatar?, email? }`. Hosts may omit
-`color` when supplying a profile; moi derives a stable color from its ID before publishing it to
-applets or the presence socket. Supplied colors take precedence and may repeat across users. Names
+A `UserProfile` returned to applets is `{ id, name?, color, avatar?, email? }`. `color` is one of
+`pink`, `orange`, `amber`, `lime`, `emerald`, `cyan`, `blue`, or `violet`. The host may omit it;
+moi derives a stable palette name from the ID before publishing the profile to applets or the
+presence socket. The shades are defined in [client/index.css](../client/index.css), so they can be
+tuned without changing profiles. Supplied color names take
+precedence and may repeat. Names
 may be omitted or empty; built-in labels fall back from a nonblank name to email, then ID, without
 changing the profile returned by hooks. IDs are stable attribution identifiers;
 profiles and browser injection do not provide authentication or workspace access enforcement.

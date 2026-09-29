@@ -10,11 +10,20 @@ declare module 'moi/collab' {
     | CollabJsonValue[]
     | { [key: string]: CollabJsonValue }
 
+  export type UserColor =
+    | 'pink'
+    | 'orange'
+    | 'amber'
+    | 'lime'
+    | 'emerald'
+    | 'cyan'
+    | 'blue'
+    | 'violet'
   export type UserProfile = {
     id: string
     // May be omitted or empty; display with email or id as a fallback.
     name?: string
-    color: string
+    color: UserColor
     avatar?: string
     email?: string
   }
