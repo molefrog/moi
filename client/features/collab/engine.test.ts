@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 
+import { colorForId } from '@/lib/collab/colors'
 import { isCollabClientMessage } from '@/lib/collab/protocol'
 import type { CollabClientMessage } from '@/lib/collab/types'
 import { CollabService } from '@/server/collab/service'
@@ -100,6 +101,26 @@ test('an explicit user enables workspace presence without an applet and clearing
   setCurrentUser(null)
   expect(socket.readyState).toBe(3)
   expect(engine.getSnapshot().status).toBe('disconnected')
+})
+
+test('two tabs send the same resolved color for a host user without one', () => {
+  setHostState({ currentUser: { id: 'alice' }, workspaces: {} })
+  const first = new CollabEngine('workspace')
+  const second = new CollabEngine('workspace')
+  stop = first.start()
+  const stopSecond = second.start()
+  try {
+    expect(sockets).toHaveLength(2)
+    sockets.forEach(socket => socket.open())
+    for (const socket of sockets) {
+      expect(socket.sent[0]).toMatchObject({
+        type: 'join',
+        profile: { id: 'alice', color: colorForId('alice') }
+      })
+    }
+  } finally {
+    stopSecond()
+  }
 })
 
 test('reconnecting restores current presence and removed registrations stay gone', async () => {

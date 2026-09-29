@@ -94,9 +94,11 @@ keeps the live fallback.
 
 ## Users and connections
 
-A `UserProfile` is `{ id, name?, color, avatar?, email? }`. ID and color are required. Names may be
-omitted or empty; built-in labels fall back from a nonblank name to email, then ID, without changing
-the profile returned by hooks. IDs are stable attribution identifiers;
+A `UserProfile` returned to applets is `{ id, name?, color, avatar?, email? }`. Hosts may omit
+`color` when supplying a profile; moi derives a stable color from its ID before publishing it to
+applets or the presence socket. Supplied colors take precedence and may repeat across users. Names
+may be omitted or empty; built-in labels fall back from a nonblank name to email, then ID, without
+changing the profile returned by hooks. IDs are stable attribution identifiers;
 profiles and browser injection do not provide authentication or workspace access enforcement.
 Those policies remain the outer host's responsibility.
 

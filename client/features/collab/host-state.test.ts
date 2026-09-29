@@ -1,9 +1,15 @@
 import { afterEach, expect, test } from 'bun:test'
 
+import { colorForId } from '@/lib/collab/colors'
 import type { UserProfile } from '@/lib/collab/types'
 
 import type * as HostState from './host-state'
-import type { CollabHostState, CollabHostApi, WorkspaceDirectory } from './host-state'
+import type {
+  CollabHostState,
+  CollabHostStateInput,
+  CollabHostApi,
+  WorkspaceDirectory
+} from './host-state'
 
 const PROFILE_KEY = 'moi:collab:dev-profile'
 const alice = { id: 'alice', name: 'Alice', color: '#0f766e' }
@@ -26,13 +32,17 @@ afterEach(() => {
 })
 
 async function setup(
-  getHostState?: () => CollabHostState | null,
+  getHostState?: () => CollabHostStateInput | null,
   profile?: UserProfile,
   beforeInstall?: (state: typeof HostState) => void
 ) {
-  const host: { moi?: { collab?: Partial<CollabHostApi> } } = getHostState
-    ? { moi: { collab: { getHostState } } }
-    : {}
+  const host: {
+    moi?: {
+      collab?: {
+        getHostState?: () => CollabHostStateInput | null
+      }
+    }
+  } = getHostState ? { moi: { collab: { getHostState } } } : {}
   const saved = new Map<string, string>([
     ['moi:collab:dev-identity', JSON.stringify(alice)],
     ...(profile ? [[PROFILE_KEY, JSON.stringify(profile)] as [string, string]] : [])
@@ -50,7 +60,9 @@ async function setup(
   const collab: typeof HostState = await import(path)
   beforeInstall?.(collab)
   collab.installHostApi()
-  return { ...collab, host, saved }
+  // Installation replaces the bootstrap getter with the complete bridge.
+  const api = host.moi?.collab as CollabHostApi
+  return { ...collab, host, api, saved }
 }
 
 test('current user starts empty and persists only an explicitly enabled dev profile', async () => {
@@ -92,7 +104,7 @@ test.each([
   collab.setDevUser(alice)
   expect(collab.getCurrentUser()).toEqual(expected)
   expect(JSON.parse(collab.saved.get(PROFILE_KEY) ?? 'null')).toEqual(alice)
-  collab.host.moi?.collab?.setHostState?.({ currentUser: bob, workspaces: {} })
+  collab.api.setHostState({ currentUser: bob, workspaces: {} })
   expect(collab.getCurrentUser()).toEqual(bob)
 })
 
@@ -150,6 +162,36 @@ test('preloaded state exposes stable copied current user and directories across 
   expect(Object.isFrozen(directory)).toBe(true)
   expect(Object.isFrozen(directory.users)).toBe(true)
   expect(Object.isFrozen(directory.users[1])).toBe(true)
+})
+
+test('host profiles without colors resolve consistently, while supplied colors win', async () => {
+  const collab = await setup(() => ({
+    currentUser: { id: 'alice', name: 'Alice' },
+    workspaces: {
+      first: { status: 'ready', users: [{ id: 'alice' }, { id: 'bob' }] },
+      second: { status: 'ready', users: [{ id: 'alice' }, { id: 'bob' }] }
+    }
+  }))
+  const aliceColor = colorForId('alice')
+  const bobColor = colorForId('bob')
+  expect(collab.getCurrentUser()).toEqual({ id: 'alice', name: 'Alice', color: aliceColor })
+  expect(collab.getWorkspaceUsers('first')).toEqual([
+    { id: 'alice', name: 'Alice', color: aliceColor },
+    { id: 'bob', color: bobColor }
+  ])
+  expect(collab.getWorkspaceUsers('second')).toEqual(collab.getWorkspaceUsers('first'))
+  expect(collab.getWorkspaceUsers('first')?.[0]).toBe(collab.getCurrentUser()!)
+  expect(collab.getWorkspaceUsers('second')?.[0]).toBe(collab.getCurrentUser()!)
+  collab.setHostState({
+    currentUser: { id: 'alice', color: '#123456' },
+    workspaces: {
+      first: { status: 'ready', users: [{ id: 'alice' }, { id: 'bob', color: '#654321' }] }
+    }
+  })
+  expect(collab.getWorkspaceUsers('first')).toEqual([
+    { id: 'alice', color: '#123456' },
+    { id: 'bob', color: '#654321' }
+  ])
 })
 
 test('every subscriber sees the complete new state after an atomic replacement', async () => {
@@ -261,7 +303,7 @@ test('host snapshots preserve nameless current and other users without inventing
   expect(collab.getWorkspaceUsers('a')?.[0]).toBe(collab.getCurrentUser()!)
 })
 
-test('optional names still reject invalid types and bounds, while ids remain required', async () => {
+test('optional names and colors still reject invalid values, while ids remain required', async () => {
   const collab = await setup()
   collab.setHostState({ currentUser: alice, workspaces: {} })
   const previous = collab.getHostState()
@@ -274,7 +316,12 @@ test('optional names still reject invalid types and bounds, while ids remain req
     { ...alice, name: null },
     { ...alice, name: 4 },
     { ...alice, name: 'x'.repeat(257) },
-    { ...alice, name: 'a\0b' }
+    { ...alice, name: 'a\0b' },
+    { ...alice, color: null },
+    { ...alice, color: '' },
+    { ...alice, color: 'invalid' },
+    { ...alice, color: '#12345' },
+    { ...alice, color: 42 }
   ]) {
     // The bridge must validate JavaScript callers as well as typed integrations.
     expect(() =>
@@ -282,10 +329,10 @@ test('optional names still reject invalid types and bounds, while ids remain req
     ).toThrow()
     expect(collab.getHostState()).toBe(previous)
   }
-  expect(collab.normalizeUserProfile({ id: 'id', name: '', color: 'invalid' })).toEqual({
+  expect(collab.normalizeUserProfile({ id: 'id', name: '' })).toEqual({
     id: 'id',
     name: '',
-    color: '#0f766e'
+    color: colorForId('id')
   })
 })
 
@@ -427,8 +474,7 @@ test('the outer share bridge uses its URL and rejects unsafe destinations', asyn
       }
     }
   })
-  const api = collab.host.moi?.collab
-  if (!api?.setShareHandler) throw new Error('The collab host bridge was not installed')
+  const api = collab.api
   api.setShareHandler(async context => {
     expect(context.workspaceId).toBe('board')
     return { url: 'https://cloud.example/share/board' }

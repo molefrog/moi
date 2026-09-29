@@ -8,8 +8,9 @@ connected users, cursors, focus, and selections.
 
 ### User profiles
 
-Every user has a unique, stable `id` and a `color`. A profile can also include `name`, `email`,
-and `avatar`; these fields are optional, and a name can be empty.
+Every user has a unique, stable `id` and a `color`. moi derives a stable color from the ID when the
+host does not supply one. A profile can also include `name`,
+`email`, and `avatar`; these fields are optional, and a name can be empty.
 
 **Store only user IDs when writing user references to the server**, such as `authorId` or
 `assigneeIds`. Do not copy names, emails, colors, or avatars into application records. Resolve

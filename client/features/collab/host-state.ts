@@ -1,22 +1,29 @@
 import { isUserProfile } from '@/lib/collab/protocol'
+import { colorForId } from '@/lib/collab/colors'
 import type { IdentityProvider, ProxyIdentity, UserProfile } from '@/lib/collab/types'
 
 export type CollabShareContext = { workspaceId: string; url: string }
 export type CollabShareHandler = (context: CollabShareContext) => Promise<{ url: string }>
-export type CollabHostDirectory =
-  | { readonly status: 'loading' }
-  | { readonly status: 'ready'; readonly users: readonly UserProfile[] }
-export type CollabHostState = {
-  readonly currentUser: UserProfile | null
-  readonly workspaces: Readonly<Record<string, CollabHostDirectory>>
+export type UserProfileInput = Omit<UserProfile, 'color'> & { color?: string }
+type HostState<Profile> = {
+  readonly currentUser: Profile | null
+  readonly workspaces: Readonly<
+    Record<
+      string,
+      | { readonly status: 'loading' }
+      | { readonly status: 'ready'; readonly users: readonly Profile[] }
+    >
+  >
 }
+export type CollabHostStateInput = HostState<UserProfileInput>
+export type CollabHostState = HostState<UserProfile>
 export type WorkspaceDirectory = {
   readonly status: 'unavailable' | 'loading' | 'ready'
   readonly users: readonly UserProfile[]
 }
 export type CollabHostApi = {
   getHostState: () => CollabHostState | null
-  setHostState: (state: CollabHostState) => void
+  setHostState: (state: CollabHostStateInput) => void
   subscribeHostState: (listener: (state: CollabHostState | null) => void) => () => void
   setShareHandler: (handler: CollabShareHandler | null) => void
 }
@@ -46,15 +53,18 @@ const LOADING_DIRECTORY: WorkspaceDirectory = Object.freeze({
 })
 let hostState: CollabHostState | null = null
 
-export function normalizeUserProfile(value: UserProfile): UserProfile {
+export function normalizeUserProfile(value: UserProfileInput): UserProfile {
   if (!value || typeof value.id !== 'string' || !value.id.trim())
     throw new Error('A user profile needs an id.')
   if (value.name !== undefined && typeof value.name !== 'string')
     throw new Error('A user profile name must be a string when provided.')
+  if (value.color !== undefined && !/^#[0-9a-f]{6}$/i.test(value.color))
+    throw new Error('A user profile color must be a six-digit hex value when provided.')
+  const id = value.id.trim()
   const normalized: UserProfile = {
-    id: value.id.trim(),
+    id,
     ...(value.name !== undefined ? { name: value.name.trim() } : {}),
-    color: /^#[0-9a-f]{6}$/i.test(value.color) ? value.color : '#0f766e',
+    color: value.color ?? colorForId(id),
     ...(value.avatar !== undefined ? { avatar: value.avatar } : {}),
     ...(value.email !== undefined ? { email: value.email } : {})
   }
@@ -62,7 +72,9 @@ export function normalizeUserProfile(value: UserProfile): UserProfile {
   return Object.freeze(normalized)
 }
 
-export function normalizeWorkspaceUsers(users: readonly UserProfile[]): readonly UserProfile[] {
+export function normalizeWorkspaceUsers(
+  users: readonly UserProfileInput[]
+): readonly UserProfile[] {
   if (!Array.isArray(users)) throw new Error('Workspace users must be an array.')
   const ids = new Set<string>()
   const snapshot = users.map(user => {
@@ -74,7 +86,7 @@ export function normalizeWorkspaceUsers(users: readonly UserProfile[]): readonly
   return Object.freeze(snapshot)
 }
 
-function normalizeHostState(value: CollabHostState): CollabHostState {
+function normalizeHostState(value: CollabHostStateInput): CollabHostState {
   if (!value || typeof value !== 'object') throw new Error('Invalid host state.')
   const current = value.currentUser === null ? null : normalizeUserProfile(value.currentUser)
   if (!value.workspaces || typeof value.workspaces !== 'object' || Array.isArray(value.workspaces))
@@ -115,7 +127,7 @@ export function getWorkspaceUsers(workspaceId: string): readonly UserProfile[] |
   return directory.status === 'unavailable' ? null : directory.users
 }
 
-export function setHostState(next: CollabHostState): void {
+export function setHostState(next: CollabHostStateInput): void {
   const normalized = normalizeHostState(next)
   const previousDirectories = new Map(
     [...workspaceListeners.keys()].map(id => [id, getWorkspaceDirectory(id)])
@@ -266,8 +278,13 @@ export async function shareWorkspace(workspaceId: string): Promise<'copied'> {
 export function installHostApi(): void {
   if (typeof window === 'undefined' || installed) return
   installed = true
-  const host = window as unknown as {
-    moi?: { collab?: Partial<CollabHostApi>; [key: string]: unknown }
+  const host = window as Window & {
+    moi?: {
+      collab?: {
+        getHostState?: () => CollabHostStateInput | null
+      }
+      [key: string]: unknown
+    }
   }
   const previous = host.moi?.collab
   if (previous?.getHostState) {
@@ -289,7 +306,7 @@ export function installHostApi(): void {
     }
   }
   host.moi ??= {}
-  host.moi.collab = {
+  const api: CollabHostApi = {
     getHostState,
     setHostState,
     subscribeHostState,
@@ -297,6 +314,7 @@ export function installHostApi(): void {
       shareHandler = handler
     }
   }
+  host.moi.collab = api
   if (typeof window.dispatchEvent === 'function') {
     window.dispatchEvent(new CustomEvent('moi:collab-ready'))
   }

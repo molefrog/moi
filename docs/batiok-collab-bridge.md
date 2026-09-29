@@ -10,39 +10,45 @@ The bridge is `window.moi.collab`. Its implementation and exported TypeScript co
 [host-state.ts](../client/features/collab/host-state.ts).
 
 ```ts
-type UserProfile = {
+type UserProfileInput = {
   id: string
   name?: string
-  color: string
+  color?: string
   avatar?: string
   email?: string
 }
 
-type WorkspaceDirectory = { status: 'loading' } | { status: 'ready'; users: readonly UserProfile[] }
-
-type HostState = {
-  currentUser: UserProfile | null
-  workspaces: Readonly<Record<string, WorkspaceDirectory>>
+type UserProfile = UserProfileInput & { color: string }
+type HostState<Profile> = {
+  currentUser: Profile | null
+  workspaces: Readonly<
+    Record<string, { status: 'loading' } | { status: 'ready'; users: readonly Profile[] }>
+  >
 }
+type CollabHostStateInput = HostState<UserProfileInput>
+type CollabHostState = HostState<UserProfile>
 
 type CollabHostApi = {
-  getHostState(): HostState | null
-  setHostState(state: HostState): void
-  subscribeHostState(listener: (state: HostState | null) => void): () => void
+  getHostState(): CollabHostState | null
+  setHostState(state: CollabHostStateInput): void
+  subscribeHostState(listener: (state: CollabHostState | null) => void): () => void
   setShareHandler(
     handler: ((context: { workspaceId: string; url: string }) => Promise<{ url: string }>) | null
   ): void
 }
 ```
 
-Every profile requires a nonblank `id` and a `color`. `name` may be omitted or empty; supplied names
-are trimmed. `email` and `avatar` are optional. User hooks preserve missing or empty names; built-in
-labels display the first nonblank value from name, email, and ID. These rules apply to both the
-current account and every workspace member, including offline members.
+Every supplied profile requires a nonblank `id`; `color` is optional. moi picks a stable color from
+the ID when it is omitted. A supplied color must be a six-digit hex value. Colors can repeat across
+users. `name` may be omitted or empty; supplied names are trimmed. `email` and `avatar` are optional.
+User hooks always return a color and preserve missing or empty names; built-in labels display the
+first nonblank value from name, email, and ID. These rules apply to both the current account and
+every workspace member, including offline members.
 
 `setHostState` replaces the complete snapshot. The current user and every supplied directory become visible
 together before any subscription runs. The whole input is validated before publishing; an invalid
-profile or directory leaves the previous snapshot intact. Getters return stable, copied, frozen data.
+profile or directory leaves the previous snapshot intact. Getters return stable, copied, frozen data
+with resolved colors.
 Use the setter to publish changes instead of modifying objects returned by the getter.
 
 - `currentUser` describes the current viewer globally, across all workspaces.
@@ -84,7 +90,6 @@ let currentState = {
   currentUser: {
     id: 'user-alex',
     name: 'Alex',
-    color: '#0f766e',
     email: 'alex@example.com'
   },
   workspaces: {
