@@ -134,7 +134,7 @@ This fallback is transient and makes no promise of resolving users after they le
 while membership loads or when a ready directory omits the viewer. `useWorkspaceUsersAvailability()`
 distinguishes loading from a ready empty directory; readiness does not imply a live connection.
 
-The complete host integration contract and bootstrap example are in
+The Batiok bootstrap example and update steps are in
 [batiok-collab-bridge.md](batiok-collab-bridge.md).
 
 ## Applet API
