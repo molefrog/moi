@@ -14,7 +14,7 @@
 // — no central handlers object assembled by the screen. Applet → host only;
 // if a host → applet direction is ever added (`moi.on(...)`), `dispose` must
 // also unbind those listeners or a disposed module leaks.
-import { getAppletCollabApi } from '@/client/features/collab/entry'
+import { getAppletCollabApi, type AppletCollabApi } from '@/client/features/collab/entry'
 import {
   MAX_ATTACHMENT_LABEL_CHARS,
   MAX_TEXT_ATTACHMENT_CHARS,
@@ -38,8 +38,8 @@ import { useLatestRef } from '@/client/lib/use-latest-ref'
 import { isParamsRecord } from '@/lib/workspace-tabs'
 import { resolveWorkspaceHref } from '@/lib/navigation'
 
-export type AppletBridge = SharedAppletBridge & {
-  collab?: ReturnType<typeof getAppletCollabApi>
+type HostAppletBridge = SharedAppletBridge & {
+  readonly collab: AppletCollabApi | undefined
 }
 
 // Which applet a bridge belongs to, supplied by the host at attach time.
@@ -126,7 +126,7 @@ function createRuntime(workspaceId: string) {
     connect(identity: AppletIdentity, base = '') {
       let alive = true
       const source = appletSource(identity)
-      const bridge: AppletBridge = {
+      const bridge: HostAppletBridge = {
         get collab() {
           return alive ? getAppletCollabApi() : undefined
         },
@@ -279,7 +279,7 @@ export function useAppletEvent<K extends keyof AppletEvents>(
 // The shape of the host wiring every bundle entry re-exports (see the entry
 // plugin in server/applets/build-applet.ts).
 type BridgeModule = {
-  __attachBridge?: (bridge: AppletBridge) => void
+  __attachBridge?: (bridge: Partial<SharedAppletBridge>) => void
 }
 
 // Live connections keyed by applet cache key (`${segment}/${workspaceId}/${name}`)

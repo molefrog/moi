@@ -1,6 +1,7 @@
 import * as appletLog from './applet-log'
 import { describe, expect, test, spyOn } from 'bun:test'
 import { toast } from '@/client/components/ui/toast'
+import type { AppletBridge } from '@/lib/types'
 
 import {
   appletKey,
@@ -9,7 +10,6 @@ import {
   setCachedApplet
 } from './applet-cache'
 import {
-  type AppletBridge,
   type AppletChatMessage,
   type AppletIdentity,
   appletRuntime,

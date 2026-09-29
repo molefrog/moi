@@ -40,6 +40,8 @@ const appletApi = {
   usePublishPresence
 }
 
+export type AppletCollabApi = typeof appletApi
+
 export function createAppletCollabApi() {
   return appletApi
 }

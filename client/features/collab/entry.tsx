@@ -8,6 +8,7 @@ import { WorkspaceCollabControls } from './WorkspaceCollabControls'
 import type { CollabTabInfo } from './WorkspaceCollabControls'
 
 export type { CollabTabInfo } from './WorkspaceCollabControls'
+export type { AppletCollabApi } from './index'
 export { AppletScope, CollabProvider } from './hooks'
 
 export const getAppletCollabApi = createAppletCollabApi
