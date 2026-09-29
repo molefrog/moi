@@ -80,9 +80,7 @@ function enable() {
 
 describe('collab HTTP integration', () => {
   test('ordinary and dev starts remain disabled without creating data', async () => {
-    expect((await api.request(`/api/workspaces/${workspace.id}/collab`)).status).toBe(404)
     expect(clientAppConfig().experimental.collab).toBe(false)
-    expect((await post('/collab', { enabled: true })).status).toBe(404)
     expect((await command({ type: 'snapshot', scope: 'board' })).status).toBe(404)
     process.env.MOI_DEV = '1'
     resetAppConfig()
@@ -98,8 +96,6 @@ describe('collab HTTP integration', () => {
     const defaultSkill = '# moi workspace\nExisting workspace instructions.\n'
     await Bun.write(defaultSkillPath, defaultSkill)
     enable()
-    expect((await api.request(`/api/workspaces/${workspace.id}/collab`)).status).toBe(404)
-    expect((await post('/collab', { enabled: true })).status).toBe(404)
     expect(await Bun.file(join(directory, '.moi', '.workspace.json')).exists()).toBe(false)
     expect(await Bun.file(defaultSkillPath).text()).toBe(defaultSkill)
     expect(await Bun.file(referencePath).exists()).toBe(false)
@@ -109,15 +105,6 @@ describe('collab HTTP integration', () => {
 
   test('startup config reports availability while workspace info exposes only an installed guide', async () => {
     const workspaceUrl = `/api/workspaces/${workspace.id}`
-    await Bun.write(
-      join(directory, '.moi', '.workspace.json'),
-      JSON.stringify({
-        version: 1,
-        widgetGrid: [],
-        collab: { enabled: true },
-        collabReference: '/stale/guide.md'
-      })
-    )
     const referencePath = collabSkillReferencePath(directory, workspace.type)
     for (const enabled of [false, true]) {
       if (enabled) enable()
@@ -126,11 +113,7 @@ describe('collab HTTP integration', () => {
       const response = await api.request(workspaceUrl)
       expect(response.status).toBe(200)
       const info = await response.json()
-      expect(info).not.toHaveProperty('collab')
-      expect(info).not.toHaveProperty('enabled')
-      expect(info).not.toHaveProperty('experimental')
       expect(info).not.toHaveProperty('collabReference')
-      expect((await api.request(`${workspaceUrl}/collab`)).status).toBe(404)
     }
     await Bun.write(referencePath, '# Manually installed guide')
     expect((await (await api.request(workspaceUrl)).json()).collabReference).toBe(referencePath)

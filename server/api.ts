@@ -927,7 +927,7 @@ one.get('/', async c => {
     cwd: ws.path,
     provider: ws.type,
     agentId: ws.agentId,
-    // Undefined is omitted from JSON and overrides stale persisted metadata.
+    // Undefined is omitted from JSON when no guide is installed.
     collabReference
   })
 })
