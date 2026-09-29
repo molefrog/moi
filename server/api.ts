@@ -919,16 +919,13 @@ one.delete('/icon', async c => {
 one.get('/', async c => {
   const ws = c.get('ws')
   const layout = await loadLayout(ws.path)
-  const collabReference = await getCollabReferencePath(ws.path, ws.type)
   return c.json({
     ...layout,
     // Resolved display name: the settings override, or the folder name.
     name: layout.name || basename(ws.path),
     cwd: ws.path,
     provider: ws.type,
-    agentId: ws.agentId,
-    // Undefined is omitted from JSON when no guide is installed.
-    collabReference
+    agentId: ws.agentId
   })
 })
 

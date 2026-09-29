@@ -103,7 +103,7 @@ describe('collab HTTP integration', () => {
     expect(await Bun.file(join(directory, '.moi', 'data', 'collab.sqlite')).exists()).toBe(false)
   })
 
-  test('startup config reports availability while workspace info exposes only an installed guide', async () => {
+  test('startup config reports availability without exposing the reference path in workspace info', async () => {
     const workspaceUrl = `/api/workspaces/${workspace.id}`
     const referencePath = collabSkillReferencePath(directory, workspace.type)
     for (const enabled of [false, true]) {
@@ -116,7 +116,7 @@ describe('collab HTTP integration', () => {
       expect(info).not.toHaveProperty('collabReference')
     }
     await Bun.write(referencePath, '# Manually installed guide')
-    expect((await (await api.request(workspaceUrl)).json()).collabReference).toBe(referencePath)
+    expect(await (await api.request(workspaceUrl)).json()).not.toHaveProperty('collabReference')
     initializeAppConfig({ collab: false })
     expect(await (await api.request(workspaceUrl)).json()).not.toHaveProperty('collabReference')
   })

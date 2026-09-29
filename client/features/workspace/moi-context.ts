@@ -1,8 +1,8 @@
-import { WorkspaceLayoutContext } from './WorkspaceLayoutContext'
 // Central assembly of the moi context sent with every chat message — the one
 // place that snapshots the workspace's primary UI state (active tab, view
 // titles) and drains queued one-shot directives. The structured `MoiContext`
-// travels to the server as-is; harnesses render it (lib/moi-context.ts).
+// travels to the server, which adds server-owned fields before harnesses render
+// it (lib/moi-context.ts).
 //
 // Quick API:
 //
@@ -22,9 +22,8 @@ import { WorkspaceLayoutContext } from './WorkspaceLayoutContext'
 //   Adding a new ambient field (e.g. scratchpad selection): extend the
 //   `MoiContext` type and its renderer in lib/moi-context.ts, then supply
 //   the field in `useMoiUserMessageContext`'s builder below.
-import { useCallback, useContext } from 'react'
+import { useCallback } from 'react'
 
-import { useAppConfig } from '@/client/api/app-config'
 import { useViewBuilders, useViews } from '@/client/features/views/api'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import type { MoiAppletMessage, MoiContext } from '@/lib/moi-context'
@@ -113,8 +112,6 @@ export function useMoiUserMessageContext({
   appletParams
 }: WorkspaceTabAddress): (options?: MoiUserMessageOptions) => MoiContext {
   const workspaceId = useWorkspaceId()
-  const { experimental } = useAppConfig()
-  const collabReference = useContext(WorkspaceLayoutContext)?.collabReference
   const views = useViews(workspaceId).data
   const builders = useViewBuilders(workspaceId).data
   return useCallback(
@@ -123,13 +120,12 @@ export function useMoiUserMessageContext({
       const tabParams = envelopeTabParams(activeTab, appletParams)
       return {
         activeTab,
-        ...(experimental.collab && collabReference ? { collabReference } : {}),
         tabTitle: activeTabTitle(activeTab, views, builders),
         ...(tabParams ? { tabParams } : {}),
         ...(options.applet ? { applet: options.applet } : {}),
         ...(directives.length > 0 ? { directives } : {})
       }
     },
-    [workspaceId, activeTab, appletParams, views, builders, experimental.collab, collabReference]
+    [workspaceId, activeTab, appletParams, views, builders]
   )
 }

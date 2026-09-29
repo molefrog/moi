@@ -7,9 +7,9 @@
 //
 // Flow: a structured `MoiContext` is assembled at send time — by the client
 // for chat sends (client/features/workspace/moi-context.ts, sent as the chat
-// frame's `context`), by the server for view-builder requests — and travels
-// structured all the way to the harness, which renders it with the transform
-// matching its conventions:
+// frame's `context`), by the server for view-builder requests. The server adds
+// the optional collab reference path before the harness renders the context with
+// the transform matching its conventions:
 //   - Claude Code  — `moiContextSystemReminder` as its own leading text block
 //     (mirrors how Claude Code itself injects ambient context; a string
 //     prefix would defeat the SDK's first-prompt extraction, which skips
@@ -45,6 +45,7 @@ export type MoiAppletMessage = {
 // the server for programmatic sends (the view builder). Extend this (and
 // `renderMoiContext`) when new ambient fields land.
 export type MoiContext = {
+  // Server-resolved path to the installed COLLAB.md reference for this workspace.
   collabReference?: string
   // The workspace tab the user is on when they hit send — for a view-builder
   // request that's the builder's own tab (`view-builders/<id>`).

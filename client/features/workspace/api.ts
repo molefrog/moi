@@ -17,7 +17,6 @@ import type {
 } from '@/lib/types'
 
 export type WorkspaceLayoutResponse = WorkspaceLayout & {
-  collabReference?: string
   cwd: string
   name: string
   provider?: WorkspaceType

@@ -63,7 +63,7 @@ describe('collab startup configuration', () => {
     expect(clientAppConfig().experimental.collab).toBe(false)
   })
 
-  test('only advertises an already installed guide when runtime is enabled', async () => {
+  test('returns an installed reference path only when runtime is enabled', async () => {
     const referencePath = collabSkillReferencePath(workspacePath)
     await Bun.write(referencePath, '# Collab')
     expect(await getCollabReferencePath(workspacePath)).toBeUndefined()

@@ -31,7 +31,6 @@ export type WorkspaceLayoutContextValue = {
   // The workspace's registry id (the route param), so descendants can key
   // their own queries (e.g. the model picker) without prop-drilling.
   workspaceId: string
-  collabReference?: string
   isLoading: boolean
 }
 
@@ -56,14 +55,7 @@ export function useWorkspaceThemeSetting(): WorkspaceLayout['theme'] {
 // Strip the server-only metadata so what we PUT back (and expose as `layout`)
 // is just the persisted `WorkspaceLayout`.
 function stripMeta(data: WorkspaceLayoutResponse): WorkspaceLayout {
-  const {
-    cwd: _cwd,
-    name: _name,
-    provider: _provider,
-    agentId: _agentId,
-    collabReference: _collabReference,
-    ...layout
-  } = data
+  const { cwd: _cwd, name: _name, provider: _provider, agentId: _agentId, ...layout } = data
   return layout
 }
 
@@ -124,7 +116,6 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
       cwd: query.data?.cwd ?? null,
       provider: query.data?.provider ?? null,
       workspaceId: id,
-      collabReference: query.data?.collabReference,
       isLoading: query.isLoading
     }),
     [query.data, query.isLoading, setLayout, id]
