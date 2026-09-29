@@ -26,7 +26,7 @@ export type ProxyUserState = {
   profile: UserProfile | null
 }
 
-export type CollabLocation = { page: string; title?: string; away?: boolean }
+export type CollabLocation = { page: string; away?: boolean }
 
 export type CollabPresenceRegistration = {
   registrationId: string

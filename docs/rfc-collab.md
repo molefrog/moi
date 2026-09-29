@@ -105,7 +105,7 @@ profiles and browser injection do not provide authentication or workspace access
 Those policies remain the outer host's responsibility.
 
 A `Connection` is `{ connectionId, userId, location, presence }`. One user can have multiple browser
-tabs. The server assigns connection IDs. `location` is `{ page, title?, away? } | null`. Hidden
+tabs. The server assigns connection IDs. `location` is `{ page, away? } | null`. Hidden
 tabs retain their page with `away: true`; `null` means the connection has no known page. A page is
 the route segment within the workspace. Status is aggregated across a user's workspace connections.
 Hooks return a `WorkspaceUser`, which adds this status to the profile:
