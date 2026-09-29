@@ -8,7 +8,7 @@ import { getCollabReferencePath, isCollabEnabled } from './config'
 import { collabSkillReferencePath } from './skill'
 
 let workspacePath: string
-const envKeys = ['MOI_COLLAB', 'MOI_DEV', 'MOI_COLLAB_IDENTITY']
+const envKeys = ['MOI_COLLAB', 'MOI_DEV']
 let savedEnv: Record<string, string | undefined>
 beforeEach(async () => {
   workspacePath = await mkdtemp(join(tmpdir(), 'moi-collab-config-'))
@@ -29,7 +29,6 @@ describe('collab startup configuration', () => {
   test('dev mode, old environment settings and legacy workspace flags do not enable runtime', async () => {
     process.env.MOI_DEV = '1'
     process.env.MOI_COLLAB = '1'
-    process.env.MOI_COLLAB_IDENTITY = 'local'
     await Bun.write(
       join(workspacePath, '.moi', '.workspace.json'),
       JSON.stringify({ version: 1, experimental: { collab: true } })

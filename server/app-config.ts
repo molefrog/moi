@@ -25,7 +25,7 @@ export type AppConfig = {
   // Link target for the cloud-demo promo dialog.
   demoInstallUrl: string
   // Cloudflare Access (Zero Trust) in front of this deployment: each viewer
-  // inherits the identity from Access's signed token. Null trusts no proxy.
+  // inherits the user profile from Access's signed token. Null trusts no proxy.
   cloudflareAccess: CloudflareAccessConfig | null
 }
 

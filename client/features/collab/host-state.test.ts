@@ -43,10 +43,7 @@ async function setup(
       }
     }
   } = getHostState ? { moi: { collab: { getHostState } } } : {}
-  const saved = new Map<string, string>([
-    ['moi:collab:dev-identity', JSON.stringify(alice)],
-    ...(profile ? [[PROFILE_KEY, JSON.stringify(profile)] as [string, string]] : [])
-  ])
+  const saved = new Map<string, string>(profile ? [[PROFILE_KEY, JSON.stringify(profile)]] : [])
   Object.defineProperty(globalThis, 'sessionStorage', {
     configurable: true,
     value: {
@@ -112,27 +109,27 @@ test('Cloudflare Access replaces a saved test user, locks edits, and ignores rep
   const collab = await setup(undefined, alice)
   let notifications = 0
   collab.subscribeCurrentUserStore(() => notifications++)
-  collab.setProxyIdentity(accessed)
-  collab.setProxyIdentity({ ...accessed, profile: { ...carol } })
+  collab.setProxyUserState(accessed)
+  collab.setProxyUserState({ ...accessed, profile: { ...carol } })
   collab.setDevUser(bob)
   expect(collab.getCurrentUser()).toEqual(carol)
   expect(collab.getCurrentUserSource()).toBe('cloudflare-access')
   expect(notifications).toBe(1)
-  collab.setProxyIdentity({ provider: 'cloudflare-access', profile: null })
+  collab.setProxyUserState({ provider: 'cloudflare-access', profile: null })
   expect(collab.getCurrentUser()).toBeNull()
-  collab.setProxyIdentity({ provider: null, profile: null })
+  collab.setProxyUserState({ provider: null, profile: null })
   expect(collab.getCurrentUserSource()).toBeNull()
 })
 
 test('Access arriving before setup beats a saved test user, and an outer host beats Access', async () => {
-  const early = await setup(undefined, alice, state => state.setProxyIdentity(accessed))
+  const early = await setup(undefined, alice, state => state.setProxyUserState(accessed))
   expect(early.getCurrentUser()).toEqual(carol)
   const hosted = await setup(
     () => ({ currentUser: bob, workspaces: {} }),
     undefined,
-    state => state.setProxyIdentity(accessed)
+    state => state.setProxyUserState(accessed)
   )
-  hosted.setProxyIdentity(accessed)
+  hosted.setProxyUserState(accessed)
   expect([hosted.getCurrentUser(), hosted.getCurrentUserSource()]).toEqual([bob, 'external'])
 })
 

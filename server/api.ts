@@ -24,7 +24,7 @@ import type {
 import type { MoiContext } from '@/lib/moi-context'
 import { viewBuilderDirectives } from '@/lib/view-builder-directives'
 
-import { proxyIdentity } from './collab/cloudflare-access'
+import { proxyUserState } from './collab/cloudflare-access'
 import { getCollabReferencePath } from './collab/config'
 import { collabManager } from './collab/manager'
 import { agentStore } from './agent'
@@ -1160,11 +1160,11 @@ api.route('/api/workspaces', workspaces)
 // subset. Immutable for the process lifetime — clients cache it forever.
 api.get('/api/config', c => c.json(clientAppConfig()))
 
-// The viewer's identity as verified by a configured proxy (Cloudflare Access).
+// The viewer's profile as verified by a configured proxy (Cloudflare Access).
 // It differs per request, so neither browsers nor Cloudflare's edge may cache it.
-api.get('/api/identity', async c => {
+api.get('/api/proxy-user', async c => {
   c.header('Cache-Control', 'private, no-store')
-  return c.json(await proxyIdentity(c.req.raw))
+  return c.json(await proxyUserState(c.req.raw))
 })
 
 // Served from a lazily-refreshed cache: this handler is a memory read, and the

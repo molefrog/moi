@@ -57,10 +57,10 @@ The current user starts as `null`. Local development uses an explicit test user 
 stored in that browser tab's `sessionStorage`. An outer provider owns the current user once injected,
 including when it signs out. Applets cannot set the current user. Without one there is no presence connection.
 
-## Cloudflare Access identity
+## Cloudflare Access user
 
-A deployment behind Cloudflare Access (Zero Trust) can inherit each viewer's identity instead of
-asking for a dev profile. It is global deployment config: `cloudflareAccess` in `config.json` in
+A deployment behind Cloudflare Access (Zero Trust) can use each viewer's verified profile instead of
+asking for a local test user. It is global deployment config: `cloudflareAccess` in `config.json` in
 moi's data directory, or env vars, which win per field. Both fields are required; half a
 configuration is ignored with a warning.
 
@@ -76,21 +76,20 @@ token in the browser's `CF_Authorization` cookie when a proxy drops that header:
 signature against the team's published keys, the issuer, the audience, and expiry, with a minute of
 clock drift. Verification uses `jose`, which caches the keys for ten minutes and refetches them for
 an unknown key id at most every 30 seconds, so a key Cloudflare stops publishing stops verifying.
-Failed key fetches are logged and verify nothing. Service tokens carry no user and resolve to no
-identity. The profile takes `id` from the token's `sub` and `email` from its `email`.
+Failed key fetches are logged and verify nothing. Service tokens carry no user. The profile takes
+`id` from the token's `sub` and `email` from its `email`.
 Tokens carry no display name, so the profile has no `name` and built-in labels show the email.
 `color` is a stable pick from the user color palette, hashed from the id. There is no avatar, so
 components draw the usual generated face.
 
-`GET /api/identity` returns `{ provider, profile }` and is never cached. The app loads it before
-mounting and again after a reconnect. The inherited profile replaces a saved dev profile and locks
-the dev form. A request without a valid token leaves the tab signed out. The presence socket
+`GET /api/proxy-user` returns `{ provider, profile }` and is never cached. The app loads it before
+mounting and again after a reconnect. The verified profile replaces a saved local test user and
+locks its setup form. A request without a valid token leaves the tab signed out. The presence socket
 upgrade verifies the token too: without it the upgrade fails with 401. With it, `join` and
 `profile` messages must carry the verified id, and the server replaces their profile with the
 verified one, so a browser cannot appear as someone else. An outer host that injects state still
-owns identity in the browser, but a socket joining with the host's different id is refused rather
-than shown to peers as someone else. Access supplies no membership, so the workspace directory
-keeps the live fallback.
+owns the current user in the browser. If that user's ID differs from the Access token, the socket
+is refused. Access supplies no membership, so the workspace directory keeps the live fallback.
 
 ## Users and connections
 

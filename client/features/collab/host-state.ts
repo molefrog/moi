@@ -1,6 +1,6 @@
 import { isUserProfile } from '@/lib/collab/protocol'
 import { colorForId } from '@/lib/collab/colors'
-import type { IdentityProvider, ProxyIdentity, UserProfile } from '@/lib/collab/types'
+import type { AuthProvider, ProxyUserState, UserProfile } from '@/lib/collab/types'
 
 export type CollabShareContext = { workspaceId: string; url: string }
 export type CollabShareHandler = (context: CollabShareContext) => Promise<{ url: string }>
@@ -28,7 +28,7 @@ export type CollabHostApi = {
   setShareHandler: (handler: CollabShareHandler | null) => void
 }
 // Who supplies the current user: local setup, an outer host, or an auth proxy.
-export type CurrentUserSource = 'dev' | 'external' | IdentityProvider
+export type CurrentUserSource = 'dev' | 'external' | AuthProvider
 
 // Earlier development builds generated a dev user automatically. Only this
 // explicit profile key opts a tab into collaboration and workspace controls.
@@ -223,7 +223,7 @@ export function getCurrentUserSource(): CurrentUserSource | null {
 
 // An auth proxy takes precedence over local test users; an outer host takes
 // precedence over the proxy. A configured proxy with no user signs this tab out.
-export function setProxyIdentity({ provider, profile }: ProxyIdentity): void {
+export function setProxyUserState({ provider, profile }: ProxyUserState): void {
   if (currentUserSource === 'external') return
   if (provider === null) {
     if (currentUserSource === null || currentUserSource === 'dev') return

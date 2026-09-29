@@ -8,7 +8,7 @@ import { api } from './api'
 import { AttachmentUploadError } from './attachment-message'
 import { PORT } from './constants'
 import { control } from './control'
-import { proxyIdentity } from './collab/cloudflare-access'
+import { proxyUserState } from './collab/cloudflare-access'
 import { getCollabReferencePath, isCollabEnabled } from './collab/config'
 import { selectChatSession } from './chat-selection'
 import { collabManager } from './collab/manager'
@@ -153,7 +153,7 @@ export const app = Bun.serve<WsData>({
         return new Response('Collab is not enabled for this workspace', { status: 403 })
       }
       // Behind Cloudflare Access, presence is joined only as the verified viewer.
-      const { provider, profile } = await proxyIdentity(req)
+      const { provider, profile } = await proxyUserState(req)
       if (provider && !profile) {
         return new Response('Sign in through Cloudflare Access to join', { status: 401 })
       }

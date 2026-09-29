@@ -302,7 +302,7 @@ describe('collab process and socket integration', () => {
     const [client, peer, other] = [localSocket(), localSocket(), localSocket()]
     runtime.open(other.socket, workspace, verified)
     joinLocal(runtime, other.socket, 'host-user')
-    expect(other.messages).toContainEqual(expect.objectContaining({ code: 'identity_mismatch' }))
+    expect(other.messages).toContainEqual(expect.objectContaining({ code: 'user_mismatch' }))
     expect(other.reason).toContain('Cloudflare Access')
     runtime.open(client.socket, workspace, verified)
     joinLocal(runtime, client.socket, 'cf-user-1')

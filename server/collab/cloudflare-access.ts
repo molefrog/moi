@@ -3,13 +3,13 @@ import type { FetchImplementation } from 'jose'
 
 import { colorForId } from '@/lib/collab/colors'
 import { isUserProfile } from '@/lib/collab/protocol'
-import type { ProxyIdentity, UserProfile } from '@/lib/collab/types'
+import type { ProxyUserState, UserProfile } from '@/lib/collab/types'
 
 import { type CloudflareAccessConfig, getAppConfig } from '../app-config'
 
 // Cloudflare Access adds a signed application token (an RS256 JWT) to every
 // request it lets through. Only the verified signature, issuer, and audience
-// make the identity trustworthy: anyone who reaches the origin some other way
+// make the claimed user trustworthy: anyone who reaches the origin some other way
 // can send the header too.
 // https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/
 export const ACCESS_TOKEN_HEADER = 'cf-access-jwt-assertion'
@@ -64,7 +64,7 @@ let current: { config: CloudflareAccessConfig; verify: AccessVerifier } | null =
 
 // Who the configured proxy says sent this request. Without Cloudflare Access
 // configured, moi trusts no proxy and every request resolves to no provider.
-export async function proxyIdentity(req: Request): Promise<ProxyIdentity> {
+export async function proxyUserState(req: Request): Promise<ProxyUserState> {
   const config = getAppConfig().cloudflareAccess
   if (!config) return { provider: null, profile: null }
   if (current?.config !== config) current = { config, verify: accessVerifier(config) }

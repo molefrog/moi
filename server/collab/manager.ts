@@ -59,7 +59,7 @@ export class CollabRuntimeError extends Error {
 }
 
 // A proxy-verified socket speaks only as the verified viewer. Another id, such
-// as an outer host's own identity, is refused rather than rewritten, so peers
+// as an outer host's current user, is refused rather than rewritten, so peers
 // never see someone other than the person the browser shows.
 function verifiedMessage(
   message: CollabClientMessage,
@@ -312,7 +312,7 @@ export class CollabManager {
     if (!validated) {
       this.emit(binding, {
         type: 'error',
-        code: 'identity_mismatch',
+        code: 'user_mismatch',
         message: 'Presence here uses your Cloudflare Access user'
       })
       this.disconnect(binding, 'User does not match Cloudflare Access')

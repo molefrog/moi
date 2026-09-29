@@ -15,12 +15,12 @@ export type UserProfile = {
 }
 
 // An authenticating proxy in front of the deployment that moi trusts.
-export type IdentityProvider = 'cloudflare-access'
+export type AuthProvider = 'cloudflare-access'
 
-// GET /api/identity. `profile` is the user the proxy verified for this
+// GET /api/proxy-user. `profile` is the user the proxy verified for this
 // request: null without a configured provider or without a valid proxy token.
-export type ProxyIdentity = {
-  provider: IdentityProvider | null
+export type ProxyUserState = {
+  provider: AuthProvider | null
   profile: UserProfile | null
 }
 

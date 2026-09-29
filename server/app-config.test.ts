@@ -62,8 +62,7 @@ test('legacy experiment names and collab settings do not enable collaboration', 
   const config = loadAppConfig(file, {
     MOI_EXPERIMENTS: 'collab',
     MOI_COLLAB: '1',
-    MOI_DEV: '1',
-    MOI_COLLAB_IDENTITY: 'local'
+    MOI_DEV: '1'
   })
   expect(config.experimental.collab).toBe(false)
 })
