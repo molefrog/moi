@@ -32,14 +32,14 @@ afterEach(() => {
 })
 
 async function setup(
-  getHostState?: () => CollabHostStateInput | null,
+  getHostState?: () => CollabHostStateInput | undefined,
   profile?: UserProfile,
   beforeInstall?: (state: typeof HostState) => void
 ) {
   const host: {
     moi?: {
       collab?: {
-        getHostState?: () => CollabHostStateInput | null
+        getHostState?: () => CollabHostStateInput | undefined
       }
     }
   } = getHostState ? { moi: { collab: { getHostState } } } : {}
@@ -64,16 +64,16 @@ async function setup(
 
 test('current user starts empty and persists only an explicitly enabled dev profile', async () => {
   const collab = await setup()
-  expect(collab.getCurrentUser()).toBeNull()
-  expect(collab.getCurrentUserSource()).toBeNull()
-  expect(collab.getHostState()).toBeNull()
+  expect(collab.getCurrentUser()).toBeUndefined()
+  expect(collab.getCurrentUserSource()).toBeUndefined()
+  expect(collab.getHostState()).toBeUndefined()
   expect(collab.getWorkspaceDirectory('a')).toEqual({ status: 'unavailable', users: [] })
   expect(collab.getWorkspaceUsers('a')).toBeNull()
   expect(collab.saved.has(PROFILE_KEY)).toBe(false)
   collab.setDevUser(alice)
   expect(collab.getCurrentUser()).toEqual(alice)
   expect(collab.getCurrentUserSource()).toBe('dev')
-  expect(collab.getHostState()).toBeNull()
+  expect(collab.getHostState()).toBeUndefined()
   expect(JSON.parse(collab.saved.get(PROFILE_KEY) ?? 'null')).toEqual(alice)
 })
 
@@ -85,13 +85,13 @@ test('an explicitly saved dev profile restores when no external provider is conf
 
 test.each([
   ['signed in', (): CollabHostState => ({ currentUser: bob, workspaces: {} }), bob],
-  ['signed out', (): CollabHostState => ({ currentUser: null, workspaces: {} }), null],
+  ['signed out', (): CollabHostState => ({ workspaces: {} }), undefined],
   [
     'unavailable',
     (): CollabHostState => {
       throw new Error('Provider unavailable')
     },
-    null
+    undefined
   ]
 ] as const)('an injected provider remains in charge while %s', async (_state, getter, expected) => {
   const collab = await setup(getter, alice)
@@ -107,6 +107,9 @@ test.each([
 
 test('Cloudflare Access replaces a saved test user, locks edits, and ignores repeats', async () => {
   const collab = await setup(undefined, alice)
+  collab.setProxyUserState({})
+  expect(collab.getCurrentUser()).toEqual(alice)
+  expect(collab.getCurrentUserSource()).toBe('dev')
   let notifications = 0
   collab.subscribeCurrentUserStore(() => notifications++)
   collab.setProxyUserState(accessed)
@@ -115,10 +118,13 @@ test('Cloudflare Access replaces a saved test user, locks edits, and ignores rep
   expect(collab.getCurrentUser()).toEqual(carol)
   expect(collab.getCurrentUserSource()).toBe('cloudflare-access')
   expect(notifications).toBe(1)
-  collab.setProxyUserState({ provider: 'cloudflare-access', profile: null })
-  expect(collab.getCurrentUser()).toBeNull()
-  collab.setProxyUserState({ provider: null, profile: null })
-  expect(collab.getCurrentUserSource()).toBeNull()
+  collab.setProxyUserState({ provider: 'cloudflare-access' })
+  expect(collab.getCurrentUser()).toBeUndefined()
+  expect(collab.getCurrentUserSource()).toBe('cloudflare-access')
+  collab.setProxyUserState(accessed)
+  collab.setProxyUserState({})
+  expect(collab.getCurrentUser()).toBeUndefined()
+  expect(collab.getCurrentUserSource()).toBeUndefined()
 })
 
 test('Access arriving before setup beats a saved test user, and an outer host beats Access', async () => {
@@ -197,10 +203,10 @@ test('every subscriber sees the complete new state after an atomic replacement',
     workspaces: { a: { status: 'ready', users: [alice] } }
   }))
   const observed: Array<{
-    current: UserProfile | null
+    current: UserProfile | undefined
     a: WorkspaceDirectory
     b: WorkspaceDirectory
-    host: CollabHostState | null
+    host: CollabHostState | undefined
   }> = []
   const read = () => {
     observed.push({
@@ -231,7 +237,7 @@ test('every subscriber sees the complete new state after an atomic replacement',
     expect(state.host).toBe(collab.getHostState())
   }
   unsubscribe.forEach(stop => stop())
-  collab.setHostState({ currentUser: null, workspaces: {} })
+  collab.setHostState({ workspaces: {} })
   expect(observed).toHaveLength(4)
 })
 
@@ -361,14 +367,14 @@ test('sign-out atomically clears directories and remains authoritative over a sa
     currentUser: bob,
     workspaces: { a: { status: 'ready', users: [alice, bob] } }
   })
-  const observed: Array<CollabHostState | null> = []
+  const observed: Array<CollabHostState | undefined> = []
   const unsubscribe = collab.subscribeHostState(state => observed.push(state))
   expect(observed).toEqual([collab.getHostState()])
-  collab.setHostState({ currentUser: null, workspaces: collab.getHostState()!.workspaces })
+  collab.setHostState({ workspaces: collab.getHostState()!.workspaces })
   collab.setDevUser(alice)
-  expect(collab.getCurrentUser()).toBeNull()
+  expect(collab.getCurrentUser()).toBeUndefined()
   expect(collab.getCurrentUserSource()).toBe('external')
-  expect(collab.getHostState()).toEqual({ currentUser: null, workspaces: {} })
+  expect(collab.getHostState()).toEqual({ workspaces: {} })
   expect(collab.getWorkspaceUsers('a')).toEqual([])
   expect(observed.at(-1)).toBe(collab.getHostState())
   unsubscribe()
@@ -387,7 +393,7 @@ test('invalid updates do not partially publish current user, directory, source, 
   ).toThrow()
   expect(collab.getCurrentUserSource()).toBe('dev')
   expect(collab.getCurrentUser()).toEqual(alice)
-  expect(collab.getHostState()).toBeNull()
+  expect(collab.getHostState()).toBeUndefined()
   collab.setHostState({
     currentUser: alice,
     workspaces: { a: { status: 'ready', users: [alice] } }
@@ -405,7 +411,7 @@ test('invalid updates do not partially publish current user, directory, source, 
       }
     },
     { currentUser: bob, workspaces: { a: { status: 'ready', users: [alice, alice] } } },
-    { currentUser: null, workspaces: { invalid: { status: 'ready', users: [invalidUser] } } },
+    { currentUser: undefined, workspaces: { invalid: { status: 'ready', users: [invalidUser] } } },
     // A JavaScript host may pass shapes that TypeScript rejects.
     { currentUser: bob, workspaces: [] } as unknown as CollabHostState,
     { currentUser: bob, workspaces: { a: { status: 'invalid' } } } as unknown as CollabHostState

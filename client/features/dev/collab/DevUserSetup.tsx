@@ -31,7 +31,7 @@ export function DevUserSetup() {
   return <DevUserForm key={profile?.id ?? 'setup'} savedUser={profile} />
 }
 
-type AccessUserProps = { profile: UserProfile | null }
+type AccessUserProps = { profile: UserProfile | undefined }
 
 // Behind Cloudflare Access the profile is inherited, so there is nothing to edit.
 // Access profiles carry no name, so the label is the email, as in workspaces.
@@ -64,7 +64,7 @@ function AccessUser({ profile }: AccessUserProps) {
   )
 }
 
-type DevUserFormProps = { savedUser: UserProfile | null }
+type DevUserFormProps = { savedUser: UserProfile | undefined }
 
 function DevUserForm({ savedUser }: DevUserFormProps) {
   const [initial] = useState(() => savedUser ?? createDevUser())

@@ -7,7 +7,7 @@ export type CollabShareContext = { workspaceId: string; url: string }
 export type CollabShareHandler = (context: CollabShareContext) => Promise<{ url: string }>
 export type UserProfileInput = Omit<UserProfile, 'color'> & { color?: UserProfile['color'] }
 type HostState<Profile> = {
-  readonly currentUser: Profile | null
+  readonly currentUser?: Profile
   readonly workspaces: Readonly<
     Record<
       string,
@@ -23,9 +23,9 @@ export type WorkspaceDirectory = {
   readonly users: readonly UserProfile[]
 }
 export type CollabHostApi = {
-  getHostState: () => CollabHostState | null
+  getHostState: () => CollabHostState | undefined
   setHostState: (state: CollabHostStateInput) => void
-  subscribeHostState: (listener: (state: CollabHostState | null) => void) => () => void
+  subscribeHostState: (listener: (state: CollabHostState | undefined) => void) => () => void
   setShareHandler: (handler: CollabShareHandler | null) => void
 }
 // Who supplies the current user: local setup, an outer host, or an auth proxy.
@@ -34,10 +34,10 @@ export type CurrentUserSource = 'dev' | 'external' | AuthProvider
 // Earlier development builds generated a dev user automatically. Only this
 // explicit profile key opts a tab into collaboration and workspace controls.
 const PROFILE_KEY = 'moi:collab:dev-profile'
-let currentUser: UserProfile | null = null
+let currentUser: UserProfile | undefined
 let installed = false
 let shareHandler: CollabShareHandler | null = null
-let currentUserSource: CurrentUserSource | null = null
+let currentUserSource: CurrentUserSource | undefined
 const listeners = new Set<() => void>()
 const workspaceListeners = new Map<string, Set<() => void>>()
 const hostListeners = new Set<() => void>()
@@ -52,7 +52,7 @@ const LOADING_DIRECTORY: WorkspaceDirectory = Object.freeze({
   status: 'loading',
   users: EMPTY_USERS
 })
-let hostState: CollabHostState | null = null
+let hostState: CollabHostState | undefined
 
 export function normalizeUserProfile(value: UserProfileInput): UserProfile {
   if (!value || typeof value.id !== 'string' || !value.id.trim())
@@ -90,7 +90,8 @@ export function normalizeWorkspaceUsers(
 
 function normalizeHostState(value: CollabHostStateInput): CollabHostState {
   if (!value || typeof value !== 'object') throw new Error('Invalid host state.')
-  const current = value.currentUser === null ? null : normalizeUserProfile(value.currentUser)
+  const current =
+    value.currentUser === undefined ? undefined : normalizeUserProfile(value.currentUser)
   if (!value.workspaces || typeof value.workspaces !== 'object' || Array.isArray(value.workspaces))
     throw new Error('Host workspaces must be a record.')
   const entries = Object.entries(value.workspaces).map(([id, directory]) => {
@@ -112,7 +113,7 @@ function normalizeHostState(value: CollabHostStateInput): CollabHostState {
   })
 }
 
-export function getHostState(): CollabHostState | null {
+export function getHostState(): CollabHostState | undefined {
   return hostState
 }
 
@@ -153,7 +154,9 @@ export function subscribeHostStateStore(listener: () => void): () => void {
   }
 }
 
-export function subscribeHostState(listener: (state: CollabHostState | null) => void): () => void {
+export function subscribeHostState(
+  listener: (state: CollabHostState | undefined) => void
+): () => void {
   const unsubscribe = subscribeHostStateStore(() => listener(getHostState()))
   listener(getHostState())
   return unsubscribe
@@ -197,11 +200,11 @@ export function subscribeWorkspaceUsers(
   return unsubscribe
 }
 
-export function getCurrentUser(): UserProfile | null {
+export function getCurrentUser(): UserProfile | undefined {
   return currentUser
 }
 
-export function setCurrentUser(next: UserProfile | null): void {
+export function setCurrentUser(next: UserProfile | undefined): void {
   setHostState({ currentUser: next, workspaces: hostState?.workspaces ?? EMPTY_WORKSPACES })
 }
 
@@ -213,13 +216,13 @@ export function subscribeCurrentUserStore(listener: () => void): () => void {
 }
 
 export function subscribeCurrentUser(
-  listener: (currentUser: UserProfile | null) => void
+  listener: (currentUser: UserProfile | undefined) => void
 ): () => void {
   listener(currentUser)
   return subscribeCurrentUserStore(() => listener(currentUser))
 }
 
-export function getCurrentUserSource(): CurrentUserSource | null {
+export function getCurrentUserSource(): CurrentUserSource | undefined {
   return currentUserSource
 }
 
@@ -227,12 +230,12 @@ export function getCurrentUserSource(): CurrentUserSource | null {
 // precedence over the proxy. A configured proxy with no user signs this tab out.
 export function setProxyUserState({ provider, profile }: ProxyUserState): void {
   if (currentUserSource === 'external') return
-  if (provider === null) {
-    if (currentUserSource === null || currentUserSource === 'dev') return
-    currentUserSource = null
-    currentUser = null
+  if (provider === undefined) {
+    if (currentUserSource === undefined || currentUserSource === 'dev') return
+    currentUserSource = undefined
+    currentUser = undefined
   } else {
-    const normalized = profile === null ? null : normalizeUserProfile(profile)
+    const normalized = profile === undefined ? undefined : normalizeUserProfile(profile)
     if (
       currentUserSource === provider &&
       JSON.stringify(currentUser) === JSON.stringify(normalized)
@@ -254,7 +257,7 @@ function persistDevUser(): void {
 
 export function setDevUser(next: UserProfile): void {
   // A provider may take over between rendering the dev form and handling input.
-  if (currentUserSource !== null && currentUserSource !== 'dev') return
+  if (currentUserSource !== undefined && currentUserSource !== 'dev') return
   const normalized = normalizeUserProfile(next)
   currentUserSource = 'dev'
   currentUser = normalized
@@ -283,7 +286,7 @@ export function installHostApi(): void {
   const host = window as Window & {
     moi?: {
       collab?: {
-        getHostState?: () => CollabHostStateInput | null
+        getHostState?: () => CollabHostStateInput | undefined
       }
       [key: string]: unknown
     }
@@ -291,12 +294,12 @@ export function installHostApi(): void {
   const previous = host.moi?.collab
   if (previous?.getHostState) {
     try {
-      setHostState(previous.getHostState() ?? { currentUser: null, workspaces: {} })
+      setHostState(previous.getHostState() ?? { workspaces: {} })
     } catch {
       // An unavailable host remains authoritative; never restore a dev profile.
-      setHostState({ currentUser: null, workspaces: {} })
+      setHostState({ workspaces: {} })
     }
-  } else if (currentUserSource === null) {
+  } else if (currentUserSource === undefined) {
     try {
       const saved = sessionStorage.getItem(PROFILE_KEY)
       if (saved) {

@@ -66,12 +66,13 @@ let current: { config: CloudflareAccessConfig; verify: AccessVerifier } | null =
 // configured, moi trusts no proxy and every request resolves to no provider.
 export async function proxyUserState(req: Request): Promise<ProxyUserState> {
   const config = getAppConfig().cloudflareAccess
-  if (!config) return { provider: null, profile: null }
+  if (!config) return {}
   if (current?.config !== config) current = { config, verify: accessVerifier(config) }
   // The header Access adds wins; the cookie covers proxies that drop it.
   const token =
     req.headers.get(ACCESS_TOKEN_HEADER) ??
     new Bun.CookieMap(req.headers.get('cookie') ?? '').get(ACCESS_TOKEN_COOKIE)
   const user = token ? await current.verify(token) : null
-  return { provider: 'cloudflare-access', profile: user ? accessProfile(user) : null }
+  const profile = user ? accessProfile(user) : null
+  return profile ? { provider: 'cloudflare-access', profile } : { provider: 'cloudflare-access' }
 }

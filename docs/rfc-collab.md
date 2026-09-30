@@ -53,7 +53,7 @@ bundle. User lookup returns `undefined`, list hooks return `[]`, publication doe
 collaboration component renders nothing, including wrapper children. A disabled runtime still
 provides a bridge and keeps ordinary applet rendering available.
 
-The current user starts as `null`. Local development uses an explicit test user from `/dev/collab`,
+The current user starts as `undefined`. Local development uses an explicit test user from `/dev/collab`,
 stored in that browser tab's `sessionStorage`. An outer provider owns the current user once injected,
 including when it signs out. Applets cannot set the current user. Without one there is no presence connection.
 

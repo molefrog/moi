@@ -17,7 +17,7 @@ export class CollabClient {
   private stopped = true
   private attempts = 0
   private lastMessageAt = 0
-  private userId = getCurrentUser()?.id ?? null
+  private userId = getCurrentUser()?.id
 
   constructor(readonly workspaceId: string) {
     this.store.setSender(message => this.send(message))
@@ -26,11 +26,11 @@ export class CollabClient {
   start(): () => void {
     if (!this.stopped) return () => {}
     this.stopped = false
-    this.userId = getCurrentUser()?.id ?? null
+    this.userId = getCurrentUser()?.id
     this.unsubscribeCurrentUser = subscribeCurrentUserStore(() => {
       const profile = getCurrentUser()
-      if ((profile?.id ?? null) !== this.userId) {
-        this.userId = profile?.id ?? null
+      if (profile?.id !== this.userId) {
+        this.userId = profile?.id
         this.store.disconnect()
         clearTimeout(this.retry)
         if (this.socket) this.socket.close()
@@ -42,7 +42,7 @@ export class CollabClient {
   }
 
   private wantsConnection(): boolean {
-    return !this.stopped && getCurrentUser() !== null
+    return !this.stopped && getCurrentUser() !== undefined
   }
 
   private connect(): void {

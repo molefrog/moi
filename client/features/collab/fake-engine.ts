@@ -6,7 +6,7 @@ import type { WorkspaceDirectory } from './host-state'
 import { CollabStore } from './store'
 
 export type FakeEngineOptions = {
-  self: UserProfile | null
+  self: UserProfile | undefined
   page?: string
   otherConnections?: Connection[]
   // Full fixture directory, including users who are offline.

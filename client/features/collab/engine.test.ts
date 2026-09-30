@@ -45,7 +45,7 @@ class TestSocket {
 }
 
 beforeEach(() => {
-  setCurrentUser(null)
+  setCurrentUser(undefined)
   sockets = []
   service = new CollabService((connectionId, message) => {
     sockets
@@ -63,7 +63,7 @@ afterEach(() => {
   stop?.()
   stop = undefined
   service.close()
-  setCurrentUser(null)
+  setCurrentUser(undefined)
   if (originalLocation) Object.defineProperty(globalThis, 'location', originalLocation)
   else Reflect.deleteProperty(globalThis, 'location')
   if (originalWebSocket) Object.defineProperty(globalThis, 'WebSocket', originalWebSocket)
@@ -81,7 +81,7 @@ test('runtime without a current user stays idle and never joins anonymously', ()
     value: 'title'
   })
   expect(sockets).toHaveLength(0)
-  expect(getCurrentUser()).toBeNull()
+  expect(getCurrentUser()).toBeUndefined()
   expect(engine.getSnapshot().status).toBe('disconnected')
 })
 
@@ -98,7 +98,7 @@ test('an explicit user enables workspace presence without an applet and clearing
   setCurrentUser({ ...profile, name: 'Alicia' })
   expect(socket.sent.at(-1)).toMatchObject({ type: 'profile', profile: { name: 'Alicia' } })
   expect(sockets).toHaveLength(1)
-  setCurrentUser(null)
+  setCurrentUser(undefined)
   expect(socket.readyState).toBe(3)
   expect(engine.getSnapshot().status).toBe('disconnected')
 })

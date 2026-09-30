@@ -99,7 +99,7 @@ function Disabled() {
   return <Observer />
 }
 test('hooks are safe without a backend or applet and resolve missing users to undefined', () => {
-  setCurrentUser(null)
+  setCurrentUser(undefined)
   const html = renderToStaticMarkup(<Disabled />)
   expect(html).toContain('[]')
 })

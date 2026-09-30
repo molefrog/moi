@@ -125,7 +125,7 @@ describe('collab HTTP integration', () => {
     const headers = { 'Cf-Access-Jwt-Assertion': 'forged.token.value' }
     const response = await api.request('/api/proxy-user', { headers })
     expect(response.headers.get('Cache-Control')).toBe('private, no-store')
-    expect(await response.json()).toEqual({ provider: null, profile: null })
+    expect(await response.json()).toEqual({})
   })
 
   test('persistent commands remain absent even when presence is enabled', async () => {

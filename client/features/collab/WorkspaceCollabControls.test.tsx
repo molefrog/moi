@@ -6,6 +6,7 @@ import { TooltipProvider } from '@/client/components/ui/tooltip'
 import type { UserProfile, Connection } from '@/lib/collab/types'
 
 import { WorkspaceCollabControls } from './WorkspaceCollabControls'
+import { useCollabEnabled } from './entry'
 import { createFakeEngine } from './fake-engine'
 import { CollabContext } from './hooks'
 import { getCurrentUser, setCurrentUser } from './host-state'
@@ -112,4 +113,24 @@ test('header gives nameless viewers and connected users nonempty accessible labe
   expect(html).not.toContain('undefined')
   expect(html).not.toContain('aria-label=""')
   expect(html).not.toContain('Unknown user')
+})
+
+function CollabEnabled() {
+  return <output>{String(useCollabEnabled())}</output>
+}
+
+test('collab controls and browser-tab selection require runtime support and a current user', () => {
+  for (const [user, enabled, expected] of [
+    [undefined, true, false],
+    [self, false, false],
+    [self, true, true]
+  ] as const) {
+    const engine = createFakeEngine({ self: user })
+    const html = renderToStaticMarkup(
+      <CollabContext value={{ ...engine, enabled }}>
+        <CollabEnabled />
+      </CollabContext>
+    )
+    expect(html).toBe(`<output>${expected}</output>`)
+  }
 })

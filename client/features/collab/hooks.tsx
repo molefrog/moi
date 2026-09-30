@@ -134,8 +134,7 @@ export function usePeers(options: UsePeersOptions = {}): WorkspaceUser[] {
   const { state, self, users, engine } = useUsersSource()
   const { scope, status } = options
   return useMemo(
-    () =>
-      resolvePeers({ ...state, users }, self?.id ?? null, engine.getLocation(), { scope, status }),
+    () => resolvePeers({ ...state, users }, self?.id, engine.getLocation(), { scope, status }),
     [state, self, users, engine, scope, status]
   )
 }

@@ -21,7 +21,7 @@ export function useCollabEnabled(): boolean {
     engine.getCurrentUser,
     engine.getCurrentUser
   )
-  return engine.enabled && currentUser !== null
+  return engine.enabled && currentUser !== undefined
 }
 
 export type CollabControlsProps = {

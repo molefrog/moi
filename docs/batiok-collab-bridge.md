@@ -60,7 +60,7 @@ loading. A ready list determines membership and lets applets resolve offline use
 does not add someone missing from that list.
 
 On account switch, publish the new `currentUser` with only that account's directories, using loading
-entries until they arrive. On sign-out, publish `{ currentUser: null, workspaces: {} }`. Discard stale
+entries until they arrive. On sign-out, publish `{ workspaces: {} }`. Discard stale
 asynchronous responses before publishing either change. Batiok must enforce access separately from
 this display-data bridge.
 

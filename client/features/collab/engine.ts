@@ -24,7 +24,7 @@ export type CollabEngineApi = {
   getUsersSnapshot: () => CollabConnectionState
   getPresenceSnapshot: (surface: string, channel: string) => readonly CollabPresenceEntry[]
   subscribe: (listener: () => void) => Unsubscribe
-  getCurrentUser: () => UserProfile | null
+  getCurrentUser: () => UserProfile | undefined
   subscribeCurrentUser: (listener: () => void) => Unsubscribe
   getWorkspaceUsers: () => readonly UserProfile[] | null
   getWorkspaceDirectory: () => WorkspaceDirectory

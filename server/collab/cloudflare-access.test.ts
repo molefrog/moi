@@ -99,10 +99,7 @@ test('requests get a nameless Access profile only when Access is configured', as
   const fetch = spyOn(globalThis, 'fetch').mockImplementation((async () =>
     Response.json({ keys: [current.jwk] })) as unknown as typeof globalThis.fetch)
   try {
-    expect(await proxyUserState(request({ [ACCESS_TOKEN_HEADER]: valid }))).toEqual({
-      provider: null,
-      profile: null
-    })
+    expect(await proxyUserState(request({ [ACCESS_TOKEN_HEADER]: valid }))).toEqual({})
     process.env.MOI_CLOUDFLARE_ACCESS_TEAM_DOMAIN = 'acme'
     process.env.MOI_CLOUDFLARE_ACCESS_AUD = 'aud-moi'
     resetAppConfig()
@@ -113,7 +110,10 @@ test('requests get a nameless Access profile only when Access is configured', as
     })
     const cookie = { cookie: `${ACCESS_TOKEN_COOKIE}=${valid}` }
     expect((await proxyUserState(request(cookie))).profile).toEqual(profile)
-    expect((await proxyUserState(request({}))).profile).toBeNull()
+    expect(await proxyUserState(request({}))).toEqual({ provider: 'cloudflare-access' })
+    expect(await proxyUserState(request({ [ACCESS_TOKEN_HEADER]: 'invalid' }))).toEqual({
+      provider: 'cloudflare-access'
+    })
   } finally {
     fetch.mockRestore()
     delete process.env.MOI_CLOUDFLARE_ACCESS_TEAM_DOMAIN

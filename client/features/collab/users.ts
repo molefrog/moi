@@ -32,7 +32,7 @@ export function userStatus(connections: readonly Connection[], id: string): User
 // A supplied host directory is authoritative, including an empty list/removals.
 export function workspaceProfiles(
   liveUsers: readonly UserProfile[],
-  self: UserProfile | null,
+  self: UserProfile | undefined,
   directory: readonly UserProfile[] | null
 ): readonly UserProfile[] {
   if (directory !== null) return directory
@@ -48,7 +48,7 @@ export function resolveUser(source: UsersSource, id: string): WorkspaceUser | un
 
 export function resolvePeers(
   source: UsersSource,
-  selfId: string | null,
+  selfId: string | undefined,
   location: CollabLocation | null,
   { scope = 'page', status }: UsePeersOptions = {}
 ): WorkspaceUser[] {
@@ -77,7 +77,7 @@ export type WorkspaceUserInfo = {
   status: UserStatus
 }
 export type CurrentUserContext = {
-  currentUser: UserProfile | null
+  currentUser: UserProfile | undefined
   connectionId: string | null
   page: string | null
   users: readonly UserProfile[]

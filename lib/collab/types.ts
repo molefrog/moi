@@ -5,11 +5,11 @@ export type { CollabJsonValue, UserProfile } from 'moi/collab'
 // An authenticating proxy in front of the deployment that moi trusts.
 export type AuthProvider = 'cloudflare-access'
 
-// GET /api/proxy-user. `profile` is the user the proxy verified for this
-// request: null without a configured provider or without a valid proxy token.
+// Complete snapshot from GET /api/proxy-user. No provider means no proxy;
+// a provider without a profile means no verified user.
 export type ProxyUserState = {
-  provider: AuthProvider | null
-  profile: UserProfile | null
+  provider?: AuthProvider
+  profile?: UserProfile
 }
 
 export type CollabLocation = { page: string; away?: boolean }
