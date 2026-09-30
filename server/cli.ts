@@ -61,6 +61,7 @@ import {
   matchHermesProfile
 } from './harness/hermes/discovery'
 import { type OpenClawAgent, discoverOpenClawAgents } from './harness/openclaw/discovery'
+import { dependencyInstallLogPath } from './moi-scaffold'
 import {
   assertWorkspaceIdAvailable,
   liftToWorkspaceRoot,
@@ -399,10 +400,14 @@ const init = defineCommand({
     if (scaffold !== 'exists') {
       if (scaffold === 'installing') {
         console.log(pc.dim('  Widget dependencies still installing in .moi/ (background)'))
+        console.log(pc.dim('  Install log: ' + dependencyInstallLogPath(target)))
       } else if (scaffold === 0) {
         console.log(pc.dim('  Installed widget dependencies in .moi/'))
       } else {
-        console.warn(pc.yellow('  bun install failed — run it manually in .moi/'))
+        console.warn(
+          pc.yellow(`  bun install failed (exit ${scaffold}) — run it manually in .moi/`)
+        )
+        console.warn(pc.dim('  Install log: ' + dependencyInstallLogPath(target)))
       }
     }
 
@@ -1362,10 +1367,14 @@ const openclawInit = defineCommand({
     if (scaffold !== 'exists') {
       if (scaffold === 'installing') {
         console.log('\n' + pc.dim('  Widget dependencies still installing in .moi/ (background)'))
+        console.log(pc.dim('  Install log: ' + dependencyInstallLogPath(target.path)))
       } else if (scaffold === 0) {
         console.log('\n' + pc.dim('  Installed widget dependencies in .moi/'))
       } else {
-        console.warn('\n' + pc.yellow('  bun install failed — run it manually in .moi/'))
+        console.warn(
+          '\n' + pc.yellow(`  bun install failed (exit ${scaffold}) — run it manually in .moi/`)
+        )
+        console.warn(pc.dim('  Install log: ' + dependencyInstallLogPath(target.path)))
       }
     }
 
@@ -1500,10 +1509,14 @@ const hermesInit = defineCommand({
     if (scaffold !== 'exists') {
       if (scaffold === 'installing') {
         console.log('\n' + pc.dim('  Widget dependencies still installing in .moi/ (background)'))
+        console.log(pc.dim('  Install log: ' + dependencyInstallLogPath(target.path)))
       } else if (scaffold === 0) {
         console.log('\n' + pc.dim('  Installed widget dependencies in .moi/'))
       } else {
-        console.warn('\n' + pc.yellow('  bun install failed — run it manually in .moi/'))
+        console.warn(
+          '\n' + pc.yellow(`  bun install failed (exit ${scaffold}) — run it manually in .moi/`)
+        )
+        console.warn(pc.dim('  Install log: ' + dependencyInstallLogPath(target.path)))
       }
     }
 

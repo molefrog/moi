@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -10,7 +11,12 @@ import {
 } from 'node:fs'
 import { join } from 'path'
 
-import { ensureMoiGitignore, scaffoldMoiDir, writeAppletEnvDts } from '../moi-scaffold'
+import {
+  dependencyInstallLogPath,
+  ensureMoiGitignore,
+  scaffoldMoiDir,
+  writeAppletEnvDts
+} from '../moi-scaffold'
 import { silenceConsole } from './quiet'
 
 // The scaffold backstop: `scaffoldMoiDir` must refuse to create a `.moi/` inside
@@ -86,6 +92,79 @@ describe('scaffoldMoiDir install', () => {
     expect(installs).toBe(0)
     // The repair path: pre-gitignore workspaces pick the file up on re-init.
     expect(existsSync(join(moiDir, '.gitignore'))).toBe(true)
+  })
+})
+
+describe('dependency install diagnostics', () => {
+  function writeInstaller(script: string): string {
+    const binDir = join(WS, 'bin')
+    mkdirSync(binDir)
+    const executable = join(binDir, 'bun')
+    writeFileSync(executable, '#!/bin/sh\n' + script)
+    chmodSync(executable, 0o755)
+    return binDir
+  }
+
+  test('a failed install reports its log and captures both streams', async () => {
+    const binDir = writeInstaller('echo "install stdout"\necho "install stderr" >&2\nexit 23\n')
+    const proc = Bun.spawn(
+      [process.execPath, join(import.meta.dir, '..', 'cli.ts'), 'init', WS, '--harness=codex'],
+      {
+        env: {
+          ...process.env,
+          PATH: binDir,
+          MOI_DATA_DIR: join(WS, 'moi-data'),
+          MOI_CONTROL_PORT: '65534'
+        },
+        stdout: 'ignore',
+        stderr: 'pipe',
+        timeout: 3000
+      }
+    )
+    await proc.exited
+    const stderr = await new Response(proc.stderr).text()
+    const logPath = dependencyInstallLogPath(WS)
+
+    expect(stderr).toContain('bun install failed (exit 23)')
+    expect(stderr).toContain('Install log: ' + logPath)
+    const log = await Bun.file(logPath).text()
+    expect(log).toContain('install stdout')
+    expect(log).toContain('install stderr')
+  })
+
+  test('captures background output after the parent process exits', async () => {
+    const releasePath = join(WS, 'release-install')
+    const binDir = writeInstaller(`
+      while [ ! -f "$MOI_TEST_INSTALL_RELEASE" ]; do /bin/sleep 0.01; done
+      echo "error after parent exit" >&2
+    `)
+    const source = join(import.meta.dir, '..', 'moi-scaffold.ts')
+    const proc = Bun.spawn(
+      [
+        process.execPath,
+        '-e',
+        `import { scaffoldMoiDir } from ${JSON.stringify(source)};
+         await scaffoldMoiDir(${JSON.stringify(WS)}, undefined, 5);`
+      ],
+      {
+        env: { ...process.env, PATH: binDir, MOI_TEST_INSTALL_RELEASE: releasePath },
+        stdout: 'ignore',
+        stderr: 'ignore',
+        timeout: 2000
+      }
+    )
+    try {
+      expect(await proc.exited).toBe(0)
+      writeFileSync(releasePath, '')
+      const log = Bun.file(dependencyInstallLogPath(WS))
+      for (let attempts = 0; attempts < 100; attempts++) {
+        if ((await log.text()).includes('error after parent exit')) break
+        await Bun.sleep(10)
+      }
+      expect(await log.text()).toContain('error after parent exit')
+    } finally {
+      writeFileSync(releasePath, '')
+    }
   })
 })
 
