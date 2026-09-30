@@ -1,4 +1,4 @@
-// Optional collab applet types installed as `.moi/collab.d.ts` by moi.
+// Public collab contract, reused internally and installed as `.moi/collab.d.ts`.
 declare module 'moi/collab' {
   import type { ReactElement, ReactNode } from 'react'
 
@@ -81,9 +81,12 @@ declare module 'moi/collab' {
   export type UserProps = {
     id: string
     size?: UserSize
+    // Show only the face.
     avatarOnly?: boolean
     you?: boolean
+    // Secondary text alongside or below the name.
     detail?: ReactNode
+    // Show an active status dot. Defaults to true.
     showStatus?: boolean
     label?: string
     className?: string
@@ -93,6 +96,7 @@ declare module 'moi/collab' {
     ids: readonly string[]
     max?: number
     size?: 'xs' | 'sm' | 'md'
+    // Status dots default to false in a facepile.
     showStatus?: boolean
     className?: string
   }

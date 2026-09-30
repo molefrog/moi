@@ -1,3 +1,12 @@
+import type {
+  ActivityProps,
+  CursorsProps,
+  PresenceGroupProps,
+  PresenceFrameProps,
+  PresenceGutterProps,
+  SelectionProps
+} from 'moi/collab'
+
 import {
   Fragment,
   createContext,
@@ -27,12 +36,20 @@ import {
 import { Cursor, Facepile, PresenceFramePrimitive, PresenceGutterPrimitive } from './primitives'
 import { presenceTarget } from './presence-target'
 
+export type {
+  ActivityProps,
+  CursorsProps,
+  PresenceGroupProps,
+  PresenceFrameProps,
+  PresenceGutterProps,
+  SelectionProps
+} from 'moi/collab'
+
 export { Facepile, User } from './primitives'
 
 // Built-in indicators have no registration while unfocused, unselected, or absent.
 const hasPresence = (value: CollabJsonValue) => value !== false && value !== null
 
-export type ActivityProps = { scope?: 'page' | 'workspace'; className?: string }
 export function Activity({ scope = 'page', className }: ActivityProps) {
   const peers = usePeers({ scope })
   const me = useMe()
@@ -58,7 +75,6 @@ function pointerPosition(value: CollabJsonValue): PointerPosition | null {
   }
 }
 
-export type CursorsProps = { surface?: string; children: ReactNode; className?: string }
 export function Cursors({ surface = 'default', children, className }: CursorsProps) {
   const root = useRef<HTMLDivElement>(null)
   const channel = presenceChannels.cursor(surface)
@@ -176,7 +192,6 @@ function RemoteCursor({ root, point, id }: RemoteCursorProps) {
 }
 
 const PresenceGroupContext = createContext<readonly string[]>([])
-export type PresenceGroupProps = { id: string; children: ReactNode }
 export function PresenceGroup({ id, children }: PresenceGroupProps) {
   const parent = useContext(PresenceGroupContext)
   const scope = useMemo(() => {
@@ -241,11 +256,6 @@ function useTargetPresence(target: string) {
   }
 }
 
-export type PresenceFrameProps = {
-  id: string
-  children: ReactElement
-  className?: string
-}
 export function PresenceFrame({ id, children, className }: PresenceFrameProps) {
   const target = usePresenceTarget(id)
   const presence = useTargetPresence(target)
@@ -261,11 +271,6 @@ export function PresenceFrame({ id, children, className }: PresenceFrameProps) {
   )
 }
 
-export type PresenceGutterProps = {
-  id: string
-  children: ReactElement
-  className?: string
-}
 export function PresenceGutter({ id, children, className }: PresenceGutterProps) {
   const target = usePresenceTarget(id)
   const presence = useTargetPresence(target)
@@ -282,12 +287,6 @@ export function PresenceGutter({ id, children, className }: PresenceGutterProps)
   )
 }
 
-export type SelectionProps = {
-  id: string
-  selected: boolean
-  children: ReactNode
-  className?: string
-}
 export function Selection({ id, selected, children, className }: SelectionProps) {
   const target = usePresenceTarget(id)
   const channel = presenceChannels.selection(target)

@@ -10,6 +10,7 @@ import {
   useSyncExternalStore
 } from 'react'
 import type { ReactNode } from 'react'
+import type { PresenceValue, WorkspaceUsersAvailability } from 'moi/collab'
 import { useRouter } from 'wouter'
 import { usePathname } from 'wouter/use-browser-location'
 
@@ -81,7 +82,7 @@ function useWorkspaceDirectory() {
     engine.getWorkspaceDirectory
   )
 }
-export function useWorkspaceUsersAvailability() {
+export function useWorkspaceUsersAvailability(): WorkspaceUsersAvailability {
   return useWorkspaceDirectory().status
 }
 function useUsersSource() {
@@ -148,7 +149,7 @@ export const presenceChannels = {
   field: (target: string) => `field:${target}`,
   selection: (target: string) => `selection:${target}`
 }
-export type PresenceValue<T> = { connectionId: string; userId: string; value: T }
+export type { PresenceValue } from 'moi/collab'
 
 // Observation never allocates a registration or publishes a value.
 export function usePresence<T extends CollabJsonValue>(channel: string): PresenceValue<T>[] {

@@ -1,20 +1,6 @@
-import type { UserColor } from './colors'
+import type { CollabJsonValue, UserProfile } from 'moi/collab'
 
-export type CollabJsonValue =
-  | null
-  | boolean
-  | number
-  | string
-  | CollabJsonValue[]
-  | { [key: string]: CollabJsonValue }
-
-export type UserProfile = {
-  id: string
-  name?: string
-  color: UserColor
-  avatar?: string
-  email?: string
-}
+export type { CollabJsonValue, UserProfile } from 'moi/collab'
 
 // An authenticating proxy in front of the deployment that moi trusts.
 export type AuthProvider = 'cloudflare-access'

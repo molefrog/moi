@@ -1,3 +1,5 @@
+import type { UserProps, FacepileProps } from 'moi/collab'
+
 import { useCallback, useLayoutEffect, useRef } from 'react'
 import type { HTMLAttributes, ReactNode, Ref } from 'react'
 
@@ -13,29 +15,15 @@ import { UserFace } from './user-face'
 import { userDisplayName } from './users'
 import { motion } from 'motion/react'
 
+export type { UserSize, UserProps, FacepileProps } from 'moi/collab'
+
 // User components resolve IDs through the current workspace directory,
 // which resolves to the current name, face, and status through the workspace.
 
-export type UserSize = 'xs' | 'sm' | 'md' | 'lg'
 const AVATAR_SIZE = { xs: 'xs', sm: 'sm', md: 'default', lg: 'lg' } as const
 // Shown for an id nobody in this workspace has ever used.
 const UNKNOWN_NAME = 'Unknown user'
 
-export type UserProps = {
-  id: string
-  size?: UserSize
-  // Only the face, for stacks, gutters, and tight rows.
-  avatarOnly?: boolean
-  you?: boolean
-  // A quiet second line: where they are, what they are doing. The compact
-  // `xs` size keeps it on the same line.
-  detail?: ReactNode
-  // The green dot: this user has the workspace open in a visible tab right
-  // now. Away (every tab hidden) and offline users never get one.
-  showStatus?: boolean
-  label?: string
-  className?: string
-}
 export function User({
   id,
   size = 'md',
@@ -102,14 +90,6 @@ export function User({
   )
 }
 
-export type FacepileProps = {
-  ids: readonly string[]
-  max?: number
-  size?: 'xs' | 'sm' | 'md'
-  // Dots are off in a pile, where they crowd the overlapping faces.
-  showStatus?: boolean
-  className?: string
-}
 export function Facepile({
   ids,
   max = 3,

@@ -6,7 +6,7 @@ import type * as CollabApi from 'moi/collab'
 
 import type * as Components from '@/client/features/collab/components'
 import type * as Hooks from '@/client/features/collab/hooks'
-import type { UserProfile } from '@/lib/collab/types'
+import type { USER_COLORS } from '@/lib/collab/colors'
 import type { WorkspaceType } from '@/lib/types'
 
 import { COLLAB_DECLARATION_SOURCE_PATH } from '../../applets/declarations'
@@ -38,10 +38,9 @@ type ActualComponents = Pick<
 // This assignment is checked by tsc without importing React into the server.
 const declarationsMatch: ActualHooks & ActualComponents extends typeof CollabApi ? true : false =
   true
-const profileDeclarationsMatch: UserProfile extends CollabApi.UserProfile
-  ? CollabApi.UserProfile extends UserProfile
-    ? true
-    : false
+// `satisfies` checks palette entries; this checks that none are missing.
+const paletteDeclarationsMatch: CollabApi.UserColor extends (typeof USER_COLORS)[number]
+  ? true
   : false = true
 
 const directories: string[] = []
@@ -80,7 +79,7 @@ test('optional collab reference installs beside the default skill without changi
 
 test('workspace declarations match the public hooks and components', () => {
   expect(declarationsMatch).toBe(true)
-  expect(profileDeclarationsMatch).toBe(true)
+  expect(paletteDeclarationsMatch).toBe(true)
 })
 
 test('optional guide uses each harness skill directory', async () => {

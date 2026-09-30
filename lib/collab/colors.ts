@@ -1,3 +1,7 @@
+import type { UserColor } from 'moi/collab'
+
+export type { UserColor } from 'moi/collab'
+
 // The eight Tailwind palette names available for users. Their shades live in CSS.
 export const USER_COLORS = [
   'pink',
@@ -8,8 +12,7 @@ export const USER_COLORS = [
   'cyan',
   'blue',
   'violet'
-] as const
-export type UserColor = (typeof USER_COLORS)[number]
+] as const satisfies readonly UserColor[]
 
 export function isUserColor(value: unknown): value is UserColor {
   return typeof value === 'string' && (USER_COLORS as readonly string[]).includes(value)

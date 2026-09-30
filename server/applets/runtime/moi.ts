@@ -1,12 +1,8 @@
-import type { AppletBridge, AttachmentInput } from '../../../lib/types'
+import type { AttachmentInput, ChatMessageInput } from 'moi'
+import type { AppletBridge } from '../../../lib/types'
 import { resolveUrl as resolveWorkspaceUrl } from '../../../lib/navigation'
 
 import { APPLET_API_BASE_SENTINEL } from '../api-base'
-
-type AppletChatInput = {
-  message: string
-  attachments?: AttachmentInput[]
-}
 
 let bridge: Partial<AppletBridge> | null = null
 
@@ -34,6 +30,6 @@ export function addChatAttachment(input: AttachmentInput): void {
 }
 
 // Keep positional calls working for previously built applets.
-export function sendChatMessage(input: AppletChatInput | string, legacyContext?: unknown): void {
+export function sendChatMessage(input: ChatMessageInput | string, legacyContext?: unknown): void {
   bridge?.sendChatMessage?.(input, legacyContext)
 }

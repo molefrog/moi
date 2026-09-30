@@ -1,6 +1,7 @@
 import { isUserProfile } from '@/lib/collab/protocol'
 import { colorForId, isUserColor } from '@/lib/collab/colors'
 import type { AuthProvider, ProxyUserState, UserProfile } from '@/lib/collab/types'
+import type { WorkspaceUsersAvailability } from 'moi/collab'
 
 export type CollabShareContext = { workspaceId: string; url: string }
 export type CollabShareHandler = (context: CollabShareContext) => Promise<{ url: string }>
@@ -18,7 +19,7 @@ type HostState<Profile> = {
 export type CollabHostStateInput = HostState<UserProfileInput>
 export type CollabHostState = HostState<UserProfile>
 export type WorkspaceDirectory = {
-  readonly status: 'unavailable' | 'loading' | 'ready'
+  readonly status: WorkspaceUsersAvailability
   readonly users: readonly UserProfile[]
 }
 export type CollabHostApi = {

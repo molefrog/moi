@@ -1,4 +1,4 @@
-// Base applet types installed as `.moi/base.d.ts` by moi.
+// Public moi contract, reused internally and installed as `.moi/base.d.ts`.
 // Editor/`tsc` only — the moi bundler needs no declarations.
 
 declare module 'moi' {
@@ -18,13 +18,22 @@ declare module 'moi' {
   // Prepare optional attachments and send to the active chat without changing
   // its draft. Call from event handlers; each call starts an agent run and is
   // rate-limited. Preparation failure or navigation cancels the whole send.
-  export function sendChatMessage(input: { message: string; attachments?: AttachmentInput[] }): void
+  export type ChatMessageInput = { message: string; attachments?: AttachmentInput[] }
+  export function sendChatMessage(input: ChatMessageInput): void
   export type WidgetConfig = {
     rowSpan: 1 | 2 | 3 | 4
     colSpan: 1 | 2 | 3 | 4
+    // Advisory env hints for server functions; never blocks loading.
     requiredEnv?: string[]
   }
-  export type ViewConfig = { title?: string; icon?: string; requiredEnv?: string[] }
+  export type ViewConfig = {
+    // Nav tab label; defaults to the file name.
+    title?: string
+    // App icon registry id used by workspace tabs.
+    icon?: string
+    // Advisory env hints for server functions; never blocks loading.
+    requiredEnv?: string[]
+  }
 }
 
 // Bundled asset imports (`import logo from './logo.png'`) resolve to a URL string.

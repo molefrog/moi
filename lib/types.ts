@@ -3,6 +3,9 @@ import type { AppIconId } from './app-icons'
 import type { ExperimentalFeatures } from './experimental'
 import type { MoiContext } from './moi-context'
 import type { WorkspaceTheme } from './themes'
+import type { AttachmentInput, ViewConfig, WidgetConfig } from 'moi'
+
+export type { AttachmentInput, ViewConfig, WidgetConfig } from 'moi'
 
 // A custom UI unit embedded in a workspace.
 export type AppletKind = 'view' | 'widget'
@@ -23,15 +26,6 @@ export type AppletInfo = {
   revision?: string
 }
 
-export type WidgetConfig = {
-  rowSpan: 1 | 2 | 3 | 4
-  colSpan: 1 | 2 | 3 | 4
-  // Env vars this widget's `.server.ts` expects (e.g. `ELEVENLABS_API_KEY`).
-  // Purely advisory: it lets the UI surface a "missing key" hint. It never
-  // blocks loading — the server function still just reads `process.env`.
-  requiredEnv?: string[]
-}
-
 export type WidgetInfo = AppletInfo & {
   config: WidgetConfig
 }
@@ -39,15 +33,6 @@ export type WidgetInfo = AppletInfo & {
 // A view is a full-screen, agent-authored "app" (`.moi/views/<name>.tsx`),
 // shown one-at-a-time in the workspace nav. Same build/RPC machinery as a
 // widget, minus the grid: no sizing, the view owns its own layout and scroll.
-export type ViewConfig = {
-  // Nav tab label. Falls back to the file name when unset.
-  title?: string
-  // App icon registry id used by workspace tabs.
-  icon?: string
-  // Advisory env hints, same semantics as WidgetConfig.requiredEnv.
-  requiredEnv?: string[]
-}
-
 export type ViewInfo = AppletInfo & {
   config: ViewConfig
 }
@@ -226,13 +211,7 @@ export type Attachment =
   | ({ type: 'image' } & ImageAttachment)
 
 // Caller input: text or a browser file / workspace-relative path.
-export type TextAttachmentInput = Pick<TextAttachment, 'label' | 'text'>
-
-type FileAttachmentInput = { file: File; path?: never } | { path: string; file?: never }
-
-export type AttachmentInput =
-  | ({ type: 'text' } & TextAttachmentInput)
-  | ({ type: 'file' } & FileAttachmentInput)
+export type TextAttachmentInput = Omit<Extract<AttachmentInput, { type: 'text' }>, 'type'>
 
 // Upload receipt: returned by the upload API before sending the message.
 // Bytes or an absolute file path live in the server's workspace-scoped store.

@@ -1,8 +1,13 @@
 import type { UserProfile, CollabLocation, Connection } from '@/lib/collab/types'
 
-export type UserStatus = 'active' | 'away' | 'offline'
-export type WorkspaceUser = UserProfile & { status: UserStatus }
-export type UseWorkspaceUsersOptions = { status?: UserStatus }
+import type { UserStatus, WorkspaceUser, UsePeersOptions } from 'moi/collab'
+
+export type {
+  UserStatus,
+  WorkspaceUser,
+  UsePeersOptions,
+  UseWorkspaceUsersOptions
+} from 'moi/collab'
 export type UsersSource = {
   connections: readonly Connection[]
   users: readonly UserProfile[]
@@ -41,7 +46,6 @@ export function resolveUser(source: UsersSource, id: string): WorkspaceUser | un
   return profile ? { ...profile, status: userStatus(source.connections, id) } : undefined
 }
 
-export type UsePeersOptions = { scope?: 'page' | 'workspace'; status?: 'active' | 'away' }
 export function resolvePeers(
   source: UsersSource,
   selfId: string | null,

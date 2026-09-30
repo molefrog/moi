@@ -2,6 +2,7 @@
 import { createElement } from 'react'
 import type {
   ActivityProps,
+  CollabJsonValue,
   CursorsProps,
   FacepileProps,
   PresenceFrameProps,
@@ -14,7 +15,6 @@ import type {
   UseWorkspaceUsersOptions
 } from 'moi/collab'
 import type { AppletCollabApi } from '../../../client/features/collab'
-import type { CollabJsonValue } from '../../../lib/collab/types'
 
 import { __getBridge } from './moi'
 
