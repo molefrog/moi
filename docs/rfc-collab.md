@@ -14,7 +14,7 @@ Existing experimental `.moi/data/collab.sqlite` files are left untouched and are
 
 ```mermaid
 flowchart TB
-  Host["Batiok / outer host"] -->|"Current user + workspace users"| Directory["Browser user directory"]
+  Host["Outer host"] -->|"Current user + workspace users"| Directory["Browser user directory"]
   Applets["Widgets and views: moi/collab"] --> Hooks["Hooks and connected components"]
   Directory --> Hooks
   Hooks --> Engine["CollabEngine: lifecycle + selected snapshots"]
@@ -117,12 +117,12 @@ or window focus. Hidden connections have no visible cursor/focus/selection marke
 Presence values remain per connection and exclude only the observing connection, so another tab
 of the same user can still have its own pointer.
 
-Batiok atomically publishes `{ currentUser, workspaces }` through `window.moi.collab.setHostState`.
+The outer host atomically publishes `{ currentUser, workspaces }` through `window.moi.collab.setHostState`.
 The current user is global across all workspaces; each directory has an explicit `loading` or `ready` state.
 The current user profile replaces its own row in every ready directory which includes that ID,
 without adding missing membership. Sign-out clears all directories in the same update.
 
-Batiok's full workspace directory is authoritative when supplied. It allows resolving an offline
+The outer host's full workspace directory is authoritative when supplied. It allows resolving an offline
 user, including someone who has never opened the workspace. Profile replacement and removal take
 effect immediately; live connections cannot resurrect removed directory entries. With no host
 directory, current connection profiles and the local test user provide a development fallback.
@@ -132,8 +132,8 @@ This fallback is transient and makes no promise of resolving users after they le
 while membership loads or when a ready directory omits the viewer. `useWorkspaceUsersAvailability()`
 distinguishes loading from a ready empty directory; readiness does not imply a live connection.
 
-The Batiok bootstrap example and update steps are in
-[batiok-collab-bridge.md](batiok-collab-bridge.md).
+The bootstrap example and update steps are in the
+[host bridge guide](collab-host-bridge.md).
 
 ## Applet API
 
