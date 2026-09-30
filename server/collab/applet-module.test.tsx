@@ -59,8 +59,8 @@ test('missing collaboration bridge returns empty hook values and warns once', as
   try {
     for (const bridge of [undefined, null, {}, { collab: undefined }]) {
       api.__attachBridge(bridge)
-      expect(api.useMe()).toBeNull()
-      expect(api.useUser('alice')).toBeNull()
+      expect(api.useMe()).toBeUndefined()
+      expect(api.useUser('alice')).toBeUndefined()
       expect(api.usePeers()).toEqual([])
       expect(api.useWorkspaceUsers()).toEqual([])
       expect(api.useWorkspaceUsersAvailability()).toBe('unavailable')
@@ -134,7 +134,7 @@ test('the bridge delegates when attached and falls back again when disposed', as
     expect(warning).not.toHaveBeenCalled()
 
     alive = false
-    expect(api.useUser('alice')).toBeNull()
+    expect(api.useUser('alice')).toBeUndefined()
     api.usePublishPresence('editing', false)
     expect(renderToStaticMarkup(createElement(api.User, { id: 'alice' }))).toBe('')
     expect(host.usePublishPresence).toHaveBeenCalledTimes(1)

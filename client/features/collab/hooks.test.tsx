@@ -12,6 +12,7 @@ import {
   usePresence,
   usePublishPresence,
   useUser,
+  useUsers,
   useWorkspaceUsers,
   useWorkspaceUsersAvailability
 } from './hooks'
@@ -92,12 +93,14 @@ test('observers resolve users and read presence without creating a publisher', (
 
 function Disabled() {
   usePublishPresence('editing', 'title')
+  expect(useMe()).toBeUndefined()
+  expect(useUser('missing')).toBeUndefined()
+  expect(useUsers(['missing'])).toEqual([undefined])
   return <Observer />
 }
-test('hooks are safe without a backend or applet and resolve missing users to null', () => {
+test('hooks are safe without a backend or applet and resolve missing users to undefined', () => {
   setCurrentUser(null)
   const html = renderToStaticMarkup(<Disabled />)
-  expect(html).toContain('null')
   expect(html).toContain('[]')
 })
 
@@ -209,11 +212,13 @@ test('workspace users include self and offline members with workspace-wide statu
 test('directory loading is distinguishable from an empty authoritative directory', () => {
   const engine = createFakeEngine({ self: alice, directoryStatus: 'loading' })
   function Directory() {
+    const me = useMe()
     return encodeURIComponent(
       JSON.stringify({
         status: useWorkspaceUsersAvailability(),
         users: useWorkspaceUsers(),
-        me: useMe()
+        me,
+        hasMe: me !== undefined
       })
     )
   }
@@ -227,14 +232,15 @@ test('directory loading is distinguishable from an empty authoritative directory
         )
       )
     )
-  expect(render()).toEqual({ status: 'loading', users: [], me: null })
+  expect(render()).toEqual({ status: 'loading', users: [], hasMe: false })
   engine.setUsers([])
-  expect(render()).toEqual({ status: 'ready', users: [], me: null })
+  expect(render()).toEqual({ status: 'ready', users: [], hasMe: false })
   engine.setUsers([alice])
   expect(render()).toEqual({
     status: 'ready',
     users: [{ ...alice, status: 'active' }],
-    me: { ...alice, status: 'active' }
+    me: { ...alice, status: 'active' },
+    hasMe: true
   })
 })
 

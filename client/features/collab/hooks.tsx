@@ -104,11 +104,11 @@ function useUsersSource() {
   )
   return { state, self, users, engine }
 }
-export function useUser(id: string): WorkspaceUser | null {
+export function useUser(id: string): WorkspaceUser | undefined {
   const { state, users } = useUsersSource()
   return useMemo(() => resolveUser({ ...state, users }, id), [state, users, id])
 }
-export function useUsers(ids: readonly string[]): (WorkspaceUser | null)[] {
+export function useUsers(ids: readonly string[]): (WorkspaceUser | undefined)[] {
   const { state, users } = useUsersSource()
   return ids.map(id => resolveUser({ ...state, users }, id))
 }
@@ -122,10 +122,10 @@ export function useWorkspaceUsers({ status }: UseWorkspaceUsersOptions = {}): Wo
     [state, users, status]
   )
 }
-export function useMe(): WorkspaceUser | null {
+export function useMe(): WorkspaceUser | undefined {
   const { state, self, users } = useUsersSource()
   return useMemo(
-    () => (self ? resolveUser({ ...state, users }, self.id) : null),
+    () => (self ? resolveUser({ ...state, users }, self.id) : undefined),
     [state, self, users]
   )
 }

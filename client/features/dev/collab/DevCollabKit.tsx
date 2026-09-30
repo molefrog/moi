@@ -351,7 +351,8 @@ type OutputProps = { value: unknown }
 function Output({ value }: OutputProps) {
   return (
     <pre className="max-h-48 overflow-auto rounded-lg bg-muted p-3 font-mono text-xs leading-5">
-      {JSON.stringify(value, (key, entry) => (key === 'avatar' ? undefined : entry), 2) ?? 'null'}
+      {JSON.stringify(value, (key, entry) => (key === 'avatar' ? undefined : entry), 2) ??
+        'undefined'}
     </pre>
   )
 }

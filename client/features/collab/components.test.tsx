@@ -17,6 +17,7 @@ import { createFakeEngine } from './fake-engine'
 import type { FakeCollabEngine } from './fake-engine'
 import { AppletScope, CollabContext, presenceChannels } from './hooks'
 import { presenceTarget } from './presence-target'
+import { PresenceFramePrimitive } from './primitives'
 
 const me: UserProfile = { id: 'me', name: 'Me', color: 'blue' }
 const peer: UserProfile = { id: 'peer', name: 'Ada', color: 'cyan' }
@@ -62,6 +63,27 @@ test('user rendering follows authoritative profile updates and removal', () => {
   expect(removed).toContain('Unknown user')
   expect(removed).not.toContain('Ada')
   expect(removed).not.toContain('data-slot="avatar-badge"')
+})
+
+test('presence frames skip missing users and hide the outline when no users resolve', () => {
+  const backend = room()
+  const frame = render(
+    backend,
+    <PresenceFramePrimitive ids={['missing', 'peer']}>
+      <input />
+    </PresenceFramePrimitive>
+  )
+  expect(frame).toContain('Ada')
+  expect(frame).toContain('outline-collab')
+  backend.setUsers([me])
+  const removed = render(
+    backend,
+    <PresenceFramePrimitive ids={['missing', 'peer']}>
+      <input />
+    </PresenceFramePrimitive>
+  )
+  expect(removed).toContain('<input')
+  expect(removed).not.toContain('outline-collab')
 })
 
 test.each([

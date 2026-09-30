@@ -32,8 +32,8 @@ declare module 'moi/collab' {
   export type UseWorkspaceUsersOptions = { status?: UserStatus }
 
   // Peers are connected users, deduplicated across tabs, excluding your own user.
-  export function useMe(): WorkspaceUser | null
-  export function useUser(id: string): WorkspaceUser | null
+  export function useMe(): WorkspaceUser | undefined
+  export function useUser(id: string): WorkspaceUser | undefined
   export function usePeers(options?: UsePeersOptions): WorkspaceUser[]
   // Full workspace directory, including your own user and offline users.
   export function useWorkspaceUsers(options?: UseWorkspaceUsersOptions): WorkspaceUser[]

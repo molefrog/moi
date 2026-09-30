@@ -45,7 +45,7 @@ page, `away` when connected without a visible page, or `offline` when disconnect
 another page can still be active. `usePeers` excludes your own user, combines multiple tabs
 into one user, and can filter by `status: 'active'` or `'away'`.
 
-`useMe()` and `useUser(id)` return `null` when the user cannot be resolved. When the user directory
+`useMe()` and `useUser(id)` return `undefined` when the user cannot be resolved. When the user directory
 is unavailable, enumeration falls back to your profile and connected users; it cannot
 discover offline users.
 

@@ -45,8 +45,12 @@ export default function Notes() { return resolveUrl('moi:/views/notes') + photoU
     await Bun.write(dts, "declare module 'moi/collab' {}\n")
     await Bun.write(
       join(workspaceRoot, '.moi', 'views', 'users.tsx'),
-      `import { useMe } from 'moi/collab'
-export default function Users() { return useMe()?.id ?? null }
+      `import { useMe, useUser, type WorkspaceUser } from 'moi/collab'
+export default function Users() {
+  const me: WorkspaceUser | undefined = useMe()
+  const user: WorkspaceUser | undefined = useUser('alice')
+  return me?.id ?? user?.id ?? null
+}
 `
     )
 

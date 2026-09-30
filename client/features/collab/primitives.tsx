@@ -239,7 +239,7 @@ export function PresenceFramePrimitive({
   className,
   ...rest
 }: PresenceFramePrimitiveProps) {
-  const resolved = useUsers(ids).filter(user => user !== null)
+  const resolved = useUsers(ids).filter(user => user !== undefined)
   const lead = resolved[0]
   return (
     <div className={cn('relative', className)} {...rest}>

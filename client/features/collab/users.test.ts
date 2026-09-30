@@ -67,7 +67,7 @@ test('host directory resolves offline users and removals remain authoritative ov
     ...offline,
     status: 'offline'
   })
-  expect(resolveUser({ connections, users: profiles }, bob.id)).toBeNull()
+  expect(resolveUser({ connections, users: profiles }, bob.id)).toBeUndefined()
   expect(workspaceProfiles([bob], alice, [])).toEqual([])
   expect(workspaceProfiles([bob], alice, null)).toEqual([bob, alice])
 })
@@ -111,7 +111,7 @@ test.each(['__proto__', 'constructor', 'toString'])('%s resolves as an ordinary 
     ...user,
     status: 'offline'
   })
-  expect(resolveUser({ connections: [], users: [] }, id)).toBeNull()
+  expect(resolveUser({ connections: [], users: [] }, id)).toBeUndefined()
   expect(workspaceProfiles([{ ...user, name: 'Stale name' }, bob], user, null)).toEqual([user, bob])
 })
 

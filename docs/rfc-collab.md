@@ -49,7 +49,7 @@ peer/presence lists are empty, and publication is inert. No presence socket is o
 applet gets the same context shape in either mode.
 
 If an applet has no host bridge, or its bridge has been disposed, `moi/collab` warns once per
-bundle. User lookup returns `null`, list hooks return `[]`, publication does nothing, and every
+bundle. User lookup returns `undefined`, list hooks return `[]`, publication does nothing, and every
 collaboration component renders nothing, including wrapper children. A disabled runtime still
 provides a bridge and keeps ordinary applet rendering available.
 
@@ -128,7 +128,7 @@ effect immediately; live connections cannot resurrect removed directory entries.
 directory, current connection profiles and the local test user provide a development fallback.
 This fallback is transient and makes no promise of resolving users after they leave.
 
-`useMe()` resolves the current user through the current workspace membership. It returns `null`
+`useMe()` resolves the current user through the current workspace membership. It returns `undefined`
 while membership loads or when a ready directory omits the viewer. `useWorkspaceUsersAvailability()`
 distinguishes loading from a ready empty directory; readiness does not imply a live connection.
 
@@ -139,8 +139,8 @@ The Batiok bootstrap example and update steps are in
 
 | Hook                                 | Contract                                                                                                        |
 | ------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| `useMe()`                            | Current user profile plus `status`, or `null`.                                                                  |
-| `useUser(id)`                        | A profile plus `status`, including offline users; `null` for unknown IDs.                                       |
+| `useMe()`                            | Current user profile plus `status`, or `undefined`.                                                             |
+| `useUser(id)`                        | A profile plus `status`, including offline users; `undefined` for unknown IDs.                                  |
 | `useWorkspaceUsersAvailability()`    | Directory availability: `unavailable` (live/dev fallback), `loading`, or `ready` (possibly empty).              |
 | `useWorkspaceUsers({ status? })`     | Complete workspace directory, including self and offline users; optional `active`, `away`, or `offline` filter. |
 | `usePeers({ scope?, status? })`      | Other connected users; `scope` is `page` or `workspace`, `status` is `active` or `away`.                        |

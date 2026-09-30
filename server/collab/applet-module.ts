@@ -6,8 +6,8 @@ import { __getBridge } from 'moi';
 const empty = () => [];
 const nothing = () => null;
 const fallback = {
-  useMe: nothing,
-  useUser: nothing,
+  useMe: () => undefined,
+  useUser: () => undefined,
   usePeers: empty,
   useWorkspaceUsers: empty,
   useWorkspaceUsersAvailability: () => 'unavailable',

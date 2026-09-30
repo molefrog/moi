@@ -36,9 +36,9 @@ export function workspaceProfiles(
   return [...users.values()]
 }
 
-export function resolveUser(source: UsersSource, id: string): WorkspaceUser | null {
+export function resolveUser(source: UsersSource, id: string): WorkspaceUser | undefined {
   const profile = source.users.find(user => user.id === id)
-  return profile ? { ...profile, status: userStatus(source.connections, id) } : null
+  return profile ? { ...profile, status: userStatus(source.connections, id) } : undefined
 }
 
 export type UsePeersOptions = { scope?: 'page' | 'workspace'; status?: 'active' | 'away' }
