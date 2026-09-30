@@ -1,4 +1,4 @@
-import { CollabProvider, useCollabEnabled } from '@/client/features/collab/entry'
+import { CollabProvider, useCollabEnabled } from '@/client/features/collab'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'

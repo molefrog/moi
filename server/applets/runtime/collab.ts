@@ -14,7 +14,7 @@ import type {
   UsePeersOptions,
   UseWorkspaceUsersOptions
 } from 'moi/collab'
-import type { AppletCollabApi } from '../../../client/features/collab'
+import type { AppletCollabApi } from '../../../client/features/collab/applet-api'
 
 import { __getBridge } from './moi'
 

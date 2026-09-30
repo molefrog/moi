@@ -1,7 +1,7 @@
 import type { JsonValue } from 'moi'
 import type { PresenceRegistration } from '@/lib/collab/types'
 
-import type { CollabEngineApi } from './engine'
+import type { CollabEngineApi } from './client'
 
 // A mounted control owns a registration only while it has something to show.
 // Public custom publishers omit the predicate: false and null are valid values.

@@ -1,12 +1,9 @@
 import { expect, test } from 'bun:test'
 import { renderToStaticMarkup } from 'react-dom/server'
-import type { CollabEngineApi } from './engine'
-import { createFakeEngine } from './fake-engine'
-import { setCurrentUser } from './host-state'
+import type { CollabEngineApi } from './client'
+import { createFakeEngine } from './testing/fake-engine'
+import { setHostState } from './host-state'
 import {
-  AppletPresenceProvider,
-  CollabContext,
-  pageFromPath,
   useMe,
   usePeers,
   usePresence,
@@ -16,6 +13,7 @@ import {
   useWorkspaceUsers,
   useWorkspaceUsersAvailability
 } from './hooks'
+import { AppletPresenceProvider, CollabContext, pageFromPath } from './provider'
 import type { WorkspaceUser } from './hooks'
 
 const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
@@ -99,7 +97,7 @@ function Disabled() {
   return <Observer />
 }
 test('hooks are safe without a backend or applet and resolve missing users to undefined', () => {
-  setCurrentUser(undefined)
+  setHostState({ currentUser: undefined, workspaces: {} })
   const html = renderToStaticMarkup(<Disabled />)
   expect(html).toContain('[]')
 })

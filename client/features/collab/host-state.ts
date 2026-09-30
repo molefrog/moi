@@ -125,11 +125,6 @@ export function getWorkspaceDirectory(workspaceId: string): WorkspaceDirectory {
   return directory?.status === 'ready' ? directory : LOADING_DIRECTORY
 }
 
-export function getWorkspaceUsers(workspaceId: string): readonly UserProfile[] | null {
-  const directory = getWorkspaceDirectory(workspaceId)
-  return directory.status === 'unavailable' ? null : directory.users
-}
-
 export function setHostState(next: HostStateInput): void {
   const normalized = normalizeHostState(next)
   const previousDirectories = new Map(
@@ -160,17 +155,6 @@ export function subscribeHostState(listener: (state: HostState | undefined) => v
   return unsubscribe
 }
 
-// Internal compatibility helpers. External hosts replace the complete state atomically.
-export function setWorkspaceUsers(workspaceId: string, users: readonly UserProfile[] | null): void {
-  setHostState({
-    currentUser,
-    workspaces: {
-      ...hostState?.workspaces,
-      [workspaceId]: users === null ? { status: 'loading' } : { status: 'ready', users }
-    }
-  })
-}
-
 export function subscribeWorkspaceUsersStore(
   workspaceId: string,
   listener: () => void
@@ -187,23 +171,8 @@ export function subscribeWorkspaceUsersStore(
   }
 }
 
-export function subscribeWorkspaceUsers(
-  workspaceId: string,
-  listener: (users: readonly UserProfile[] | null) => void
-): () => void {
-  const unsubscribe = subscribeWorkspaceUsersStore(workspaceId, () =>
-    listener(getWorkspaceUsers(workspaceId))
-  )
-  listener(getWorkspaceUsers(workspaceId))
-  return unsubscribe
-}
-
 export function getCurrentUser(): UserProfile | undefined {
   return currentUser
-}
-
-export function setCurrentUser(next: UserProfile | undefined): void {
-  setHostState({ currentUser: next, workspaces: hostState?.workspaces ?? EMPTY_WORKSPACES })
 }
 
 export function subscribeCurrentUserStore(listener: () => void): () => void {
@@ -211,13 +180,6 @@ export function subscribeCurrentUserStore(listener: () => void): () => void {
   return () => {
     listeners.delete(listener)
   }
-}
-
-export function subscribeCurrentUser(
-  listener: (currentUser: UserProfile | undefined) => void
-): () => void {
-  listener(currentUser)
-  return subscribeCurrentUserStore(() => listener(currentUser))
 }
 
 export function getCurrentUserSource(): CurrentUserSource | undefined {

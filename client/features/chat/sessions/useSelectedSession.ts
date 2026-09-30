@@ -1,8 +1,8 @@
-import { useCollabEnabled } from '@/client/features/collab/entry'
+import { useCollabEnabled } from '@/client/features/collab'
 import {
   readSelectedSession,
   writeSelectedSession
-} from '@/client/features/collab/browser-tab-state'
+} from '@/client/features/chat/sessions/browser-tab-state'
 import { useCallback, useMemo } from 'react'
 
 import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'

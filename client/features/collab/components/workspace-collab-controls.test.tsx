@@ -5,11 +5,11 @@ import { Router } from 'wouter'
 import { TooltipProvider } from '@/client/components/ui/tooltip'
 import type { UserProfile, Connection } from '@/lib/collab/types'
 
-import { WorkspaceCollabControls } from './WorkspaceCollabControls'
-import { useCollabEnabled } from './entry'
-import { createFakeEngine } from './fake-engine'
-import { CollabContext } from './hooks'
-import { getCurrentUser, setCurrentUser } from './host-state'
+import { WorkspaceCollabControls } from './workspace-collab-controls'
+import { useCollabEnabled } from '../provider'
+import { createFakeEngine } from '../testing/fake-engine'
+import { CollabContext } from '../provider'
+import { getCurrentUser, setHostState } from '../host-state'
 
 const self = { id: 'self', name: 'Self', color: 'emerald' } as const
 const active = { id: 'active', name: 'Active colleague', color: 'blue' } as const
@@ -39,7 +39,7 @@ function renderHeader(
   viewer: UserProfile = self
 ) {
   const previous = getCurrentUser()
-  setCurrentUser(viewer)
+  setHostState({ currentUser: viewer, workspaces: {} })
   try {
     return renderToStaticMarkup(
       <Router ssrPath="/workspace/test/overview">
@@ -57,7 +57,7 @@ function renderHeader(
       </Router>
     )
   } finally {
-    setCurrentUser(previous)
+    setHostState({ currentUser: previous, workspaces: {} })
   }
 }
 

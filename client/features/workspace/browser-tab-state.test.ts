@@ -12,12 +12,11 @@ import type { SelectedSessionState, WorkspaceTabsState } from '@/lib/types'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import { mergeLayoutForSave } from '@/server/layout'
 
+import { readWorkspaceTabs, writeWorkspaceTabs } from './browser-tab-state'
 import {
   readSelectedSession,
-  readWorkspaceTabs,
-  writeSelectedSession,
-  writeWorkspaceTabs
-} from './browser-tab-state'
+  writeSelectedSession
+} from '@/client/features/chat/sessions/browser-tab-state'
 
 const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage')
 

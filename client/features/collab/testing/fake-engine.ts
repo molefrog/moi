@@ -1,9 +1,9 @@
 import type { UserProfile, Connection, PresenceRegistration } from '@/lib/collab/types'
 import { COLLAB_PROTOCOL_VERSION } from '@/lib/collab/protocol'
-import type { CollabEngineApi } from './engine'
-import { normalizeWorkspaceUsers } from './host-state'
-import type { WorkspaceDirectory } from './host-state'
-import { CollabStore } from './store'
+import type { CollabEngineApi } from '../client'
+import { normalizeWorkspaceUsers } from '../host-state'
+import type { WorkspaceDirectory } from '../host-state'
+import { CollabStore } from '../store'
 
 export type FakeEngineOptions = {
   self: UserProfile | undefined
@@ -29,13 +29,12 @@ export function createFakeEngine({
   const store = new CollabStore()
   const presence = new Map<string, PresenceRegistration>()
   const userListeners = new Set<() => void>()
-  let directory = users === undefined ? null : normalizeWorkspaceUsers(users)
+  const directory = users === undefined ? null : normalizeWorkspaceUsers(users)
   let profiles = directory ?? (self ? [self] : [])
   let directorySnapshot: WorkspaceDirectory = {
     status: directoryStatus,
     users: directoryStatus === 'ready' ? (directory ?? []) : []
   }
-  directory = directoryStatus === 'unavailable' ? null : directorySnapshot.users
   let currentOtherConnections = otherConnections
   let location: Connection['location'] = { page, status: 'active' }
   const connections = (): Connection[] => [
@@ -88,7 +87,6 @@ export function createFakeEngine({
     subscribe: store.subscribe,
     getCurrentUser: () => self,
     subscribeCurrentUser: () => () => {},
-    getWorkspaceUsers: () => directory,
     getWorkspaceDirectory: () => directorySnapshot,
     subscribeWorkspaceUsers: listener => {
       userListeners.add(listener)
@@ -109,7 +107,7 @@ export function createFakeEngine({
       announce()
     },
     setUsers: next => {
-      directory = next === null ? null : normalizeWorkspaceUsers(next)
+      const directory = next === null ? null : normalizeWorkspaceUsers(next)
       directorySnapshot = {
         status: next === null ? 'unavailable' : 'ready',
         users: directory ?? []
@@ -120,7 +118,6 @@ export function createFakeEngine({
     },
     setDirectoryStatus: status => {
       directorySnapshot = { status, users: status === 'ready' ? profiles : [] }
-      directory = status === 'unavailable' ? null : directorySnapshot.users
       userListeners.forEach(listener => listener())
     }
   }

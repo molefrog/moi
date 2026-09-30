@@ -25,7 +25,7 @@ import {
   useView
 } from '@/client/features/applets/useApplet'
 import { WidgetErrorBoundary } from '@/client/features/applets/WidgetErrorBoundary'
-import { AppletPresenceProvider } from '@/client/features/collab/entry'
+import { AppletPresenceProvider } from '@/client/features/collab'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { cn } from '@/client/lib/cn'
 import { useLatestRef } from '@/client/lib/use-latest-ref'

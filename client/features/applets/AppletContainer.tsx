@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react'
 
-import { AppletPresenceProvider } from '@/client/features/collab/entry'
+import { AppletPresenceProvider } from '@/client/features/collab'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 
 import { type AppletSegment, appletId, appletStyleKey } from './applet-cache'

@@ -4,8 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import type * as CollabApi from 'moi/collab'
 
-import type * as Components from '@/client/features/collab/components'
-import type * as Hooks from '@/client/features/collab/hooks'
+import type { AppletCollabApi } from '@/client/features/collab/applet-api'
 import type { USER_COLORS } from '@/lib/collab/colors'
 import type { WorkspaceType } from '@/lib/types'
 
@@ -17,30 +16,8 @@ import { COLLAB_REFERENCE_SOURCE_PATH } from '../../skills-template'
 import { provisionWorkspace, skillsDirFor } from '../../workspace-init'
 import { installCollabSkill, removeCollabSkill } from './index'
 
-type ActualHooks = Pick<
-  typeof Hooks,
-  | 'useMe'
-  | 'usePeers'
-  | 'useUser'
-  | 'useWorkspaceUsers'
-  | 'useWorkspaceUsersAvailability'
-  | 'usePresence'
-  | 'usePublishPresence'
->
-type ActualComponents = Pick<
-  typeof Components,
-  | 'Activity'
-  | 'Cursors'
-  | 'Facepile'
-  | 'User'
-  | 'PresenceFrame'
-  | 'PresenceGroup'
-  | 'PresenceGutter'
-  | 'Selection'
->
 // This assignment is checked by tsc without importing React into the server.
-const declarationsMatch: ActualHooks & ActualComponents extends typeof CollabApi ? true : false =
-  true
+const declarationsMatch: AppletCollabApi extends typeof CollabApi ? true : false = true
 // `satisfies` checks palette entries; this checks that none are missing.
 const paletteDeclarationsMatch: CollabApi.UserColor extends (typeof USER_COLORS)[number]
   ? true

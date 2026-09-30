@@ -20,21 +20,17 @@ import { Textarea } from '@/client/components/ui/textarea'
 import type { JsonValue } from 'moi'
 import type { UserProfile, Connection, PresenceRegistration } from '@/lib/collab/types'
 
+import { PresenceFrame } from '@/client/features/collab/components/presence-frame'
+import { PresenceGroup } from '@/client/features/collab/components/presence-group'
+import { PresenceGutter } from '@/client/features/collab/components/presence-gutter'
+import { Selection } from '@/client/features/collab/components/selection'
+import { Cursors } from '@/client/features/collab/components/cursors'
+import { Activity } from '@/client/features/collab/components/activity'
+import { Facepile } from '@/client/features/collab/components/facepile'
+import { User } from '@/client/features/collab/components/user'
+import { createFakeEngine } from '@/client/features/collab/testing/fake-engine'
+import type { FakeEngine } from '@/client/features/collab/testing/fake-engine'
 import {
-  Activity,
-  Cursors,
-  Facepile,
-  PresenceFrame,
-  PresenceGroup,
-  PresenceGutter,
-  Selection,
-  User
-} from '@/client/features/collab/components'
-import { createFakeEngine } from '@/client/features/collab/fake-engine'
-import type { FakeEngine } from '@/client/features/collab/fake-engine'
-import {
-  AppletPresenceProvider,
-  CollabContext,
   presenceChannels,
   useMe,
   usePeers,
@@ -43,6 +39,7 @@ import {
   useUser,
   useWorkspaceUsers
 } from '@/client/features/collab/hooks'
+import { AppletPresenceProvider, CollabContext } from '@/client/features/collab/provider'
 import { presenceTarget } from '@/client/features/collab/presence-target'
 
 const YOU: UserProfile = {

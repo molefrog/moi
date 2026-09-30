@@ -24,21 +24,17 @@ import type { WorkspaceTabId } from '@/lib/types'
 import { tabFromPath } from '@/lib/navigation'
 import { Avatar, AvatarFallback } from '@/ui-components/avatar'
 
-import { User } from './primitives'
-import {
-  pageFromPath,
-  useConnectionState,
-  useWorkspaceUsers,
-  useWorkspaceUsersAvailability
-} from './hooks'
+import { User } from './user'
+import { pageFromPath, useCollabEnabled } from '../provider'
+import { useConnectionState, useWorkspaceUsers, useWorkspaceUsersAvailability } from '../hooks'
 import {
   getCurrentUser,
   getCurrentUserSource,
   shareWorkspace,
   subscribeCurrentUserStore
-} from './host-state'
-import { summarizeWorkspaceUsers, userDisplayName } from './users'
-import type { WorkspaceUserInfo } from './users'
+} from '../host-state'
+import { summarizeWorkspaceUsers, userDisplayName } from '../users'
+import type { WorkspaceUserInfo } from '../users'
 
 export type TabInfo = { label: string; Icon: TabIcon }
 type DescribeTab = (tab: WorkspaceTabId) => TabInfo | null
@@ -57,6 +53,7 @@ export function WorkspaceCollabControls({
   describeTab,
   onOpenTab
 }: WorkspaceCollabControlsProps) {
+  const enabled = useCollabEnabled()
   const state = useConnectionState()
   const workspaceUsers = useWorkspaceUsers()
   const directoryStatus = useWorkspaceUsersAvailability()
@@ -84,7 +81,7 @@ export function WorkspaceCollabControls({
     onOpenTab(tab)
   }
   const canEdit = getCurrentUserSource() === 'dev'
-  if (!currentUser) return null
+  if (!enabled || !currentUser) return null
   return (
     <div className="flex items-center gap-1">
       <Popover open={open} onOpenChange={setOpen}>

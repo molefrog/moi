@@ -8,7 +8,7 @@ import { USER_COLORS } from '@/lib/collab/colors'
 import type { UserProfile } from '@/lib/collab/types'
 import { Avatar, AvatarFallback, AvatarImage } from '@/ui-components/avatar'
 
-import { UserFace } from '@/client/features/collab/user-face'
+import { UserFace } from '@/client/features/collab/components/user'
 import { userDisplayName } from '@/client/features/collab/users'
 import { createDevUser, devUserProfile, randomDevUser } from './dev-user'
 import type { DevUserDraft } from './dev-user'

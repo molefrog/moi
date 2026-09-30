@@ -4,6 +4,8 @@ import './structured-clone-shim'
 import 'blobatar/motion.css'
 import './index.css'
 
+import { installHostApi } from './features/collab/host-state'
+
 import { startHmrWatchdog } from './runtime/hmr-watchdog'
 
 // React Fast Refresh works here despite React being externalized to the
@@ -22,6 +24,7 @@ if (import.meta.hot) {
 }
 
 export async function init(el: HTMLElement) {
+  installHostApi()
   // Startup config and any proxy-verified user load in parallel with the
   // main chunk, so both are available synchronously from the first render.
   const [{ mount }] = await Promise.all([

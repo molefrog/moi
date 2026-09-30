@@ -9,7 +9,7 @@ import {
 } from '@/client/features/chat/chat-send'
 import { liveStore } from '@/client/features/chat/chat-store'
 import { useSelectedSession } from '@/client/features/chat/sessions/useSelectedSession'
-import { useCollabEnabled } from '@/client/features/collab/entry'
+import { useCollabEnabled } from '@/client/features/collab'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import {

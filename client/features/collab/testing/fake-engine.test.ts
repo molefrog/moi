@@ -15,7 +15,7 @@ test('fixture directory includes offline users while live state contains only co
   const room = createFakeEngine({ self: alice, users: [alice, bob] })
   expect(room.getSnapshot().connections[0]?.userId).toBe('alice')
   expect(room.getSnapshot().users).toEqual([alice])
-  expect(room.getWorkspaceUsers()).toEqual([alice, bob])
+  expect(room.getWorkspaceDirectory().users).toEqual([alice, bob])
 })
 
 test('presence publication and deletion belong to the caller and other connections can be replaced', () => {
@@ -33,11 +33,11 @@ test('directory replacement notifies observers without retaining removed users',
   let notifications = 0
   room.subscribeWorkspaceUsers(() => notifications++)
   room.setUsers([bob])
-  expect(room.getWorkspaceUsers()).toEqual([bob])
+  expect(room.getWorkspaceDirectory().users).toEqual([bob])
   room.setUsers([])
-  expect(room.getWorkspaceUsers()).toEqual([])
+  expect(room.getWorkspaceDirectory().users).toEqual([])
   room.setUsers(null)
-  expect(room.getWorkspaceUsers()).toBeNull()
+  expect(room.getWorkspaceDirectory().status).toBe('unavailable')
   expect(notifications).toBe(3)
 })
 
@@ -58,11 +58,11 @@ test('loading fixtures expose no directory until the complete ready snapshot arr
   const room = createFakeEngine({ self: alice, users: [alice, bob], directoryStatus: 'loading' })
   const loading = room.getWorkspaceDirectory()
   expect(loading).toEqual({ status: 'loading', users: [] })
-  expect(room.getWorkspaceUsers()).toEqual([])
+  expect(room.getWorkspaceDirectory().users).toEqual([])
   expect(room.getWorkspaceDirectory()).toBe(loading)
   room.setDirectoryStatus('ready')
   expect(room.getWorkspaceDirectory()).toEqual({ status: 'ready', users: [alice, bob] })
-  expect(room.getWorkspaceUsers()).toBe(room.getWorkspaceDirectory().users)
+  expect(room.getWorkspaceDirectory().users).toBe(room.getWorkspaceDirectory().users)
   room.setUsers([])
   expect(room.getWorkspaceDirectory()).toEqual({ status: 'ready', users: [] })
 })

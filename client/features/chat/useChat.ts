@@ -10,7 +10,7 @@ import {
 } from '@/client/features/chat/sessions/api'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import { useSelectedSession } from '@/client/features/chat/sessions/useSelectedSession'
-import { useCollabEnabled } from '@/client/features/collab/entry'
+import { useCollabEnabled } from '@/client/features/collab'
 import {
   type WorkspaceTabAddress,
   useMoiUserMessageContext

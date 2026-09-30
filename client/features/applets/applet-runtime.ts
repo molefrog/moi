@@ -14,7 +14,7 @@
 // — no central handlers object assembled by the screen. Applet → host only;
 // if a host → applet direction is ever added (`moi.on(...)`), `dispose` must
 // also unbind those listeners or a disposed module leaks.
-import { getAppletCollabApi, type AppletCollabApi } from '@/client/features/collab/entry'
+import { appletCollabApi, type AppletCollabApi } from '@/client/features/collab/applet-api'
 import {
   MAX_ATTACHMENT_LABEL_CHARS,
   MAX_TEXT_ATTACHMENT_CHARS,
@@ -132,7 +132,7 @@ function createRuntime(workspaceId: string) {
       }
       const bridge: HostAppletBridge = {
         get collab() {
-          return alive ? getAppletCollabApi() : undefined
+          return alive ? appletCollabApi : undefined
         },
         addChatAttachment(input) {
           if (!alive) return
