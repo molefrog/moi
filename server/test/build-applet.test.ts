@@ -504,12 +504,13 @@ describe('asset imports', () => {
   })
 })
 
-describe('moi fileUrl module', () => {
-  test('compiles fileUrl against the sentinel base + /fs/', async () => {
-    const result = await buildApplet(join(FIXTURES, 'with-fileurl.tsx'), undefined, 'view')
-    expect(result.js).toContain('function fileUrl')
+describe('moi resolveUrl module', () => {
+  test('compiles resolveUrl with workspace files resolved during module evaluation', async () => {
+    const result = await buildApplet(join(FIXTURES, 'with-resolve-url.tsx'), undefined, 'view')
+    expect(result.js).toContain('function resolveUrl')
     expect(result.js).toContain('%%MOI_APPLET_API_BASE%%')
-    expect(result.js).toContain('"/fs/"')
+    expect(result.js).toContain('/files/')
+    expect(result.js).toContain('moi:/files/clips/a b.mp4')
   })
 
   test('bundles navigate forwarding to the per-bundle bridge, not a global', async () => {

@@ -141,8 +141,8 @@ moi navigate 'moi:/views/orders?order=o-1024'
 The CLI moves the most recently focused browser showing this workspace and waits for its URL
 acknowledgement. A timeout may mean navigation happened; inspect the browser before retrying.
 
-For applet `navigate(href)` and `resolveHref(href)` usage, see
-[Applet intents](references/INTENTS.md#navigation-navigatehref-and-resolvehrefhref).
+For applet `navigate(url)` and `resolveUrl(url)` usage, see
+[Applet intents](references/INTENTS.md#navigation-and-files).
 
 After building or editing an applet, follow [Verification and handoff](#verification-and-handoff).
 
@@ -375,20 +375,28 @@ It's plain Bun — every Bun API is available with no setup: `bun:sqlite`, `Bun.
 - **Bundled asset** — `import logo from './logo.png'` resolves to a URL at build time (images &
   fonts: `png jpg gif svg webp avif ico woff woff2 ttf otf`). For small art shipped beside the
   `.tsx`.
-- **Workspace file** — stream a file from the workspace via `fileUrl` from the **`moi`** package:
+- **Workspace file** — stream a file from the workspace via `resolveUrl` from the **`moi`** package:
 
   ```tsx
-  import { fileUrl } from 'moi'
-  ;<video src={fileUrl('clips/intro.mp4')} controls />
+  import { resolveUrl } from 'moi'
+  ;<video src={resolveUrl('moi:/files/clips/intro.mp4')} controls />
   ```
 
-  `fileUrl(path)` maps a **workspace-root-relative** path to a streaming URL (HTTP range — media
-  seeks, nothing is base64-inlined). Media/asset extensions only; `.env`, source, JSON and dotfiles
-  are rejected. The path is plain data, so a `.server.ts` can return it and the component renders
-  `fileUrl(clip.file)`.
+  `resolveUrl('moi:/files/...')` maps a **workspace-root-relative** file address to a streaming URL
+  (HTTP range — media seeks). Media/asset extensions only; `.env`, source, JSON and dotfiles are
+  rejected. File URLs also work at module load, before the applet bridge is attached.
+
+  A `.server.ts` can return a plain workspace-relative path. Encode each segment when constructing
+  the address so spaces, `%`, `?`, and `#` in filenames work:
+
+  ```tsx
+  const fileAddress = `moi:/files/${clip.file.split('/').map(encodeURIComponent).join('/')}`
+  ;<video src={resolveUrl(fileAddress)} controls />
+  ```
 
 Rule of thumb: small own art → `import`; structured data → `.server.ts` returns it; large/streamable
-media → `.server.ts` returns the **path**, render with `fileUrl()`.
+media → `.server.ts` returns the **path**, encode its segments and render with
+`resolveUrl('moi:/files/...')`.
 
 ### Applet intents
 

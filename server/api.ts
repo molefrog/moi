@@ -400,14 +400,14 @@ one.delete('/view-builders/:builderId', async c => {
   }
 })
 
-// Workspace file stream — an applet's `fileUrl(path)` resolves here. Streams a
+// Workspace file stream — `resolveUrl('moi:/files/...')` resolves here. Streams a
 // media file from the workspace root (range-enabled). Guarded: traversal and
 // dotfiles (`.env`, `.moi`, `.git`) are rejected and only media/asset extensions
 // are allowed — the workspace holds secrets, and this route is unauthenticated.
 // localhost binding is NOT the guard.
-one.get('/fs/*', c => {
+one.get('/files/*', c => {
   const ws = c.get('ws')
-  const tail = new URL(c.req.url).pathname.split(`/api/workspaces/${ws.id}/fs/`)[1] ?? ''
+  const tail = new URL(c.req.url).pathname.split(`/api/workspaces/${ws.id}/files/`)[1] ?? ''
   return serveWorkspaceFile(ws.path, tail, c.req.header('range'), c.req.header('if-none-match'))
 })
 
@@ -468,7 +468,7 @@ one.post('/applet-log', async c => {
 })
 
 // Downscaled image preview of a workspace file. The chat's expanded tool rows
-// use this to show the picture an agent `Read` — same guards as /fs/ above,
+// use this to show the picture an agent `Read` — same guards as /files/ above,
 // images only, resized server-side (see server/preview.ts).
 one.get('/preview/*', c => {
   const ws = c.get('ws')

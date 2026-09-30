@@ -11,8 +11,8 @@ export type AppletKind = 'view' | 'widget'
 // Inputs stay unknown at this trust boundary; the browser host narrows them.
 export type AppletBridge = {
   addChatAttachment: (input: unknown) => void
-  navigate: (href: unknown) => void
-  resolveHref: (href: unknown) => string
+  navigate: (url: unknown) => void
+  resolveUrl: (url: unknown) => string
   sendChatMessage: (input: unknown, context?: unknown) => void
 }
 

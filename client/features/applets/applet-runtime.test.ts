@@ -45,27 +45,39 @@ describe('bridge validation', () => {
     const log = spyOn(appletLog, 'reportAppletError').mockImplementation(() => {})
     bridge.navigate('moi:/views/orders?order=o-1')
     bridge.navigate('moi:/overview')
+    bridge.navigate('moi:/files/clips/video.mp4#t=5')
     bridge.navigate(['invalid'])
     bridge.navigate('javascript:alert(1)')
-    expect(calls).toEqual(['moi:/views/orders?order=o-1', 'moi:/overview'])
-    expect(log).toHaveBeenCalledTimes(2)
+    bridge.navigate('moi:/files/clips/%2Fvideo.mp4')
+    expect(calls).toEqual([
+      'moi:/views/orders?order=o-1',
+      'moi:/overview',
+      'moi:/files/clips/video.mp4#t=5'
+    ])
+    expect(log).toHaveBeenCalledTimes(3)
     log.mockRestore()
   })
 
   test('resolves native anchor hrefs in the source workspace and disposes safely', () => {
     const { bridge, dispose } = appletRuntime('ws-1').connect(VIEW)
-    expect(bridge.resolveHref('moi:/views/orders?order=o-1')).toBe(
+    expect(bridge.resolveUrl('moi:/views/orders?order=o-1')).toBe(
       '/workspace/ws-1/views/orders?order=o-1'
     )
-    expect(bridge.resolveHref('https://example.com/')).toBe('https://example.com/')
-    expect(() => bridge.resolveHref('javascript:alert(1)')).toThrow()
+    expect(bridge.resolveUrl('https://example.com/')).toBe('https://example.com/')
+    expect(bridge.resolveUrl('moi:/files/clips/a%20b.mp4')).toBe(
+      '/api/workspaces/ws-1/files/clips/a%20b.mp4'
+    )
+    expect(() => bridge.resolveUrl('javascript:alert(1)')).toThrow()
     dispose()
-    expect(bridge.resolveHref('moi:/overview')).toBe('')
+    expect(bridge.resolveUrl('moi:/overview')).toBe('')
   })
 
   test('resolves applet links with the host router base', () => {
     const { bridge } = appletRuntime('prefixed').connect(VIEW, '/prefix')
-    expect(bridge.resolveHref('moi:/views/orders')).toBe('/prefix/workspace/prefixed/views/orders')
+    expect(bridge.resolveUrl('moi:/views/orders')).toBe('/prefix/workspace/prefixed/views/orders')
+    expect(bridge.resolveUrl('moi:/files/photo.png')).toBe(
+      '/api/workspaces/prefixed/files/photo.png'
+    )
   })
 
   test('drops calls with malformed addresses instead of emitting', () => {

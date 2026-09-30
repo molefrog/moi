@@ -5,18 +5,24 @@ Portable addresses identify destinations inside the current workspace:
 - `moi:/overview`
 - `moi:/scratchpad`
 - `moi:/views/events?eventId=123`
+- `moi:/files/clips/video.mp4`
 
-The host resolves these to `/workspace/<id>/views/events?eventId=123`. Domain and deployment
+The host resolves workspace pages to `/workspace/<id>/views/events?eventId=123`. Domain and deployment
 prefix belong to the host adapter in `lib/navigation.ts`. Tab IDs use those same workspace-relative
 paths (`views/events`, `view-builders/abc`), without query strings, including in saved layouts.
 The singleton agent and view-builder tabs remain host-internal routes.
 
 ## One controller
 
-Applet `navigate(href)`, tab selection, resolved anchor clicks, and CLI requests use
-`useWorkspaceNavigation`. `resolveHref(href)` gives applets a native browser href; chat Markdown
-uses the same resolver. Ordinary modified clicks, downloads, targets, and web links keep browser
-behavior. The Markdown sanitizer only admits valid moi navigation links, never moi image URLs.
+Applet `navigate(url)`, tab selection, resolved anchor clicks, and CLI requests use
+`useWorkspaceNavigation`. `resolveUrl(url)` resolves pages, workspace files, and HTTP(S) addresses
+for applets and chat Markdown links. Workspace pages resolve to `/workspace/<id>/...`; files resolve
+to `/api/workspaces/<id>/files/...`. Both are root-relative URLs using the current
+origin. Ordinary modified clicks, downloads, targets, and web links keep browser behavior.
+The Markdown sanitizer admits valid moi links, including file links; moi image URLs stay sanitized.
+
+`navigate` uses the same resolver. Workspace pages navigate within the app; files and HTTP(S)
+addresses open through the browser in the current tab. CLI navigation still targets workspace pages.
 
 The browser URL owns the active destination and params. Query values are strings, read with
 `URLSearchParams.get()` (the first value for repeated keys), and views parse their own types.
@@ -30,7 +36,7 @@ exact state to open. Only the active URL survives reload. Parked views retain th
 Layout persistence still stores tab order and the default tab, without query strings.
 
 Invalid action requests do not navigate. An unavailable direct browser address stays in the URL
-and shows recovery to Overview. `fileUrl()` remains the resource URL API.
+and shows recovery to Overview. File access restrictions remain enforced by the server.
 
 ## CLI transport
 
@@ -51,3 +57,8 @@ five-second timeout does not retry: navigation may already have happened.
 addresses and rebuild. Update installed workspace guidance/types through `moi skill update`.
 No workspace layout migration is needed. This change does not implement full deployment-prefix
 support for unrelated assets and API endpoints.
+
+`fileUrl` and `resolveHref` have been replaced by `resolveUrl`. Update existing applet imports,
+use `moi:/files/...` addresses for files, and rebuild. File URLs still work during module evaluation,
+before the host attaches the applet bridge; workspace page resolution uses that bridge.
+Rebuild existing applet bundles to use the renamed `/files/` endpoint.

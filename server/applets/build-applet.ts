@@ -19,7 +19,7 @@ export type { AppletKind }
 // Extensions an applet may `import` as a bundled asset. Each is emitted as a
 // content-hashed sibling of `index.js` and the import resolves to its URL via
 // `import.meta.url`. Deliberately images + fonts only: large media (video/audio)
-// belongs in the workspace and should stream via `fileUrl()`, not bloat the
+// belongs in the workspace and should stream via `resolveUrl()`, not bloat the
 // bundle dir.
 const ASSET_EXTENSIONS = /\.(png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf)$/i
 

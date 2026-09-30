@@ -2,14 +2,13 @@
 // Editor/`tsc` only — the moi bundler needs no declarations.
 
 declare module 'moi' {
-  // Absolute URL to a workspace file, streamed by the server. Pass a
-  // workspace-relative path (e.g. 'clips/001.mp4'). Media/asset files only.
-  export function fileUrl(path: string): string
-  // Navigate within this workspace. Query strings are delivered as view params.
-  // Navigation adds a browser history entry. Include view params in the URL.
-  export function navigate(href: string): void
-  // Resolve a portable moi:/ address to a real browser href for an anchor.
-  export function resolveHref(href: string): string
+  // Resolve moi:/views/..., moi:/files/... or an HTTP(S) address for the browser.
+  // moi addresses become root-relative URLs using the current page's origin.
+  // Workspace files use the server's media/asset stream.
+  export function resolveUrl(url: string): string
+  // Navigate to a workspace page, file, or HTTP(S) address in the current tab.
+  // Workspace pages add browser history; their query strings become view params.
+  export function navigate(url: string): void
   export type AttachmentInput =
     | { type: 'text'; label: string; text: string }
     | { type: 'file'; file: File; path?: never }

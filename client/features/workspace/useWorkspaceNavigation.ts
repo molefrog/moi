@@ -19,7 +19,7 @@ import {
   legacyTabFromPath,
   parseMoiHref,
   readViewParams,
-  resolveWorkspaceHref,
+  resolveUrl,
   tabFromPath,
   workspacePath
 } from '@/lib/navigation'
@@ -88,17 +88,20 @@ export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceN
 
   const navigateHref = useCallback(
     (href: string) => {
-      if (!href.startsWith('moi:')) {
-        const target = resolveWorkspaceHref(workspaceId, href, base)
+      const target = resolveUrl(href, {
+        apiBase: `/api/workspaces/${encodeURIComponent(workspaceId)}`,
+        workspacePath: workspacePath(workspaceId)
+      })
+      if (href.startsWith('moi:/files/') || !href.startsWith('moi:')) {
         window.location.assign(target)
         return
       }
       const address = parseMoiHref(href)
       if (!tabAvailable(address.tab, views, builders))
         throw new Error('This destination is unavailable in this workspace')
-      go(addressPath(workspaceId, address))
+      go(target)
     },
-    [base, builders, go, views, workspaceId]
+    [builders, go, views, workspaceId]
   )
 
   const reportError = useCallback(

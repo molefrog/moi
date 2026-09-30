@@ -166,7 +166,7 @@ sendChatMessage(message: string, context?: Record<string, unknown>): void
   never passed by the caller.
 - The bridge wiring (`__attachBridge` / `__getBridge`, re-exported by every bundle entry) is host
   plumbing: it stays out of the author-facing ambient types (`.moi/base.d.ts`), which
-  declare only the public API — `fileUrl`, `focusTab`, and the config types.
+  declare only the public API — `resolveUrl`, `focusTab`, and the config types.
 - `focusTab` from an applet is client-local navigation (replace) — no server round-trip.
 - `sendChatMessage` always targets the **active chat**. Envelope discipline: `message` is the
   visible chat text; `{ source, context }` rides the `<moi-context>` envelope under an

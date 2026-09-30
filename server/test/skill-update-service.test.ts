@@ -91,7 +91,7 @@ describe('workspace skill update service', () => {
     tempRoot = await mkdtemp(join(tmpdir(), 'moi-skill-base-types-'))
     await writeInstalledVersion(tempRoot, 'codex', '0.7.1')
     const dts = join(tempRoot, '.moi', 'base.d.ts')
-    await Bun.write(dts, "declare module 'moi' { export function fileUrl(p: string): string }\n")
+    await Bun.write(dts, "declare module 'moi' { export function resolveUrl(p: string): string }\n")
 
     const result = await updateWorkspaceSkills(tempRoot, 'codex')
 

@@ -65,7 +65,7 @@ describe('serveWorkspaceImagePreview', () => {
     expect((await serveWorkspaceImagePreview(root, 'nope.png')).status).toBe(404)
   })
 
-  test('blocks traversal and symlink escape (shared /fs/ guards)', async () => {
+  test('blocks traversal and symlink escape (shared /files/ guards)', async () => {
     const root = await makeWorkspace()
     expect((await serveWorkspaceImagePreview(root, '../escape.png')).status).toBe(403)
     // A symlink inside the root pointing outside it must not serve.

@@ -22,9 +22,10 @@ describe('applet typecheck', () => {
   test('checks applet and Bun ambient types without a workspace tsconfig', async () => {
     await Bun.write(
       join(workspaceRoot, '.moi', 'views', 'notes.tsx'),
-      `import type { ViewConfig } from 'moi'
+      `import { resolveUrl, type ViewConfig } from 'moi'
+const photoUrl: string = resolveUrl('moi:/files/photo.png')
 export const config = { title: 'Notes' } satisfies ViewConfig
-export default function Notes() { return null }
+export default function Notes() { return resolveUrl('moi:/views/notes') + photoUrl }
 `
     )
     await Bun.write(

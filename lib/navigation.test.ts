@@ -6,10 +6,12 @@ import {
   moiHref,
   parseMoiHref,
   readViewParams,
-  resolveWorkspaceHref,
+  resolveUrl,
   tabFromPath,
   workspaceTabPath
 } from './navigation'
+
+const context = { apiBase: '/api/workspaces/abc', workspacePath: '/workspace/abc' }
 
 describe('workspace addresses', () => {
   test('tab IDs are the workspace-relative paths', () => {
@@ -35,7 +37,10 @@ describe('workspace addresses', () => {
     expect(addressPath('other', address, '/prefix/')).toBe(
       '/prefix/workspace/other/views/events?eventId=123'
     )
-    expect(resolveWorkspaceHref('abc', href)).toBe('/workspace/abc/views/events?eventId=123')
+    expect(resolveUrl(href, context)).toBe('/workspace/abc/views/events?eventId=123')
+    expect(resolveUrl(href, { ...context, workspacePath: '/prefix/workspace/abc' })).toBe(
+      '/prefix/workspace/abc/views/events?eventId=123'
+    )
   })
   test('accepts encoded IDs supported by the applet server', () => {
     expect(parseMoiHref('moi:/views/%65vents_2026-09').tab).toBe('views/events_2026-09')
@@ -89,10 +94,57 @@ describe('workspace addresses', () => {
     }
   })
   test('web hrefs stay web hrefs; executable protocols cannot use the API', () => {
-    expect(resolveWorkspaceHref('abc', 'https://example.com/a?q=b')).toBe(
-      'https://example.com/a?q=b'
+    expect(resolveUrl('https://example.com/a?q=b', context)).toBe('https://example.com/a?q=b')
+    expect(() => resolveUrl('javascript:alert(1)', context)).toThrow()
+    expect(() => resolveUrl('data:text/html,hello', context)).toThrow()
+  })
+})
+
+describe('workspace file addresses', () => {
+  test('resolves files using the existing API route, including before a bridge is attached', () => {
+    expect(resolveUrl('moi:/files/clips/video.mp4', context)).toBe(
+      '/api/workspaces/abc/files/clips/video.mp4'
     )
-    expect(() => resolveWorkspaceHref('abc', 'javascript:alert(1)')).toThrow()
-    expect(() => resolveWorkspaceHref('abc', 'data:text/html,hello')).toThrow()
+    expect(resolveUrl('moi:/files/photo.png', { apiBase: '/api/workspaces/other' })).toBe(
+      '/api/workspaces/other/files/photo.png'
+    )
+  })
+
+  test('encodes spaces and Unicode and preserves escaped filename characters exactly once', () => {
+    expect(resolveUrl('moi:/files/clips/Grüße intro.mp4', context)).toBe(
+      '/api/workspaces/abc/files/clips/Gr%C3%BC%C3%9Fe%20intro.mp4'
+    )
+    const path = 'moi:/files/clips/100%25%3F%23%20intro.mp4'
+    expect(resolveUrl(path, context)).toBe(
+      '/api/workspaces/abc/files/clips/100%25%3F%23%20intro.mp4'
+    )
+    expect(resolveUrl('moi:/files/literal%252F.png', context)).toBe(
+      '/api/workspaces/abc/files/literal%252F.png'
+    )
+  })
+
+  test('preserves file queries and media fragments', () => {
+    expect(resolveUrl('moi:/files/clips/video.mp4?version=2#t=10,20', context)).toBe(
+      '/api/workspaces/abc/files/clips/video.mp4?version=2#t=10,20'
+    )
+  })
+
+  test('rejects malformed escapes, path separators, empty segments, and traversal', () => {
+    for (const path of [
+      'moi://files/photo.png',
+      'moi:/files/',
+      'moi:/files/clips//video.mp4',
+      'moi:/files/clips/../video.mp4',
+      'moi:/files/clips/./video.mp4',
+      'moi:/files/clips/%2e%2e/video.mp4',
+      'moi:/files/clips%2Fvideo.mp4',
+      'moi:/files/clips%5Cvideo.mp4',
+      'moi:/files/clips\\video.mp4',
+      'moi:/files/clips/%00.mp4',
+      'moi:/files/clips/100%.mp4',
+      'moi:/files/clips/%C3.mp4'
+    ]) {
+      expect(() => resolveUrl(path, context)).toThrow()
+    }
   })
 })

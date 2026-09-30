@@ -36,7 +36,7 @@ import { toast } from '@/client/components/ui/toast'
 import { createRateLimiter, type RateLimiter } from '@/client/lib/rate-limit'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import { isParamsRecord } from '@/lib/workspace-tabs'
-import { resolveWorkspaceHref } from '@/lib/navigation'
+import { resolveUrl, workspacePath } from '@/lib/navigation'
 
 type HostAppletBridge = SharedAppletBridge & {
   readonly collab: AppletCollabApi | undefined
@@ -126,6 +126,10 @@ function createRuntime(workspaceId: string) {
     connect(identity: AppletIdentity, base = '') {
       let alive = true
       const source = appletSource(identity)
+      const urlContext = {
+        apiBase: `/api/workspaces/${encodeURIComponent(workspaceId)}`,
+        workspacePath: workspacePath(workspaceId, base)
+      }
       const bridge: HostAppletBridge = {
         get collab() {
           return alive ? getAppletCollabApi() : undefined
@@ -141,20 +145,20 @@ function createRuntime(workspaceId: string) {
             drop(identity, `addChatAttachment() was dropped: ${message}`)
           }
         },
-        navigate(href) {
+        navigate(url) {
           if (!alive) return
           try {
-            if (typeof href !== 'string') throw new Error('Navigation needs a URL')
-            resolveWorkspaceHref(workspaceId, href, base)
-            emitter.emit('navigate', href)
+            if (typeof url !== 'string') throw new Error('Navigation needs a URL')
+            resolveUrl(url, urlContext)
+            emitter.emit('navigate', url)
           } catch (error) {
             drop(identity, `navigate() was dropped: ${errorMessage(error)}`)
           }
         },
-        resolveHref(href) {
+        resolveUrl(url) {
           if (!alive) return ''
-          if (typeof href !== 'string') throw new Error('A URL is required')
-          return resolveWorkspaceHref(workspaceId, href, base)
+          if (typeof url !== 'string') throw new Error('A URL is required')
+          return resolveUrl(url, urlContext)
         },
         sendChatMessage(input, legacyContext) {
           if (!alive) return

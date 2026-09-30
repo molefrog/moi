@@ -36,7 +36,7 @@ shadow the sibling routes (`/sessions`, `/env`, …). The `*` tail is `<name>/<f
 ```
 GET  /api/workspaces/:id/widgets/*         ┐ applet file: <name>/<file>
 GET  /api/workspaces/:id/views/*           ┘ (entry / chunk / asset)
-GET  /api/workspaces/:id/fs/*              → workspace-root file (explicit range)
+GET  /api/workspaces/:id/files/*           → workspace-root file (explicit range)
 POST /api/workspaces/:id/rpc/<module>/<fn> → workspace worker (run server fn)
 ```
 
@@ -46,7 +46,7 @@ Example paths (widget `clips`, workspace `wsab12`):
 entry   /api/workspaces/wsab12/widgets/clips/module?v=0
 asset   /api/workspaces/wsab12/widgets/clips/logo-9f3a2b1c.png
 chunk   /api/workspaces/wsab12/widgets/clips/chunk-7d4e1a09.js
-fs      /api/workspaces/wsab12/fs/clips/001_copenhagen.mp4
+files   /api/workspaces/wsab12/files/clips/001_copenhagen.mp4
 rpc     /api/workspaces/wsab12/rpc/widgets/clips/listClips
 ```
 
@@ -90,7 +90,7 @@ Consequences to keep in mind when touching this:
   so it's cheap insurance for any shared cache that stores the response anyway.
   `no-cache` (not `no-store`) is deliberate — the browser keeps the bytes and
   revalidates, which the origin answers with a bodyless 304.
-- Other stable-url routes on cacheable extensions (`/fs/*`, `/preview/*`,
+- Other stable-url routes on cacheable extensions (`/files/*`, `/preview/*`,
   `/vendor/react/*.js`) have the same exposure and are **not** fixed by this;
   their urls can't drop the extension as cheaply.
 
@@ -106,23 +106,26 @@ as base64.
 stub becomes `fetch(BASE + '/rpc/' + module + '/' + name, …)` (devalue in/out),
 replacing today's `/_rpc/<ws>/fn/…` and the global lookup.
 
-**Workspace files — `fileUrl(path)`** (runtime, off disk). `BASE + '/fs/' + path`,
-streamed with HTTP range. For media/binary that must not go through RPC. The path
-is _data_ (e.g. a clip id from a `.server.ts`), so it's a helper, not an import.
+**Workspace files — `resolveUrl('moi:/files/...')`** (runtime, off disk). Resolves to
+`BASE + '/files/' + encodedPath`, streamed with HTTP range. A `.server.ts` can return a
+workspace-relative path; encode its segments when constructing the file address.
+The same resolver handles workspace pages and HTTP(S) addresses.
 
 ## What the agent writes
 
 ```tsx
 import logo from './logo.png'              // its own asset
-import { fileUrl } from 'moi'              // workspace files
+import { resolveUrl } from 'moi'         // browser URLs
 import { listClips } from './clips.server' // data + file paths
 
+const fileAddress = `moi:/files/${clip.file.split('/').map(encodeURIComponent).join('/')}`
 <img src={logo} />
-<video src={fileUrl(clip.file)} controls /> // clip.file = 'clips/001_….mp4'
+<video src={resolveUrl(fileAddress)} controls /> // clip.file = 'clips/001_….mp4'
 ```
 
 Rule of thumb: own-code asset → `import`; small data → `.server.ts`; large/
-streamable file → `.server.ts` returns the **path**, render with `fileUrl()`.
+streamable file → `.server.ts` returns the **path**, encode its segments and render with
+`resolveUrl('moi:/files/...')`. File resolution also works before the applet bridge is attached.
 
 ## Types (editor DX only — the build needs none)
 
@@ -133,9 +136,8 @@ by `moi init`:
 ```ts
 declare module 'moi' {
   // required: build-provided module, Bun won't type it
-  export function fileUrl(path: string): string
-  export function navigate(href: string): void
-  export function resolveHref(href: string): string
+  export function resolveUrl(url: string): string
+  export function navigate(url: string): void
   export type WidgetConfig = {
     colSpan: 1 | 2 | 3 | 4
     rowSpan: 1 | 2 | 3 | 4
@@ -163,7 +165,7 @@ declare module '*.png' {
 - **Build** (`build-applet.ts`): asset `onLoad` plugin emits each imported image/
   font as a content-hashed sibling and rewrites the import to
   `new URL('./<name>-<hash>.<ext>', import.meta.url)`. The `mei:rpc` + `moi`
-  runtime modules bake `%%MOI_APPLET_API_BASE%%` into the rpc stub + `fileUrl`.
+  runtime modules bake `%%MOI_APPLET_API_BASE%%` into the rpc stub + `resolveUrl`.
   Output is a multi-file artifact written to `.build/<kind>/<name>/` (entry
   `index.js`, `chunk-*.js`, assets). `naming.entry` must be `index.[ext]` — bun
   emits the entry's CSS sibling as an "entry" output too, so a literal `index.js`
@@ -173,7 +175,7 @@ declare module '*.png' {
   `module` to `index.js`; `.js` is sentinel-swapped and sent as `text/javascript`,
   anything else streams raw (`Bun.file` infers content-type).
   `…/<id>/rpc/<module>/<fn>` reuses the existing worker call.
-- **`/fs`** (`server/applets/index.ts` `serveWorkspaceFile`): reject empty/`.`/`..`/dotfile
+- **`/files`** (`server/applets/index.ts` `serveWorkspaceFile`): reject empty/`.`/`..`/dotfile
   segments and anything resolving outside the root, allowlist media extensions —
   the secret-leak guard, not the localhost bind. Range is handled **explicitly**
   (slice the BunFile → 206 + `Content-Range`): bun's implicit range handling
