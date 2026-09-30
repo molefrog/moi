@@ -21,11 +21,10 @@ declare module 'moi/collab' {
     | 'violet'
   export type UserProfile = {
     id: string
-    // May be omitted or empty; display with email or id as a fallback.
-    name?: string
     color: UserColor
-    avatar?: string
+    name?: string
     email?: string
+    avatar?: string
   }
   export type UserStatus = 'active' | 'away' | 'offline'
   export type WorkspaceUser = UserProfile & { status: UserStatus }

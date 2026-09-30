@@ -287,8 +287,8 @@ test('host snapshots preserve nameless current and other users without inventing
   expect(users).toEqual([
     self,
     other,
-    { id: 'empty', name: '', color: 'emerald' },
-    { id: 'whitespace', name: '', color: 'blue' }
+    { id: 'empty', color: 'emerald' },
+    { id: 'whitespace', color: 'blue' }
   ])
   expect(Object.hasOwn(users[0]!, 'name')).toBe(false)
   expect(Object.hasOwn(users[1]!, 'name')).toBe(false)
@@ -296,7 +296,7 @@ test('host snapshots preserve nameless current and other users without inventing
     currentUser: { ...self, name: '' },
     workspaces: collab.getHostState()!.workspaces
   })
-  expect(collab.getCurrentUser()).toEqual({ ...self, name: '' })
+  expect(collab.getCurrentUser()).toEqual(self)
   expect(collab.getWorkspaceUsers('a')?.[0]).toBe(collab.getCurrentUser()!)
 })
 
@@ -330,7 +330,6 @@ test('optional names and colors still reject invalid values, while ids remain re
   }
   expect(collab.normalizeUserProfile({ id: 'id', name: '' })).toEqual({
     id: 'id',
-    name: '',
     color: colorForId('id')
   })
 })

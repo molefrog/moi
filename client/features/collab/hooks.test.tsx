@@ -101,9 +101,9 @@ test('hooks are safe without a backend or applet and resolve missing users to nu
   expect(html).toContain('[]')
 })
 
-test('user hooks preserve missing and empty names for self, peers, and offline members', () => {
+test('user hooks preserve missing names for self, peers, and offline members', () => {
   const self = { id: 'self', color: 'emerald', email: 'self@example.test' } as const
-  const peer = { id: 'bob', name: '', color: 'blue', email: 'bob@example.test' } as const
+  const peer = { id: 'bob', color: 'blue', email: 'bob@example.test' } as const
   const offline = { id: 'offline', color: 'blue' } as const
   const room = createFakeEngine({
     self,

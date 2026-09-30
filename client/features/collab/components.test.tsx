@@ -80,7 +80,7 @@ test.each([
     expect(user).toContain('data-facehash')
     expect(user).toContain(`>${label.charAt(0).toUpperCase()}<`)
     expect(user).not.toContain('Unknown user')
-    expect(engine.getWorkspaceUsers()?.[1]?.name).toBe(profile.name?.trim())
+    expect(engine.getWorkspaceUsers()?.[1]?.name).toBe(profile.name?.trim() || undefined)
 
     const frame = render(
       engine,

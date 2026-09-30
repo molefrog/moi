@@ -50,12 +50,10 @@ test('only protocol v1 clients with a user profile can join', () => {
   )
 })
 
-test('join and profile updates accept missing or empty names but retain profile validation', () => {
+test('join and profile updates accept missing names and reject blank names', () => {
   const unnamed = { id: 'anna', color: 'violet' } as const
   for (const profile of [
     unnamed,
-    { ...unnamed, name: '' },
-    { ...unnamed, name: ' \t ' },
     { ...unnamed, email: 'anna@example.com', avatar: 'https://example.com/avatar' }
   ]) {
     expect(isUserProfile(profile)).toBe(true)
@@ -68,6 +66,8 @@ test('join and profile updates accept missing or empty names but retain profile 
     { ...unnamed, id: ' \t ' },
     { ...unnamed, id: null },
     { ...unnamed, name: null },
+    { ...unnamed, name: '' },
+    { ...unnamed, name: ' \t ' },
     { ...unnamed, name: 7 },
     { ...unnamed, name: 'a\0b' },
     { ...unnamed, name: '🙂'.repeat(65) },

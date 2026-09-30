@@ -50,7 +50,8 @@ export function randomDevUser(current?: DevUserDraft): DevUserDraft {
 }
 
 export function devUserProfile(id: string, draft: DevUserDraft): UserProfile {
-  return { id, name: draft.name, color: draft.color }
+  const name = draft.name.trim()
+  return { id, ...(name ? { name } : {}), color: draft.color }
 }
 
 // The id stays with the tab through renames, so peers keep seeing one user.

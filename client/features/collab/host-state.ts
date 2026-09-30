@@ -61,9 +61,10 @@ export function normalizeUserProfile(value: UserProfileInput): UserProfile {
   if (value.color !== undefined && !isUserColor(value.color))
     throw new Error('A user profile color must be one of the user palette names.')
   const id = value.id.trim()
+  const name = value.name?.trim()
   const normalized: UserProfile = {
     id,
-    ...(value.name !== undefined ? { name: value.name.trim() } : {}),
+    ...(name ? { name } : {}),
     color: value.color ?? colorForId(id),
     ...(value.avatar !== undefined ? { avatar: value.avatar } : {}),
     ...(value.email !== undefined ? { email: value.email } : {})

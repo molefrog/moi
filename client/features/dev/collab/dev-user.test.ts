@@ -2,10 +2,13 @@ import { expect, test } from 'bun:test'
 
 import { devUserProfile } from './dev-user'
 
-test('test users allow empty names without filling the profile with a display fallback', () => {
-  expect(devUserProfile('dev-user', { name: '', color: 'emerald' })).toEqual({
+test.each(['', ' \t '])('test users omit blank names: %j', name => {
+  expect(devUserProfile('dev-user', { name, color: 'emerald' })).toEqual({
     id: 'dev-user',
-    name: '',
     color: 'emerald'
   })
+})
+
+test('test users trim supplied names', () => {
+  expect(devUserProfile('dev-user', { name: ' Ada ', color: 'emerald' }).name).toBe('Ada')
 })
