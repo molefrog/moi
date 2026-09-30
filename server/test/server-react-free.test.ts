@@ -9,8 +9,8 @@ import { join, relative } from 'path'
 // before a single request is served (the tldraw-powered scratchpad writer used
 // to). The browser gets React from moi's own vendored ESM (client/vendor/react),
 // so nothing outside the browser needs it. Two guards:
-//   1. a static scan: first-party server/lib code, excluding browser-only applet
-//      runtimes, never imports `react`,
+//   1. a static scan: first-party server/lib code, excluding the browser-only
+//      applet collab module, never imports `react`,
 //      `react-dom`, or the `tldraw` package (whose entry point is the React
 //      editor) — `tldraw/package.json` is fine, it's data;
 //   2. a runtime check: loading the server's entry modules in a fresh Bun
@@ -75,7 +75,7 @@ describe('the server never loads React', () => {
       const glob = new Bun.Glob('**/*.ts')
       for await (const file of glob.scan({ cwd: join(ROOT, dir) })) {
         if (file.endsWith('.test.ts') || file.startsWith('test/')) continue
-        if (dir === 'server' && file.startsWith('applets/runtime/')) continue
+        if (dir === 'server' && file === 'applets/runtime/collab.ts') continue
         const path = join(ROOT, dir, file)
         const hits = forbiddenImports(await Bun.file(path).text())
         for (const hit of hits) offenders.push(`${relative(ROOT, path)}: ${hit}`)

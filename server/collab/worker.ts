@@ -1,6 +1,6 @@
 import type { CollabServerMessage } from '@/lib/collab/types'
 
-import type { ParentMessage, WorkerMessage } from './ipc'
+import type { ParentMessage, WorkerMessage } from './worker-messages'
 import { CollabService } from './service'
 
 const workspacePath = process.env.MOI_COLLAB_WORKSPACE

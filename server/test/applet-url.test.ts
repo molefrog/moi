@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from 'bun:test'
 
-import { APPLET_API_BASE_SENTINEL } from '../applets/runtime/base'
+import { APPLET_API_BASE_SENTINEL } from '../applets/api-base'
 import { __attachBridge, resolveUrl } from '../applets/runtime/moi'
 
 // Evaluated as the module loads, before the host has attached any bridge.

@@ -6,7 +6,7 @@ import { COLLAB_MAX_MESSAGE_BYTES, isCollabClientMessage } from '@/lib/collab/pr
 import type { CollabClientMessage, CollabServerMessage, UserProfile } from '@/lib/collab/types'
 
 import { isCollabEnabled } from './config'
-import type { ParentMessage, WorkerMessage } from './ipc'
+import type { ParentMessage, WorkerMessage } from './worker-messages'
 
 export type CollabSocket = {
   send: (message: string) => number
