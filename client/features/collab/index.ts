@@ -1,5 +1,5 @@
 export { CollabProvider, AppletPresenceProvider, useCollabEnabled } from './provider'
-export { WorkspaceCollabControls } from './components/workspace-collab-controls'
-export type { TabInfo } from './components/workspace-collab-controls'
+export { WorkspaceCollabToolbar } from './components/workspace-collab-toolbar'
+export type { TabInfo } from './components/workspace-collab-toolbar'
 export { appletCollabApi } from './applet-api'
 export type { AppletCollabApi } from './applet-api'

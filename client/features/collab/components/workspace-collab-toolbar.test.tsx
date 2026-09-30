@@ -5,7 +5,7 @@ import { Router } from 'wouter'
 import { TooltipProvider } from '@/client/components/ui/tooltip'
 import type { UserProfile, Connection } from '@/lib/collab/types'
 
-import { WorkspaceCollabControls } from './workspace-collab-controls'
+import { WorkspaceCollabToolbar } from './workspace-collab-toolbar'
 import { useCollabEnabled } from '../provider'
 import { createFakeEngine } from '../testing/fake-engine'
 import { CollabContext } from '../provider'
@@ -47,7 +47,7 @@ function renderHeader(
           <CollabContext
             value={createFakeEngine({ self: viewer, page: 'overview', users, otherConnections })}
           >
-            <WorkspaceCollabControls
+            <WorkspaceCollabToolbar
               workspaceId="test"
               describeTab={() => null}
               onOpenTab={() => {}}
@@ -119,7 +119,7 @@ function CollabEnabled() {
   return <output>{String(useCollabEnabled())}</output>
 }
 
-test('collab controls and browser-tab selection require runtime support and a current user', () => {
+test('collab toolbar and browser-tab selection require runtime support and a current user', () => {
   for (const [user, enabled, expected] of [
     [undefined, true, false],
     [self, false, false],

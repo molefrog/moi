@@ -39,7 +39,7 @@ import type { WorkspaceUserInfo } from '../users'
 export type TabInfo = { label: string; Icon: TabIcon }
 type DescribeTab = (tab: WorkspaceTabId) => TabInfo | null
 
-export type WorkspaceCollabControlsProps = {
+export type WorkspaceCollabToolbarProps = {
   workspaceId: string
   describeTab: DescribeTab
   onOpenTab: (tab: WorkspaceTabId) => void
@@ -48,11 +48,11 @@ export type WorkspaceCollabControlsProps = {
 // Faces shown in the header before the rest collapse into a count.
 const MAX_FACES = 3
 
-export function WorkspaceCollabControls({
+export function WorkspaceCollabToolbar({
   workspaceId,
   describeTab,
   onOpenTab
-}: WorkspaceCollabControlsProps) {
+}: WorkspaceCollabToolbarProps) {
   const enabled = useCollabEnabled()
   const state = useConnectionState()
   const workspaceUsers = useWorkspaceUsers()

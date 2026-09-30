@@ -5,7 +5,8 @@
  *
  * The actual CSS variables (`--sans`, `--mono`, `--background`, etc.)
  * are owned by the host and declared on `:root` / `.dark` in
- * `client/index.css`. This file only maps Tailwind's `--font-*` /
+ * `client/index.css`. Collaboration colors are scoped to `[data-collab-color]`
+ * elements. This file only maps Tailwind's `--font-*` /
  * `--color-*` / `--radius-*` tokens onto those host-owned variables via
  * `@theme inline`,
  * which:
