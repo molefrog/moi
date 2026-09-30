@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 
-import type { CollabClientMessage, CollabJsonValue } from '@/lib/collab/types'
+import type { JsonValue } from 'moi'
+import type { CollabClientMessage } from '@/lib/collab/types'
 
 import { createPresencePublisher } from './presence-publisher'
 import { CollabStore } from './store'
@@ -12,7 +13,7 @@ const welcome = {
   connections: [],
   users: []
 }
-const hasPresence = (value: CollabJsonValue) => value !== false && value !== null
+const hasPresence = (value: JsonValue) => value !== false && value !== null
 
 function room() {
   const store = new CollabStore()
@@ -22,7 +23,7 @@ function room() {
   const publisher = (
     registrationId: string,
     channel: string,
-    isPresent?: (value: CollabJsonValue) => boolean
+    isPresent?: (value: JsonValue) => boolean
   ) =>
     createPresencePublisher(
       {

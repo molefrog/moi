@@ -9,7 +9,10 @@ import type * as Hooks from '@/client/features/collab/hooks'
 import type { USER_COLORS } from '@/lib/collab/colors'
 import type { WorkspaceType } from '@/lib/types'
 
-import { COLLAB_DECLARATION_SOURCE_PATH } from '../../applets/declarations'
+import {
+  BASE_DECLARATION_SOURCE_PATH,
+  COLLAB_DECLARATION_SOURCE_PATH
+} from '../../applets/declarations'
 import { COLLAB_REFERENCE_SOURCE_PATH } from '../../skills-template'
 import { provisionWorkspace, skillsDirFor } from '../../workspace-init'
 import { installCollabSkill, removeCollabSkill } from './index'
@@ -58,6 +61,9 @@ test('optional collab reference installs beside the default skill without changi
     join(workspace, '.agents', 'skills', 'moi-workspace', 'references', 'COLLAB.md')
   )
   expect(installed.typesPath).toBe(join(workspace, '.moi', 'collab.d.ts'))
+  expect(await readFile(join(workspace, '.moi', 'base.d.ts'), 'utf8')).toBe(
+    await readFile(BASE_DECLARATION_SOURCE_PATH, 'utf8')
+  )
   expect(await readFile(installed.referencePath, 'utf8')).toBe(
     await readFile(COLLAB_REFERENCE_SOURCE_PATH, 'utf8')
   )

@@ -40,8 +40,8 @@ import {
 import { summarizeWorkspaceUsers, userDisplayName } from './users'
 import type { WorkspaceUserInfo } from './users'
 
-export type CollabTabInfo = { label: string; Icon: TabIcon }
-type DescribeTab = (tab: WorkspaceTabId) => CollabTabInfo | null
+export type TabInfo = { label: string; Icon: TabIcon }
+type DescribeTab = (tab: WorkspaceTabId) => TabInfo | null
 
 export type WorkspaceCollabControlsProps = {
   workspaceId: string

@@ -1,8 +1,8 @@
 // Browser-only runtime. State and React contexts belong to the host feature.
 import { createElement } from 'react'
+import type { JsonValue } from 'moi'
 import type {
   ActivityProps,
-  CollabJsonValue,
   CursorsProps,
   FacepileProps,
   PresenceFrameProps,
@@ -18,7 +18,7 @@ import type { AppletCollabApi } from '../../../client/features/collab'
 
 import { __getBridge } from './moi'
 
-type CollabBridge = { readonly collab?: AppletCollabApi }
+type Bridge = { readonly collab?: AppletCollabApi }
 
 function empty(): never[] {
   return []
@@ -30,7 +30,7 @@ const fallback = {
   usePeers: empty,
   useWorkspaceUsers: empty,
   useWorkspaceUsersAvailability: () => 'unavailable' as const,
-  usePresence<T extends CollabJsonValue>(_channel: string): PresenceValue<T>[] {
+  usePresence<T extends JsonValue>(_channel: string): PresenceValue<T>[] {
     return []
   },
   usePublishPresence() {},
@@ -45,7 +45,7 @@ const fallback = {
 }
 let warned = false
 function api() {
-  const collab = (__getBridge() as CollabBridge | null)?.collab
+  const collab = (__getBridge() as Bridge | null)?.collab
   if (collab) return collab
   if (!warned) {
     warned = true
@@ -71,10 +71,10 @@ export function useWorkspaceUsers(options?: UseWorkspaceUsersOptions) {
 export function useWorkspaceUsersAvailability() {
   return api().useWorkspaceUsersAvailability()
 }
-export function usePresence<T extends CollabJsonValue>(channel: string) {
+export function usePresence<T extends JsonValue>(channel: string) {
   return api().usePresence<T>(channel)
 }
-export function usePublishPresence<T extends CollabJsonValue>(channel: string, value: T) {
+export function usePublishPresence<T extends JsonValue>(channel: string, value: T) {
   return api().usePublishPresence(channel, value)
 }
 export function Cursors(props: CursorsProps) {

@@ -2,6 +2,14 @@
 // Editor/`tsc` only — the moi bundler needs no declarations.
 
 declare module 'moi' {
+  export type JsonValue =
+    | null
+    | boolean
+    | number
+    | string
+    | JsonValue[]
+    | { [key: string]: JsonValue }
+
   // Resolve moi:/views/..., moi:/files/... or an HTTP(S) address for the browser.
   // moi addresses become root-relative URLs using the current page's origin.
   // Workspace files use the server's media/asset stream.

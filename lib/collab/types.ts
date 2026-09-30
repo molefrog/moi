@@ -1,6 +1,7 @@
-import type { CollabJsonValue, ConnectionStatus, UserProfile } from 'moi/collab'
+import type { JsonValue } from 'moi'
+import type { ConnectionStatus, UserProfile } from 'moi/collab'
 
-export type { CollabJsonValue, ConnectionStatus, UserProfile } from 'moi/collab'
+export type { ConnectionStatus, UserProfile } from 'moi/collab'
 
 // An authenticating proxy in front of the deployment that moi trusts.
 export type AuthProvider = 'cloudflare-access'
@@ -12,27 +13,27 @@ export type ProxyUserState = {
   profile?: UserProfile
 }
 
-export type CollabLocation = { page: string; status: ConnectionStatus }
+export type ConnectionLocation = { page: string; status: ConnectionStatus }
 
-export type CollabPresenceRegistration = {
+export type PresenceRegistration = {
   registrationId: string
   appletId: string
   channel: string
-  value: CollabJsonValue
+  value: JsonValue
 }
 
 export type Connection = {
   connectionId: string
   userId: string
-  location: CollabLocation | null
-  presence: CollabPresenceRegistration[]
+  location: ConnectionLocation | null
+  presence: PresenceRegistration[]
 }
 
 export type CollabClientMessage =
-  | { type: 'join'; version: 1; profile: UserProfile; location?: CollabLocation | null }
+  | { type: 'join'; version: 1; profile: UserProfile; location?: ConnectionLocation | null }
   | { type: 'profile'; profile: UserProfile }
-  | { type: 'location'; location: CollabLocation | null }
-  | ({ type: 'presence:set' } & CollabPresenceRegistration)
+  | { type: 'location'; location: ConnectionLocation | null }
+  | ({ type: 'presence:set' } & PresenceRegistration)
   | { type: 'presence:delete'; registrationId: string }
   | { type: 'ping' }
 

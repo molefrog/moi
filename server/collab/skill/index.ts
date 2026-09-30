@@ -7,13 +7,13 @@ import { appletDeclarationPath, installCollabDeclaration } from '../../applets/d
 import { COLLAB_REFERENCE_SOURCE_PATH } from '../../skills-template'
 import { skillsDirFor } from '../../workspace-init'
 
-export type CollabSkillPaths = { referencePath: string; typesPath: string }
+export type SkillPaths = { referencePath: string; typesPath: string }
 
 export function collabSkillReferencePath(workspacePath: string, type?: WorkspaceType): string {
   return join(skillsDirFor(workspacePath, type), 'moi-workspace', 'references', 'COLLAB.md')
 }
 
-function targetPaths(workspacePath: string, type?: WorkspaceType): CollabSkillPaths {
+function targetPaths(workspacePath: string, type?: WorkspaceType): SkillPaths {
   return {
     referencePath: collabSkillReferencePath(workspacePath, type),
     typesPath: appletDeclarationPath(workspacePath, 'collab.d.ts')
@@ -31,7 +31,7 @@ async function writeChanged(path: string, contents: string): Promise<void> {
 export async function installCollabSkill(
   workspacePath: string,
   type?: WorkspaceType
-): Promise<CollabSkillPaths> {
+): Promise<SkillPaths> {
   const source = Bun.file(COLLAB_REFERENCE_SOURCE_PATH)
   if (!(await source.exists())) {
     throw new Error('The collab guide is unavailable in this build: COLLAB.md is missing.')

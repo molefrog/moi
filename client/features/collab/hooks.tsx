@@ -14,7 +14,7 @@ import type { PresenceValue, WorkspaceUsersAvailability } from 'moi/collab'
 import { useRouter } from 'wouter'
 import { usePathname } from 'wouter/use-browser-location'
 
-import type { CollabJsonValue } from '@/lib/collab/types'
+import type { JsonValue } from 'moi'
 import { legacyTabFromPath, tabFromPath, workspacePath } from '@/lib/navigation'
 
 import { CollabEngine, NO_ENGINE } from './engine'
@@ -154,10 +154,10 @@ export const presenceChannels = {
 export type { PresenceValue } from 'moi/collab'
 
 // Observation never allocates a registration or publishes a value.
-export function usePresence<T extends CollabJsonValue>(channel: string): PresenceValue<T>[] {
+export function usePresence<T extends JsonValue>(channel: string): PresenceValue<T>[] {
   return usePresenceChannel<T>(presenceChannels.custom(channel))
 }
-export function usePresenceChannel<T extends CollabJsonValue>(channel: string): PresenceValue<T>[] {
+export function usePresenceChannel<T extends JsonValue>(channel: string): PresenceValue<T>[] {
   const { users, engine } = useUsersSource()
   const mount = useMount()
   const appletId = mount?.appletId ?? ''
@@ -180,7 +180,7 @@ export function usePresenceChannel<T extends CollabJsonValue>(channel: string): 
 }
 
 // Internal imperative publisher for pointer/focus events. Ownership is per mount.
-export function usePresencePublisher<T extends CollabJsonValue>(
+export function usePresencePublisher<T extends JsonValue>(
   channel: string,
   initialValue: T,
   isPresent?: (value: T) => boolean
@@ -220,7 +220,7 @@ export function usePresencePublisher<T extends CollabJsonValue>(
     [publish]
   )
 }
-export function usePublishPresenceChannel<T extends CollabJsonValue>(
+export function usePublishPresenceChannel<T extends JsonValue>(
   channel: string,
   value: T,
   isPresent?: (value: T) => boolean
@@ -228,6 +228,6 @@ export function usePublishPresenceChannel<T extends CollabJsonValue>(
   const publish = usePresencePublisher(channel, value, isPresent)
   useLayoutEffect(() => publish(value), [publish, value])
 }
-export function usePublishPresence<T extends CollabJsonValue>(channel: string, value: T): void {
+export function usePublishPresence<T extends JsonValue>(channel: string, value: T): void {
   usePublishPresenceChannel(presenceChannels.custom(channel), value)
 }

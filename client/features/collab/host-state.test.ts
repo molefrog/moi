@@ -3,13 +3,8 @@ import { afterEach, expect, test } from 'bun:test'
 import { colorForId } from '@/lib/collab/colors'
 import type { UserProfile } from '@/lib/collab/types'
 
-import type * as HostState from './host-state'
-import type {
-  CollabHostState,
-  CollabHostStateInput,
-  CollabHostApi,
-  WorkspaceDirectory
-} from './host-state'
+import type * as HostStateModule from './host-state'
+import type { HostState, HostStateInput, HostApi, WorkspaceDirectory } from './host-state'
 
 const PROFILE_KEY = 'moi:collab:dev-profile'
 const alice = { id: 'alice', name: 'Alice', color: 'emerald' } satisfies UserProfile
@@ -32,14 +27,14 @@ afterEach(() => {
 })
 
 async function setup(
-  getHostState?: () => CollabHostStateInput | undefined,
+  getHostState?: () => HostStateInput | undefined,
   profile?: UserProfile,
-  beforeInstall?: (state: typeof HostState) => void
+  beforeInstall?: (state: typeof HostStateModule) => void
 ) {
   const host: {
     moi?: {
       collab?: {
-        getHostState?: () => CollabHostStateInput | undefined
+        getHostState?: () => HostStateInput | undefined
       }
     }
   } = getHostState ? { moi: { collab: { getHostState } } } : {}
@@ -54,11 +49,11 @@ async function setup(
   Object.defineProperty(globalThis, 'window', { configurable: true, value: host })
   // Each bridge starts fresh without changing the singleton used by client.test.ts.
   const path = `./host-state.ts?host-state-test=${++instance}`
-  const collab: typeof HostState = await import(path)
+  const collab: typeof HostStateModule = await import(path)
   beforeInstall?.(collab)
   collab.installHostApi()
   // Installation replaces the bootstrap getter with the complete bridge.
-  const api = host.moi?.collab as CollabHostApi
+  const api = host.moi?.collab as HostApi
   return { ...collab, host, api, saved }
 }
 
@@ -84,11 +79,11 @@ test('an explicitly saved dev profile restores when no external provider is conf
 })
 
 test.each([
-  ['signed in', (): CollabHostState => ({ currentUser: bob, workspaces: {} }), bob],
-  ['signed out', (): CollabHostState => ({ workspaces: {} }), undefined],
+  ['signed in', (): HostState => ({ currentUser: bob, workspaces: {} }), bob],
+  ['signed out', (): HostState => ({ workspaces: {} }), undefined],
   [
     'unavailable',
-    (): CollabHostState => {
+    (): HostState => {
       throw new Error('Provider unavailable')
     },
     undefined
@@ -140,7 +135,7 @@ test('Access arriving before setup beats a saved test user, and an outer host be
 })
 
 test('preloaded state exposes stable copied current user and directories across later workspace visits', async () => {
-  const input: CollabHostState = {
+  const input: HostState = {
     currentUser: alice,
     workspaces: { a: { status: 'ready', users: [alice, bob] }, b: { status: 'loading' } }
   }
@@ -206,7 +201,7 @@ test('every subscriber sees the complete new state after an atomic replacement',
     current: UserProfile | undefined
     a: WorkspaceDirectory
     b: WorkspaceDirectory
-    host: CollabHostState | undefined
+    host: HostState | undefined
   }> = []
   const read = () => {
     observed.push({
@@ -367,7 +362,7 @@ test('sign-out atomically clears directories and remains authoritative over a sa
     currentUser: bob,
     workspaces: { a: { status: 'ready', users: [alice, bob] } }
   })
-  const observed: Array<CollabHostState | undefined> = []
+  const observed: Array<HostState | undefined> = []
   const unsubscribe = collab.subscribeHostState(state => observed.push(state))
   expect(observed).toEqual([collab.getHostState()])
   collab.setHostState({ workspaces: collab.getHostState()!.workspaces })
@@ -401,7 +396,7 @@ test('invalid updates do not partially publish current user, directory, source, 
   const before = collab.getHostState()
   let notifications = 0
   collab.subscribeHostStateStore(() => notifications++)
-  const invalidStates: CollabHostState[] = [
+  const invalidStates: HostState[] = [
     { currentUser: { ...bob, id: '' }, workspaces: {} },
     {
       currentUser: bob,
@@ -413,8 +408,8 @@ test('invalid updates do not partially publish current user, directory, source, 
     { currentUser: bob, workspaces: { a: { status: 'ready', users: [alice, alice] } } },
     { currentUser: undefined, workspaces: { invalid: { status: 'ready', users: [invalidUser] } } },
     // A JavaScript host may pass shapes that TypeScript rejects.
-    { currentUser: bob, workspaces: [] } as unknown as CollabHostState,
-    { currentUser: bob, workspaces: { a: { status: 'invalid' } } } as unknown as CollabHostState
+    { currentUser: bob, workspaces: [] } as unknown as HostState,
+    { currentUser: bob, workspaces: { a: { status: 'invalid' } } } as unknown as HostState
   ]
   for (const invalid of invalidStates) {
     expect(() => collab.setHostState(invalid)).toThrow()

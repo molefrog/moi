@@ -5,9 +5,9 @@ import type { WorkspaceTabId } from '@/lib/types'
 import { createAppletCollabApi } from './index'
 import { useCollabEngine } from './hooks'
 import { WorkspaceCollabControls } from './WorkspaceCollabControls'
-import type { CollabTabInfo } from './WorkspaceCollabControls'
+import type { TabInfo } from './WorkspaceCollabControls'
 
-export type { CollabTabInfo } from './WorkspaceCollabControls'
+export type { TabInfo } from './WorkspaceCollabControls'
 export type { AppletCollabApi } from './index'
 export { AppletScope, CollabProvider } from './hooks'
 
@@ -27,7 +27,7 @@ export function useCollabEnabled(): boolean {
 export type CollabControlsProps = {
   workspaceId: string
   // Resolves a connection's tab to the label and icon the tab strip uses.
-  describeTab: (tab: WorkspaceTabId) => CollabTabInfo | null
+  describeTab: (tab: WorkspaceTabId) => TabInfo | null
   onOpenTab: (tab: WorkspaceTabId) => void
 }
 export function CollabControls(props: CollabControlsProps) {

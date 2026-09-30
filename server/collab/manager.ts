@@ -8,14 +8,14 @@ import type { CollabClientMessage, CollabServerMessage, UserProfile } from '@/li
 import { isCollabEnabled } from './config'
 import type { ParentMessage, WorkerMessage } from './worker-messages'
 
-export type CollabSocket = {
+export type ClientSocket = {
   send: (message: string) => number
   close: (code?: number, reason?: string) => void
   getBufferedAmount?: () => number
 }
 
 type Binding = {
-  socket: CollabSocket
+  socket: ClientSocket
   workspacePaths: Set<string>
   connectionId: string
   closed: boolean
@@ -72,7 +72,7 @@ function verifiedMessage(
 // One owner map per moi server. No LRU: active workspaces cannot be evicted.
 export class CollabManager {
   private slots = new Map<string, Slot>()
-  private bindings = new Map<CollabSocket, Binding>()
+  private bindings = new Map<ClientSocket, Binding>()
   private failures = new Map<string, { count: number; retryAfter: number }>()
   private livenessTimer: ReturnType<typeof setInterval> | null = null
   private closed = false
@@ -247,7 +247,7 @@ export class CollabManager {
     binding.socket.close(1012, reason.slice(0, 120))
   }
 
-  open(socket: CollabSocket, workspacePath: string, verifiedProfile?: UserProfile) {
+  open(socket: ClientSocket, workspacePath: string, verifiedProfile?: UserProfile) {
     const binding: Binding = {
       socket,
       workspacePaths: new Set([resolve(workspacePath)]),
@@ -287,7 +287,7 @@ export class CollabManager {
     this.livenessTimer.unref()
   }
 
-  message(socket: CollabSocket, raw: string | Uint8Array) {
+  message(socket: ClientSocket, raw: string | Uint8Array) {
     const binding = this.bindings.get(socket)
     if (!binding || binding.closed) return
     const size = typeof raw === 'string' ? new TextEncoder().encode(raw).length : raw.byteLength
@@ -331,7 +331,7 @@ export class CollabManager {
       .catch(() => this.disconnect(binding, 'Collab restarted'))
   }
 
-  close(socket: CollabSocket) {
+  close(socket: ClientSocket) {
     const binding = this.bindings.get(socket)
     if (!binding) return
     binding.closed = true

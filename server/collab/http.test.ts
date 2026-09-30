@@ -9,7 +9,7 @@ import type { WorkspaceEntry } from '@/lib/types'
 import { api } from '../api'
 import { clientAppConfig, initializeAppConfig, resetAppConfig } from '../app-config'
 import { DEFAULT_REGISTRY_PATH, setRegistryPath } from '../registry'
-import { collabManager, type CollabSocket } from './manager'
+import { collabManager, type ClientSocket } from './manager'
 import { collabSkillReferencePath } from './skill'
 
 let fixtureRoot: string
@@ -213,7 +213,7 @@ describe('collab HTTP integration', () => {
     await Bun.write(databasePath, previousDatabase)
     const messages: CollabServerMessage[] = []
     let closed = false
-    const socket: CollabSocket = {
+    const socket: ClientSocket = {
       send(data) {
         messages.push(JSON.parse(data) as CollabServerMessage)
         return data.length

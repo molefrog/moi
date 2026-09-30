@@ -1,5 +1,6 @@
+import type { JsonValue } from 'moi'
 import { isUserColor } from './colors'
-import type { CollabClientMessage, CollabJsonValue, CollabLocation, UserProfile } from './types'
+import type { CollabClientMessage, ConnectionLocation, UserProfile } from './types'
 
 export const COLLAB_PROTOCOL_VERSION = 1
 export const COLLAB_MAX_CONNECTIONS = 64
@@ -22,7 +23,7 @@ export function isCollabString(value: unknown, max = 256): value is string {
   )
 }
 
-export function isCollabJson(value: unknown, depth = 0): value is CollabJsonValue {
+export function isCollabJson(value: unknown, depth = 0): value is JsonValue {
   if (depth > 24) return false
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return true
   if (typeof value === 'number') return Number.isFinite(value)
@@ -43,7 +44,7 @@ export function isUserProfile(value: unknown): value is UserProfile {
   )
 }
 
-function isLocation(value: unknown): value is CollabLocation | null {
+function isLocation(value: unknown): value is ConnectionLocation | null {
   return (
     value === null ||
     (isRecord(value) &&

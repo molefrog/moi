@@ -1,4 +1,4 @@
-import type { UserProfile, CollabLocation, CollabPresenceRegistration } from '@/lib/collab/types'
+import type { UserProfile, ConnectionLocation, PresenceRegistration } from '@/lib/collab/types'
 
 import { CollabClient } from './client'
 import {
@@ -10,7 +10,7 @@ import {
 } from './host-state'
 import type { WorkspaceDirectory } from './host-state'
 import { DISCONNECTED_STATE } from './store'
-import type { CollabConnectionState, CollabPresenceEntry } from './store'
+import type { ClientState, PresenceEntry } from './store'
 
 type Unsubscribe = () => void
 
@@ -20,23 +20,23 @@ export type CollabEngineApi = {
   readonly workspaceId: string
   readonly enabled: boolean
   start: () => Unsubscribe
-  getSnapshot: () => CollabConnectionState
-  getUsersSnapshot: () => CollabConnectionState
-  getPresenceSnapshot: (appletId: string, channel: string) => readonly CollabPresenceEntry[]
+  getSnapshot: () => ClientState
+  getUsersSnapshot: () => ClientState
+  getPresenceSnapshot: (appletId: string, channel: string) => readonly PresenceEntry[]
   subscribe: (listener: () => void) => Unsubscribe
   getCurrentUser: () => UserProfile | undefined
   subscribeCurrentUser: (listener: () => void) => Unsubscribe
   getWorkspaceUsers: () => readonly UserProfile[] | null
   getWorkspaceDirectory: () => WorkspaceDirectory
   subscribeWorkspaceUsers: (listener: () => void) => Unsubscribe
-  getLocation: () => CollabLocation | null
-  setLocation: (location: CollabLocation | null) => void
-  setPresence: (registration: CollabPresenceRegistration) => void
+  getLocation: () => ConnectionLocation | null
+  setLocation: (location: ConnectionLocation | null) => void
+  setPresence: (registration: PresenceRegistration) => void
   deletePresence: (registrationId: string) => void
 }
 
 const noop = () => {}
-const EMPTY_PRESENCE: readonly CollabPresenceEntry[] = []
+const EMPTY_PRESENCE: readonly PresenceEntry[] = []
 const UNAVAILABLE_DIRECTORY: WorkspaceDirectory = { status: 'unavailable', users: [] }
 
 export const NO_ENGINE: CollabEngineApi = {
@@ -69,11 +69,11 @@ export class CollabEngine implements CollabEngineApi {
   }
 
   start = (): Unsubscribe => (this.enabled ? this.client.start() : noop)
-  getSnapshot = (): CollabConnectionState =>
+  getSnapshot = (): ClientState =>
     this.enabled ? this.client.store.getSnapshot() : DISCONNECTED_STATE
-  getUsersSnapshot = (): CollabConnectionState =>
+  getUsersSnapshot = (): ClientState =>
     this.enabled ? this.client.store.getUsersSnapshot() : DISCONNECTED_STATE
-  getPresenceSnapshot = (appletId: string, channel: string): readonly CollabPresenceEntry[] =>
+  getPresenceSnapshot = (appletId: string, channel: string): readonly PresenceEntry[] =>
     this.enabled ? this.client.store.getPresenceSnapshot(appletId, channel) : EMPTY_PRESENCE
   subscribe = (listener: () => void): Unsubscribe =>
     this.enabled ? this.client.store.subscribe(listener) : noop
@@ -83,11 +83,12 @@ export class CollabEngine implements CollabEngineApi {
   getWorkspaceDirectory = (): WorkspaceDirectory => getWorkspaceDirectory(this.workspaceId)
   subscribeWorkspaceUsers = (listener: () => void): Unsubscribe =>
     subscribeWorkspaceUsersStore(this.workspaceId, listener)
-  getLocation = (): CollabLocation | null => (this.enabled ? this.client.store.getLocation() : null)
-  setLocation = (location: CollabLocation | null): void => {
+  getLocation = (): ConnectionLocation | null =>
+    this.enabled ? this.client.store.getLocation() : null
+  setLocation = (location: ConnectionLocation | null): void => {
     this.client.store.setLocation(location)
   }
-  setPresence = (registration: CollabPresenceRegistration): void => {
+  setPresence = (registration: PresenceRegistration): void => {
     if (this.enabled) this.client.store.setPresence(registration)
   }
   deletePresence = (registrationId: string): void => {

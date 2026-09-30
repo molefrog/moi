@@ -1,4 +1,4 @@
-import type { UserProfile, Connection, CollabPresenceRegistration } from '@/lib/collab/types'
+import type { UserProfile, Connection, PresenceRegistration } from '@/lib/collab/types'
 import { COLLAB_PROTOCOL_VERSION } from '@/lib/collab/protocol'
 import type { CollabEngineApi } from './engine'
 import { normalizeWorkspaceUsers } from './host-state'
@@ -13,7 +13,7 @@ export type FakeEngineOptions = {
   users?: readonly UserProfile[]
   directoryStatus?: WorkspaceDirectory['status']
 }
-export type FakeCollabEngine = CollabEngineApi & {
+export type FakeEngine = CollabEngineApi & {
   setOtherConnections: (otherConnections: Connection[]) => void
   setUsers: (users: readonly UserProfile[] | null) => void
   setDirectoryStatus: (status: WorkspaceDirectory['status']) => void
@@ -25,9 +25,9 @@ export function createFakeEngine({
   otherConnections = [],
   users,
   directoryStatus = users === undefined ? 'unavailable' : 'ready'
-}: FakeEngineOptions): FakeCollabEngine {
+}: FakeEngineOptions): FakeEngine {
   const store = new CollabStore()
-  const presence = new Map<string, CollabPresenceRegistration>()
+  const presence = new Map<string, PresenceRegistration>()
   const userListeners = new Set<() => void>()
   let directory = users === undefined ? null : normalizeWorkspaceUsers(users)
   let profiles = directory ?? (self ? [self] : [])

@@ -1,14 +1,7 @@
 // Public collab contract, reused internally and installed as `.moi/collab.d.ts`.
 declare module 'moi/collab' {
   import type { ReactElement, ReactNode } from 'react'
-
-  export type CollabJsonValue =
-    | null
-    | boolean
-    | number
-    | string
-    | CollabJsonValue[]
-    | { [key: string]: CollabJsonValue }
+  import type { JsonValue } from 'moi'
 
   export type UserColor =
     | 'pink'
@@ -44,9 +37,9 @@ declare module 'moi/collab' {
 
   export type PresenceValue<T> = { connectionId: string; userId: string; value: T }
   // Reading never registers or publishes presence. Values belong to connections.
-  export function usePresence<T extends CollabJsonValue>(channel: string): PresenceValue<T>[]
+  export function usePresence<T extends JsonValue>(channel: string): PresenceValue<T>[]
   // Publishes the current value reactively, releasing it on hide or unmount.
-  export function usePublishPresence<T extends CollabJsonValue>(channel: string, value: T): void
+  export function usePublishPresence<T extends JsonValue>(channel: string, value: T): void
 
   export type ActivityProps = { scope?: 'page' | 'workspace'; className?: string }
   export function Activity(props: ActivityProps): ReactElement

@@ -1,4 +1,4 @@
-import type { UserProfile, CollabLocation, Connection } from '@/lib/collab/types'
+import type { UserProfile, ConnectionLocation, Connection } from '@/lib/collab/types'
 
 import type { UserStatus, WorkspaceUser, UsePeersOptions } from 'moi/collab'
 
@@ -47,7 +47,7 @@ export function resolveUser(source: UsersSource, id: string): WorkspaceUser | un
 export function resolvePeers(
   source: UsersSource,
   selfId: string | undefined,
-  location: CollabLocation | null,
+  location: ConnectionLocation | null,
   { scope = 'page', status }: UsePeersOptions = {}
 ): WorkspaceUser[] {
   const peers: WorkspaceUser[] = []

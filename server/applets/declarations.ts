@@ -41,5 +41,6 @@ export async function syncAppletDeclarations(
 }
 
 export async function installCollabDeclaration(workspacePath: string): Promise<void> {
+  await writeDeclaration(workspacePath, 'base.d.ts')
   await writeDeclaration(workspacePath, 'collab.d.ts')
 }

@@ -14,7 +14,7 @@ import {
   User
 } from './components'
 import { createFakeEngine } from './fake-engine'
-import type { FakeCollabEngine } from './fake-engine'
+import type { FakeEngine } from './fake-engine'
 import { AppletScope, CollabContext, presenceChannels } from './hooks'
 import { presenceTarget } from './presence-target'
 import { PresenceFramePrimitive } from './primitives'
@@ -43,7 +43,7 @@ function room(target = presenceTarget('task:42:title'), profile: UserProfile = p
     ]
   })
 }
-function render(backend: FakeCollabEngine, children: ReactNode, active = true) {
+function render(backend: FakeEngine, children: ReactNode, active = true) {
   return renderToStaticMarkup(
     <CollabContext value={backend}>
       <AppletScope appletId="view:board" active={active}>

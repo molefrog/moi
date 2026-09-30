@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { COLLAB_MAX_MESSAGE_BYTES } from '@/lib/collab/protocol'
 import type { CollabClientMessage, CollabServerMessage } from '@/lib/collab/types'
 
-import { CollabManager, type CollabSocket } from './manager'
+import { CollabManager, type ClientSocket } from './manager'
 
 const managers: CollabManager[] = []
 const directories: string[] = []
@@ -41,7 +41,7 @@ async function until(predicate: () => boolean, timeout = 5000) {
 }
 
 function serve(runtime: CollabManager, workspacePath: string) {
-  const connections = new Map<Bun.ServerWebSocket<{ workspacePath: string }>, CollabSocket>()
+  const connections = new Map<Bun.ServerWebSocket<{ workspacePath: string }>, ClientSocket>()
   const server = Bun.serve<{ workspacePath: string }>({
     port: 0,
     hostname: '127.0.0.1',
@@ -52,7 +52,7 @@ function serve(runtime: CollabManager, workspacePath: string) {
     },
     websocket: {
       open(socket) {
-        const connection: CollabSocket = {
+        const connection: ClientSocket = {
           send: message => socket.send(message),
           close: (code, reason) => socket.close(code, reason),
           getBufferedAmount: () => socket.getBufferedAmount()
@@ -98,7 +98,7 @@ function localSocket() {
   const messages: CollabServerMessage[] = []
   let reason: string | undefined
   let buffered = 0
-  const socket: CollabSocket = {
+  const socket: ClientSocket = {
     send(message) {
       messages.push(JSON.parse(message) as CollabServerMessage)
       return message.length
@@ -120,7 +120,7 @@ function localSocket() {
   }
 }
 
-function joinLocal(runtime: CollabManager, socket: CollabSocket, id = 'anna') {
+function joinLocal(runtime: CollabManager, socket: ClientSocket, id = 'anna') {
   runtime.message(
     socket,
     JSON.stringify({

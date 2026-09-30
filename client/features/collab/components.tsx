@@ -23,7 +23,7 @@ import { IconCursorText, IconPointer } from '@tabler/icons-react'
 import { LayoutGroup, MotionConfig } from 'motion/react'
 
 import { cn } from '@/client/lib/cn'
-import type { CollabJsonValue } from '@/lib/collab/types'
+import type { JsonValue } from 'moi'
 
 import {
   presenceChannels,
@@ -48,7 +48,7 @@ export type {
 export { Facepile, User } from './primitives'
 
 // Built-in indicators have no registration while unfocused, unselected, or absent.
-const hasPresence = (value: CollabJsonValue) => value !== false && value !== null
+const hasPresence = (value: JsonValue) => value !== false && value !== null
 
 export function Activity({ scope = 'page', className }: ActivityProps) {
   const peers = usePeers({ scope })
@@ -58,7 +58,7 @@ export function Activity({ scope = 'page', className }: ActivityProps) {
 }
 
 type PointerPosition = { x: number; y: number; target?: string; targetX?: number; targetY?: number }
-function pointerPosition(value: CollabJsonValue): PointerPosition | null {
+function pointerPosition(value: JsonValue): PointerPosition | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   if (typeof value.x !== 'number' || typeof value.y !== 'number') return null
   if (!Number.isFinite(value.x) || !Number.isFinite(value.y)) return null
@@ -78,8 +78,8 @@ function pointerPosition(value: CollabJsonValue): PointerPosition | null {
 export function Cursors({ id = 'default', children, className }: CursorsProps) {
   const root = useRef<HTMLDivElement>(null)
   const channel = presenceChannels.cursor(id)
-  const cursors = usePresenceChannel<CollabJsonValue>(channel)
-  const publish = usePresencePublisher<CollabJsonValue>(channel, null, hasPresence)
+  const cursors = usePresenceChannel<JsonValue>(channel)
+  const publish = usePresencePublisher<JsonValue>(channel, null, hasPresence)
   const byConnection = new Map<string, { id: string; point: PointerPosition }>()
   for (const { connectionId, userId, value } of cursors) {
     const point = pointerPosition(value)

@@ -17,12 +17,8 @@ import {
 } from '@/client/components/ui/dialog'
 import { Input } from '@/client/components/ui/input'
 import { Textarea } from '@/client/components/ui/textarea'
-import type {
-  UserProfile,
-  CollabJsonValue,
-  Connection,
-  CollabPresenceRegistration
-} from '@/lib/collab/types'
+import type { JsonValue } from 'moi'
+import type { UserProfile, Connection, PresenceRegistration } from '@/lib/collab/types'
 
 import {
   Activity,
@@ -35,7 +31,7 @@ import {
   User
 } from '@/client/features/collab/components'
 import { createFakeEngine } from '@/client/features/collab/fake-engine'
-import type { FakeCollabEngine } from '@/client/features/collab/fake-engine'
+import type { FakeEngine } from '@/client/features/collab/fake-engine'
 import {
   AppletScope,
   CollabContext,
@@ -72,11 +68,7 @@ const TARGETS = [
   ['Launch dialog', presenceTarget('todo', 'launch', 'dialog', 'title')]
 ] as const
 
-function registration(
-  userId: string,
-  channel: string,
-  value: CollabJsonValue
-): CollabPresenceRegistration {
+function registration(userId: string, channel: string, value: JsonValue): PresenceRegistration {
   return { registrationId: `${userId}:${channel}`, appletId: APPLET_ID, channel, value }
 }
 
@@ -121,7 +113,7 @@ function sampleConnections(target: string, tick = 0): Connection[] {
   ]
 }
 
-function useBots(room: FakeCollabEngine, target: string) {
+function useBots(room: FakeEngine, target: string) {
   useEffect(() => {
     let tick = 0
     room.setOtherConnections(sampleConnections(target))

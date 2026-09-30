@@ -47,10 +47,16 @@ export default function Notes() { return resolveUrl('moi:/views/notes') + photoU
     await Bun.write(dts, "declare module 'moi/collab' {}\n")
     await Bun.write(
       join(workspaceRoot, '.moi', 'views', 'users.tsx'),
-      `import { useMe, useUser, type WorkspaceUser } from 'moi/collab'
+      `import type { JsonValue } from 'moi'
+import { useMe, useUser, usePresence, usePublishPresence, type WorkspaceUser } from 'moi/collab'
 export default function Users() {
   const me: WorkspaceUser | undefined = useMe()
   const user: WorkspaceUser | undefined = useUser('alice')
+  const value: JsonValue = { nested: [null, true, 1, 'hello'] }
+  usePublishPresence('test', value)
+  const presence = usePresence<JsonValue>('test')
+  // @ts-expect-error Functions are not JSON values.
+  usePublishPresence('test', () => {})
   return me?.id ?? user?.id ?? null
 }
 `

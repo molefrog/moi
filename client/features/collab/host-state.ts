@@ -3,10 +3,10 @@ import { colorForId, isUserColor } from '@/lib/collab/colors'
 import type { AuthProvider, ProxyUserState, UserProfile } from '@/lib/collab/types'
 import type { WorkspaceUsersAvailability } from 'moi/collab'
 
-export type CollabShareContext = { workspaceId: string; url: string }
-export type CollabShareHandler = (context: CollabShareContext) => Promise<{ url: string }>
+export type ShareContext = { workspaceId: string; url: string }
+export type ShareHandler = (context: ShareContext) => Promise<{ url: string }>
 export type UserProfileInput = Omit<UserProfile, 'color'> & { color?: UserProfile['color'] }
-type HostState<Profile> = {
+type State<Profile> = {
   readonly currentUser?: Profile
   readonly workspaces: Readonly<
     Record<
@@ -16,17 +16,17 @@ type HostState<Profile> = {
     >
   >
 }
-export type CollabHostStateInput = HostState<UserProfileInput>
-export type CollabHostState = HostState<UserProfile>
+export type HostStateInput = State<UserProfileInput>
+export type HostState = State<UserProfile>
 export type WorkspaceDirectory = {
   readonly status: WorkspaceUsersAvailability
   readonly users: readonly UserProfile[]
 }
-export type CollabHostApi = {
-  getHostState: () => CollabHostState | undefined
-  setHostState: (state: CollabHostStateInput) => void
-  subscribeHostState: (listener: (state: CollabHostState | undefined) => void) => () => void
-  setShareHandler: (handler: CollabShareHandler | null) => void
+export type HostApi = {
+  getHostState: () => HostState | undefined
+  setHostState: (state: HostStateInput) => void
+  subscribeHostState: (listener: (state: HostState | undefined) => void) => () => void
+  setShareHandler: (handler: ShareHandler | null) => void
 }
 // Who supplies the current user: local setup, an outer host, or an auth proxy.
 export type CurrentUserSource = 'dev' | 'external' | AuthProvider
@@ -36,7 +36,7 @@ export type CurrentUserSource = 'dev' | 'external' | AuthProvider
 const PROFILE_KEY = 'moi:collab:dev-profile'
 let currentUser: UserProfile | undefined
 let installed = false
-let shareHandler: CollabShareHandler | null = null
+let shareHandler: ShareHandler | null = null
 let currentUserSource: CurrentUserSource | undefined
 const listeners = new Set<() => void>()
 const workspaceListeners = new Map<string, Set<() => void>>()
@@ -52,7 +52,7 @@ const LOADING_DIRECTORY: WorkspaceDirectory = Object.freeze({
   status: 'loading',
   users: EMPTY_USERS
 })
-let hostState: CollabHostState | undefined
+let hostState: HostState | undefined
 
 export function normalizeUserProfile(value: UserProfileInput): UserProfile {
   if (!value || typeof value.id !== 'string' || !value.id.trim())
@@ -88,7 +88,7 @@ export function normalizeWorkspaceUsers(
   return Object.freeze(snapshot)
 }
 
-function normalizeHostState(value: CollabHostStateInput): CollabHostState {
+function normalizeHostState(value: HostStateInput): HostState {
   if (!value || typeof value !== 'object') throw new Error('Invalid host state.')
   const current =
     value.currentUser === undefined ? undefined : normalizeUserProfile(value.currentUser)
@@ -113,7 +113,7 @@ function normalizeHostState(value: CollabHostStateInput): CollabHostState {
   })
 }
 
-export function getHostState(): CollabHostState | undefined {
+export function getHostState(): HostState | undefined {
   return hostState
 }
 
@@ -130,7 +130,7 @@ export function getWorkspaceUsers(workspaceId: string): readonly UserProfile[] |
   return directory.status === 'unavailable' ? null : directory.users
 }
 
-export function setHostState(next: CollabHostStateInput): void {
+export function setHostState(next: HostStateInput): void {
   const normalized = normalizeHostState(next)
   const previousDirectories = new Map(
     [...workspaceListeners.keys()].map(id => [id, getWorkspaceDirectory(id)])
@@ -154,9 +154,7 @@ export function subscribeHostStateStore(listener: () => void): () => void {
   }
 }
 
-export function subscribeHostState(
-  listener: (state: CollabHostState | undefined) => void
-): () => void {
+export function subscribeHostState(listener: (state: HostState | undefined) => void): () => void {
   const unsubscribe = subscribeHostStateStore(() => listener(getHostState()))
   listener(getHostState())
   return unsubscribe
@@ -286,7 +284,7 @@ export function installHostApi(): void {
   const host = window as Window & {
     moi?: {
       collab?: {
-        getHostState?: () => CollabHostStateInput | undefined
+        getHostState?: () => HostStateInput | undefined
       }
       [key: string]: unknown
     }
@@ -311,7 +309,7 @@ export function installHostApi(): void {
     }
   }
   host.moi ??= {}
-  const api: CollabHostApi = {
+  const api: HostApi = {
     getHostState,
     setHostState,
     subscribeHostState,
