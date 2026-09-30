@@ -4,16 +4,12 @@ import { join } from 'node:path'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type * as CollabApi from 'moi/collab'
-
-import { COLLAB_MODULE_SOURCE } from './applet-module'
+import type * as CollabRuntime from './collab'
 
 type TestModule = typeof CollabApi & { __attachBridge(bridge: unknown): void }
+type RuntimeModule = typeof CollabRuntime & { __attachBridge(bridge: unknown): void }
 
 async function loadModule(): Promise<TestModule> {
-  const sources: Record<string, string> = {
-    entry: `export * from 'moi/collab'; export { __attachBridge } from 'moi';`,
-    'moi/collab': COLLAB_MODULE_SOURCE
-  }
   const result = await Bun.build({
     entrypoints: ['entry'],
     target: 'bun',
@@ -21,16 +17,19 @@ async function loadModule(): Promise<TestModule> {
       {
         name: 'collab-module-test',
         setup(build) {
-          build.onResolve({ filter: /^(entry|moi\/collab)$/ }, args => ({
+          build.onResolve({ filter: /^entry$/ }, args => ({
             path: args.path,
             namespace: 'collab-test'
           }))
-          build.onLoad({ filter: /.*/, namespace: 'collab-test' }, args => ({
-            contents: sources[args.path]!,
+          build.onLoad({ filter: /.*/, namespace: 'collab-test' }, () => ({
+            contents: `export * from 'moi/collab'; export { __attachBridge } from 'moi';`,
             loader: 'js'
           }))
+          build.onResolve({ filter: /^moi\/collab$/ }, () => ({
+            path: join(import.meta.dir, 'collab.ts')
+          }))
           build.onResolve({ filter: /^moi$/ }, () => ({
-            path: join(import.meta.dir, '../applets/runtime/moi.ts')
+            path: join(import.meta.dir, 'moi.ts')
           }))
           build.onResolve({ filter: /^react$/ }, () => ({
             path: Bun.resolveSync('react', import.meta.dir),
@@ -42,12 +41,12 @@ async function loadModule(): Promise<TestModule> {
   })
   if (!result.success) throw new Error(result.logs.join('\n'))
   const source = await result.outputs[0]!.text()
-  // Each test gets the same generated module with fresh warning/bridge state.
+  // Each test gets a fresh bundle with its own warning/bridge state.
   const directory = await mkdtemp(join(import.meta.dir, '.collab-module-test-'))
   try {
     const path = join(directory, 'entry.mjs')
     await Bun.write(path, source)
-    return (await import(path)) as TestModule
+    return (await import(path)) as RuntimeModule
   } finally {
     await rm(directory, { recursive: true, force: true })
   }

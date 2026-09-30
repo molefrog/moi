@@ -1,4 +1,3 @@
-import { COLLAB_MODULE_SOURCE } from '../collab/applet-module'
 import type { BunPlugin } from 'bun'
 import tailwind from 'bun-plugin-tailwind'
 import { realpathSync } from 'node:fs'
@@ -33,6 +32,7 @@ const EXTERNAL_MODULES = [
 
 const RPC_MODULE_PATH = join(import.meta.dir, 'runtime', 'rpc.ts')
 const MOI_MODULE_PATH = join(import.meta.dir, 'runtime', 'moi.ts')
+const COLLAB_MODULE_PATH = join(import.meta.dir, 'runtime', 'collab.ts')
 
 type ServerModule = {
   name: string
@@ -148,12 +148,7 @@ function appletRuntimePlugin(
 
       // Collaboration forwards to the same host bridge as the applet runtime.
       build.onResolve({ filter: /^moi\/collab$/ }, () => ({
-        path: 'moi/collab',
-        namespace: 'moi-collab'
-      }))
-      build.onLoad({ filter: /.*/, namespace: 'moi-collab' }, () => ({
-        contents: COLLAB_MODULE_SOURCE,
-        loader: 'js'
+        path: COLLAB_MODULE_PATH
       }))
       // The applet-facing runtime. A bare specifier, so match it exactly.
       build.onResolve({ filter: /^moi$/ }, () => ({ path: MOI_MODULE_PATH }))
