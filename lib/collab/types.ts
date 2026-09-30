@@ -1,6 +1,6 @@
-import type { CollabJsonValue, UserProfile } from 'moi/collab'
+import type { CollabJsonValue, ConnectionStatus, UserProfile } from 'moi/collab'
 
-export type { CollabJsonValue, UserProfile } from 'moi/collab'
+export type { CollabJsonValue, ConnectionStatus, UserProfile } from 'moi/collab'
 
 // An authenticating proxy in front of the deployment that moi trusts.
 export type AuthProvider = 'cloudflare-access'
@@ -12,7 +12,7 @@ export type ProxyUserState = {
   profile?: UserProfile
 }
 
-export type CollabLocation = { page: string; away?: boolean }
+export type CollabLocation = { page: string; status: ConnectionStatus }
 
 export type CollabPresenceRegistration = {
   registrationId: string

@@ -175,10 +175,13 @@ describe('collab process and socket integration', () => {
         item => item.userId === 'anna' && item.presence.length === 1
       )
     )
-    a.send({ type: 'location', location: { page: 'view:board', away: true } })
+    a.send({ type: 'location', location: { page: 'view:board', status: 'away' } })
     await until(() =>
       latestConnections(b.messages).connections.some(
-        item => item.userId === 'anna' && item.location?.page === 'view:board' && item.location.away
+        item =>
+          item.userId === 'anna' &&
+          item.location?.page === 'view:board' &&
+          item.location.status === 'away'
       )
     )
     expect(runtime.debugSnapshot()[0]?.connections).toBe(2)

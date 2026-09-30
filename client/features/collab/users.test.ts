@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test'
+import type { ConnectionStatus } from 'moi/collab'
 import type { Connection } from '@/lib/collab/types'
 import {
   summarizeWorkspaceUsers,
@@ -15,9 +16,9 @@ function connection(
   connectionId: string,
   userId: string,
   page: string | null,
-  away = false
+  status: ConnectionStatus = 'active'
 ): Connection {
-  return { connectionId, userId, location: page === null ? null : { page, away }, presence: [] }
+  return { connectionId, userId, location: page === null ? null : { page, status }, presence: [] }
 }
 const connections = [
   connection('self', 'alice', 'board'),
@@ -44,8 +45,12 @@ test('display names fall back to email or stable id without changing profile fie
 })
 
 test('peers are other users, deduplicated across tabs, with page/workspace and status filters', () => {
-  expect(resolvePeers(source, 'alice', { page: 'board' })).toEqual([{ ...bob, status: 'active' }])
-  expect(resolvePeers(source, 'alice', { page: 'board' }, { scope: 'workspace' })).toEqual([
+  expect(resolvePeers(source, 'alice', { page: 'board', status: 'active' })).toEqual([
+    { ...bob, status: 'active' }
+  ])
+  expect(
+    resolvePeers(source, 'alice', { page: 'board', status: 'active' }, { scope: 'workspace' })
+  ).toEqual([
     { ...bob, status: 'active' },
     { ...eve, status: 'away' }
   ])
@@ -75,16 +80,20 @@ test('host directory resolves offline users and removals remain authoritative ov
 test('hidden tabs stay in their page peers and support the away filter', () => {
   const connections = [
     connection('self', 'alice', 'board'),
-    connection('b1', 'bob', 'board', true),
-    connection('b2', 'bob', 'notes', true),
-    connection('e1', 'eve', 'notes', true)
+    connection('b1', 'bob', 'board', 'away'),
+    connection('b2', 'bob', 'notes', 'away'),
+    connection('e1', 'eve', 'notes', 'away')
   ]
   const source = { connections, users: [alice, bob, eve] }
-  expect(resolvePeers(source, 'alice', { page: 'board' })).toEqual([{ ...bob, status: 'away' }])
-  expect(resolvePeers(source, 'alice', { page: 'board' }, { status: 'away' })).toEqual([
+  expect(resolvePeers(source, 'alice', { page: 'board', status: 'active' })).toEqual([
     { ...bob, status: 'away' }
   ])
-  expect(resolvePeers(source, 'alice', { page: 'board' }, { status: 'active' })).toEqual([])
+  expect(
+    resolvePeers(source, 'alice', { page: 'board', status: 'active' }, { status: 'away' })
+  ).toEqual([{ ...bob, status: 'away' }])
+  expect(
+    resolvePeers(source, 'alice', { page: 'board', status: 'active' }, { status: 'active' })
+  ).toEqual([])
   expect(
     summarizeWorkspaceUsers(connections, {
       currentUser: alice,
@@ -96,13 +105,15 @@ test('hidden tabs stay in their page peers and support the away filter', () => {
 })
 
 test('a visible connection makes the user active across their away page connections', () => {
-  const connections = [connection('b1', 'bob', 'board', true), connection('b2', 'bob', 'notes')]
+  const connections = [connection('b1', 'bob', 'board', 'away'), connection('b2', 'bob', 'notes')]
   const source = { connections, users: [bob] }
   expect(resolveUser(source, 'bob')?.status).toBe('active')
-  expect(resolvePeers(source, 'alice', { page: 'board' }, { status: 'away' })).toEqual([])
-  expect(resolvePeers(source, 'alice', { page: 'board' }, { status: 'active' })).toEqual([
-    { ...bob, status: 'active' }
-  ])
+  expect(
+    resolvePeers(source, 'alice', { page: 'board', status: 'active' }, { status: 'away' })
+  ).toEqual([])
+  expect(
+    resolvePeers(source, 'alice', { page: 'board', status: 'active' }, { status: 'active' })
+  ).toEqual([{ ...bob, status: 'active' }])
 })
 
 test.each(['__proto__', 'constructor', 'toString'])('%s resolves as an ordinary user id', id => {

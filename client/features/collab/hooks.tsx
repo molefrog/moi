@@ -51,7 +51,7 @@ export function CollabProvider({ workspaceId, enabled, children }: CollabProvide
     const update = () =>
       engine.setLocation({
         page: pageFromPath(window.location.pathname, workspaceId, base),
-        away: document.visibilityState === 'hidden'
+        status: document.visibilityState === 'hidden' ? 'away' : 'active'
       })
     update()
     document.addEventListener('visibilitychange', update)

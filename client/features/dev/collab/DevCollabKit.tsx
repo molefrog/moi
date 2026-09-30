@@ -85,7 +85,7 @@ function sampleConnections(target: string, tick = 0): Connection[] {
     {
       connectionId: 'bot-fig',
       userId: 'fig',
-      location: { page: PAGE },
+      location: { page: PAGE, status: 'active' },
       presence: [
         registration('fig', presenceChannels.field(target), true),
         registration('fig', presenceChannels.cursor('examples'), {
@@ -101,7 +101,7 @@ function sampleConnections(target: string, tick = 0): Connection[] {
     {
       connectionId: 'bot-alex',
       userId: 'alex',
-      location: { page: PAGE },
+      location: { page: PAGE, status: 'active' },
       presence: [
         registration(
           'alex',
@@ -114,7 +114,7 @@ function sampleConnections(target: string, tick = 0): Connection[] {
     {
       connectionId: 'bot-pierre',
       userId: 'pierre',
-      location: { page: 'view:board' },
+      location: { page: 'view:board', status: 'active' },
       presence: []
     },
     { connectionId: 'bot-andrea', userId: 'andrea', location: null, presence: [] }

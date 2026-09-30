@@ -73,7 +73,7 @@ afterEach(() => {
 test('runtime without a current user stays idle and never joins anonymously', () => {
   const engine = new CollabEngine('workspace')
   stop = engine.start()
-  engine.setLocation({ page: 'view:board' })
+  engine.setLocation({ page: 'view:board', status: 'active' })
   engine.setPresence({
     registrationId: 'field',
     surface: 'board',
@@ -191,7 +191,7 @@ test('disabled engine exposes host profiles and readiness without starting a tra
   expect(engine.getWorkspaceDirectory()).toEqual({ status: 'ready', users: [alice] })
   expect(engine.getWorkspaceUsers()).toEqual([alice])
   expect(updates).toBe(1)
-  engine.setLocation({ page: 'overview' })
+  engine.setLocation({ page: 'overview', status: 'active' })
   engine.setPresence({
     registrationId: 'focus',
     surface: 'view:board',
@@ -236,6 +236,6 @@ test('the default engine keeps the current user readable while workspace operati
     NO_ENGINE.getPresenceSnapshot('two', 'cursor')
   )
   NO_ENGINE.start()()
-  NO_ENGINE.setLocation({ page: 'overview' })
+  NO_ENGINE.setLocation({ page: 'overview', status: 'active' })
   expect(sockets).toHaveLength(0)
 })

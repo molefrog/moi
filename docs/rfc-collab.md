@@ -100,12 +100,12 @@ Names are trimmed and blank names omitted. Built-in labels fall back to email, t
 The outer host enforces authentication and workspace access.
 
 A `Connection` is `{ connectionId, userId, location, presence }`. One user can have multiple browser
-tabs. The server assigns connection IDs. `location` is `{ page, away? } | null`. Hidden
-tabs retain their page with `away: true`; `null` means the connection has no known page. A page is
+tabs. The server assigns connection IDs. `location` is `{ page, status: 'active' | 'away' } | null`. Hidden
+tabs retain their page with `status: 'away'`; `null` means the connection has no known page. A page is
 the route segment within the workspace. Status is aggregated across a user's workspace connections.
 Hooks return a `WorkspaceUser`, which adds this status to the profile:
 
-- `active`: at least one connection with a known page and `away` absent or false.
+- `active`: at least one connection with `status: 'active'`.
 - `away`: connected, but no visible connection with a known page.
 - `offline`: no connection in this workspace.
 

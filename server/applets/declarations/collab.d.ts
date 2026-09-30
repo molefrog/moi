@@ -26,9 +26,10 @@ declare module 'moi/collab' {
     email?: string
     avatar?: string
   }
-  export type UserStatus = 'active' | 'away' | 'offline'
+  export type ConnectionStatus = 'active' | 'away'
+  export type UserStatus = ConnectionStatus | 'offline'
   export type WorkspaceUser = UserProfile & { status: UserStatus }
-  export type UsePeersOptions = { scope?: 'page' | 'workspace'; status?: 'active' | 'away' }
+  export type UsePeersOptions = { scope?: 'page' | 'workspace'; status?: ConnectionStatus }
   export type UseWorkspaceUsersOptions = { status?: UserStatus }
 
   // Peers are connected users, deduplicated across tabs, excluding your own user.

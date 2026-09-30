@@ -30,7 +30,7 @@ function room(target = presenceTarget('task:42:title'), profile: UserProfile = p
       {
         connectionId: 'remote',
         userId: profile.id,
-        location: { page: 'board' },
+        location: { page: 'board', status: 'active' },
         presence: [
           {
             registrationId: 'focus',
@@ -123,7 +123,7 @@ test.each([
       {
         connectionId: 'remote',
         userId: profile.id,
-        location: { page: 'board' },
+        location: { page: 'board', status: 'active' },
         presence: [
           {
             registrationId: 'cursor',
@@ -344,7 +344,7 @@ test('selection uses group scope while preserving flexible children', () => {
     {
       connectionId: 'remote',
       userId: peer.id,
-      location: { page: 'board' },
+      location: { page: 'board', status: 'active' },
       presence: [
         {
           registrationId: 'selection',

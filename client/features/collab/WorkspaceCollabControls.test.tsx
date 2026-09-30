@@ -28,7 +28,7 @@ function connection(user: UserProfile, page: string | null): Connection {
   return {
     connectionId: user.id,
     userId: user.id,
-    location: page === null ? null : { page },
+    location: page === null ? null : { page, status: 'active' },
     presence: []
   }
 }

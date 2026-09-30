@@ -22,7 +22,7 @@ describe('collab service', () => {
       type: 'join',
       version: 1,
       profile: { id, name: id, color: 'blue' },
-      location: { page: 'view:board' }
+      location: { page: 'view:board', status: 'active' }
     })
   }
 
@@ -43,8 +43,18 @@ describe('collab service', () => {
       version: 1,
       connectionId: 'b',
       connections: [
-        { connectionId: 'a', userId: 'anna', location: { page: 'view:board' }, presence: [] },
-        { connectionId: 'b', userId: 'boris', location: { page: 'view:board' }, presence: [] }
+        {
+          connectionId: 'a',
+          userId: 'anna',
+          location: { page: 'view:board', status: 'active' },
+          presence: []
+        },
+        {
+          connectionId: 'b',
+          userId: 'boris',
+          location: { page: 'view:board', status: 'active' },
+          presence: []
+        }
       ],
       users: [
         { id: 'anna', name: 'anna', color: 'blue' },
@@ -140,7 +150,7 @@ describe('collab service', () => {
   test('presence and location updates are coalesced and deletion clears a registration', async () => {
     join('one')
     messages = []
-    service.receive('one', { type: 'location', location: { page: 'view:board', away: true } })
+    service.receive('one', { type: 'location', location: { page: 'view:board', status: 'away' } })
     service.receive('one', {
       type: 'presence:set',
       registrationId: 'cursor',
@@ -159,7 +169,7 @@ describe('collab service', () => {
     await Bun.sleep(60)
     expect(messages).toHaveLength(1)
     expect(latest().connections[0]).toMatchObject({
-      location: { page: 'view:board', away: true },
+      location: { page: 'view:board', status: 'away' },
       presence: [{ value: { x: 20 } }]
     })
     service.receive('one', { type: 'presence:delete', registrationId: 'cursor' })

@@ -6,7 +6,7 @@ const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
 const connection: Connection = {
   connectionId: 'a',
   userId: 'alice',
-  location: { page: 'overview' },
+  location: { page: 'overview', status: 'active' },
   presence: []
 }
 const welcome = {
@@ -63,9 +63,9 @@ test('location changes notify page observers immediately and identical presence 
   store.receive(welcome)
   let notifications = 0
   store.subscribe(() => notifications++)
-  store.setLocation({ page: 'view:board' })
+  store.setLocation({ page: 'view:board', status: 'active' })
   expect(notifications).toBe(1)
-  expect(store.getLocation()).toEqual({ page: 'view:board' })
+  expect(store.getLocation()).toEqual({ page: 'view:board', status: 'active' })
   store.setPresence(field)
   store.setPresence({ ...field })
   expect(sent.filter(message => message.type === 'presence:set')).toHaveLength(1)
@@ -75,7 +75,7 @@ const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
 const remote: Connection = {
   connectionId: 'b',
   userId: 'bob',
-  location: { page: 'overview' },
+  location: { page: 'overview', status: 'active' },
   presence: [
     field,
     { ...field, registrationId: 'cursor', channel: 'cursor:board', value: { x: 1, y: 2 } }
@@ -84,7 +84,7 @@ const remote: Connection = {
 
 test('cursor movement preserves the users and unrelated channel snapshots by reference', () => {
   const store = new CollabStore()
-  store.setLocation({ page: 'overview' })
+  store.setLocation({ page: 'overview', status: 'active' })
   store.receive({ ...welcome, connections: [connection, remote], users: [alice, bob] })
   const users = store.getUsersSnapshot()
   const title = store.getPresenceSnapshot('view:board', 'field:title')
@@ -114,7 +114,7 @@ test('cursor movement preserves the users and unrelated channel snapshots by ref
 
 test('presence selectors respond immediately to page and visibility changes, filtering other connections', () => {
   const store = new CollabStore()
-  store.setLocation({ page: 'overview' })
+  store.setLocation({ page: 'overview', status: 'active' })
   store.receive({
     ...welcome,
     connections: [{ ...connection, presence: [field] }, remote],
@@ -123,16 +123,16 @@ test('presence selectors respond immediately to page and visibility changes, fil
   const getTitle = () => store.getPresenceSnapshot('view:board', 'field:title')
   expect(getTitle().map(entry => entry.connectionId)).toEqual(['b'])
   const users = store.getUsersSnapshot()
-  store.setLocation({ page: 'view:other' })
+  store.setLocation({ page: 'view:other', status: 'active' })
   expect(getTitle()).toEqual([])
   expect(store.getUsersSnapshot()).not.toBe(users)
-  store.setLocation({ page: 'overview', away: true })
+  store.setLocation({ page: 'overview', status: 'away' })
   expect(getTitle()).toEqual([])
-  store.setLocation({ page: 'overview' })
+  store.setLocation({ page: 'overview', status: 'active' })
   expect(getTitle()).toHaveLength(1)
   store.receive({
     type: 'connections',
-    connections: [{ ...remote, location: { page: 'overview', away: true } }],
+    connections: [{ ...remote, location: { page: 'overview', status: 'away' } }],
     users: [bob]
   })
   expect(getTitle()).toEqual([])
@@ -144,7 +144,7 @@ test('presence selectors respond immediately to page and visibility changes, fil
 
 test('profile and status changes advance users snapshots without republishing unchanged presence', () => {
   const store = new CollabStore()
-  store.setLocation({ page: 'overview' })
+  store.setLocation({ page: 'overview', status: 'active' })
   store.receive({ ...welcome, connections: [connection, remote], users: [alice, bob] })
   const users = store.getUsersSnapshot()
   const title = store.getPresenceSnapshot('view:board', 'field:title')

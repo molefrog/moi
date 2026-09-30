@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test'
+import type { Connection } from '@/lib/collab/types'
 import { createFakeEngine } from './fake-engine'
 
 const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
@@ -67,10 +68,10 @@ test('loading fixtures expose no directory until the complete ready snapshot arr
 })
 
 test('fake updates share the live engine selection rules and stable snapshots', () => {
-  const connection = {
+  const connection: Connection = {
     connectionId: 'b',
     userId: 'bob',
-    location: { page: 'preview' },
+    location: { page: 'preview', status: 'active' },
     presence: [field]
   }
   const room = createFakeEngine({
@@ -91,9 +92,9 @@ test('fake updates share the live engine selection rules and stable snapshots', 
   ])
   expect(room.getUsersSnapshot()).toBe(users)
   expect(room.getPresenceSnapshot('view:board', 'field:title')).toBe(title)
-  room.setLocation({ page: 'preview', away: true })
-  expect(room.getLocation()).toEqual({ page: 'preview', away: true })
+  room.setLocation({ page: 'preview', status: 'away' })
+  expect(room.getLocation()).toEqual({ page: 'preview', status: 'away' })
   expect(room.getPresenceSnapshot('view:board', 'field:title')).toEqual([])
-  room.setLocation({ page: 'preview' })
+  room.setLocation({ page: 'preview', status: 'active' })
   expect(room.getPresenceSnapshot('view:board', 'field:title')).toHaveLength(1)
 })

@@ -57,7 +57,7 @@ test('observers resolve users and read presence without creating a publisher', (
       {
         connectionId: 'b',
         userId: 'bob',
-        location: { page: 'board' },
+        location: { page: 'board', status: 'active' },
         presence: [
           {
             registrationId: 'field',
@@ -113,7 +113,12 @@ test('user hooks preserve missing names for self, peers, and offline members', (
     page: 'board',
     users: [self, peer, offline],
     otherConnections: [
-      { connectionId: 'b', userId: peer.id, location: { page: 'board' }, presence: [] }
+      {
+        connectionId: 'b',
+        userId: peer.id,
+        location: { page: 'board', status: 'active' },
+        presence: []
+      }
     ]
   })
   function Users() {
@@ -155,7 +160,12 @@ test('workspace users include self and offline members with workspace-wide statu
     page: 'board',
     users: [alice, bob, carol, david],
     otherConnections: [
-      { connectionId: 'b1', userId: 'bob', location: { page: 'other-page' }, presence: [] },
+      {
+        connectionId: 'b1',
+        userId: 'bob',
+        location: { page: 'other-page', status: 'active' },
+        presence: []
+      },
       { connectionId: 'b2', userId: 'bob', location: null, presence: [] },
       { connectionId: 'c', userId: 'carol', location: null, presence: [] }
     ]
@@ -253,7 +263,7 @@ test('away peers remain on the page while their focus presence is hidden', () =>
       {
         connectionId: 'b',
         userId: bob.id,
-        location: { page: 'board', away: true },
+        location: { page: 'board', status: 'away' },
         presence: [
           {
             registrationId: 'focus',

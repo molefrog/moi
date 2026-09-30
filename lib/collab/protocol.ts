@@ -48,7 +48,7 @@ function isLocation(value: unknown): value is CollabLocation | null {
     value === null ||
     (isRecord(value) &&
       isCollabString(value.page, 1024) &&
-      (value.away === undefined || typeof value.away === 'boolean'))
+      (value.status === 'active' || value.status === 'away'))
   )
 }
 

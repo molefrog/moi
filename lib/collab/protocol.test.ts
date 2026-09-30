@@ -43,11 +43,21 @@ test('only protocol v1 clients with a user profile can join', () => {
     isCollabClientMessage({ type: 'join', version: 1, profile: null, anonymousId: 'tab' })
   ).toBe(false)
   expect(
-    isCollabClientMessage({ type: 'join', version: 1, profile, location: { page: 'view:board' } })
+    isCollabClientMessage({
+      type: 'join',
+      version: 1,
+      profile,
+      location: { page: 'view:board', status: 'active' }
+    })
   ).toBe(true)
-  expect(isCollabClientMessage({ type: 'join', version: 1, profile, location: { page: '' } })).toBe(
-    false
-  )
+  expect(
+    isCollabClientMessage({
+      type: 'join',
+      version: 1,
+      profile,
+      location: { page: '', status: 'active' }
+    })
+  ).toBe(false)
 })
 
 test('join and profile updates accept missing names and reject blank names', () => {
@@ -93,14 +103,18 @@ test('presence bounds JSON bytes, nesting and finite numbers', () => {
   expect(isCollabClientMessage({ ...presence, value: nested })).toBe(false)
 })
 
-test('away locations retain their page and reject invalid activity flags', () => {
-  for (const away of [undefined, false, true]) {
-    const location = { page: 'view:board', away }
+test('locations require an active or away connection status', () => {
+  for (const status of ['active', 'away']) {
+    const location = { page: 'view:board', status }
     expect(isCollabClientMessage({ type: 'location', location })).toBe(true)
     expect(isCollabClientMessage({ type: 'join', version: 1, profile, location })).toBe(true)
   }
-  for (const away of [null, 0, 1, 'true']) {
-    const location = { page: 'view:board', away }
+  for (const status of [undefined, null, false, true, 0, 'offline', 'unknown']) {
+    const location = { page: 'view:board', status }
+    expect(isCollabClientMessage({ type: 'location', location })).toBe(false)
+    expect(isCollabClientMessage({ type: 'join', version: 1, profile, location })).toBe(false)
+  }
+  for (const location of [{ page: 'view:board' }, { page: 'view:board', away: true }]) {
     expect(isCollabClientMessage({ type: 'location', location })).toBe(false)
     expect(isCollabClientMessage({ type: 'join', version: 1, profile, location })).toBe(false)
   }

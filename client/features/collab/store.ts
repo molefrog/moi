@@ -119,12 +119,12 @@ export class CollabStore {
       this.usersState = users
     }
     const channels = new Map<string, CollabPresenceEntry[]>()
-    if (this.location && !this.location.away) {
+    if (this.location?.status === 'active') {
       for (const connection of this.state.connections) {
         if (
           connection.connectionId === this.state.connectionId ||
           connection.location?.page !== this.location.page ||
-          connection.location.away
+          connection.location.status !== 'active'
         )
           continue
         for (const registration of connection.presence) {

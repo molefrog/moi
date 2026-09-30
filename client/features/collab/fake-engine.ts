@@ -37,7 +37,7 @@ export function createFakeEngine({
   }
   directory = directoryStatus === 'unavailable' ? null : directorySnapshot.users
   let currentOtherConnections = otherConnections
-  let location: Connection['location'] = { page }
+  let location: Connection['location'] = { page, status: 'active' }
   const connections = (): Connection[] => [
     ...(self
       ? [{ connectionId: 'local', userId: self.id, location, presence: [...presence.values()] }]

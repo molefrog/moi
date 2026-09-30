@@ -20,9 +20,7 @@ export function userDisplayName(user: UserProfile): string {
 
 export function userStatus(connections: readonly Connection[], id: string): UserStatus {
   const userConnections = connections.filter(connection => connection.userId === id)
-  return userConnections.some(
-    connection => connection.location !== null && !connection.location.away
-  )
+  return userConnections.some(connection => connection.location?.status === 'active')
     ? 'active'
     : userConnections.length
       ? 'away'
