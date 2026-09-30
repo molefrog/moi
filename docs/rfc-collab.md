@@ -150,7 +150,7 @@ The Batiok bootstrap example and update steps are in
 Reading presence never creates a presence registration. Publication owns one registration per
 mounted hook and replaces that registration's whole value. Hidden views, browser tabs, outgoing
 builds, unmounts, and Strict Mode cleanup release registrations. Presence is restored after reconnect.
-Custom channel names are scoped by applet ID (`view:<name>` or `widget:<name>`); they are not
+Custom channel names are scoped by applet ID (`views/<name>` or `widgets/<name>`); they are not
 a persistent key/value store. Channel values must be JSON and fit within 4 KiB.
 
 | Component        | Contract                                                                                |

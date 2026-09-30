@@ -166,7 +166,7 @@ describe('collab process and socket integration', () => {
     a.send({
       type: 'presence:set',
       registrationId: 'focus',
-      appletId: 'view:board',
+      appletId: 'views/board',
       channel: 'focus',
       value: { target: 'todo:42' }
     })
@@ -175,12 +175,12 @@ describe('collab process and socket integration', () => {
         item => item.userId === 'anna' && item.presence.length === 1
       )
     )
-    a.send({ type: 'location', location: { page: 'view:board', status: 'away' } })
+    a.send({ type: 'location', location: { page: 'views/board', status: 'away' } })
     await until(() =>
       latestConnections(b.messages).connections.some(
         item =>
           item.userId === 'anna' &&
-          item.location?.page === 'view:board' &&
+          item.location?.page === 'views/board' &&
           item.location.status === 'away'
       )
     )
@@ -198,7 +198,7 @@ describe('collab process and socket integration', () => {
     client.send({
       type: 'presence:set',
       registrationId: 'cursor',
-      appletId: 'view:board',
+      appletId: 'views/board',
       channel: 'cursor',
       value: { x: 12 }
     })

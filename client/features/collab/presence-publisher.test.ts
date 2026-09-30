@@ -30,7 +30,7 @@ function room() {
         setPresence: registration => store.setPresence(registration),
         deletePresence: id => store.deletePresence(id)
       },
-      { registrationId, appletId: 'view:board', channel },
+      { registrationId, appletId: 'views/board', channel },
       isPresent
     )
   return { store, sent, publisher }
@@ -52,7 +52,7 @@ test('hundreds of idle built-in controls leave capacity for the focused control'
     {
       type: 'presence:set',
       registrationId: 'field-99',
-      appletId: 'view:board',
+      appletId: 'views/board',
       channel: 'field:task-99',
       value: true
     }

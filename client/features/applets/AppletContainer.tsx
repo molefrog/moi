@@ -6,7 +6,7 @@ import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { type AppletSegment, appletId, appletStyleKey } from './applet-cache'
 import { useAppletStyle } from './applet-styles'
 
-type AppletMountProps = {
+type AppletContainerProps = {
   segment: AppletSegment
   name: string
   version: number
@@ -20,7 +20,7 @@ type AppletMountProps = {
 // page. This is the widget path. Views don't use it: ViewManager parks a view's
 // DOM offscreen instead of unmounting it, so it holds the styles itself, above
 // the boundary that hides the view.
-export function AppletMount({ segment, name, version, children }: AppletMountProps) {
+export function AppletContainer({ segment, name, version, children }: AppletContainerProps) {
   const workspaceId = useWorkspaceId()
   const id = appletId(segment, name)
   useAppletStyle(appletStyleKey(segment, workspaceId, name), version)

@@ -22,7 +22,7 @@ describe('collab service', () => {
       type: 'join',
       version: 1,
       profile: { id, name: id, color: 'blue' },
-      location: { page: 'view:board', status: 'active' }
+      location: { page: 'views/board', status: 'active' }
     })
   }
 
@@ -46,13 +46,13 @@ describe('collab service', () => {
         {
           connectionId: 'a',
           userId: 'anna',
-          location: { page: 'view:board', status: 'active' },
+          location: { page: 'views/board', status: 'active' },
           presence: []
         },
         {
           connectionId: 'b',
           userId: 'boris',
-          location: { page: 'view:board', status: 'active' },
+          location: { page: 'views/board', status: 'active' },
           presence: []
         }
       ],
@@ -71,7 +71,7 @@ describe('collab service', () => {
         type: 'presence:set',
         registrationId,
         channel: 'focus',
-        appletId: 'view:board',
+        appletId: 'views/board',
         value: { focused: true }
       })
     }
@@ -150,18 +150,18 @@ describe('collab service', () => {
   test('presence and location updates are coalesced and deletion clears a registration', async () => {
     join('one')
     messages = []
-    service.receive('one', { type: 'location', location: { page: 'view:board', status: 'away' } })
+    service.receive('one', { type: 'location', location: { page: 'views/board', status: 'away' } })
     service.receive('one', {
       type: 'presence:set',
       registrationId: 'cursor',
-      appletId: 'board',
+      appletId: 'views/board',
       channel: 'cursor',
       value: { x: 10 }
     })
     service.receive('one', {
       type: 'presence:set',
       registrationId: 'cursor',
-      appletId: 'board',
+      appletId: 'views/board',
       channel: 'cursor',
       value: { x: 20 }
     })
@@ -169,7 +169,7 @@ describe('collab service', () => {
     await Bun.sleep(60)
     expect(messages).toHaveLength(1)
     expect(latest().connections[0]).toMatchObject({
-      location: { page: 'view:board', status: 'away' },
+      location: { page: 'views/board', status: 'away' },
       presence: [{ value: { x: 20 } }]
     })
     service.receive('one', { type: 'presence:delete', registrationId: 'cursor' })
@@ -191,7 +191,7 @@ describe('collab service', () => {
     join('one')
     const registration = {
       type: 'presence:set' as const,
-      appletId: 'board',
+      appletId: 'views/board',
       channel: 'focus',
       value: true
     }

@@ -12,7 +12,7 @@ const profile = { id: 'anna', name: 'Anna', color: 'violet' } as const
 const presence = {
   type: 'presence:set',
   registrationId: 'field',
-  appletId: 'board',
+  appletId: 'views/board',
   channel: 'focus'
 }
 
@@ -47,7 +47,7 @@ test('only protocol v1 clients with a user profile can join', () => {
       type: 'join',
       version: 1,
       profile,
-      location: { page: 'view:board', status: 'active' }
+      location: { page: 'views/board', status: 'active' }
     })
   ).toBe(true)
   expect(
@@ -105,16 +105,16 @@ test('presence bounds JSON bytes, nesting and finite numbers', () => {
 
 test('locations require an active or away connection status', () => {
   for (const status of ['active', 'away']) {
-    const location = { page: 'view:board', status }
+    const location = { page: 'views/board', status }
     expect(isCollabClientMessage({ type: 'location', location })).toBe(true)
     expect(isCollabClientMessage({ type: 'join', version: 1, profile, location })).toBe(true)
   }
   for (const status of [undefined, null, false, true, 0, 'offline', 'unknown']) {
-    const location = { page: 'view:board', status }
+    const location = { page: 'views/board', status }
     expect(isCollabClientMessage({ type: 'location', location })).toBe(false)
     expect(isCollabClientMessage({ type: 'join', version: 1, profile, location })).toBe(false)
   }
-  for (const location of [{ page: 'view:board' }, { page: 'view:board', away: true }]) {
+  for (const location of [{ page: 'views/board' }, { page: 'views/board', away: true }]) {
     expect(isCollabClientMessage({ type: 'location', location })).toBe(false)
     expect(isCollabClientMessage({ type: 'join', version: 1, profile, location })).toBe(false)
   }

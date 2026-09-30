@@ -455,10 +455,11 @@ export async function buildApplet(
 
   if (cssOutput) {
     // Scope every rule to the applet's mount container (`[data-applet=
-    // "<kind>:<name>"]`, see applet-css.ts) so the bundle's Tailwind never
+    // "<widgets|views>/<name>"]`, see applet-css.ts) so the bundle's Tailwind never
     // leaks into the host page. Kind-namespaced so a widget and a view sharing
     // a name scope independently.
-    const css = scopeAppletCss(await cssOutput.text(), `${kind}:${widgetName}`)
+    const segment = kind === 'widget' ? 'widgets' : 'views'
+    const css = scopeAppletCss(await cssOutput.text(), `${segment}/${widgetName}`)
     js = injectCss(js, css)
   }
 

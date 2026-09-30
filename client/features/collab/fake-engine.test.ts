@@ -6,7 +6,7 @@ const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
 const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
 const field = {
   registrationId: 'field',
-  appletId: 'view:board',
+  appletId: 'views/board',
   channel: 'field:title',
   value: true
 }
@@ -80,7 +80,7 @@ test('fake updates share the live engine selection rules and stable snapshots', 
     otherConnections: [connection]
   })
   const users = room.getUsersSnapshot()
-  const title = room.getPresenceSnapshot('view:board', 'field:title')
+  const title = room.getPresenceSnapshot('views/board', 'field:title')
   room.setOtherConnections([
     {
       ...connection,
@@ -91,10 +91,10 @@ test('fake updates share the live engine selection rules and stable snapshots', 
     }
   ])
   expect(room.getUsersSnapshot()).toBe(users)
-  expect(room.getPresenceSnapshot('view:board', 'field:title')).toBe(title)
+  expect(room.getPresenceSnapshot('views/board', 'field:title')).toBe(title)
   room.setLocation({ page: 'preview', status: 'away' })
   expect(room.getLocation()).toEqual({ page: 'preview', status: 'away' })
-  expect(room.getPresenceSnapshot('view:board', 'field:title')).toEqual([])
+  expect(room.getPresenceSnapshot('views/board', 'field:title')).toEqual([])
   room.setLocation({ page: 'preview', status: 'active' })
-  expect(room.getPresenceSnapshot('view:board', 'field:title')).toHaveLength(1)
+  expect(room.getPresenceSnapshot('views/board', 'field:title')).toHaveLength(1)
 })

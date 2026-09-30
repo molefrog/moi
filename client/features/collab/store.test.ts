@@ -18,7 +18,7 @@ const welcome = {
 }
 const field = {
   registrationId: 'field',
-  appletId: 'view:board',
+  appletId: 'views/board',
   channel: 'field:title',
   value: true
 }
@@ -63,9 +63,9 @@ test('location changes notify page observers immediately and identical presence 
   store.receive(welcome)
   let notifications = 0
   store.subscribe(() => notifications++)
-  store.setLocation({ page: 'view:board', status: 'active' })
+  store.setLocation({ page: 'views/board', status: 'active' })
   expect(notifications).toBe(1)
-  expect(store.getLocation()).toEqual({ page: 'view:board', status: 'active' })
+  expect(store.getLocation()).toEqual({ page: 'views/board', status: 'active' })
   store.setPresence(field)
   store.setPresence({ ...field })
   expect(sent.filter(message => message.type === 'presence:set')).toHaveLength(1)
@@ -87,9 +87,9 @@ test('cursor movement preserves the users and unrelated channel snapshots by ref
   store.setLocation({ page: 'overview', status: 'active' })
   store.receive({ ...welcome, connections: [connection, remote], users: [alice, bob] })
   const users = store.getUsersSnapshot()
-  const title = store.getPresenceSnapshot('view:board', 'field:title')
-  const cursor = store.getPresenceSnapshot('view:board', 'cursor:board')
-  const absent = store.getPresenceSnapshot('view:board', 'custom:absent')
+  const title = store.getPresenceSnapshot('views/board', 'field:title')
+  const cursor = store.getPresenceSnapshot('views/board', 'cursor:board')
+  const absent = store.getPresenceSnapshot('views/board', 'custom:absent')
   store.receive({
     type: 'connections',
     users: structuredClone([alice, bob]),
@@ -103,10 +103,10 @@ test('cursor movement preserves the users and unrelated channel snapshots by ref
   })
   expect(store.getUsersSnapshot()).toBe(users)
   expect(store.getUsersSnapshot().connections.every(peer => peer.presence.length === 0)).toBe(true)
-  expect(store.getPresenceSnapshot('view:board', 'field:title')).toBe(title)
-  expect(store.getPresenceSnapshot('view:board', 'custom:absent')).toBe(absent)
-  expect(store.getPresenceSnapshot('view:board', 'cursor:board')).not.toBe(cursor)
-  expect(store.getPresenceSnapshot('view:board', 'cursor:board')[0]?.value).toEqual({
+  expect(store.getPresenceSnapshot('views/board', 'field:title')).toBe(title)
+  expect(store.getPresenceSnapshot('views/board', 'custom:absent')).toBe(absent)
+  expect(store.getPresenceSnapshot('views/board', 'cursor:board')).not.toBe(cursor)
+  expect(store.getPresenceSnapshot('views/board', 'cursor:board')[0]?.value).toEqual({
     x: 20,
     y: 40
   })
@@ -120,10 +120,10 @@ test('presence selectors respond immediately to page and visibility changes, fil
     connections: [{ ...connection, presence: [field] }, remote],
     users: [alice, bob]
   })
-  const getTitle = () => store.getPresenceSnapshot('view:board', 'field:title')
+  const getTitle = () => store.getPresenceSnapshot('views/board', 'field:title')
   expect(getTitle().map(entry => entry.connectionId)).toEqual(['b'])
   const users = store.getUsersSnapshot()
-  store.setLocation({ page: 'view:other', status: 'active' })
+  store.setLocation({ page: 'views/other', status: 'active' })
   expect(getTitle()).toEqual([])
   expect(store.getUsersSnapshot()).not.toBe(users)
   store.setLocation({ page: 'overview', status: 'away' })
@@ -147,7 +147,7 @@ test('profile and status changes advance users snapshots without republishing un
   store.setLocation({ page: 'overview', status: 'active' })
   store.receive({ ...welcome, connections: [connection, remote], users: [alice, bob] })
   const users = store.getUsersSnapshot()
-  const title = store.getPresenceSnapshot('view:board', 'field:title')
+  const title = store.getPresenceSnapshot('views/board', 'field:title')
   store.receive({
     type: 'connections',
     connections: [connection, remote],
@@ -155,5 +155,5 @@ test('profile and status changes advance users snapshots without republishing un
   })
   expect(store.getUsersSnapshot()).not.toBe(users)
   expect(store.getUsersSnapshot().users[1]?.name).toBe('Robert')
-  expect(store.getPresenceSnapshot('view:board', 'field:title')).toBe(title)
+  expect(store.getPresenceSnapshot('views/board', 'field:title')).toBe(title)
 })

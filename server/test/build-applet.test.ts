@@ -2,6 +2,8 @@ import { afterAll, beforeAll, describe, expect, spyOn, test } from 'bun:test'
 import { rmSync } from 'node:fs'
 import { join } from 'path'
 
+import { appletId } from '@/client/features/applets/applet-cache'
+
 import { buildApplet } from '../applets/build-applet'
 import { extractViewConfig, extractWidgetConfig } from '../applets/config'
 
@@ -62,7 +64,7 @@ describe('buildApplet', () => {
     expect(result.js).not.toContain('document.createElement("style")')
     // Every rule is scoped to the applet's mount container.
     expect(result.js).toContain('[data-applet=')
-    expect(result.js).toContain('widget:hello')
+    expect(result.js).toContain('widgets/hello')
   })
 
   test('maps widget and view fonts to workspace-owned variables', async () => {
@@ -340,7 +342,7 @@ describe('buildApplet', () => {
     const css = injectedCss((await buildApplet(join(FIXTURES, 'hello.tsx'))).js)
 
     expect(css).toMatch(
-      /\[data-applet="widget:hello"\] \* \{\s*border-color: var\(--border\);\s*outline-color: var\(--ring\)/
+      /\[data-applet="widgets\/hello"\] \* \{\s*border-color: var\(--border\);\s*outline-color: var\(--ring\)/
     )
   })
 
@@ -473,13 +475,15 @@ describe("buildApplet kind='view'", () => {
   test('namespaces the CSS scope with the view kind', async () => {
     const result = await buildApplet(join(FIXTURES, 'with-view-config.tsx'), undefined, 'view')
     // Prevents a widget and a view sharing a name from clobbering each other.
-    expect(result.js).toContain('view:with-view-config')
+    expect(injectedCss(result.js)).toContain(
+      `[data-applet="${appletId('views', 'with-view-config')}"]`
+    )
   })
 
-  test('widget kind uses the widget: scope namespace', async () => {
+  test('widget kind uses the widgets/ scope namespace', async () => {
     const result = await buildApplet(join(FIXTURES, 'hello.tsx'), undefined, 'widget')
-    expect(result.js).toContain('widget:hello')
-    expect(result.js).not.toContain('view:hello')
+    expect(injectedCss(result.js)).toContain(`[data-applet="${appletId('widgets', 'hello')}"]`)
+    expect(injectedCss(result.js)).not.toContain(`[data-applet="${appletId('views', 'hello')}"]`)
   })
 })
 

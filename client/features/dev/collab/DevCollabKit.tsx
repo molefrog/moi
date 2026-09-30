@@ -60,7 +60,7 @@ const USERS: UserProfile[] = [
   { id: 'david', name: 'David Tibbitts', email: 'david@example.com', color: 'emerald' }
 ]
 const PAGE = 'kit'
-const APPLET_ID = 'view:kit'
+const APPLET_ID = 'views/kit'
 const TARGETS = [
   ['First task', presenceTarget('tasks', 'launch')],
   ['Second task', presenceTarget('tasks', 'notes')],
@@ -106,7 +106,7 @@ function sampleConnections(target: string, tick = 0): Connection[] {
     {
       connectionId: 'bot-pierre',
       userId: 'pierre',
-      location: { page: 'view:board', status: 'active' },
+      location: { page: 'views/board', status: 'active' },
       presence: []
     },
     { connectionId: 'bot-andrea', userId: 'andrea', location: null, presence: [] }

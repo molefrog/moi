@@ -56,7 +56,7 @@ export function appletStyleKey(segment: AppletSegment, workspaceId: string, name
 
 // Stable applet identity used by scoped CSS, presence, and thumbnail capture.
 export function appletId(segment: AppletSegment, name: string): string {
-  return `${segment === 'widgets' ? 'widget' : 'view'}:${name}`
+  return `${segment}/${name}`
 }
 
 export function getCachedApplet(key: string): Promise<unknown> | undefined {

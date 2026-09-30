@@ -73,10 +73,10 @@ afterEach(() => {
 test('runtime without a current user stays idle and never joins anonymously', () => {
   const engine = new CollabEngine('workspace')
   stop = engine.start()
-  engine.setLocation({ page: 'view:board', status: 'active' })
+  engine.setLocation({ page: 'views/board', status: 'active' })
   engine.setPresence({
     registrationId: 'field',
-    appletId: 'board',
+    appletId: 'views/board',
     channel: 'focus',
     value: 'title'
   })
@@ -130,13 +130,13 @@ test('reconnecting restores current presence and removed registrations stay gone
   sockets[0]!.open()
   engine.setPresence({
     registrationId: 'kept',
-    appletId: 'board',
+    appletId: 'views/board',
     channel: 'focus',
     value: true
   })
   engine.setPresence({
     registrationId: 'removed',
-    appletId: 'board',
+    appletId: 'views/board',
     channel: 'focus',
     value: true
   })
@@ -149,7 +149,7 @@ test('reconnecting restores current presence and removed registrations stay gone
     {
       type: 'presence:set',
       registrationId: 'kept',
-      appletId: 'board',
+      appletId: 'views/board',
       channel: 'focus',
       value: true
     }
@@ -194,7 +194,7 @@ test('disabled engine exposes host profiles and readiness without starting a tra
   engine.setLocation({ page: 'overview', status: 'active' })
   engine.setPresence({
     registrationId: 'focus',
-    appletId: 'view:board',
+    appletId: 'views/board',
     channel: 'field:title',
     value: true
   })
@@ -202,7 +202,7 @@ test('disabled engine exposes host profiles and readiness without starting a tra
   expect(sockets).toHaveLength(0)
   expect(engine.getSnapshot()).toMatchObject({ status: 'disconnected', connections: [] })
   expect(engine.getUsersSnapshot()).toBe(engine.getSnapshot())
-  expect(engine.getPresenceSnapshot('view:board', 'field:title')).toEqual([])
+  expect(engine.getPresenceSnapshot('views/board', 'field:title')).toEqual([])
   unsubscribe()
 })
 
