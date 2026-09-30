@@ -11,7 +11,7 @@ export function UserFace({ name }: UserFaceProps) {
       intensity3d="none"
       interactive={false}
       colorClasses={['bg-collab']}
-      className="text-collab-foreground"
+      className="rounded-full text-collab-foreground"
     />
   )
 }
