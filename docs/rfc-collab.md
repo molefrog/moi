@@ -93,16 +93,11 @@ is refused. Access supplies no membership, so the workspace directory keeps the 
 
 ## Users and connections
 
-A `UserProfile` returned to applets is `{ id, name?, color, avatar?, email? }`. `color` is one of
-`pink`, `orange`, `amber`, `lime`, `emerald`, `cyan`, `blue`, or `violet`. The host may omit it;
-moi derives a stable palette name from the ID before publishing the profile to applets or the
-presence socket. The shades are defined in [client/index.css](../client/index.css), so they can be
-tuned without changing profiles. Supplied color names take
-precedence and may repeat. Names
-may be omitted or empty; built-in labels fall back from a nonblank name to email, then ID, without
-changing the profile returned by hooks. IDs are stable attribution identifiers;
-profiles and browser injection do not provide authentication or workspace access enforcement.
-Those policies remain the outer host's responsibility.
+A `UserProfile` is `{ id, color, name?, email?, avatar? }`. Colors use the
+[user palette](../lib/collab/colors.ts), with shades defined in [client/index.css](../client/index.css).
+Hosts may omit color; moi derives it from the ID. Supplied colors take precedence and may repeat.
+Names are trimmed and blank names omitted. Built-in labels fall back to email, then ID.
+The outer host enforces authentication and workspace access.
 
 A `Connection` is `{ connectionId, userId, location, presence }`. One user can have multiple browser
 tabs. The server assigns connection IDs. `location` is `{ page, away? } | null`. Hidden

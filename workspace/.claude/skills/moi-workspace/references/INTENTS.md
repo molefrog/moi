@@ -6,8 +6,8 @@ such as a button click; moi handles the action in the workspace.
 
 ## Navigation and files
 
-Use the shared [workspace navigation convention](../SKILL.md#workspace-navigation) for addresses
-and query params. Use one resolver for workspace pages, files, and HTTP(S) addresses:
+Use [workspace addresses](../SKILL.md#workspace-navigation) and query params for pages.
+`resolveUrl` also accepts workspace files and HTTP(S) addresses:
 
 ```ts
 function navigate(url: string): void
@@ -25,14 +25,10 @@ const href = `moi:/views/orders?${query}`
 
 // Use the same address from an event handler.
 <button onClick={() => navigate(href)}>Open order</button>
-
-// Workspace files use the same resolver.
-<video src={resolveUrl('moi:/files/clips/intro.mp4')} controls />
 ```
 
-`moi:` addresses resolve to root-relative browser URLs. Files use the existing workspace stream;
-see [Files and assets](../SKILL.md#files-and-assets) for supported types and dynamic paths.
-`navigate` opens workspace pages within moi; files and HTTP(S) addresses open in the current browser tab.
+`navigate` opens workspace pages within moi and files or HTTP(S) URLs in the current browser tab.
+See [Files and assets](../SKILL.md#files-and-assets) for file examples and path encoding.
 
 ### View params and history
 

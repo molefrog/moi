@@ -8,8 +8,7 @@ membership changes to each browser. The bridge's types and validation rules live
 
 ## Bootstrap
 
-Put this script before moi's modules in Batiok's HTML shell. `getHostState` lets moi read the latest
-snapshot when its bridge starts, including changes that arrived during loading.
+Put this script before moi's modules in Batiok's HTML shell:
 
 ```js
 // Fill this from Batiok's authenticated session and workspace API.
@@ -24,16 +23,14 @@ window.moi ??= {}
 window.moi.collab = { getHostState: () => state }
 
 function publishState(next) {
-  // Once moi has installed its bridge, validate and publish before saving the snapshot.
+  // Validation may throw; keep the previous state in that case.
   window.moi.collab.setHostState?.(next)
   state = next
 }
 ```
 
-When moi initializes, it replaces the bootstrap object with its bridge and reads the snapshot from
-`getHostState`. After that, `publishState` calls `setHostState`. An invalid snapshot throws and leaves
-the previous one in place. The bridge dispatches `moi:collab-ready` when it is installed; Batiok can
-use that event to register an optional `setShareHandler` for invitation links.
+moi reads `getHostState` during initialization, then installs its bridge. Use `moi:collab-ready`
+to register an optional `setShareHandler` for invitation links.
 
 ## Publish changes
 
@@ -67,6 +64,5 @@ entries until they arrive. On sign-out, publish `{ currentUser: null, workspaces
 asynchronous responses before publishing either change. Batiok must enforce access separately from
 this display-data bridge.
 
-The current user and directories remain available when live presence is disabled. A ready directory
-does not imply its users are connected. Verify loading and empty directories, an offline user, profile
-updates, removal, account switching, and sign-out in the Batiok integration.
+Directories remain available when live presence is disabled. A ready directory does not imply
+its users are connected.

@@ -382,21 +382,16 @@ It's plain Bun — every Bun API is available with no setup: `bun:sqlite`, `Bun.
   ;<video src={resolveUrl('moi:/files/clips/intro.mp4')} controls />
   ```
 
-  `resolveUrl('moi:/files/...')` maps a **workspace-root-relative** file address to a streaming URL
-  (HTTP range — media seeks). Media/asset extensions only; `.env`, source, JSON and dotfiles are
-  rejected. File URLs also work at module load, before the applet bridge is attached.
+  Paths are relative to the workspace root. Files stream with HTTP range support for media seeking.
+  Only media/asset extensions are served; dotfiles, source, and JSON are rejected.
+  File URLs can be resolved at module load.
 
-  A `.server.ts` can return a plain workspace-relative path. Encode each segment when constructing
-  the address so spaces, `%`, `?`, and `#` in filenames work:
+  For a dynamic path, such as one returned by a server function, encode each segment:
 
   ```tsx
   const fileAddress = `moi:/files/${clip.file.split('/').map(encodeURIComponent).join('/')}`
   ;<video src={resolveUrl(fileAddress)} controls />
   ```
-
-Rule of thumb: small own art → `import`; structured data → `.server.ts` returns it; large/streamable
-media → `.server.ts` returns the **path**, encode its segments and render with
-`resolveUrl('moi:/files/...')`.
 
 ### Applet intents
 

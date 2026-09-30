@@ -3,7 +3,7 @@
 > Implemented. How an applet (widget/view) reaches the outside: bundled assets
 > it imports, server functions, and workspace files. One base, three transports.
 > Compiler: `server/applets/build-applet.ts`; serve/guards: `server/applets/index.ts`; routes:
-> `server/web.ts`.
+> `server/api.ts`.
 
 ## One base, swapped at serve
 
@@ -15,7 +15,7 @@ on-disk bundle is workspace-agnostic, and the served copy carries its base:
 %%MOI_APPLET_API_BASE%%  →  /api/workspaces/<id>
 ```
 
-`rpc` and `fs` are **workspace-scoped** — they hang off this base. Bundle files
+`rpc` and `files` are **workspace-scoped** — they hang off this base. Bundle files
 (entry/chunk/asset) are **applet-scoped** and don't need the sentinel; assets
 self-locate via `import.meta.url`. This replaces the `window.__MEI_WS__` global.
 
@@ -107,58 +107,18 @@ stub becomes `fetch(BASE + '/rpc/' + module + '/' + name, …)` (devalue in/out)
 replacing today's `/_rpc/<ws>/fn/…` and the global lookup.
 
 **Workspace files — `resolveUrl('moi:/files/...')`** (runtime, off disk). Resolves to
-`BASE + '/files/' + encodedPath`, streamed with HTTP range. A `.server.ts` can return a
-workspace-relative path; encode its segments when constructing the file address.
-The same resolver handles workspace pages and HTTP(S) addresses.
-
-## What the agent writes
-
-```tsx
-import logo from './logo.png'              // its own asset
-import { resolveUrl } from 'moi'         // browser URLs
-import { listClips } from './clips.server' // data + file paths
-
-const fileAddress = `moi:/files/${clip.file.split('/').map(encodeURIComponent).join('/')}`
-<img src={logo} />
-<video src={resolveUrl(fileAddress)} controls /> // clip.file = 'clips/001_….mp4'
-```
-
-Rule of thumb: own-code asset → `import`; small data → `.server.ts`; large/
-streamable file → `.server.ts` returns the **path**, encode its segments and render with
-`resolveUrl('moi:/files/...')`. File resolution also works before the applet bridge is attached.
+`BASE + '/files/' + encodedPath`, streamed with HTTP range. See
+[Files and assets](../workspace/.claude/skills/moi-workspace/SKILL.md#files-and-assets)
+for static and dynamic path examples.
 
 ## Types (editor DX only — the build needs none)
 
-The bundler resolves asset imports and `moi` without any declarations; types are
-only for the agent's editor / `tsc`. The base `.moi/base.d.ts`, scaffolded
-by `moi init`:
+`moi init` installs [base.d.ts](../server/applets/declarations/base.d.ts) as `.moi/base.d.ts`;
+`moi skill update` refreshes it. It declares the public `moi` API and bundled asset imports
+for editors and `moi check`. The bundler needs no declarations.
 
-```ts
-declare module 'moi' {
-  // required: build-provided module, Bun won't type it
-  export function resolveUrl(url: string): string
-  export function navigate(url: string): void
-  export type WidgetConfig = {
-    colSpan: 1 | 2 | 3 | 4
-    rowSpan: 1 | 2 | 3 | 4
-    requiredEnv?: string[]
-  }
-  export type ViewConfig = { title?: string; requiredEnv?: string[] }
-}
-declare module '*.png' {
-  const s: string
-  export default s
-} // optional: jpg/svg/webp…
-```
-
-- RPC types are free — the agent imports the real `.server.ts`, so signatures flow
-  from source (the build swaps it for the stub only at bundle time).
-- `moi` is the one that _must_ be declared (the build plugin provides the impl).
-- Image modules are optional: `bun-types` declares text/data formats
-  (txt/yaml/json5/html) but **not** images — add these only for squiggle-free asset
-  imports in the editor.
-- Keep the `.d.ts` at `.moi/` **root** — inside `widgets/`/`views/` it matches the
-  `.ts` build glob and would be compiled as an applet.
+RPC types come directly from the imported `.server.ts` source. Keep declarations at the `.moi/`
+root; files inside `widgets/` or `views/` are treated as applet sources.
 
 ## How it's built
 
