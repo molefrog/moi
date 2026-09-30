@@ -33,7 +33,7 @@ export type CollabPresenceEntry = {
 }
 
 const EMPTY_PRESENCE: readonly CollabPresenceEntry[] = []
-const channelKey = (surface: string, channel: string) => JSON.stringify([surface, channel])
+const channelKey = (appletId: string, channel: string) => JSON.stringify([appletId, channel])
 
 // Sockets and timers live in client.ts; this model owns ephemeral registrations.
 export class CollabStore {
@@ -48,8 +48,8 @@ export class CollabStore {
   getSnapshot = (): CollabConnectionState => this.state
   // User hooks never need cursor coordinates or other publication payloads.
   getUsersSnapshot = (): CollabConnectionState => this.usersState
-  getPresenceSnapshot = (surface: string, channel: string): readonly CollabPresenceEntry[] =>
-    this.channels.get(channelKey(surface, channel)) ?? EMPTY_PRESENCE
+  getPresenceSnapshot = (appletId: string, channel: string): readonly CollabPresenceEntry[] =>
+    this.channels.get(channelKey(appletId, channel)) ?? EMPTY_PRESENCE
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener)
     return () => {
@@ -128,7 +128,7 @@ export class CollabStore {
         )
           continue
         for (const registration of connection.presence) {
-          const key = channelKey(registration.surface, registration.channel)
+          const key = channelKey(registration.appletId, registration.channel)
           const entries = channels.get(key) ?? []
           entries.push({
             registrationId: registration.registrationId,

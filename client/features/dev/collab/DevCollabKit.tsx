@@ -64,7 +64,7 @@ const USERS: UserProfile[] = [
   { id: 'david', name: 'David Tibbitts', email: 'david@example.com', color: 'emerald' }
 ]
 const PAGE = 'kit'
-const SURFACE = 'view:kit'
+const APPLET_ID = 'view:kit'
 const TARGETS = [
   ['First task', presenceTarget('tasks', 'launch')],
   ['Second task', presenceTarget('tasks', 'notes')],
@@ -77,7 +77,7 @@ function registration(
   channel: string,
   value: CollabJsonValue
 ): CollabPresenceRegistration {
-  return { registrationId: `${userId}:${channel}`, surface: SURFACE, channel, value }
+  return { registrationId: `${userId}:${channel}`, appletId: APPLET_ID, channel, value }
 }
 
 function sampleConnections(target: string, tick = 0): Connection[] {
@@ -430,7 +430,7 @@ export function DevCollabKit() {
   }, [room, renamed, david])
   return (
     <CollabContext value={room}>
-      <AppletScope surface={SURFACE}>
+      <AppletScope appletId={APPLET_ID}>
         <div className="flex flex-col gap-10 border-t border-border pt-8">
           <header>
             <h2 className="text-base font-medium">Presence playground</h2>

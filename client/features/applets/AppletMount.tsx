@@ -26,7 +26,7 @@ export function AppletMount({ segment, name, version, children }: AppletMountPro
 
   return (
     <div data-applet={appletScope(segment, name)} className="size-full">
-      <AppletScope surface={`${segment === 'views' ? 'view' : 'widget'}:${name}`}>
+      <AppletScope appletId={`${segment === 'views' ? 'view' : 'widget'}:${name}`}>
         {children}
       </AppletScope>
     </div>

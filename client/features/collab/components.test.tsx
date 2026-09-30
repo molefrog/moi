@@ -34,7 +34,7 @@ function room(target = presenceTarget('task:42:title'), profile: UserProfile = p
         presence: [
           {
             registrationId: 'focus',
-            surface: 'view:board',
+            appletId: 'view:board',
             channel: presenceChannels.field(target),
             value: true
           }
@@ -46,7 +46,7 @@ function room(target = presenceTarget('task:42:title'), profile: UserProfile = p
 function render(backend: FakeCollabEngine, children: ReactNode, active = true) {
   return renderToStaticMarkup(
     <CollabContext value={backend}>
-      <AppletScope surface="view:board" active={active}>
+      <AppletScope appletId="view:board" active={active}>
         {children}
       </AppletScope>
     </CollabContext>
@@ -127,7 +127,7 @@ test.each([
         presence: [
           {
             registrationId: 'cursor',
-            surface: 'view:board',
+            appletId: 'view:board',
             channel: presenceChannels.cursor('board'),
             value: { x: 10, y: 20 }
           }
@@ -348,7 +348,7 @@ test('selection uses group scope while preserving flexible children', () => {
       presence: [
         {
           registrationId: 'selection',
-          surface: 'view:board',
+          appletId: 'view:board',
           channel: presenceChannels.selection(presenceTarget('tasks', '42')),
           value: true
         }

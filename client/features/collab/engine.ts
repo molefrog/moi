@@ -22,7 +22,7 @@ export type CollabEngineApi = {
   start: () => Unsubscribe
   getSnapshot: () => CollabConnectionState
   getUsersSnapshot: () => CollabConnectionState
-  getPresenceSnapshot: (surface: string, channel: string) => readonly CollabPresenceEntry[]
+  getPresenceSnapshot: (appletId: string, channel: string) => readonly CollabPresenceEntry[]
   subscribe: (listener: () => void) => Unsubscribe
   getCurrentUser: () => UserProfile | undefined
   subscribeCurrentUser: (listener: () => void) => Unsubscribe
@@ -73,8 +73,8 @@ export class CollabEngine implements CollabEngineApi {
     this.enabled ? this.client.store.getSnapshot() : DISCONNECTED_STATE
   getUsersSnapshot = (): CollabConnectionState =>
     this.enabled ? this.client.store.getUsersSnapshot() : DISCONNECTED_STATE
-  getPresenceSnapshot = (surface: string, channel: string): readonly CollabPresenceEntry[] =>
-    this.enabled ? this.client.store.getPresenceSnapshot(surface, channel) : EMPTY_PRESENCE
+  getPresenceSnapshot = (appletId: string, channel: string): readonly CollabPresenceEntry[] =>
+    this.enabled ? this.client.store.getPresenceSnapshot(appletId, channel) : EMPTY_PRESENCE
   subscribe = (listener: () => void): Unsubscribe =>
     this.enabled ? this.client.store.subscribe(listener) : noop
   getCurrentUser = getCurrentUser

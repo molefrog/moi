@@ -166,7 +166,7 @@ describe('collab process and socket integration', () => {
     a.send({
       type: 'presence:set',
       registrationId: 'focus',
-      surface: 'view:board',
+      appletId: 'view:board',
       channel: 'focus',
       value: { target: 'todo:42' }
     })
@@ -198,7 +198,7 @@ describe('collab process and socket integration', () => {
     client.send({
       type: 'presence:set',
       registrationId: 'cursor',
-      surface: 'view:board',
+      appletId: 'view:board',
       channel: 'cursor',
       value: { x: 12 }
     })

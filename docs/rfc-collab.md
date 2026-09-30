@@ -27,7 +27,7 @@ separately compiled bundle. Those functions read the host's workspace and applet
 React receives one `CollabEngine` per mounted workspace through `CollabProvider`. The engine owns
 transport lifecycle and exposes stable user and channel snapshots, so cursor-only traffic does not
 rerender profile readers or unrelated channels. Transport and registration storage remain private
-implementation details. `AppletScope` supplies only the surface and active mount lifetime. There is
+implementation details. `AppletScope` supplies only the applet ID and active mount lifetime. There is
 no separate enabled context or backend adapter; the playground supplies the same engine contract.
 
 ## Enable and install
@@ -144,13 +144,13 @@ The Batiok bootstrap example and update steps are in
 | `useWorkspaceUsersAvailability()`    | Directory availability: `unavailable` (live/dev fallback), `loading`, or `ready` (possibly empty).              |
 | `useWorkspaceUsers({ status? })`     | Complete workspace directory, including self and offline users; optional `active`, `away`, or `offline` filter. |
 | `usePeers({ scope?, status? })`      | Other connected users; `scope` is `page` or `workspace`, `status` is `active` or `away`.                        |
-| `usePresence(channel)`               | Read-only array of `{ connectionId, userId, value }` for other connections on this page and applet surface.     |
+| `usePresence(channel)`               | Read-only array of `{ connectionId, userId, value }` for other connections on this page and applet.             |
 | `usePublishPresence(channel, value)` | Publish the current JSON value reactively while mounted and visible. Returns nothing.                           |
 
 Reading presence never creates a presence registration. Publication owns one registration per
 mounted hook and replaces that registration's whole value. Hidden views, browser tabs, outgoing
 builds, unmounts, and Strict Mode cleanup release registrations. Presence is restored after reconnect.
-Custom channel names are scoped by applet surface (`view:<name>` or `widget:<name>`); they are not
+Custom channel names are scoped by applet ID (`view:<name>` or `widget:<name>`); they are not
 a persistent key/value store. Channel values must be JSON and fit within 4 KiB.
 
 | Component        | Contract                                                                                |
@@ -180,7 +180,7 @@ registration. Reusing a modal for another record must change its group ID or loc
 Groups add no DOM or presence publication; ordinary elements own layout. Each group also has a
 separate local animation identity so avatars do not glide between unrelated rendered groups which
 happen to share semantic IDs. Page and applet isolation remain outside this namespace. Group IDs
-scope frame, gutter, and selection targets; custom presence channels and cursor surface names keep
+scope frame, gutter, and selection targets; custom presence channels and cursor-area IDs keep
 their existing applet scope. Built-in target wrappers also provide the resolved cursor anchor.
 
 `useWorkspaceUsers` enumerates the full host directory, while `usePeers` enumerates connections

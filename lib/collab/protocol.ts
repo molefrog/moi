@@ -68,7 +68,7 @@ export function isCollabClientMessage(value: unknown): value is CollabClientMess
     case 'presence:set':
       return (
         isCollabString(value.registrationId) &&
-        isCollabString(value.surface) &&
+        isCollabString(value.appletId) &&
         isCollabString(value.channel) &&
         isCollabJson(value.value) &&
         new TextEncoder().encode(JSON.stringify(value.value)).length <= COLLAB_MAX_PRESENCE_BYTES

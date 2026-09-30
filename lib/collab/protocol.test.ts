@@ -12,7 +12,7 @@ const profile = { id: 'anna', name: 'Anna', color: 'violet' } as const
 const presence = {
   type: 'presence:set',
   registrationId: 'field',
-  surface: 'board',
+  appletId: 'board',
   channel: 'focus'
 }
 

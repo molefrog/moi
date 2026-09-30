@@ -25,7 +25,7 @@ import type { WorkspaceUser, UsePeersOptions, UseWorkspaceUsersOptions } from '.
 import { createPresencePublisher } from './presence-publisher'
 
 export type { WorkspaceUser, UsePeersOptions, UseWorkspaceUsersOptions } from './users'
-type Mount = { active: boolean; surface: string }
+type Mount = { active: boolean; appletId: string }
 export const CollabContext = createContext<CollabEngineApi>(NO_ENGINE)
 const MountContext = createContext<Mount | null>(null)
 installHostApi()
@@ -60,10 +60,13 @@ export function CollabProvider({ workspaceId, enabled, children }: CollabProvide
   return <CollabContext value={engine}>{children}</CollabContext>
 }
 
-export type AppletScopeProps = { surface: string; active?: boolean; children: ReactNode }
-export function AppletScope({ surface, active = true, children }: AppletScopeProps) {
+export type AppletScopeProps = { appletId: string; active?: boolean; children: ReactNode }
+export function AppletScope({ appletId, active = true, children }: AppletScopeProps) {
   const { enabled } = useCollabEngine()
-  const mount = useMemo(() => ({ active: enabled && active, surface }), [enabled, active, surface])
+  const mount = useMemo(
+    () => ({ active: enabled && active, appletId }),
+    [enabled, active, appletId]
+  )
   return <MountContext value={mount}>{children}</MountContext>
 }
 
@@ -157,10 +160,10 @@ export function usePresence<T extends CollabJsonValue>(channel: string): Presenc
 export function usePresenceChannel<T extends CollabJsonValue>(channel: string): PresenceValue<T>[] {
   const { users, engine } = useUsersSource()
   const mount = useMount()
-  const surface = mount?.surface ?? ''
+  const appletId = mount?.appletId ?? ''
   const snapshot = useCallback(
-    () => engine.getPresenceSnapshot(surface, channel),
-    [engine, surface, channel]
+    () => engine.getPresenceSnapshot(appletId, channel),
+    [engine, appletId, channel]
   )
   const entries = useSyncExternalStore(engine.subscribe, snapshot, snapshot)
   return useMemo(() => {
@@ -187,10 +190,10 @@ export function usePresencePublisher<T extends CollabJsonValue>(
   const [registrationId] = useState(() => crypto.randomUUID())
   const valueRef = useRef(initialValue)
   const live = useRef(false)
-  const surface = mount?.surface ?? ''
+  const appletId = mount?.appletId ?? ''
   const registration = useMemo(
-    () => createPresencePublisher<T>(engine, { registrationId, surface, channel }, isPresent),
-    [engine, registrationId, surface, channel, isPresent]
+    () => createPresencePublisher<T>(engine, { registrationId, appletId, channel }, isPresent),
+    [engine, registrationId, appletId, channel, isPresent]
   )
   const publish = useCallback(() => {
     registration.publish(

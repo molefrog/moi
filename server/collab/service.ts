@@ -105,8 +105,8 @@ export class CollabService {
         const index = presence.findIndex(item => item.registrationId === message.registrationId)
         if (index < 0 && presence.length >= COLLAB_MAX_REGISTRATIONS)
           throw new Error('Too many presence registrations')
-        const { registrationId, surface, channel, value } = message
-        const registration = { registrationId, surface, channel, value }
+        const { registrationId, appletId, channel, value } = message
+        const registration = { registrationId, appletId, channel, value }
         if (index >= 0) presence[index] = registration
         else presence.push(registration)
         this.scheduleConnections()

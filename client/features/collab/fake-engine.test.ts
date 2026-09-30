@@ -6,7 +6,7 @@ const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
 const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
 const field = {
   registrationId: 'field',
-  surface: 'view:board',
+  appletId: 'view:board',
   channel: 'field:title',
   value: true
 }

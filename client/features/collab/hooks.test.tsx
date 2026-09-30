@@ -61,7 +61,7 @@ test('observers resolve users and read presence without creating a publisher', (
         presence: [
           {
             registrationId: 'field',
-            surface: 'view:board',
+            appletId: 'view:board',
             channel: 'custom:editing',
             value: 'title'
           }
@@ -79,7 +79,7 @@ test('observers resolve users and read presence without creating a publisher', (
   }
   const html = renderToStaticMarkup(
     <CollabContext value={backend}>
-      <AppletScope surface="view:board">
+      <AppletScope appletId="view:board">
         <Observer />
       </AppletScope>
     </CollabContext>
@@ -267,7 +267,7 @@ test('away peers remain on the page while their focus presence is hidden', () =>
         presence: [
           {
             registrationId: 'focus',
-            surface: 'view:board',
+            appletId: 'view:board',
             channel: 'custom:editing',
             value: 'title'
           }
@@ -284,7 +284,7 @@ test('away peers remain on the page while their focus presence is hidden', () =>
     decodeURIComponent(
       renderToStaticMarkup(
         <CollabContext value={engine}>
-          <AppletScope surface="view:board">
+          <AppletScope appletId="view:board">
             <Away />
           </AppletScope>
         </CollabContext>

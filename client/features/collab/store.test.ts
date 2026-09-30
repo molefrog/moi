@@ -18,7 +18,7 @@ const welcome = {
 }
 const field = {
   registrationId: 'field',
-  surface: 'view:board',
+  appletId: 'view:board',
   channel: 'field:title',
   value: true
 }

@@ -71,7 +71,7 @@ describe('collab service', () => {
         type: 'presence:set',
         registrationId,
         channel: 'focus',
-        surface: 'view:board',
+        appletId: 'view:board',
         value: { focused: true }
       })
     }
@@ -154,14 +154,14 @@ describe('collab service', () => {
     service.receive('one', {
       type: 'presence:set',
       registrationId: 'cursor',
-      surface: 'board',
+      appletId: 'board',
       channel: 'cursor',
       value: { x: 10 }
     })
     service.receive('one', {
       type: 'presence:set',
       registrationId: 'cursor',
-      surface: 'board',
+      appletId: 'board',
       channel: 'cursor',
       value: { x: 20 }
     })
@@ -191,7 +191,7 @@ describe('collab service', () => {
     join('one')
     const registration = {
       type: 'presence:set' as const,
-      surface: 'board',
+      appletId: 'board',
       channel: 'focus',
       value: true
     }

@@ -16,7 +16,7 @@ export type CollabLocation = { page: string; status: ConnectionStatus }
 
 export type CollabPresenceRegistration = {
   registrationId: string
-  surface: string
+  appletId: string
   channel: string
   value: CollabJsonValue
 }

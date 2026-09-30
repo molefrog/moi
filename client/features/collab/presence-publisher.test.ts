@@ -29,7 +29,7 @@ function room() {
         setPresence: registration => store.setPresence(registration),
         deletePresence: id => store.deletePresence(id)
       },
-      { registrationId, surface: 'view:board', channel },
+      { registrationId, appletId: 'view:board', channel },
       isPresent
     )
   return { store, sent, publisher }
@@ -43,7 +43,7 @@ test('hundreds of idle built-in controls leave capacity for the focused control'
   for (let index = 0; index < 100; index++) {
     fields[index]!.publish(false, true)
     publisher(`selection-${index}`, `selection:task-${index}`, hasPresence).publish(false, true)
-    publisher(`cursor-${index}`, `cursor:surface-${index}`, hasPresence).publish(null, true)
+    publisher(`cursor-${index}`, `cursor:area-${index}`, hasPresence).publish(null, true)
   }
   expect(sent).toEqual([])
   fields[99]!.publish(true, true)
@@ -51,7 +51,7 @@ test('hundreds of idle built-in controls leave capacity for the focused control'
     {
       type: 'presence:set',
       registrationId: 'field-99',
-      surface: 'view:board',
+      appletId: 'view:board',
       channel: 'field:task-99',
       value: true
     }

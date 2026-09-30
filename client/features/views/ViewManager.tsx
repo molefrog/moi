@@ -226,7 +226,7 @@ function ViewFrame({ view, build, params, entering, thumbnailTarget }: ViewFrame
           workspaceId={workspaceId}
           resetKey={build.version}
         >
-          <AppletScope surface={`view:${view.id}`} active={thumbnailTarget === true}>
+          <AppletScope appletId={`view:${view.id}`} active={thumbnailTarget === true}>
             <build.Component params={params} />
           </AppletScope>
         </WidgetErrorBoundary>

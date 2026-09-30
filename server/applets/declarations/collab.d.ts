@@ -50,6 +50,7 @@ declare module 'moi/collab' {
 
   export type ActivityProps = { scope?: 'page' | 'workspace'; className?: string }
   export function Activity(props: ActivityProps): ReactElement
+  // Identifies a cursor area within the applet; defaults to 'default'.
   export type CursorsProps = { id?: string; children: ReactNode; className?: string }
   export function Cursors(props: CursorsProps): ReactElement
 

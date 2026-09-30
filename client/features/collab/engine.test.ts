@@ -76,7 +76,7 @@ test('runtime without a current user stays idle and never joins anonymously', ()
   engine.setLocation({ page: 'view:board', status: 'active' })
   engine.setPresence({
     registrationId: 'field',
-    surface: 'board',
+    appletId: 'board',
     channel: 'focus',
     value: 'title'
   })
@@ -130,13 +130,13 @@ test('reconnecting restores current presence and removed registrations stay gone
   sockets[0]!.open()
   engine.setPresence({
     registrationId: 'kept',
-    surface: 'board',
+    appletId: 'board',
     channel: 'focus',
     value: true
   })
   engine.setPresence({
     registrationId: 'removed',
-    surface: 'board',
+    appletId: 'board',
     channel: 'focus',
     value: true
   })
@@ -149,7 +149,7 @@ test('reconnecting restores current presence and removed registrations stay gone
     {
       type: 'presence:set',
       registrationId: 'kept',
-      surface: 'board',
+      appletId: 'board',
       channel: 'focus',
       value: true
     }
@@ -194,7 +194,7 @@ test('disabled engine exposes host profiles and readiness without starting a tra
   engine.setLocation({ page: 'overview', status: 'active' })
   engine.setPresence({
     registrationId: 'focus',
-    surface: 'view:board',
+    appletId: 'view:board',
     channel: 'field:title',
     value: true
   })
