@@ -31,9 +31,6 @@ declare module 'moi/collab' {
   export function usePeers(options?: UsePeersOptions): WorkspaceUser[]
   // Full workspace directory, including your own user and offline users.
   export function useWorkspaceUsers(options?: UseWorkspaceUsersOptions): WorkspaceUser[]
-  // Unavailable uses live/dev profiles; loading differs from a ready empty directory.
-  export type WorkspaceUsersAvailability = 'unavailable' | 'loading' | 'ready'
-  export function useWorkspaceUsersAvailability(): WorkspaceUsersAvailability
 
   export type PresenceValue<T> = { connectionId: string; userId: string; value: T }
   // Reading never registers or publishes presence. Values belong to connections.

@@ -19,6 +19,11 @@ const descriptors = new Map(
 )
 let instance = 0
 
+function readyDirectory(directory: WorkspaceDirectory | undefined) {
+  if (directory?.status !== 'ready') throw new Error('Expected a ready directory.')
+  return directory
+}
+
 afterEach(() => {
   for (const [key, descriptor] of descriptors) {
     if (descriptor) Object.defineProperty(globalThis, key, descriptor)
@@ -62,13 +67,13 @@ test('current user starts empty and persists only an explicitly enabled dev prof
   expect(collab.getCurrentUser()).toBeUndefined()
   expect(collab.getCurrentUserSource()).toBeUndefined()
   expect(collab.getHostState()).toBeUndefined()
-  expect(collab.getWorkspaceDirectory('a')).toEqual({ status: 'unavailable', users: [] })
-  expect(collab.getWorkspaceDirectory('a').status).toBe('unavailable')
+  expect(collab.getWorkspaceDirectory('a')).toBeUndefined()
   expect(collab.saved.has(PROFILE_KEY)).toBe(false)
   collab.setDevUser(alice)
   expect(collab.getCurrentUser()).toEqual(alice)
   expect(collab.getCurrentUserSource()).toBe('dev')
   expect(collab.getHostState()).toBeUndefined()
+  expect(collab.getWorkspaceDirectory('a')).toBeUndefined()
   expect(JSON.parse(collab.saved.get(PROFILE_KEY) ?? 'null')).toEqual(alice)
 })
 
@@ -92,7 +97,7 @@ test.each([
   const collab = await setup(getter, alice)
   expect(collab.getCurrentUser()).toEqual(expected)
   expect(collab.getCurrentUserSource()).toBe('external')
-  expect(collab.getWorkspaceDirectory('a')).toEqual({ status: 'loading', users: [] })
+  expect(collab.getWorkspaceDirectory('a')).toEqual({ status: 'loading' })
   collab.setDevUser(alice)
   expect(collab.getCurrentUser()).toEqual(expected)
   expect(JSON.parse(collab.saved.get(PROFILE_KEY) ?? 'null')).toEqual(alice)
@@ -112,6 +117,7 @@ test('Cloudflare Access replaces a saved test user, locks edits, and ignores rep
   collab.setDevUser(bob)
   expect(collab.getCurrentUser()).toEqual(carol)
   expect(collab.getCurrentUserSource()).toBe('cloudflare-access')
+  expect(collab.getWorkspaceDirectory('a')).toBeUndefined()
   expect(notifications).toBe(1)
   collab.setProxyUserState({ provider: 'cloudflare-access' })
   expect(collab.getCurrentUser()).toBeUndefined()
@@ -149,14 +155,15 @@ test('preloaded state exposes stable copied current user and directories across 
   expect(collab.getHostState()).toBe(state)
   expect(state).not.toBe(input)
   expect(Object.is(collab.getWorkspaceDirectory('a'), state.workspaces.a)).toBe(true)
-  expect(collab.getWorkspaceDirectory('b')).toEqual({ status: 'loading', users: [] })
-  expect(collab.getWorkspaceDirectory('unknown')).toEqual({ status: 'loading', users: [] })
-  expect(collab.getWorkspaceDirectory('unknown').users).toEqual([])
+  expect(collab.getWorkspaceDirectory('b')).toEqual({ status: 'loading' })
+  expect(collab.getWorkspaceDirectory('unknown')).toEqual({ status: 'loading' })
+  expect(collab.getWorkspaceDirectory('unknown')).toBe(collab.getWorkspaceDirectory('b'))
+  expect(collab.getWorkspaceDirectory('b')).toBe(state.workspaces.b)
   expect(reads).toBe(1)
   expect(Object.isFrozen(state)).toBe(true)
   expect(Object.isFrozen(state.currentUser)).toBe(true)
   expect(Object.isFrozen(state.workspaces)).toBe(true)
-  const directory = collab.getWorkspaceDirectory('a')
+  const directory = readyDirectory(collab.getWorkspaceDirectory('a'))
   expect(Object.isFrozen(directory)).toBe(true)
   expect(Object.isFrozen(directory.users)).toBe(true)
   expect(Object.isFrozen(directory.users[1])).toBe(true)
@@ -173,22 +180,26 @@ test('host profiles without colors resolve consistently, while supplied colors w
   const aliceColor = colorForId('alice')
   const bobColor = colorForId('bob')
   expect(collab.getCurrentUser()).toEqual({ id: 'alice', name: 'Alice', color: aliceColor })
-  expect(collab.getWorkspaceDirectory('first').users).toEqual([
+  expect(readyDirectory(collab.getWorkspaceDirectory('first')).users).toEqual([
     { id: 'alice', name: 'Alice', color: aliceColor },
     { id: 'bob', color: bobColor }
   ])
-  expect(collab.getWorkspaceDirectory('second').users).toEqual(
-    collab.getWorkspaceDirectory('first').users
+  expect(readyDirectory(collab.getWorkspaceDirectory('second')).users).toEqual(
+    readyDirectory(collab.getWorkspaceDirectory('first')).users
   )
-  expect(collab.getWorkspaceDirectory('first').users?.[0]).toBe(collab.getCurrentUser()!)
-  expect(collab.getWorkspaceDirectory('second').users?.[0]).toBe(collab.getCurrentUser()!)
+  expect(readyDirectory(collab.getWorkspaceDirectory('first')).users?.[0]).toBe(
+    collab.getCurrentUser()!
+  )
+  expect(readyDirectory(collab.getWorkspaceDirectory('second')).users?.[0]).toBe(
+    collab.getCurrentUser()!
+  )
   collab.setHostState({
     currentUser: { id: 'alice', color: 'blue' },
     workspaces: {
       first: { status: 'ready', users: [{ id: 'alice' }, { id: 'bob', color: 'amber' }] }
     }
   })
-  expect(collab.getWorkspaceDirectory('first').users).toEqual([
+  expect(readyDirectory(collab.getWorkspaceDirectory('first')).users).toEqual([
     { id: 'alice', color: 'blue' },
     { id: 'bob', color: 'amber' }
   ])
@@ -201,8 +212,8 @@ test('every subscriber sees the complete new state after an atomic replacement',
   }))
   const observed: Array<{
     current: UserProfile | undefined
-    a: WorkspaceDirectory
-    b: WorkspaceDirectory
+    a: WorkspaceDirectory | undefined
+    b: WorkspaceDirectory | undefined
     host: HostState | undefined
   }> = []
   const read = () => {
@@ -248,17 +259,25 @@ test('the current user supplies the same own profile in every membership list wi
       c: { status: 'ready', users: [bob] }
     }
   })
-  expect(collab.getWorkspaceDirectory('a').users?.[0]).toBe(collab.getCurrentUser()!)
-  expect(collab.getWorkspaceDirectory('b').users?.[0]).toBe(collab.getCurrentUser()!)
-  expect(collab.getWorkspaceDirectory('a').users?.[0]?.name).toBe('Alicia')
-  expect(collab.getWorkspaceDirectory('c').users).toEqual([bob])
+  expect(readyDirectory(collab.getWorkspaceDirectory('a')).users?.[0]).toBe(
+    collab.getCurrentUser()!
+  )
+  expect(readyDirectory(collab.getWorkspaceDirectory('b')).users?.[0]).toBe(
+    collab.getCurrentUser()!
+  )
+  expect(readyDirectory(collab.getWorkspaceDirectory('a')).users?.[0]?.name).toBe('Alicia')
+  expect(readyDirectory(collab.getWorkspaceDirectory('c')).users).toEqual([bob])
   collab.setHostState({
     currentUser: { ...alice, name: 'Alice updated again' },
     workspaces: collab.getHostState()!.workspaces
   })
-  expect(collab.getWorkspaceDirectory('a').users?.[0]?.name).toBe('Alice updated again')
-  expect(collab.getWorkspaceDirectory('b').users?.[0]).toBe(collab.getCurrentUser()!)
-  expect(collab.getWorkspaceDirectory('c').users).toEqual([bob])
+  expect(readyDirectory(collab.getWorkspaceDirectory('a')).users?.[0]?.name).toBe(
+    'Alice updated again'
+  )
+  expect(readyDirectory(collab.getWorkspaceDirectory('b')).users?.[0]).toBe(
+    collab.getCurrentUser()!
+  )
+  expect(readyDirectory(collab.getWorkspaceDirectory('c')).users).toEqual([bob])
 })
 
 test('host snapshots preserve nameless current and other users without inventing profile names', async () => {
@@ -286,7 +305,7 @@ test('host snapshots preserve nameless current and other users without inventing
   })
   expect(collab.getCurrentUser()).toEqual(self)
   expect(Object.hasOwn(collab.getCurrentUser()!, 'name')).toBe(false)
-  const users = collab.getWorkspaceDirectory('a').users!
+  const users = readyDirectory(collab.getWorkspaceDirectory('a')).users!
   expect(users).toEqual([
     self,
     other,
@@ -300,7 +319,9 @@ test('host snapshots preserve nameless current and other users without inventing
     workspaces: collab.getHostState()!.workspaces
   })
   expect(collab.getCurrentUser()).toEqual(self)
-  expect(collab.getWorkspaceDirectory('a').users?.[0]).toBe(collab.getCurrentUser()!)
+  expect(readyDirectory(collab.getWorkspaceDirectory('a')).users?.[0]).toBe(
+    collab.getCurrentUser()!
+  )
 })
 
 test('optional names and colors still reject invalid values, while ids remain required', async () => {
@@ -347,15 +368,14 @@ test('loading, empty, removed workspaces, and removed members remain distinct an
       members: { status: 'ready', users: [alice, bob] }
     }
   })
-  expect(collab.getWorkspaceDirectory('loading').status).toBe('loading')
+  expect(collab.getWorkspaceDirectory('loading')).toEqual({ status: 'loading' })
   expect(collab.getWorkspaceDirectory('empty')).toEqual({ status: 'ready', users: [] })
   collab.setHostState({
     currentUser: alice,
     workspaces: { members: { status: 'ready', users: [] } }
   })
   expect(collab.getWorkspaceDirectory('members')).toEqual({ status: 'ready', users: [] })
-  expect(collab.getWorkspaceDirectory('empty').status).toBe('loading')
-  expect(collab.getWorkspaceDirectory('members').users).toEqual([])
+  expect(collab.getWorkspaceDirectory('empty')).toEqual({ status: 'loading' })
 })
 
 test('sign-out atomically clears directories and remains authoritative over a saved dev user', async () => {
@@ -372,7 +392,7 @@ test('sign-out atomically clears directories and remains authoritative over a sa
   expect(collab.getCurrentUser()).toBeUndefined()
   expect(collab.getCurrentUserSource()).toBe('external')
   expect(collab.getHostState()).toEqual({ workspaces: {} })
-  expect(collab.getWorkspaceDirectory('a').users).toEqual([])
+  expect(collab.getWorkspaceDirectory('a')).toEqual({ status: 'loading' })
   expect(observed.at(-1)).toBe(collab.getHostState())
   unsubscribe()
   collab.setHostState({ currentUser: bob, workspaces: {} })
@@ -439,9 +459,9 @@ test.each(['__proto__', 'constructor', 'toString'])(
     user.name = 'Changed outside'
     users.push(alice)
     expect(collab.getCurrentUser()?.name).toBe('Alice')
-    expect(collab.getWorkspaceDirectory(id).users).toEqual([{ ...bob, id }])
-    expect(collab.getWorkspaceDirectory('ordinary').users).toEqual([alice])
-    expect(collab.getWorkspaceDirectory('hasOwnProperty').status).toBe('loading')
+    expect(readyDirectory(collab.getWorkspaceDirectory(id)).users).toEqual([{ ...bob, id }])
+    expect(readyDirectory(collab.getWorkspaceDirectory('ordinary')).users).toEqual([alice])
+    expect(collab.getWorkspaceDirectory('hasOwnProperty')).toEqual({ status: 'loading' })
     collab.setHostState({
       currentUser: collab.getCurrentUser(),
       workspaces: {
@@ -449,8 +469,8 @@ test.each(['__proto__', 'constructor', 'toString'])(
         [id]: { status: 'ready', users: [alice] }
       }
     })
-    expect(collab.getWorkspaceDirectory(id).users).toEqual([alice])
-    expect(collab.getWorkspaceDirectory('ordinary').users).toEqual([alice])
+    expect(readyDirectory(collab.getWorkspaceDirectory(id)).users).toEqual([alice])
+    expect(readyDirectory(collab.getWorkspaceDirectory('ordinary')).users).toEqual([alice])
   }
 )
 

@@ -26,7 +26,7 @@ import { Avatar, AvatarFallback } from '@/ui-components/avatar'
 
 import { User } from './user'
 import { pageFromPath, useCollabEnabled } from '../provider'
-import { useConnectionState, useWorkspaceUsers, useWorkspaceUsersAvailability } from '../hooks'
+import { useConnectionState, useWorkspaceUsers, useWorkspaceDirectory } from '../hooks'
 import {
   getCurrentUser,
   getCurrentUserSource,
@@ -56,7 +56,7 @@ export function WorkspaceCollabToolbar({
   const enabled = useCollabEnabled()
   const state = useConnectionState()
   const workspaceUsers = useWorkspaceUsers()
-  const directoryStatus = useWorkspaceUsersAvailability()
+  const directory = useWorkspaceDirectory()
   const currentUser = useSyncExternalStore(
     subscribeCurrentUserStore,
     getCurrentUser,
@@ -155,7 +155,7 @@ export function WorkspaceCollabToolbar({
             </ul>
           ) : (
             <p className="px-2 pb-1 text-xs text-muted-foreground">
-              {directoryStatus === 'loading'
+              {directory?.status === 'loading'
                 ? 'Loading workspace users…'
                 : 'No other workspace users to show.'}
             </p>

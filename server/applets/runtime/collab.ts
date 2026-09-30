@@ -29,7 +29,6 @@ const fallback = {
   useUser: () => undefined,
   usePeers: empty,
   useWorkspaceUsers: empty,
-  useWorkspaceUsersAvailability: () => 'unavailable' as const,
   usePresence<T extends JsonValue>(_channel: string): PresenceValue<T>[] {
     return []
   },
@@ -67,9 +66,6 @@ export function useUser(id: string) {
 }
 export function useWorkspaceUsers(options?: UseWorkspaceUsersOptions) {
   return api().useWorkspaceUsers(options)
-}
-export function useWorkspaceUsersAvailability() {
-  return api().useWorkspaceUsersAvailability()
 }
 export function usePresence<T extends JsonValue>(channel: string) {
   return api().usePresence<T>(channel)

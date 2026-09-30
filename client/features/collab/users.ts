@@ -31,9 +31,9 @@ export function userStatus(connections: readonly Connection[], id: string): User
 export function workspaceProfiles(
   liveUsers: readonly UserProfile[],
   self: UserProfile | undefined,
-  directory: readonly UserProfile[] | null
+  directory: readonly UserProfile[] | undefined
 ): readonly UserProfile[] {
-  if (directory !== null) return directory
+  if (directory !== undefined) return directory
   const users = new Map(liveUsers.map(user => [user.id, user]))
   if (self) users.set(self.id, self)
   return [...users.values()]

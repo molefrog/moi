@@ -34,7 +34,6 @@ who is connected.
 | `useMe()`                          | The current user.                                                   |
 | `useUser(id)`                      | A user by ID, including an offline user.                            |
 | `useWorkspaceUsers()`              | All available workspace users, including you.                       |
-| `useWorkspaceUsersAvailability()`  | Whether the user directory is `loading`, `ready`, or `unavailable`. |
 | `usePeers()`                       | Other connected users on the current page.                          |
 | `usePeers({ scope: 'workspace' })` | Other connected users anywhere in the workspace.                    |
 
@@ -46,8 +45,8 @@ not idle time. A user on another page can still be active.
 and accepts an `active` or `away` status filter.
 
 `useMe()` and `useUser(id)` return `undefined` when the user cannot be resolved, including while
-the directory loads. A `ready` directory can be empty. When it is `unavailable`, user lists fall
-back to your profile and connected users and cannot discover offline users. Applets read profiles;
+the directory loads. A supplied directory can be empty. When no directory is supplied, user lists
+fall back to your profile and connected users and cannot discover offline users. Applets read profiles;
 the host owns profile updates and workspace membership.
 
 ## Presence

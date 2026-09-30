@@ -1,27 +1,19 @@
 import { isUserProfile } from '@/lib/collab/protocol'
 import { colorForId, isUserColor } from '@/lib/collab/colors'
 import type { AuthProvider, ProxyUserState, UserProfile } from '@/lib/collab/types'
-import type { WorkspaceUsersAvailability } from 'moi/collab'
 
 export type ShareContext = { workspaceId: string; url: string }
 export type ShareHandler = (context: ShareContext) => Promise<{ url: string }>
 export type UserProfileInput = Omit<UserProfile, 'color'> & { color?: UserProfile['color'] }
+export type WorkspaceDirectory<Profile = UserProfile> =
+  | { readonly status: 'loading' }
+  | { readonly status: 'ready'; readonly users: readonly Profile[] }
 type State<Profile> = {
   readonly currentUser?: Profile
-  readonly workspaces: Readonly<
-    Record<
-      string,
-      | { readonly status: 'loading' }
-      | { readonly status: 'ready'; readonly users: readonly Profile[] }
-    >
-  >
+  readonly workspaces: Readonly<Record<string, WorkspaceDirectory<Profile>>>
 }
 export type HostStateInput = State<UserProfileInput>
 export type HostState = State<UserProfile>
-export type WorkspaceDirectory = {
-  readonly status: WorkspaceUsersAvailability
-  readonly users: readonly UserProfile[]
-}
 export type HostApi = {
   getHostState: () => HostState | undefined
   setHostState: (state: HostStateInput) => void
@@ -41,17 +33,8 @@ let currentUserSource: CurrentUserSource | undefined
 const listeners = new Set<() => void>()
 const workspaceListeners = new Map<string, Set<() => void>>()
 const hostListeners = new Set<() => void>()
-const EMPTY_USERS: readonly UserProfile[] = Object.freeze([])
 const EMPTY_WORKSPACES = Object.freeze({})
-const LOADING_HOST_DIRECTORY = Object.freeze({ status: 'loading' as const })
-const UNAVAILABLE_DIRECTORY: WorkspaceDirectory = Object.freeze({
-  status: 'unavailable',
-  users: EMPTY_USERS
-})
-const LOADING_DIRECTORY: WorkspaceDirectory = Object.freeze({
-  status: 'loading',
-  users: EMPTY_USERS
-})
+const LOADING_DIRECTORY = Object.freeze({ status: 'loading' as const })
 let hostState: HostState | undefined
 
 export function normalizeUserProfile(value: UserProfileInput): UserProfile {
@@ -97,7 +80,7 @@ function normalizeHostState(value: HostStateInput): HostState {
   const entries = Object.entries(value.workspaces).map(([id, directory]) => {
     if (!id.trim() || !directory || typeof directory !== 'object')
       throw new Error('Invalid workspace directory.')
-    if (directory.status === 'loading') return [id, LOADING_HOST_DIRECTORY] as const
+    if (directory.status === 'loading') return [id, LOADING_DIRECTORY] as const
     if (directory.status !== 'ready') throw new Error('Invalid workspace directory status.')
     const profiles = normalizeWorkspaceUsers(directory.users)
     // The viewer has one global profile; membership is still workspace-specific.
@@ -117,12 +100,12 @@ export function getHostState(): HostState | undefined {
   return hostState
 }
 
-export function getWorkspaceDirectory(workspaceId: string): WorkspaceDirectory {
-  if (!hostState) return UNAVAILABLE_DIRECTORY
+export function getWorkspaceDirectory(workspaceId: string): WorkspaceDirectory | undefined {
+  if (!hostState) return undefined
   const directory = Object.hasOwn(hostState.workspaces, workspaceId)
     ? hostState.workspaces[workspaceId]
     : undefined
-  return directory?.status === 'ready' ? directory : LOADING_DIRECTORY
+  return directory ?? LOADING_DIRECTORY
 }
 
 export function setHostState(next: HostStateInput): void {

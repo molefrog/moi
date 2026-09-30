@@ -15,8 +15,8 @@ export type FakeEngineOptions = {
 }
 export type FakeEngine = CollabEngineApi & {
   setOtherConnections: (otherConnections: Connection[]) => void
-  setUsers: (users: readonly UserProfile[] | null) => void
-  setDirectoryStatus: (status: WorkspaceDirectory['status']) => void
+  setUsers: (users: readonly UserProfile[] | undefined) => void
+  setDirectoryStatus: (status: WorkspaceDirectory['status'] | undefined) => void
 }
 
 export function createFakeEngine({
@@ -24,17 +24,19 @@ export function createFakeEngine({
   page = 'preview',
   otherConnections = [],
   users,
-  directoryStatus = users === undefined ? 'unavailable' : 'ready'
+  directoryStatus = users === undefined ? undefined : 'ready'
 }: FakeEngineOptions): FakeEngine {
   const store = new CollabStore()
   const presence = new Map<string, PresenceRegistration>()
   const userListeners = new Set<() => void>()
-  const directory = users === undefined ? null : normalizeWorkspaceUsers(users)
+  const directory = users === undefined ? undefined : normalizeWorkspaceUsers(users)
   let profiles = directory ?? (self ? [self] : [])
-  let directorySnapshot: WorkspaceDirectory = {
-    status: directoryStatus,
-    users: directoryStatus === 'ready' ? (directory ?? []) : []
-  }
+  let directorySnapshot: WorkspaceDirectory | undefined =
+    directoryStatus === 'ready'
+      ? { status: directoryStatus, users: directory ?? [] }
+      : directoryStatus === 'loading'
+        ? { status: directoryStatus }
+        : undefined
   let currentOtherConnections = otherConnections
   let location: Connection['location'] = { page, status: 'active' }
   const connections = (): Connection[] => [
@@ -107,17 +109,20 @@ export function createFakeEngine({
       announce()
     },
     setUsers: next => {
-      const directory = next === null ? null : normalizeWorkspaceUsers(next)
-      directorySnapshot = {
-        status: next === null ? 'unavailable' : 'ready',
-        users: directory ?? []
-      }
+      const directory = next === undefined ? undefined : normalizeWorkspaceUsers(next)
+      directorySnapshot =
+        directory === undefined ? undefined : { status: 'ready', users: directory }
       if (directory) profiles = directory
       userListeners.forEach(listener => listener())
       announce()
     },
     setDirectoryStatus: status => {
-      directorySnapshot = { status, users: status === 'ready' ? profiles : [] }
+      directorySnapshot =
+        status === 'ready'
+          ? { status, users: profiles }
+          : status === 'loading'
+            ? { status }
+            : undefined
       userListeners.forEach(listener => listener())
     }
   }

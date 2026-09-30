@@ -27,6 +27,8 @@ test.each(namelessUsers)(
     expect(user).toContain('data-facehash')
     expect(user).toContain(`>${label.charAt(0).toUpperCase()}<`)
     expect(user).not.toContain('Unknown user')
-    expect(engine.getWorkspaceDirectory().users?.[1]?.name).toBe(profile.name?.trim() || undefined)
+    const directory = engine.getWorkspaceDirectory()
+    if (directory?.status !== 'ready') throw new Error('Expected a ready directory.')
+    expect(directory.users[1]?.name).toBe(profile.name?.trim() || undefined)
   }
 )

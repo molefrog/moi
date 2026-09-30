@@ -7,7 +7,7 @@ import {
   useSyncExternalStore
 } from 'react'
 import type { JsonValue } from 'moi'
-import type { PresenceValue, WorkspaceUsersAvailability } from 'moi/collab'
+import type { PresenceValue } from 'moi/collab'
 
 import { useAppletPresence, useCollabEngine } from './provider'
 import { resolvePeers, resolveUser, workspaceProfiles } from './users'
@@ -20,16 +20,13 @@ export function useConnectionState() {
   const engine = useCollabEngine()
   return useSyncExternalStore(engine.subscribe, engine.getUsersSnapshot, engine.getUsersSnapshot)
 }
-function useWorkspaceDirectory() {
+export function useWorkspaceDirectory() {
   const engine = useCollabEngine()
   return useSyncExternalStore(
     engine.subscribeWorkspaceUsers,
     engine.getWorkspaceDirectory,
     engine.getWorkspaceDirectory
   )
-}
-export function useWorkspaceUsersAvailability(): WorkspaceUsersAvailability {
-  return useWorkspaceDirectory().status
 }
 function useUsersSource() {
   const engine = useCollabEngine()
@@ -42,11 +39,7 @@ function useUsersSource() {
   const directory = useWorkspaceDirectory()
   const users = useMemo(
     () =>
-      workspaceProfiles(
-        state.users,
-        self,
-        directory.status === 'unavailable' ? null : directory.users
-      ),
+      workspaceProfiles(state.users, self, directory?.status === 'loading' ? [] : directory?.users),
     [state.users, self, directory]
   )
   return { state, self, users, engine }

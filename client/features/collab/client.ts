@@ -32,7 +32,7 @@ export type CollabEngineApi = {
   subscribe: (listener: () => void) => Unsubscribe
   getCurrentUser: () => UserProfile | undefined
   subscribeCurrentUser: (listener: () => void) => Unsubscribe
-  getWorkspaceDirectory: () => WorkspaceDirectory
+  getWorkspaceDirectory: () => WorkspaceDirectory | undefined
   subscribeWorkspaceUsers: (listener: () => void) => Unsubscribe
   getLocation: () => ConnectionLocation | null
   setLocation: (location: ConnectionLocation | null) => void
@@ -42,7 +42,6 @@ export type CollabEngineApi = {
 
 const noop = () => {}
 const EMPTY_PRESENCE: readonly PresenceEntry[] = []
-const UNAVAILABLE_DIRECTORY: WorkspaceDirectory = { status: 'unavailable', users: [] }
 
 export const NO_ENGINE: CollabEngineApi = {
   workspaceId: '',
@@ -54,7 +53,7 @@ export const NO_ENGINE: CollabEngineApi = {
   subscribe: () => noop,
   getCurrentUser,
   subscribeCurrentUser: subscribeCurrentUserStore,
-  getWorkspaceDirectory: () => UNAVAILABLE_DIRECTORY,
+  getWorkspaceDirectory: () => undefined,
   subscribeWorkspaceUsers: () => noop,
   getLocation: () => null,
   setLocation: noop,
@@ -92,7 +91,8 @@ export class CollabClient implements CollabEngineApi {
     this.enabled ? this.store.subscribe(listener) : noop
   getCurrentUser = getCurrentUser
   subscribeCurrentUser = subscribeCurrentUserStore
-  getWorkspaceDirectory = (): WorkspaceDirectory => getWorkspaceDirectory(this.workspaceId)
+  getWorkspaceDirectory = (): WorkspaceDirectory | undefined =>
+    getWorkspaceDirectory(this.workspaceId)
   subscribeWorkspaceUsers = (listener: () => void): Unsubscribe =>
     subscribeWorkspaceUsersStore(this.workspaceId, listener)
   getLocation = (): ConnectionLocation | null => (this.enabled ? this.store.getLocation() : null)

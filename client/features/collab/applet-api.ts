@@ -12,8 +12,7 @@ import {
   usePresence,
   usePublishPresence,
   useUser,
-  useWorkspaceUsers,
-  useWorkspaceUsersAvailability
+  useWorkspaceUsers
 } from './hooks'
 
 export const appletCollabApi = {
@@ -29,7 +28,6 @@ export const appletCollabApi = {
   usePeers,
   useUser,
   useWorkspaceUsers,
-  useWorkspaceUsersAvailability,
   usePresence,
   usePublishPresence
 }

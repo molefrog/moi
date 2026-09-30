@@ -15,7 +15,7 @@ test('fixture directory includes offline users while live state contains only co
   const room = createFakeEngine({ self: alice, users: [alice, bob] })
   expect(room.getSnapshot().connections[0]?.userId).toBe('alice')
   expect(room.getSnapshot().users).toEqual([alice])
-  expect(room.getWorkspaceDirectory().users).toEqual([alice, bob])
+  expect(room.getWorkspaceDirectory()).toEqual({ status: 'ready', users: [alice, bob] })
 })
 
 test('presence publication and deletion belong to the caller and other connections can be replaced', () => {
@@ -33,11 +33,11 @@ test('directory replacement notifies observers without retaining removed users',
   let notifications = 0
   room.subscribeWorkspaceUsers(() => notifications++)
   room.setUsers([bob])
-  expect(room.getWorkspaceDirectory().users).toEqual([bob])
+  expect(room.getWorkspaceDirectory()).toEqual({ status: 'ready', users: [bob] })
   room.setUsers([])
-  expect(room.getWorkspaceDirectory().users).toEqual([])
-  room.setUsers(null)
-  expect(room.getWorkspaceDirectory().status).toBe('unavailable')
+  expect(room.getWorkspaceDirectory()).toEqual({ status: 'ready', users: [] })
+  room.setUsers(undefined)
+  expect(room.getWorkspaceDirectory()).toBeUndefined()
   expect(notifications).toBe(3)
 })
 
@@ -57,12 +57,12 @@ test('reactive inline JSON values do not feed publication back into an endless r
 test('loading fixtures expose no directory until the complete ready snapshot arrives', () => {
   const room = createFakeEngine({ self: alice, users: [alice, bob], directoryStatus: 'loading' })
   const loading = room.getWorkspaceDirectory()
-  expect(loading).toEqual({ status: 'loading', users: [] })
-  expect(room.getWorkspaceDirectory().users).toEqual([])
+  expect(loading).toEqual({ status: 'loading' })
   expect(room.getWorkspaceDirectory()).toBe(loading)
   room.setDirectoryStatus('ready')
-  expect(room.getWorkspaceDirectory()).toEqual({ status: 'ready', users: [alice, bob] })
-  expect(room.getWorkspaceDirectory().users).toBe(room.getWorkspaceDirectory().users)
+  const ready = room.getWorkspaceDirectory()
+  expect(ready).toEqual({ status: 'ready', users: [alice, bob] })
+  expect(room.getWorkspaceDirectory()).toBe(ready)
   room.setUsers([])
   expect(room.getWorkspaceDirectory()).toEqual({ status: 'ready', users: [] })
 })

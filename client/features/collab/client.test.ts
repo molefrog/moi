@@ -272,7 +272,7 @@ test('disabled engine exposes host profiles and readiness without starting a tra
   expect(engine.enabled).toBe(false)
   expect(engine.workspaceId).toBe('workspace')
   expect(engine.getCurrentUser()).toEqual(alice)
-  expect(engine.getWorkspaceDirectory()).toEqual({ status: 'loading', users: [] })
+  expect(engine.getWorkspaceDirectory()).toEqual({ status: 'loading' })
   let updates = 0
   const unsubscribe = engine.subscribeWorkspaceUsers(() => updates++)
   setHostState({
@@ -280,7 +280,6 @@ test('disabled engine exposes host profiles and readiness without starting a tra
     workspaces: { workspace: { status: 'ready', users: [alice] } }
   })
   expect(engine.getWorkspaceDirectory()).toEqual({ status: 'ready', users: [alice] })
-  expect(engine.getWorkspaceDirectory().users).toEqual([alice])
   expect(updates).toBe(1)
   engine.setLocation({ page: 'overview', status: 'active' })
   engine.setPresence({
@@ -320,9 +319,7 @@ test('the default engine keeps the current user readable while workspace operati
   const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
   setHostState({ currentUser: alice, workspaces: {} })
   expect(NO_ENGINE.getCurrentUser()).toEqual(alice)
-  expect(NO_ENGINE.getWorkspaceDirectory()).toEqual({ status: 'unavailable', users: [] })
-  expect(NO_ENGINE.getWorkspaceDirectory()).toBe(NO_ENGINE.getWorkspaceDirectory())
-  expect(NO_ENGINE.getWorkspaceDirectory().status).toBe('unavailable')
+  expect(NO_ENGINE.getWorkspaceDirectory()).toBeUndefined()
   expect(NO_ENGINE.getPresenceSnapshot('one', 'field')).toBe(
     NO_ENGINE.getPresenceSnapshot('two', 'cursor')
   )

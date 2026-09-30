@@ -11,7 +11,7 @@ import {
   useUser,
   useUsers,
   useWorkspaceUsers,
-  useWorkspaceUsersAvailability
+  useWorkspaceDirectory
 } from './hooks'
 import { AppletPresenceProvider, CollabContext, pageFromPath } from './provider'
 import type { WorkspaceUser } from './hooks'
@@ -217,13 +217,18 @@ test('workspace users include self and offline members with workspace-wide statu
   expect(render().all).toEqual([])
 })
 
-test('directory loading is distinguishable from an empty authoritative directory', () => {
-  const engine = createFakeEngine({ self: alice, directoryStatus: 'loading' })
+test('absent, loading, and empty directories preserve distinct user resolution', () => {
+  const engine = createFakeEngine({
+    self: alice,
+    users: [alice, bob],
+    otherConnections: [{ connectionId: 'b', userId: bob.id, location: null, presence: [] }]
+  })
+  engine.setUsers(undefined)
   function Directory() {
     const me = useMe()
     return encodeURIComponent(
       JSON.stringify({
-        status: useWorkspaceUsersAvailability(),
+        status: useWorkspaceDirectory()?.status,
         users: useWorkspaceUsers(),
         me,
         hasMe: me !== undefined
@@ -240,16 +245,23 @@ test('directory loading is distinguishable from an empty authoritative directory
         )
       )
     )
+  const fallback = {
+    users: [
+      { ...alice, status: 'active' },
+      { ...bob, status: 'away' }
+    ],
+    me: { ...alice, status: 'active' },
+    hasMe: true
+  }
+  expect(render()).toEqual(fallback)
+  engine.setDirectoryStatus('loading')
   expect(render()).toEqual({ status: 'loading', users: [], hasMe: false })
   engine.setUsers([])
   expect(render()).toEqual({ status: 'ready', users: [], hasMe: false })
-  engine.setUsers([alice])
-  expect(render()).toEqual({
-    status: 'ready',
-    users: [{ ...alice, status: 'active' }],
-    me: { ...alice, status: 'active' },
-    hasMe: true
-  })
+  engine.setUsers([alice, bob])
+  expect(render()).toEqual({ status: 'ready', ...fallback })
+  engine.setUsers(undefined)
+  expect(render()).toEqual(fallback)
 })
 
 test('away peers remain on the page while their focus presence is hidden', () => {

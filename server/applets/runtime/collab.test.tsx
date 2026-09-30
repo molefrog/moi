@@ -62,7 +62,6 @@ test('missing collaboration bridge returns empty hook values and warns once', as
       expect(api.useUser('alice')).toBeUndefined()
       expect(api.usePeers()).toEqual([])
       expect(api.useWorkspaceUsers()).toEqual([])
-      expect(api.useWorkspaceUsersAvailability()).toBe('unavailable')
       expect(api.usePresence('editing')).toEqual([])
       expect(api.usePublishPresence('editing', true)).toBeUndefined()
     }
@@ -111,7 +110,7 @@ test('the bridge delegates when attached and falls back again when disposed', as
   }
   const host = {
     useUser: mock((_id: string) => user),
-    useWorkspaceUsersAvailability: mock(() => 'loading' as const),
+    useWorkspaceUsers: mock((_options?: CollabApi.UseWorkspaceUsersOptions) => [user]),
     usePublishPresence: mock((_channel: string, _value: unknown) => {}),
     User: mock(() => createElement('span', null, 'Alice'))
   }
@@ -123,7 +122,8 @@ test('the bridge delegates when attached and falls back again when disposed', as
       }
     })
     expect(api.useUser('alice')).toBe(user)
-    expect(api.useWorkspaceUsersAvailability()).toBe('loading')
+    expect(api.useWorkspaceUsers({ status: 'active' })).toEqual([user])
+    expect(host.useWorkspaceUsers.mock.calls).toEqual([[{ status: 'active' }]])
     expect(host.useUser.mock.calls).toEqual([['alice']])
     api.usePublishPresence('editing', { field: 'title' })
     expect(host.usePublishPresence.mock.calls).toEqual([['editing', { field: 'title' }]])
@@ -134,9 +134,11 @@ test('the bridge delegates when attached and falls back again when disposed', as
 
     alive = false
     expect(api.useUser('alice')).toBeUndefined()
+    expect(api.useWorkspaceUsers()).toEqual([])
     api.usePublishPresence('editing', false)
     expect(renderToStaticMarkup(createElement(api.User, { id: 'alice' }))).toBe('')
     expect(host.usePublishPresence).toHaveBeenCalledTimes(1)
+    expect(host.useWorkspaceUsers).toHaveBeenCalledTimes(1)
     expect(host.User).toHaveBeenCalledTimes(1)
     expect(warning).toHaveBeenCalledTimes(1)
 

@@ -74,7 +74,7 @@ test('host directory resolves offline users and removals remain authoritative ov
   })
   expect(resolveUser({ connections, users: profiles }, bob.id)).toBeUndefined()
   expect(workspaceProfiles([bob], alice, [])).toEqual([])
-  expect(workspaceProfiles([bob], alice, null)).toEqual([bob, alice])
+  expect(workspaceProfiles([bob], alice, undefined)).toEqual([bob, alice])
 })
 
 test('hidden tabs stay in their page peers and support the away filter', () => {
@@ -123,7 +123,10 @@ test.each(['__proto__', 'constructor', 'toString'])('%s resolves as an ordinary 
     status: 'offline'
   })
   expect(resolveUser({ connections: [], users: [] }, id)).toBeUndefined()
-  expect(workspaceProfiles([{ ...user, name: 'Stale name' }, bob], user, null)).toEqual([user, bob])
+  expect(workspaceProfiles([{ ...user, name: 'Stale name' }, bob], user, undefined)).toEqual([
+    user,
+    bob
+  ])
 })
 
 test('header groups users, includes offline users, and merges visible browser tabs', () => {
