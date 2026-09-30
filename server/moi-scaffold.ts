@@ -3,6 +3,7 @@
 // dependency manifest, and installs dependencies — so the agent never has to
 // bootstrap the folder itself.
 import { appendFile, mkdir, open, stat } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 
 // Dependency set available to widgets. `react`/`react-dom` are stubs — at
@@ -38,16 +39,14 @@ export const MOI_PACKAGE_JSON = {
 const INSTALL_WAIT_MS = 10_000
 const INSTALL_TIMEOUT_MS = 120_000
 
-type InstallDependencies = (moiDir: string) => Promise<number>
+type InstallDependencies = (moiDir: string, logPath: string) => Promise<number>
 
-export function dependencyInstallLogPath(workspacePath: string): string {
-  return join(resolve(workspacePath), '.moi', '.cache', 'bun-install.log')
+export function createDependencyInstallLogPath(): string {
+  return join(tmpdir(), `moi-bun-install-${crypto.randomUUID()}.log`)
 }
 
-async function runBunInstall(moiDir: string): Promise<number> {
-  const logPath = join(moiDir, '.cache', 'bun-install.log')
-  await mkdir(join(moiDir, '.cache'), { recursive: true })
-  const log = await open(logPath, 'w', 0o600)
+async function runBunInstall(moiDir: string, logPath: string): Promise<number> {
+  const log = await open(logPath, 'wx', 0o600)
   let install: Bun.Subprocess<'ignore', number, number>
   try {
     await log.writeFile(
@@ -196,7 +195,8 @@ async function isDirectory(path: string): Promise<boolean> {
 export async function scaffoldMoiDir(
   workspacePath: string,
   installDependencies: InstallDependencies = runBunInstall,
-  installWaitMs: number = INSTALL_WAIT_MS
+  installWaitMs: number = INSTALL_WAIT_MS,
+  installLogPath: string = createDependencyInstallLogPath()
 ): Promise<'exists' | 'installing' | number> {
   // Backstop against the nested-workspace bug: never scaffold a `.moi/` *inside*
   // another workspace's `.moi/` (which produces the junk `.moi/.moi`). Callers
@@ -224,7 +224,7 @@ export async function scaffoldMoiDir(
   await ensureMoiGitignore(workspacePath)
   await writeAppletEnvDts(workspacePath)
 
-  const exited = installDependencies(moiDir)
+  const exited = installDependencies(moiDir, installLogPath)
   let timer: ReturnType<typeof setTimeout> | undefined
   const result = await Promise.race([
     exited,
@@ -233,15 +233,14 @@ export async function scaffoldMoiDir(
   clearTimeout(timer)
 
   if (result === 'installing') {
-    const logPath = dependencyInstallLogPath(workspacePath)
     console.log(
-      `[scaffold] bun install in ${moiDir} still running — continuing in the background; log: ${logPath}`
+      `[scaffold] bun install in ${moiDir} still running — continuing in the background; log: ${installLogPath}`
     )
     exited.then(code => {
       if (code === 0) console.log(`[scaffold] background bun install in ${moiDir} finished`)
       else
         console.warn(
-          `[scaffold] background bun install in ${moiDir} failed (exit ${code}) — the agent will install deps on demand; log: ${logPath}`
+          `[scaffold] background bun install in ${moiDir} failed (exit ${code}) — the agent will install deps on demand; log: ${installLogPath}`
         )
     })
   }

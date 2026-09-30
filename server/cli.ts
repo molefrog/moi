@@ -61,7 +61,6 @@ import {
   matchHermesProfile
 } from './harness/hermes/discovery'
 import { type OpenClawAgent, discoverOpenClawAgents } from './harness/openclaw/discovery'
-import { dependencyInstallLogPath } from './moi-scaffold'
 import {
   assertWorkspaceIdAvailable,
   liftToWorkspaceRoot,
@@ -396,18 +395,18 @@ const init = defineCommand({
     // Provision: bundled skills + the `.moi/` bootstrap (widgets dir +
     // package.json + bun install). An existing `.moi/` is left untouched.
     console.log()
-    const { scaffold, skillsDir } = await provisionWorkspace(target, type)
+    const { scaffold, skillsDir, installLogPath } = await provisionWorkspace(target, type)
     if (scaffold !== 'exists') {
       if (scaffold === 'installing') {
         console.log(pc.dim('  Widget dependencies still installing in .moi/ (background)'))
-        console.log(pc.dim('  Install log: ' + dependencyInstallLogPath(target)))
+        console.log(pc.dim('  Install log: ' + installLogPath))
       } else if (scaffold === 0) {
         console.log(pc.dim('  Installed widget dependencies in .moi/'))
       } else {
         console.warn(
           pc.yellow(`  bun install failed (exit ${scaffold}) — run it manually in .moi/`)
         )
-        console.warn(pc.dim('  Install log: ' + dependencyInstallLogPath(target)))
+        console.warn(pc.dim('  Install log: ' + installLogPath))
       }
     }
 
@@ -1363,18 +1362,22 @@ const openclawInit = defineCommand({
     // with the highest precedence, so these win over any same-named bundled or
     // per-user skill), plus the `.moi/` bootstrap — the widgets skill assumes
     // the folder and its dependencies exist. Existing `.moi/` stays untouched.
-    const { scaffold, skillsDir: skillsRoot } = await provisionWorkspace(target.path, 'openclaw')
+    const {
+      scaffold,
+      skillsDir: skillsRoot,
+      installLogPath
+    } = await provisionWorkspace(target.path, 'openclaw')
     if (scaffold !== 'exists') {
       if (scaffold === 'installing') {
         console.log('\n' + pc.dim('  Widget dependencies still installing in .moi/ (background)'))
-        console.log(pc.dim('  Install log: ' + dependencyInstallLogPath(target.path)))
+        console.log(pc.dim('  Install log: ' + installLogPath))
       } else if (scaffold === 0) {
         console.log('\n' + pc.dim('  Installed widget dependencies in .moi/'))
       } else {
         console.warn(
           '\n' + pc.yellow(`  bun install failed (exit ${scaffold}) — run it manually in .moi/`)
         )
-        console.warn(pc.dim('  Install log: ' + dependencyInstallLogPath(target.path)))
+        console.warn(pc.dim('  Install log: ' + installLogPath))
       }
     }
 
@@ -1505,18 +1508,22 @@ const hermesInit = defineCommand({
     // dir with the highest precedence, so these win over bundled ones), plus
     // the `.moi/` bootstrap. The default profile has no workspace directory
     // until now — provisionWorkspace creates it.
-    const { scaffold, skillsDir: skillsRoot } = await provisionWorkspace(target.path, 'hermes')
+    const {
+      scaffold,
+      skillsDir: skillsRoot,
+      installLogPath
+    } = await provisionWorkspace(target.path, 'hermes')
     if (scaffold !== 'exists') {
       if (scaffold === 'installing') {
         console.log('\n' + pc.dim('  Widget dependencies still installing in .moi/ (background)'))
-        console.log(pc.dim('  Install log: ' + dependencyInstallLogPath(target.path)))
+        console.log(pc.dim('  Install log: ' + installLogPath))
       } else if (scaffold === 0) {
         console.log('\n' + pc.dim('  Installed widget dependencies in .moi/'))
       } else {
         console.warn(
           '\n' + pc.yellow(`  bun install failed (exit ${scaffold}) — run it manually in .moi/`)
         )
-        console.warn(pc.dim('  Install log: ' + dependencyInstallLogPath(target.path)))
+        console.warn(pc.dim('  Install log: ' + installLogPath))
       }
     }
 

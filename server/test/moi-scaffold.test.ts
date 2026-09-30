@@ -9,14 +9,10 @@ import {
   utimesSync,
   writeFileSync
 } from 'node:fs'
-import { join } from 'path'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'path'
 
-import {
-  dependencyInstallLogPath,
-  ensureMoiGitignore,
-  scaffoldMoiDir,
-  writeAppletEnvDts
-} from '../moi-scaffold'
+import { ensureMoiGitignore, scaffoldMoiDir, writeAppletEnvDts } from '../moi-scaffold'
 import { silenceConsole } from './quiet'
 
 // The scaffold backstop: `scaffoldMoiDir` must refuse to create a `.moi/` inside
@@ -123,17 +119,24 @@ describe('dependency install diagnostics', () => {
     )
     await proc.exited
     const stderr = await new Response(proc.stderr).text()
-    const logPath = dependencyInstallLogPath(WS)
+    const logPath = stderr.match(/Install log: (.+)/)?.[1]
 
     expect(stderr).toContain('bun install failed (exit 23)')
-    expect(stderr).toContain('Install log: ' + logPath)
-    const log = await Bun.file(logPath).text()
-    expect(log).toContain('install stdout')
-    expect(log).toContain('install stderr')
+    expect(logPath).toBeDefined()
+    if (!logPath) throw new Error('Missing install log path')
+    try {
+      expect(dirname(logPath)).toBe(tmpdir())
+      const log = await Bun.file(logPath).text()
+      expect(log).toContain('install stdout')
+      expect(log).toContain('install stderr')
+    } finally {
+      rmSync(logPath)
+    }
   })
 
   test('captures background output after the parent process exits', async () => {
     const releasePath = join(WS, 'release-install')
+    const logPath = join(WS, 'background-install.log')
     const binDir = writeInstaller(`
       while [ ! -f "$MOI_TEST_INSTALL_RELEASE" ]; do /bin/sleep 0.01; done
       echo "error after parent exit" >&2
@@ -144,7 +147,7 @@ describe('dependency install diagnostics', () => {
         process.execPath,
         '-e',
         `import { scaffoldMoiDir } from ${JSON.stringify(source)};
-         await scaffoldMoiDir(${JSON.stringify(WS)}, undefined, 5);`
+         await scaffoldMoiDir(${JSON.stringify(WS)}, undefined, 5, ${JSON.stringify(logPath)});`
       ],
       {
         env: { ...process.env, PATH: binDir, MOI_TEST_INSTALL_RELEASE: releasePath },
@@ -156,7 +159,7 @@ describe('dependency install diagnostics', () => {
     try {
       expect(await proc.exited).toBe(0)
       writeFileSync(releasePath, '')
-      const log = Bun.file(dependencyInstallLogPath(WS))
+      const log = Bun.file(logPath)
       for (let attempts = 0; attempts < 100; attempts++) {
         if ((await log.text()).includes('error after parent exit')) break
         await Bun.sleep(10)

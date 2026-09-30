@@ -11,7 +11,7 @@ import type { WorkspaceType } from '@/lib/types'
 export { validateWorkspaceFolderName } from '@/lib/workspace-name'
 
 import { harnessFor } from './harness/registry'
-import { scaffoldMoiDir } from './moi-scaffold'
+import { createDependencyInstallLogPath, scaffoldMoiDir } from './moi-scaffold'
 import { installBundledSkills } from './skills-template'
 
 // Where each backend loads skills from — the harness owns the answer
@@ -34,6 +34,8 @@ export type ProvisionResult = {
   // install continues in the background, else the install exit code (non-zero
   // means deps are missing — not fatal, the agent installs on demand).
   scaffold: 'exists' | 'installing' | number
+  // Unique temporary log for this install attempt; unused when scaffold exists.
+  installLogPath: string
 }
 
 // Lay down everything a workspace needs: create the folder, copy the bundled
@@ -47,6 +49,7 @@ export async function provisionWorkspace(
   const skillsDir = skillsDirFor(workspaceRoot, type)
   await mkdir(workspaceRoot, { recursive: true })
   await installBundledSkills(skillsDir)
-  const scaffold = await scaffoldMoiDir(workspaceRoot)
-  return { skillsDir, scaffold }
+  const installLogPath = createDependencyInstallLogPath()
+  const scaffold = await scaffoldMoiDir(workspaceRoot, undefined, undefined, installLogPath)
+  return { skillsDir, scaffold, installLogPath }
 }
