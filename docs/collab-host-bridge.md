@@ -3,8 +3,8 @@
 An outer host supplies the current user and workspace user directories to moi through
 `window.moi.collab`. It owns authentication, workspace access, and delivery of profile and
 membership changes to each browser. The bridge's types and validation rules live in
-[host-state.ts](../client/features/collab/host-state.ts); the applet behavior is described in the
-[collab RFC](rfc-collab.md).
+[host-state.ts](../client/features/collab/host-state.ts). See the [applet guide](../workspace/.claude/skills/moi-workspace/references/COLLAB.md)
+for user hooks and presence, and the [collab RFC](rfc-collab.md) for runtime details.
 
 ## Bootstrap
 
@@ -49,9 +49,9 @@ function workspaceUsersChanged(workspaceId, users) {
 }
 ```
 
-Each user needs an `id`. Name, email, avatar, and color are optional. A supplied color must be one of
-`pink`, `orange`, `amber`, `lime`, `emerald`, `cyan`, `blue`, or `violet`; moi picks a stable color from
-the ID when it is omitted. `currentUser` is global. To update that user's profile, replace
+Each user needs an `id`. Name, email, avatar, and color are optional. Supplied colors use the
+[`UserColor` palette](../server/applets/declarations/collab.d.ts); moi picks a stable color from
+the ID when omitted. `currentUser` is global. To update that user's profile, replace
 `currentUser` in the snapshot. For another user, update each ready workspace list that contains them.
 
 Use `{ status: 'loading' }` until a workspace directory arrives. Use

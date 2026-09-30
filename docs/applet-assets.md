@@ -17,7 +17,7 @@ on-disk bundle is workspace-agnostic, and the served copy carries its base:
 
 `rpc` and `files` are **workspace-scoped** — they hang off this base. Bundle files
 (entry/chunk/asset) are **applet-scoped** and don't need the sentinel; assets
-self-locate via `import.meta.url`. This replaces the `window.__MEI_WS__` global.
+self-locate via `import.meta.url`.
 
 ```
 .moi/.build/views/editor/      served at  /api/workspaces/<id>/views/editor/
@@ -103,8 +103,7 @@ via the module URL, so it needs **no** base. Tiny files: `loader: dataurl` inlin
 as base64.
 
 **Server calls — `import { x } from './x.server'`** (RPC, behavior unchanged). The
-stub becomes `fetch(BASE + '/rpc/' + module + '/' + name, …)` (devalue in/out),
-replacing today's `/_rpc/<ws>/fn/…` and the global lookup.
+stub becomes `fetch(BASE + '/rpc/' + module + '/' + name, …)` (devalue in/out).
 
 **Workspace files — `resolveUrl('moi:/files/...')`** (runtime, off disk). Resolves to
 `BASE + '/files/' + encodedPath`, streamed with HTTP range. See
@@ -124,8 +123,9 @@ root; files inside `widgets/` or `views/` are treated as applet sources.
 
 - **Build** (`build-applet.ts`): asset `onLoad` plugin emits each imported image/
   font as a content-hashed sibling and rewrites the import to
-  `new URL('./<name>-<hash>.<ext>', import.meta.url)`. The `mei:rpc` + `moi`
-  runtime modules bake `%%MOI_APPLET_API_BASE%%` into the rpc stub + `resolveUrl`.
+  `new URL('./<name>-<hash>.<ext>', import.meta.url)`. The
+  [applet runtime sources](../server/applets/runtime/) use `%%MOI_APPLET_API_BASE%%`
+  in the RPC stub and file URL resolution.
   Output is a multi-file artifact written to `.build/<kind>/<name>/` (entry
   `index.js`, `chunk-*.js`, assets). `naming.entry` must be `index.[ext]` — bun
   emits the entry's CSS sibling as an "entry" output too, so a literal `index.js`

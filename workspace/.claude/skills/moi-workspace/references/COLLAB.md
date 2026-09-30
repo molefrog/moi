@@ -1,85 +1,82 @@
 # Collab
 
-moi workspaces can be shared with multiple users. This guide explains the primitives in
-`moi/collab` that make views and widgets ready for real-time collaboration: user lookup,
-connected users, cursors, focus, and selections.
+moi workspaces can be shared with multiple users. Use `moi/collab` in views and widgets for
+user lookup, connected users, cursors, focus, and selections.
 
-## Concepts
+moi supplies the current user, workspace directory, and presence transport. Import the exports
+directly without setting up providers or sockets. See `.moi/collab.d.ts` for the full API and
+component props.
 
-### User profiles
-
-Profiles have a unique, stable `id`, a `color`, and optional `name`, `email`, and `avatar`.
+## Users
 
 **Store only user IDs when writing user references to the server**, such as `authorId` or
 `assigneeIds`. Do not copy names, emails, colors, or avatars into application records. Resolve
-current profiles through the hooks and components below. Applet-specific data, such as a user's
-preferences or role in a project, can be stored separately and keyed by user ID.
+current profiles through hooks or components. Store applet-specific preferences and roles
+separately, keyed by user ID.
 
 ```tsx
 import { User, Facepile } from 'moi/collab'
-
-<User id={authorId} />
-<Facepile ids={assigneeIds} max={3} />
+;<>
+  <User id={authorId} />
+  <Facepile ids={assigneeIds} max={3} />
+</>
 ```
 
 These components resolve profiles and handle missing names and unknown IDs for you.
 
 ### Workspace users and connected users
 
-Workspace users include users who are offline. Use the full user directory for assignee pickers
-and other user references. Query connected users to show who is here
-or working on the same page.
+Use the workspace directory for assignee pickers, including offline users. Use peers to show
+who is connected.
 
-| Hook                                       | Returns                                                              |
-| ------------------------------------------ | -------------------------------------------------------------------- |
-| `useMe()`                                  | The current user.                                                    |
-| `useUser(id)`                              | A user by ID, including an offline user.                             |
-| `useWorkspaceUsers()`                      | All available workspace users, including you.                        |
-| `useWorkspaceUsers({ status: 'offline' })` | Users who are offline. The filter also accepts `active` or `away`.  |
-| `useWorkspaceUsersAvailability()`         | Whether the user directory is `loading`, `ready`, or `unavailable`.  |
-| `usePeers()`                               | Other connected users on the current page.                           |
-| `usePeers({ scope: 'workspace' })`         | Other connected users anywhere in the workspace.                     |
+| Hook                               | Returns                                                             |
+| ---------------------------------- | ------------------------------------------------------------------- |
+| `useMe()`                          | The current user.                                                   |
+| `useUser(id)`                      | A user by ID, including an offline user.                            |
+| `useWorkspaceUsers()`              | All available workspace users, including you.                       |
+| `useWorkspaceUsersAvailability()`  | Whether the user directory is `loading`, `ready`, or `unavailable`. |
+| `usePeers()`                       | Other connected users on the current page.                          |
+| `usePeers({ scope: 'workspace' })` | Other connected users anywhere in the workspace.                    |
 
-User results include `status`: `active` when at least one workspace connection has a visible
-page, `away` when connected without a visible page, or `offline` when disconnected. A user on
-another page can still be active. `usePeers` excludes your own user, combines multiple tabs
-into one user, and can filter by `status: 'active'` or `'away'`.
+User results include `status`: `active` when at least one browser tab is visible in this workspace,
+`away` when connected with no visible tab, or `offline` when disconnected. This tracks tab visibility,
+not idle time. A user on another page can still be active.
+`useWorkspaceUsers({ status: 'offline' })` filters the directory; it also accepts
+`active` or `away`. `usePeers` excludes your own user, combines multiple tabs into one user,
+and accepts an `active` or `away` status filter.
 
-`useMe()` and `useUser(id)` return `undefined` when the user cannot be resolved. When the user directory
-is unavailable, enumeration falls back to your profile and connected users; it cannot
-discover offline users.
-
-### Provided by moi
-
-moi supplies the current user, the user directory, and the connection between applets. You do not need
-to set up transport, sockets, or providers. Use the exports from `moi/collab` directly; applets
-read user profiles rather than creating or updating them.
+`useMe()` and `useUser(id)` return `undefined` when the user cannot be resolved, including while
+the directory loads. A `ready` directory can be empty. When it is `unavailable`, user lists fall
+back to your profile and connected users and cannot discover offline users. Applets read profiles;
+the host owns profile updates and workspace membership.
 
 ## Presence
 
 Presence is ephemeral state that describes what connected users are doing: where their pointer
 is, which field they are editing, or which item they selected. It is not persisted and only
-works while users are connected. Registrations are removed when their applet becomes inactive,
-the browser tab is hidden, or the publishing component unmounts.
+works while users are connected. It is removed when the applet becomes inactive, the browser
+tab is hidden, or the publishing component unmounts.
 
 Presence does not save or synchronize application content. Continue saving documents, tasks,
 and other durable data through your applet's `.server.ts` functions and storage.
+With live presence disabled, user lookups remain available and applet content still renders.
 
 ### Built-in presence
 
-| Component        | Use                                                                                       |
-| ---------------- | ----------------------------------------------------------------------------------------- |
-| `Activity`       | Show you and other connected users; use `scope="workspace"` to include other pages.       |
-| `Cursors`        | Wrap an area to share and display pointers. Give separate areas distinct `surface` names. |
-| `PresenceFrame`  | Wrap one element to show an outline and users focused inside it.                          |
-| `PresenceGutter` | Wrap one element to show focused users beside it.                                         |
-| `PresenceGroup`  | Scope descendant frame, gutter, and selection IDs. Adds no DOM element.                   |
-| `Selection`      | Wrap an item with an `id` and controlled `selected` boolean to share its selection.       |
+| Component        | Use                                                                                   |
+| ---------------- | ------------------------------------------------------------------------------------- |
+| `Activity`       | Show you and other connected users; use `scope="workspace"` to include other pages.   |
+| `Cursors`        | Wrap an area to share and display pointers. Give separate areas distinct `id` values. |
+| `PresenceFrame`  | Wrap one element to show an outline and users focused inside it.                      |
+| `PresenceGutter` | Wrap one element to show focused users beside it.                                     |
+| `PresenceGroup`  | Scope descendant frame, gutter, and selection IDs. Adds no DOM element.               |
+| `Selection`      | Wrap an item with an `id` and controlled `selected` boolean to share its selection.   |
 
 ```tsx
 import { Cursors, PresenceGroup, PresenceFrame, PresenceGutter } from 'moi/collab'
-
-;<Cursors surface="task-details">
+import { Input } from '../ui/input'
+import { Textarea } from '../ui/textarea'
+;<Cursors id="task-details">
   <PresenceGroup id={task.id}>
     <PresenceFrame id="title">
       <Input defaultValue={task.title} />
@@ -91,17 +88,18 @@ import { Cursors, PresenceGroup, PresenceFrame, PresenceGutter } from 'moi/colla
 </Cursors>
 ```
 
-Frame and gutter each accept exactly one React element, such as an input, label, or card with
-controls inside it; do not use a fragment. They handle focus and user lookup automatically.
-Use ordinary elements for layout; a group only provides scoping.
+Frame and gutter accept exactly one React element, including a component with nested controls;
+do not use a fragment. They handle focus and user lookup. Use ordinary elements for layout.
 
 Use stable record IDs and field names for `id`. Groups can nest: a field `title` inside task
 `42` inside group `tasks` identifies `tasks/42/title`. IDs must be nonblank and unique within
 their group. In lists, give each item a React `key` as well as a presence `id`; use record IDs,
 not array positions. When a dialog switches records, change its group ID.
 
-Focus, selections, and cursors are scoped to the current page and applet. Matching IDs in an
-unrelated view or widget do not share presence.
+Focus, selections, and cursors are scoped to the current page and applet. Matching IDs in another
+view or widget do not share presence. Groups scope frame, gutter, and selection IDs. Cursor area IDs
+are local to the applet.
+`Cursors` defaults to `id="default"` when there is only one area.
 
 ### Custom presence
 
@@ -120,31 +118,7 @@ than 4 KiB.
 
 `usePresence` only reads. It returns `{ connectionId, userId, value }[]` for other connections
 on the same page and applet. Resolve each `userId` with `User` or `useUser`. One user can have
-separate presence values in multiple tabs.
+separate presence values in multiple tabs, including another tab of your own user.
 
 Channel names are local to the applet, not to `PresenceGroup`. Include record IDs in your
 values when an activity belongs to a particular record.
-
-## Component props cheat sheet
-
-All components accept optional `className: string` except `PresenceGroup`. The last column
-lists optional props, with defaults where applicable.
-
-| Component                          | Required props                                           | Optional props and defaults                                                                                                    |
-| ---------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `User`                             | `id: string`                                             | `size="md"` (`xs`, `sm`, `md`, `lg`); `avatarOnly=false`; `you=false`; `detail: ReactNode`; `showStatus=true`; `label: string` |
-| `Facepile`                         | `ids: readonly string[]`                                 | `size="sm"` (`xs`, `sm`, `md`); `max=3`; `showStatus=false`                                                                    |
-| `Activity`                         | None                                                     | `scope="page"` (`page`, `workspace`)                                                                                           |
-| `Cursors`                          | `children: ReactNode`                                    | `surface="default"` (string)                                                                                                   |
-| `PresenceFrame` / `PresenceGutter` | `id: string`; `children`: exactly one React element      | None beyond `className`                                                                                                        |
-| `PresenceGroup`                    | `id: string`; `children: ReactNode`                      | None                                                                                                                           |
-| `Selection`                        | `id: string`; `selected: boolean`; `children: ReactNode` | None beyond `className`                                                                                                        |
-
-- `User`: `avatarOnly` hides the visible name and detail; `you` adds a manual “(you)” suffix;
-  `detail` adds secondary content. `label` sets the avatar tooltip and accessible label, not
-  the visible user name. `showStatus` shows a dot for active users.
-- `Facepile`: duplicate IDs appear once; users beyond `max` become a `+N` overflow indicator.
-- Only `User` and `Facepile` accept `size`. `Activity` shows all matching users and has no
-  `size` or `max` prop.
-
-See `.moi/collab.d.ts` for the complete public types and component props.

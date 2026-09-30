@@ -53,6 +53,7 @@ five-second timeout does not retry: navigation may already have happened.
 
 Replace `fileUrl` and `resolveHref` with `resolveUrl`, using `moi:/files/...` for files.
 Replace `focusTab` and `moi tabs focus` with `navigate` and `moi navigate` using portable addresses.
-Run `moi skill update` to refresh guidance/types, then rebuild applets for the `/files/` endpoint.
+Run `moi skill update` to refresh guidance/types, then `moi bundle --force` to rebuild applets
+for the `/files/` endpoint.
 
 File URLs work during module evaluation; page resolution requires the applet bridge.
