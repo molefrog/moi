@@ -27,8 +27,8 @@ separately compiled bundle. Those functions read the host's workspace and applet
 React receives one `CollabEngine` per mounted workspace through `CollabProvider`. The engine owns
 transport lifecycle and exposes stable user and channel snapshots, so cursor-only traffic does not
 rerender profile readers or unrelated channels. Transport and registration storage remain private
-implementation details. `AppletScope` supplies only the applet ID and active mount lifetime. There is
-no separate enabled context or backend adapter; the playground supplies the same engine contract.
+implementation details. `AppletPresenceProvider` supplies the applet ID and active mount lifetime.
+The playground supplies the same engine contract.
 
 ## Enable and install
 

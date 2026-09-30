@@ -25,9 +25,9 @@ import type { WorkspaceUser, UsePeersOptions, UseWorkspaceUsersOptions } from '.
 import { createPresencePublisher } from './presence-publisher'
 
 export type { WorkspaceUser, UsePeersOptions, UseWorkspaceUsersOptions } from './users'
-type Mount = { active: boolean; appletId: string }
+type AppletPresence = { active: boolean; appletId: string }
 export const CollabContext = createContext<CollabEngineApi>(NO_ENGINE)
-const MountContext = createContext<Mount | null>(null)
+const AppletPresenceContext = createContext<AppletPresence | null>(null)
 installHostApi()
 
 export function pageFromPath(path: string, workspaceId: string, base = ''): string {
@@ -60,14 +60,22 @@ export function CollabProvider({ workspaceId, enabled, children }: CollabProvide
   return <CollabContext value={engine}>{children}</CollabContext>
 }
 
-export type AppletScopeProps = { appletId: string; active?: boolean; children: ReactNode }
-export function AppletScope({ appletId, active = true, children }: AppletScopeProps) {
+export type AppletPresenceProviderProps = {
+  appletId: string
+  active?: boolean
+  children: ReactNode
+}
+export function AppletPresenceProvider({
+  appletId,
+  active = true,
+  children
+}: AppletPresenceProviderProps) {
   const { enabled } = useCollabEngine()
-  const mount = useMemo(
+  const presence = useMemo(
     () => ({ active: enabled && active, appletId }),
     [enabled, active, appletId]
   )
-  return <MountContext value={mount}>{children}</MountContext>
+  return <AppletPresenceContext value={presence}>{children}</AppletPresenceContext>
 }
 
 export function useCollabEngine(): CollabEngineApi {
@@ -141,8 +149,8 @@ export function usePeers(options: UsePeersOptions = {}): WorkspaceUser[] {
     [state, self, users, engine, scope, status]
   )
 }
-export function useMount(): Mount | null {
-  return useContext(MountContext)
+function useAppletPresence(): AppletPresence | null {
+  return useContext(AppletPresenceContext)
 }
 
 export const presenceChannels = {
@@ -159,15 +167,15 @@ export function usePresence<T extends JsonValue>(channel: string): PresenceValue
 }
 export function usePresenceChannel<T extends JsonValue>(channel: string): PresenceValue<T>[] {
   const { users, engine } = useUsersSource()
-  const mount = useMount()
-  const appletId = mount?.appletId ?? ''
+  const presence = useAppletPresence()
+  const appletId = presence?.appletId ?? ''
   const snapshot = useCallback(
     () => engine.getPresenceSnapshot(appletId, channel),
     [engine, appletId, channel]
   )
   const entries = useSyncExternalStore(engine.subscribe, snapshot, snapshot)
   return useMemo(() => {
-    if (!mount?.active) return []
+    if (!presence?.active) return []
     const known = new Set(users.map(user => user.id))
     return entries
       .filter(entry => known.has(entry.userId))
@@ -176,7 +184,7 @@ export function usePresenceChannel<T extends JsonValue>(channel: string): Presen
         userId: entry.userId,
         value: entry.value as T
       }))
-  }, [entries, users, mount])
+  }, [entries, users, presence])
 }
 
 // Internal imperative publisher for pointer/focus events. Ownership is per mount.
@@ -186,11 +194,11 @@ export function usePresencePublisher<T extends JsonValue>(
   isPresent?: (value: T) => boolean
 ): (value: T) => void {
   const engine = useCollabEngine()
-  const mount = useMount()
+  const presence = useAppletPresence()
   const [registrationId] = useState(() => crypto.randomUUID())
   const valueRef = useRef(initialValue)
   const live = useRef(false)
-  const appletId = mount?.appletId ?? ''
+  const appletId = presence?.appletId ?? ''
   const registration = useMemo(
     () => createPresencePublisher<T>(engine, { registrationId, appletId, channel }, isPresent),
     [engine, registrationId, appletId, channel, isPresent]
@@ -198,11 +206,11 @@ export function usePresencePublisher<T extends JsonValue>(
   const publish = useCallback(() => {
     registration.publish(
       valueRef.current,
-      mount?.active === true && document.visibilityState !== 'hidden'
+      presence?.active === true && document.visibilityState !== 'hidden'
     )
-  }, [mount, registration])
+  }, [presence, registration])
   useLayoutEffect(() => {
-    if (!mount?.active) return
+    if (!presence?.active) return
     live.current = true
     publish()
     document.addEventListener('visibilitychange', publish)
@@ -211,7 +219,7 @@ export function usePresencePublisher<T extends JsonValue>(
       document.removeEventListener('visibilitychange', publish)
       registration.clear()
     }
-  }, [mount, publish, registration])
+  }, [presence, publish, registration])
   return useCallback(
     (value: T) => {
       valueRef.current = value

@@ -33,7 +33,7 @@ import {
 import { createFakeEngine } from '@/client/features/collab/fake-engine'
 import type { FakeEngine } from '@/client/features/collab/fake-engine'
 import {
-  AppletScope,
+  AppletPresenceProvider,
   CollabContext,
   presenceChannels,
   useMe,
@@ -422,7 +422,7 @@ export function DevCollabKit() {
   }, [room, renamed, david])
   return (
     <CollabContext value={room}>
-      <AppletScope appletId={APPLET_ID}>
+      <AppletPresenceProvider appletId={APPLET_ID}>
         <div className="flex flex-col gap-10 border-t border-border pt-8">
           <header>
             <h2 className="text-base font-medium">Presence playground</h2>
@@ -496,7 +496,7 @@ export function DevCollabKit() {
           </Cursors>
           <HooksDemo />
         </div>
-      </AppletScope>
+      </AppletPresenceProvider>
     </CollabContext>
   )
 }

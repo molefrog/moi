@@ -9,7 +9,7 @@ import type { TabInfo } from './WorkspaceCollabControls'
 
 export type { TabInfo } from './WorkspaceCollabControls'
 export type { AppletCollabApi } from './index'
-export { AppletScope, CollabProvider } from './hooks'
+export { AppletPresenceProvider, CollabProvider } from './hooks'
 
 export const getAppletCollabApi = createAppletCollabApi
 

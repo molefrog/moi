@@ -54,10 +54,8 @@ export function appletStyleKey(segment: AppletSegment, workspaceId: string, name
   return `/api/workspaces/${workspaceId}/${segment}/${name}`
 }
 
-// The `data-applet` value the bundle's scoped CSS selectors key off (see
-// server/applets/applet-css.ts). It goes on the container wrapping a mounted
-// applet — AppletMount for widgets, the view slot for views.
-export function appletScope(segment: AppletSegment, name: string): string {
+// Stable applet identity used by scoped CSS, presence, and thumbnail capture.
+export function appletId(segment: AppletSegment, name: string): string {
   return `${segment === 'widgets' ? 'widget' : 'view'}:${name}`
 }
 

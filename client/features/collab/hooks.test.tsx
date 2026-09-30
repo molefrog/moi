@@ -4,7 +4,7 @@ import type { CollabEngineApi } from './engine'
 import { createFakeEngine } from './fake-engine'
 import { setCurrentUser } from './host-state'
 import {
-  AppletScope,
+  AppletPresenceProvider,
   CollabContext,
   pageFromPath,
   useMe,
@@ -79,9 +79,9 @@ test('observers resolve users and read presence without creating a publisher', (
   }
   const html = renderToStaticMarkup(
     <CollabContext value={backend}>
-      <AppletScope appletId="view:board">
+      <AppletPresenceProvider appletId="view:board">
         <Observer />
-      </AppletScope>
+      </AppletPresenceProvider>
     </CollabContext>
   )
   expect(html).toContain('connectionId')
@@ -284,9 +284,9 @@ test('away peers remain on the page while their focus presence is hidden', () =>
     decodeURIComponent(
       renderToStaticMarkup(
         <CollabContext value={engine}>
-          <AppletScope appletId="view:board">
+          <AppletPresenceProvider appletId="view:board">
             <Away />
-          </AppletScope>
+          </AppletPresenceProvider>
         </CollabContext>
       )
     )

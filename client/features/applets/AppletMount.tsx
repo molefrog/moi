@@ -1,9 +1,9 @@
 import { type ReactNode } from 'react'
 
-import { AppletScope } from '@/client/features/collab/entry'
+import { AppletPresenceProvider } from '@/client/features/collab/entry'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 
-import { type AppletSegment, appletScope, appletStyleKey } from './applet-cache'
+import { type AppletSegment, appletId, appletStyleKey } from './applet-cache'
 import { useAppletStyle } from './applet-styles'
 
 type AppletMountProps = {
@@ -22,13 +22,12 @@ type AppletMountProps = {
 // the boundary that hides the view.
 export function AppletMount({ segment, name, version, children }: AppletMountProps) {
   const workspaceId = useWorkspaceId()
+  const id = appletId(segment, name)
   useAppletStyle(appletStyleKey(segment, workspaceId, name), version)
 
   return (
-    <div data-applet={appletScope(segment, name)} className="size-full">
-      <AppletScope appletId={`${segment === 'views' ? 'view' : 'widget'}:${name}`}>
-        {children}
-      </AppletScope>
+    <div data-applet={id} className="size-full">
+      <AppletPresenceProvider appletId={id}>{children}</AppletPresenceProvider>
     </div>
   )
 }

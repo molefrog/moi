@@ -16,7 +16,7 @@
 import { Activity, type ComponentType, memo, useCallback, useEffect, useState } from 'react'
 
 import { Spinner } from '@/client/components/ui/spinner'
-import { appletScope, appletStyleKey } from '@/client/features/applets/applet-cache'
+import { appletId, appletStyleKey } from '@/client/features/applets/applet-cache'
 import { useAppletStyle } from '@/client/features/applets/applet-styles'
 import { useAppletThumbnails } from '@/client/features/applets/applet-thumbnail'
 import {
@@ -25,7 +25,7 @@ import {
   useView
 } from '@/client/features/applets/useApplet'
 import { WidgetErrorBoundary } from '@/client/features/applets/WidgetErrorBoundary'
-import { AppletScope } from '@/client/features/collab/entry'
+import { AppletPresenceProvider } from '@/client/features/collab/entry'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { cn } from '@/client/lib/cn'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
@@ -182,7 +182,7 @@ function ViewSlot({ view, active, params }: ViewSlotProps) {
               build={current}
               params={shownParams}
               entering={outgoing !== null}
-              thumbnailTarget
+              current
             />
           </Activity>
         )}
@@ -197,7 +197,8 @@ type ViewFrameProps = {
   // Play the rebuild dissolve. Set on the incoming build only, and only while
   // the build it replaced is still rendered underneath it.
   entering?: boolean
-  thumbnailTarget?: boolean
+  // The current build owns thumbnails and presence during a rebuild.
+  current?: boolean
 }
 
 // One build of one view, in its style scope. Frames stack absolutely, so during
@@ -205,13 +206,14 @@ type ViewFrameProps = {
 //
 // The frame itself never scrolls; a child does. Applet-scoped overlays portal
 // into this root and position against it.
-function ViewFrame({ view, build, params, entering, thumbnailTarget }: ViewFrameProps) {
+function ViewFrame({ view, build, params, entering, current = false }: ViewFrameProps) {
   const workspaceId = useWorkspaceId()
+  const id = appletId('views', view.id)
 
   return (
     <div
-      data-applet-thumbnail={thumbnailTarget ? `view:${view.id}` : undefined}
-      data-applet={appletScope('views', view.id)}
+      data-applet-thumbnail={current ? id : undefined}
+      data-applet={id}
       className={cn(
         // Keep applet z-indexes inside the view. Host overlays render after this
         // frame and should always stack above the view as a single unit.
@@ -226,9 +228,9 @@ function ViewFrame({ view, build, params, entering, thumbnailTarget }: ViewFrame
           workspaceId={workspaceId}
           resetKey={build.version}
         >
-          <AppletScope appletId={`view:${view.id}`} active={thumbnailTarget === true}>
+          <AppletPresenceProvider appletId={id} active={current}>
             <build.Component params={params} />
-          </AppletScope>
+          </AppletPresenceProvider>
         </WidgetErrorBoundary>
       </div>
     </div>

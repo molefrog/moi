@@ -18,7 +18,7 @@ import {
   useWorkspaceUsersAvailability
 } from './hooks'
 
-export { CollabProvider, AppletScope, CollabContext } from './hooks'
+export { CollabProvider, AppletPresenceProvider, CollabContext } from './hooks'
 export { WorkspaceCollabControls } from './WorkspaceCollabControls'
 export { getCurrentUser, subscribeCurrentUserStore } from './host-state'
 
