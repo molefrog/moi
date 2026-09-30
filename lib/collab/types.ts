@@ -43,7 +43,7 @@ export type Connection = {
 }
 
 export type CollabClientMessage =
-  | { type: 'join'; version: 2; profile: UserProfile; location?: CollabLocation | null }
+  | { type: 'join'; version: 1; profile: UserProfile; location?: CollabLocation | null }
   | { type: 'profile'; profile: UserProfile }
   | { type: 'location'; location: CollabLocation | null }
   | ({ type: 'presence:set' } & CollabPresenceRegistration)
@@ -53,7 +53,7 @@ export type CollabClientMessage =
 export type CollabServerMessage =
   | {
       type: 'welcome'
-      version: 2
+      version: 1
       connectionId: string
       connections: Connection[]
       // Profile fallback for currently connected users only. The host owns

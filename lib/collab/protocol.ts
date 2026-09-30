@@ -1,7 +1,7 @@
 import { isUserColor } from './colors'
 import type { CollabClientMessage, CollabJsonValue, CollabLocation, UserProfile } from './types'
 
-export const COLLAB_PROTOCOL_VERSION = 2
+export const COLLAB_PROTOCOL_VERSION = 1
 export const COLLAB_MAX_CONNECTIONS = 64
 export const COLLAB_MAX_REGISTRATIONS = 128
 export const COLLAB_MAX_MESSAGE_BYTES = 256 * 1024

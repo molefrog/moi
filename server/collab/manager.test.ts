@@ -82,7 +82,7 @@ async function connect(url: string, id: string) {
   socket.onmessage = event => messages.push(JSON.parse(String(event.data)) as CollabServerMessage)
   const send = (message: CollabClientMessage) => socket.send(JSON.stringify(message))
   await until(() => socket.readyState === WebSocket.OPEN)
-  send({ type: 'join', version: 2, profile: { id, name: id, color: 'blue' } })
+  send({ type: 'join', version: 1, profile: { id, name: id, color: 'blue' } })
   await until(() => messages.some(message => message.type === 'welcome'))
   return { socket, messages, send }
 }
@@ -125,7 +125,7 @@ function joinLocal(runtime: CollabManager, socket: CollabSocket, id = 'anna') {
     socket,
     JSON.stringify({
       type: 'join',
-      version: 2,
+      version: 1,
       profile: { id, name: id, color: 'blue' }
     })
   )
@@ -222,15 +222,15 @@ describe('collab process and socket integration', () => {
     await until(() => runtime.debugSnapshot().length === 0)
   })
 
-  test('malformed, old-version and removed storage messages fail without reaching the room', async () => {
+  test('malformed, unsupported-version and removed storage messages fail without reaching the room', async () => {
     const runtime = manager()
     const client = await connect(serve(runtime, directory()), 'anna')
     const invalid = [
       '{',
       JSON.stringify({
         type: 'join',
-        version: 1,
-        profile: { id: 'old', name: 'Old', color: 'blue' }
+        version: 0,
+        profile: { id: 'invalid', name: 'Invalid', color: 'blue' }
       }),
       JSON.stringify({
         type: 'mutate',
@@ -403,7 +403,7 @@ describe('collab process and socket integration', () => {
         return message.length;
       }, close() {} };
       runtime.open(socket, ${JSON.stringify(root)});
-      runtime.message(socket, JSON.stringify({ type: 'join', version: 2, profile: { id: 'test', name: 'Test', color: 'blue' } }));
+      runtime.message(socket, JSON.stringify({ type: 'join', version: 1, profile: { id: 'test', name: 'Test', color: 'blue' } }));
     `
     )
     const parent = Bun.spawn([process.execPath, parentPath], { stdout: 'pipe', stderr: 'inherit' })

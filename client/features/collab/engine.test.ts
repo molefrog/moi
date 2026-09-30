@@ -154,7 +154,7 @@ test('reconnecting restores current presence and removed registrations stay gone
       value: true
     }
   ])
-  expect(sockets[1]!.sent[0]).toMatchObject({ type: 'join', version: 2 })
+  expect(sockets[1]!.sent[0]).toMatchObject({ type: 'join', version: 1 })
 })
 
 test('changing user reconnects and never sends the host directory over the socket', async () => {

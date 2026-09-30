@@ -170,7 +170,7 @@ describe('collab HTTP integration', () => {
         socket.send(
           JSON.stringify({
             type: 'join',
-            version: 2,
+            version: 1,
             profile: { id: 'anna', name: 'Anna', color: 'blue' }
           })
         )
@@ -227,7 +227,7 @@ describe('collab HTTP integration', () => {
       socket,
       JSON.stringify({
         type: 'join',
-        version: 2,
+        version: 1,
         profile: { id: 'anna', name: 'Anna', color: 'blue' }
       })
     )

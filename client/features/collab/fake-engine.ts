@@ -1,4 +1,5 @@
 import type { UserProfile, Connection, CollabPresenceRegistration } from '@/lib/collab/types'
+import { COLLAB_PROTOCOL_VERSION } from '@/lib/collab/protocol'
 import type { CollabEngineApi } from './engine'
 import { normalizeWorkspaceUsers } from './host-state'
 import type { WorkspaceDirectory } from './host-state'
@@ -72,7 +73,7 @@ export function createFakeEngine({
   store.setLocation(location)
   store.receive({
     type: 'welcome',
-    version: 2,
+    version: COLLAB_PROTOCOL_VERSION,
     connectionId: 'local',
     connections: connections(),
     users: liveUsers()

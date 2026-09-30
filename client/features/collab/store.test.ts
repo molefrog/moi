@@ -11,7 +11,7 @@ const connection: Connection = {
 }
 const welcome = {
   type: 'welcome' as const,
-  version: 2 as const,
+  version: 1 as const,
   connectionId: 'a',
   connections: [connection],
   users: [alice]

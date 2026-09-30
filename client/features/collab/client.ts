@@ -1,4 +1,5 @@
 import { wsUrl } from '@/client/lib/ws-url'
+import { COLLAB_PROTOCOL_VERSION } from '@/lib/collab/protocol'
 import type { CollabClientMessage, CollabServerMessage } from '@/lib/collab/types'
 
 import { getCurrentUser, subscribeCurrentUserStore } from './host-state'
@@ -64,7 +65,12 @@ export class CollabClient {
         socket.close()
         return
       }
-      this.rawSend({ type: 'join', version: 2, profile, location: this.store.getLocation() })
+      this.rawSend({
+        type: 'join',
+        version: COLLAB_PROTOCOL_VERSION,
+        profile,
+        location: this.store.getLocation()
+      })
       this.heartbeat = setInterval(() => {
         if (Date.now() - this.lastMessageAt > 45_000) socket.close()
         else this.rawSend({ type: 'ping' })

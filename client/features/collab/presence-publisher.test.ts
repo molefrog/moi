@@ -7,7 +7,7 @@ import { CollabStore } from './store'
 
 const welcome = {
   type: 'welcome' as const,
-  version: 2 as const,
+  version: 1 as const,
   connectionId: 'self',
   connections: [],
   users: []

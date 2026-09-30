@@ -202,7 +202,7 @@ Authoring guide: [COLLAB.md](../workspace/.claude/skills/moi-workspace/reference
 
 ## Transport and lifecycle
 
-Protocol version 2 accepts a `join` with a user profile, profile updates, location updates,
+Protocol version 1 accepts a `join` with a user profile, profile updates, location updates,
 presence registration updates/removals, and ping. It sends welcome, connection/profile snapshots,
 errors, and pong.
 Profiles in socket snapshots are only a fallback for current connections; the full host directory

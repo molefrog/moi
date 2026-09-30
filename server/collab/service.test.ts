@@ -20,7 +20,7 @@ describe('collab service', () => {
   function join(connectionId: string, id = connectionId) {
     service.receive(connectionId, {
       type: 'join',
-      version: 2,
+      version: 1,
       profile: { id, name: id, color: 'blue' },
       location: { page: 'view:board' }
     })
@@ -40,7 +40,7 @@ describe('collab service', () => {
     )?.message
     expect(welcome).toEqual({
       type: 'welcome',
-      version: 2,
+      version: 1,
       connectionId: 'b',
       connections: [
         { connectionId: 'a', userId: 'anna', location: { page: 'view:board' }, presence: [] },
@@ -118,12 +118,12 @@ describe('collab service', () => {
       email: 'anna@example.com',
       avatar: 'https://example.com/avatar'
     } as const
-    service.receive('one', { type: 'join', version: 2, profile: nameless })
+    service.receive('one', { type: 'join', version: 1, profile: nameless })
     const welcome = messages.find(item => item.message.type === 'welcome')?.message
     if (welcome?.type !== 'welcome') throw new Error('Missing welcome')
     expect(welcome.users).toEqual([nameless])
     expect(Object.hasOwn(welcome.users[0]!, 'name')).toBe(false)
-    service.receive('two', { type: 'join', version: 2, profile: nameless })
+    service.receive('two', { type: 'join', version: 1, profile: nameless })
     service.receive('one', { type: 'profile', profile: { ...nameless, name: '' } })
     expect(latest().users).toEqual([{ ...nameless, name: '' }])
     service.leave('one')
