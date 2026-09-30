@@ -75,9 +75,9 @@ function pointerPosition(value: CollabJsonValue): PointerPosition | null {
   }
 }
 
-export function Cursors({ surface = 'default', children, className }: CursorsProps) {
+export function Cursors({ id = 'default', children, className }: CursorsProps) {
   const root = useRef<HTMLDivElement>(null)
-  const channel = presenceChannels.cursor(surface)
+  const channel = presenceChannels.cursor(id)
   const cursors = usePresenceChannel<CollabJsonValue>(channel)
   const publish = usePresencePublisher<CollabJsonValue>(channel, null, hasPresence)
   const byConnection = new Map<string, { id: string; point: PointerPosition }>()
@@ -116,7 +116,7 @@ export function Cursors({ surface = 'default', children, className }: CursorsPro
   return (
     <div
       ref={root}
-      data-collab-cursors={surface}
+      data-collab-cursors={id}
       className={cn('relative', className)}
       onPointerMove={move}
       onPointerLeave={event => {

@@ -158,7 +158,7 @@ a persistent key/value store. Channel values must be JSON and fit within 4 KiB.
 | `User`           | Resolve a profile by `id`; name/avatar, sizes, optional status and detail.              |
 | `Facepile`       | Resolve `ids` and render stacked avatars with an overflow count.                        |
 | `Activity`       | Show the current user and other connected users on the page or in the workspace.        |
-| `Cursors`        | Wrap a cursor surface; optional stable `surface` name.                                  |
+| `Cursors`        | Wrap a cursor area; optional stable `id`.                                               |
 | `PresenceFrame`  | Wrap one element with a stable local `id`; outline it when another user focuses inside. |
 | `PresenceGutter` | The same single-element focus contract, with avatars beside it.                         |
 | `PresenceGroup`  | Require `id`, namespace descendant targets, and constrain gutter avatar animations.     |

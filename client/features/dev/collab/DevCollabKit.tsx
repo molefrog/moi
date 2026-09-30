@@ -318,7 +318,7 @@ function RecordDialogs() {
           <DialogTitle className="font-medium">Edit {record?.id}</DialogTitle>
           <DialogDescription>Presence follows the record’s stable ID.</DialogDescription>
           {record && (
-            <Cursors surface="examples" className="pt-6">
+            <Cursors id="examples" className="pt-6">
               <PresenceGroup id="todo">
                 <PresenceGroup id={record.id}>
                   <PresenceGroup id="dialog">
@@ -497,7 +497,7 @@ export function DevCollabKit() {
               ))}
             </div>
           </Section>
-          <Cursors surface="examples" className="flex flex-col gap-10">
+          <Cursors id="examples" className="flex flex-col gap-10">
             <EditableList />
             <NestedForm />
             <RecordDialogs />

@@ -144,7 +144,7 @@ export function useMount(): Mount | null {
 
 export const presenceChannels = {
   custom: (channel: string) => `custom:${channel}`,
-  cursor: (surface: string) => `cursor:${surface}`,
+  cursor: (id: string) => `cursor:${id}`,
   field: (target: string) => `field:${target}`,
   selection: (target: string) => `selection:${target}`
 }

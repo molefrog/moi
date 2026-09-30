@@ -134,7 +134,7 @@ test.each([
         ]
       }
     ])
-    expect(render(engine, <Cursors surface="board">Board</Cursors>)).toContain(`>${label}<`)
+    expect(render(engine, <Cursors id="board">Board</Cursors>)).toContain(`>${label}<`)
   }
 )
 
