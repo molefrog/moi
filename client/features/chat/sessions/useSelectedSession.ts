@@ -1,7 +1,7 @@
 import { useCollabEnabled } from '@/client/features/collab/entry'
 import {
-  readBrowserTabSelectedSession,
-  writeBrowserTabSelectedSession
+  readSelectedSession,
+  writeSelectedSession
 } from '@/client/features/collab/browser-tab-state'
 import { useCallback, useMemo } from 'react'
 
@@ -98,8 +98,7 @@ export function renameSelectedSessionInCache(
       current => (current?.sessionId === from ? { sessionId: to } : current)
     )
   }
-  if (readBrowserTabSelectedSession(workspaceId) === from)
-    writeBrowserTabSelectedSession(workspaceId, to)
+  if (readSelectedSession(workspaceId) === from) writeSelectedSession(workspaceId, to)
 }
 
 export function useSelectedSession(): SelectedSessionResult {
@@ -121,7 +120,7 @@ export function useSelectedSession(): SelectedSessionResult {
     queryKey,
     queryFn: () =>
       scope === 'browser-tab'
-        ? Promise.resolve({ sessionId: readBrowserTabSelectedSession(workspaceId) })
+        ? Promise.resolve({ sessionId: readSelectedSession(workspaceId) })
         : requestJson(`/api/workspaces/${workspaceId}/selected-session`),
     staleTime: Infinity,
     gcTime: 0,
@@ -138,7 +137,7 @@ export function useSelectedSession(): SelectedSessionResult {
     scope: { id: `selected-session:${workspaceId}` },
     mutationFn: input => {
       if (scope === 'browser-tab') {
-        writeBrowserTabSelectedSession(workspaceId, input.sessionId)
+        writeSelectedSession(workspaceId, input.sessionId)
         return Promise.resolve({ sessionId: input.sessionId })
       }
       return requestJson<SelectedSessionState>(

@@ -5,7 +5,7 @@ import { normalizeWorkspaceTabs } from '@/lib/workspace-layout'
 
 const keyFor = (workspaceId: string, field: string) => `moi:collab:${workspaceId}:${field}`
 
-export function readBrowserTabSelectedSession(workspaceId: string): string | null {
+export function readSelectedSession(workspaceId: string): string | null {
   try {
     return sessionStorage.getItem(keyFor(workspaceId, 'session'))
   } catch {
@@ -13,10 +13,7 @@ export function readBrowserTabSelectedSession(workspaceId: string): string | nul
   }
 }
 
-export function writeBrowserTabSelectedSession(
-  workspaceId: string,
-  sessionId: string | null
-): void {
+export function writeSelectedSession(workspaceId: string, sessionId: string | null): void {
   try {
     if (sessionId === null) sessionStorage.removeItem(keyFor(workspaceId, 'session'))
     else sessionStorage.setItem(keyFor(workspaceId, 'session'), sessionId)

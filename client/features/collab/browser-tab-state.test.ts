@@ -13,9 +13,9 @@ import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import { mergeLayoutForSave } from '@/server/layout'
 
 import {
-  readBrowserTabSelectedSession,
+  readSelectedSession,
   readWorkspaceTabs,
-  writeBrowserTabSelectedSession,
+  writeSelectedSession,
   writeWorkspaceTabs
 } from './browser-tab-state'
 
@@ -55,17 +55,17 @@ describe('collab browser tab state', () => {
     const anna = browserTab()
     const boris = browserTab()
     useBrowserTab(anna)
-    writeBrowserTabSelectedSession('workspace', 'annas-chat')
+    writeSelectedSession('workspace', 'annas-chat')
     expect(anna.getItem('moi:collab:workspace:session')).toBe('annas-chat')
     useBrowserTab(boris)
-    expect(readBrowserTabSelectedSession('workspace')).toBeNull()
-    writeBrowserTabSelectedSession('workspace', 'boris-chat')
+    expect(readSelectedSession('workspace')).toBeNull()
+    writeSelectedSession('workspace', 'boris-chat')
     useBrowserTab(anna)
-    expect(readBrowserTabSelectedSession('workspace')).toBe('annas-chat')
-    writeBrowserTabSelectedSession('workspace', null)
-    expect(readBrowserTabSelectedSession('workspace')).toBeNull()
+    expect(readSelectedSession('workspace')).toBe('annas-chat')
+    writeSelectedSession('workspace', null)
+    expect(readSelectedSession('workspace')).toBeNull()
     useBrowserTab(boris)
-    expect(readBrowserTabSelectedSession('workspace')).toBe('boris-chat')
+    expect(readSelectedSession('workspace')).toBe('boris-chat')
   })
 
   test('browser tab chat and view choices survive reads and stay partitioned by workspace', () => {
@@ -74,11 +74,11 @@ describe('collab browser tab state', () => {
       open: ['overview', 'views/board'],
       active: 'views/board'
     }
-    writeBrowserTabSelectedSession('one', 'chat-one')
-    writeBrowserTabSelectedSession('two', 'chat-two')
+    writeSelectedSession('one', 'chat-one')
+    writeSelectedSession('two', 'chat-two')
     writeWorkspaceTabs('one', selected)
-    expect(readBrowserTabSelectedSession('one')).toBe('chat-one')
-    expect(readBrowserTabSelectedSession('two')).toBe('chat-two')
+    expect(readSelectedSession('one')).toBe('chat-one')
+    expect(readSelectedSession('two')).toBe('chat-two')
     expect(readWorkspaceTabs('one', defaults)).toEqual(selected)
     expect(readWorkspaceTabs('two', defaults)).toEqual(defaults)
     expect(defaults.active).toBe('overview')
@@ -128,9 +128,9 @@ describe('collab browser tab state', () => {
         throw new Error('Storage disabled')
       }
     })
-    expect(readBrowserTabSelectedSession('workspace')).toBeNull()
+    expect(readSelectedSession('workspace')).toBeNull()
     expect(readWorkspaceTabs('workspace', defaults)).toEqual(defaults)
-    expect(() => writeBrowserTabSelectedSession('workspace', 'chat')).not.toThrow()
+    expect(() => writeSelectedSession('workspace', 'chat')).not.toThrow()
     expect(() => writeWorkspaceTabs('workspace', defaults)).not.toThrow()
   })
 })
@@ -164,7 +164,7 @@ describe('collab authored layout preservation', () => {
 describe('collab selected chat cache transitions', () => {
   test('supplying a current user switches the mounted chat observer to the saved tab chat', async () => {
     useBrowserTab(browserTab())
-    writeBrowserTabSelectedSession('workspace', 'saved-tab-chat')
+    writeSelectedSession('workspace', 'saved-tab-chat')
     const client = new QueryClient()
     const sharedKey = selectedSessionKey('workspace')
     client.setQueryData(sharedKey, { sessionId: 'old-shared-chat' })
@@ -183,7 +183,7 @@ describe('collab selected chat cache transitions', () => {
         queryKey: selectedSessionKey('workspace', 'browser-tab'),
         queryFn: async () => {
           reads++
-          return { sessionId: readBrowserTabSelectedSession('workspace') }
+          return { sessionId: readSelectedSession('workspace') }
         }
       })
       expect(selection.getCurrentResult().data).toBeUndefined()
@@ -256,13 +256,13 @@ describe('collab selected chat cache transitions', () => {
     useBrowserTab(browserTab())
     const client = new QueryClient()
     try {
-      writeBrowserTabSelectedSession('workspace', 'temporary-id')
+      writeSelectedSession('workspace', 'temporary-id')
       client.setQueryData(selectedSessionKey('workspace', 'browser-tab'), {
         sessionId: 'temporary-id'
       })
       client.setQueryData(selectedSessionKey('workspace'), { sessionId: 'different-shared-chat' })
       renameSelectedSessionInCache(client, 'workspace', 'temporary-id', 'provider-id')
-      expect(readBrowserTabSelectedSession('workspace')).toBe('provider-id')
+      expect(readSelectedSession('workspace')).toBe('provider-id')
       expect(
         client.getQueryData<SelectedSessionState>(selectedSessionKey('workspace', 'browser-tab'))
       ).toEqual({
