@@ -205,7 +205,7 @@ export function AvatarGroupExample() {
 
 ## Avatar Group Count
 
-Use `<AvatarGroupCount>` to add a count to the group. Pass the same size as the avatars in the group.
+Use `<AvatarGroupCount>` to add a count to the group.
 
 ```tsx
 import {
@@ -277,7 +277,7 @@ export function AvatarGroupCountIconExample() {
 
 ## Sizes
 
-Use the `size` prop to change the size of the avatar.
+Use the `size` prop to change the size of the avatar and the group count.
 
 ```tsx
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -457,6 +457,8 @@ The `AvatarBadge` component displays a badge indicator on the avatar, typically 
 ### AvatarGroup
 
 The `AvatarGroup` component displays a group of avatars with overlapping styling.
+
+Use the same size for all avatars and the count in a group. Transparent cutouts separate overlapping avatars, so the gaps show the surrounding background.
 
 | Prop        | Type     | Default |
 | ----------- | -------- | ------- |

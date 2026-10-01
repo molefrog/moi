@@ -66,7 +66,10 @@ function AvatarGroup({ className, ...props }: React.ComponentProps<'div'>) {
     <div
       data-slot="avatar-group"
       className={cn(
-        'group/avatar-group flex -space-x-2 *:data-[slot=avatar]:ring-2 *:data-[slot=avatar]:ring-background',
+        'group/avatar-group flex items-center -space-x-2 [--avatar-radius:--spacing(4)]',
+        '*:data-[size=lg]:[--avatar-radius:--spacing(5)] *:data-[size=sm]:[--avatar-radius:--spacing(3)] *:data-[size=xs]:[--avatar-radius:--spacing(2.5)]',
+        // Leave a transparent gap around the next avatar, including an overflow count.
+        '[&>[data-slot=avatar]:not(:last-child)]:mask-[radial-gradient(circle_at_calc(100%_+_var(--avatar-radius)_-_--spacing(2))_50%,transparent_calc(var(--avatar-radius)_+_2px),black_calc(var(--avatar-radius)_+_2.5px))]',
         className
       )}
       {...props}
@@ -86,9 +89,9 @@ function AvatarGroupCount({
       data-slot="avatar-group-count"
       data-size={size}
       className={cn(
-        'relative flex shrink-0 items-center justify-center rounded-full bg-muted text-sm text-muted-foreground ring-2 ring-background [&>svg]:size-4',
+        'relative flex shrink-0 items-center justify-center rounded-full bg-accent text-sm text-muted-foreground [&>svg]:size-4',
         'data-[size=default]:size-8 data-[size=lg]:size-10 data-[size=sm]:size-6 data-[size=xs]:size-5',
-        'data-[size=sm]:text-xs data-[size=xs]:text-[11px]',
+        'data-[size=sm]:text-[11px] data-[size=xs]:text-[11px]',
         'data-[size=lg]:[&>svg]:size-5 data-[size=sm]:[&>svg]:size-3 data-[size=xs]:[&>svg]:size-3',
         className
       )}
