@@ -4,10 +4,10 @@ import type { HTMLAttributes, ReactNode, Ref } from 'react'
 import { IconCursorText } from '@tabler/icons-react'
 import { cn } from '@/client/lib/cn'
 import type { UserColor } from '@/lib/collab/colors'
+import { Badge } from '@/ui-components/badge'
 import { useUsers } from '../hooks'
 import { userDisplayName } from '../users'
 import { presenceChild, usePresenceTarget, useTargetPresence } from './presence-helpers'
-import { UserTag } from './user-tag'
 
 export function FocusFrame({ id, children, className }: FocusFrameProps) {
   const target = usePresenceTarget(id)
@@ -117,12 +117,10 @@ function FrameOutline({ names, color, icon }: FrameOutlineProps) {
       data-collab-color={color ?? 'unknown'}
       className="group/frame pointer-events-none absolute inset-0 animate-in rounded-sm outline-2 outline-collab duration-150 fade-in data-[shape=rounded]:outline-offset-2 data-[shape=square]:outline-offset-4"
     >
-      <UserTag
-        name={names}
-        color={color}
-        icon={icon}
-        className="absolute bottom-full group-data-[shape=rounded]/frame:mb-1.5 group-data-[shape=square]/frame:mb-2 group-data-[tag=end]/frame:right-0 group-data-[tag=end]/frame:max-w-full group-data-[tag=start]/frame:left-0 group-data-[tag=start]/frame:max-w-40"
-      />
+      <Badge className="absolute bottom-full bg-collab text-collab-foreground group-data-[shape=rounded]/frame:mb-1.5 group-data-[shape=square]/frame:mb-2 group-data-[tag=end]/frame:right-0 group-data-[tag=end]/frame:max-w-full group-data-[tag=start]/frame:left-0 group-data-[tag=start]/frame:max-w-40">
+        {icon}
+        <span className="truncate">{names}</span>
+      </Badge>
     </div>
   )
 }

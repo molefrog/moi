@@ -2,12 +2,13 @@ import type { CursorsProps } from 'moi/collab'
 import type { JsonValue } from 'moi'
 import { useCallback, useLayoutEffect, useRef } from 'react'
 import type { PointerEvent, Ref, RefObject } from 'react'
+import { IconPointer2 } from '@tabler/icons-react'
 
 import { cn } from '@/client/lib/cn'
+import { Badge } from '@/ui-components/badge'
 
 import { presenceChannels, usePresenceChannel, usePresencePublisher, useUser } from '../hooks'
 import { userDisplayName } from '../users'
-import { UserTag } from './user-tag'
 import { hasPresence } from './presence-helpers'
 
 type PointerPosition = { x: number; y: number; target?: string; targetX?: number; targetY?: number }
@@ -180,15 +181,15 @@ function Cursor({ id, x, y, label = true, className, ref }: CursorProps) {
       )}
     >
       <span className="relative block animate-in duration-200 zoom-in-75 fade-in">
-        <svg viewBox="0 0 20 20" className="size-5 fill-collab drop-shadow-sm">
-          <path d="M1 1 17.5 10.5 9.8 12.2 6 19.5Z" />
-        </svg>
+        <IconPointer2
+          size={24}
+          stroke={1.5}
+          className="-translate-x-0.5 -translate-y-0.5 fill-collab stroke-white drop-shadow-xs"
+        />
         {label && (
-          <UserTag
-            name={user ? userDisplayName(user) : 'Someone'}
-            color={user?.color}
-            className="absolute top-4 left-3.5"
-          />
+          <Badge className="absolute top-3.5 left-3.5 bg-collab text-collab-foreground">
+            <span className="truncate">{user ? userDisplayName(user) : 'Someone'}</span>
+          </Badge>
         )}
       </span>
     </span>

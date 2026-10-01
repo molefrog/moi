@@ -49,11 +49,7 @@ function FocusAvatarsPrimitive({
       <div className="pointer-events-none absolute top-0 left-0 flex -space-x-3" aria-hidden="true">
         {users.map(({ id, connectionId }) => (
           <motion.span key={id} layoutId={animate ? `presence:${connectionId}` : undefined}>
-            <UserAvatar
-              id={id}
-              size="xs"
-              className="animate-in ring-2 ring-background duration-200 zoom-in-75 fade-in"
-            />
+            <UserAvatar id={id} size="sm" className="animate-in duration-200 zoom-in-75 fade-in" />
           </motion.span>
         ))}
       </div>
