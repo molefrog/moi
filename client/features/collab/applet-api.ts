@@ -19,12 +19,12 @@ export type AppletCollabApi = typeof CollabApi
 
 export const appletCollabApi = {
   Cursors,
-  UserAvatarGroup,
   User,
   UserAvatar,
+  UserAvatarGroup,
   PresenceFrame,
-  PresenceGroup,
   PresenceAvatars,
+  PresenceGroup,
   useMe,
   usePeers,
   useUser,

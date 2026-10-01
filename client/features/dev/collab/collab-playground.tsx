@@ -475,8 +475,8 @@ function ParticipantPane({ room, user }: ParticipantPaneProps) {
           className="flex min-w-0 flex-col gap-4"
         >
           <User id={user.id} description="Interact here; presence appears in the other pane" />
-          <div className="h-96 overflow-auto rounded-lg border border-border p-4">
-            <Cursors id="examples" className="flex flex-col gap-8">
+          <div className="h-96 overflow-auto rounded-lg border border-border">
+            <Cursors id="examples" className="flex min-h-full flex-col gap-8 p-4">
               <TargetPresenceDemo />
               <EditableList />
               <NestedForm />

@@ -1,6 +1,6 @@
 import type { CursorsProps } from 'moi/collab'
 import type { JsonValue } from 'moi'
-import { useCallback, useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import type { PointerEvent, Ref, RefObject } from 'react'
 import { IconPointer2 } from '@tabler/icons-react'
 
@@ -31,6 +31,19 @@ function pointerPosition(value: JsonValue): PointerPosition | null {
 
 export function Cursors({ id = 'default', children, className }: CursorsProps) {
   const root = useRef<HTMLDivElement>(null)
+  const layer = useRef<HTMLDivElement>(null)
+  // Keep the overlay in the visible viewport when the cursor area itself scrolls.
+  useLayoutEffect(() => {
+    const element = root.current
+    const overlay = layer.current
+    if (!element || !overlay) return
+    const position = () => {
+      overlay.style.transform = `translate(${element.scrollLeft}px, ${element.scrollTop}px)`
+    }
+    position()
+    element.addEventListener('scroll', position)
+    return () => element.removeEventListener('scroll', position)
+  }, [])
   const channel = presenceChannels.cursor(id)
   const cursors = usePresenceChannel<JsonValue>(channel)
   const publish = usePresencePublisher<JsonValue>(channel, null, hasPresence)
@@ -56,8 +69,8 @@ export function Cursors({ id = 'default', children, className }: CursorsProps) {
     const anchor = target && element.contains(target) ? target : null
     const rect = anchor?.getBoundingClientRect()
     publish({
-      x: event.clientX - bounds.left + element.scrollLeft,
-      y: event.clientY - bounds.top + element.scrollTop,
+      x: event.clientX - bounds.left - element.clientLeft + element.scrollLeft,
+      y: event.clientY - bounds.top - element.clientTop + element.scrollTop,
       ...(anchor && rect
         ? {
             target: anchor.dataset.collabTarget ?? '',
@@ -72,6 +85,7 @@ export function Cursors({ id = 'default', children, className }: CursorsProps) {
       ref={root}
       data-collab-cursors={id}
       className={cn('relative', className)}
+      onPointerEnter={move}
       onPointerMove={move}
       onPointerLeave={event => {
         if (
@@ -82,7 +96,11 @@ export function Cursors({ id = 'default', children, className }: CursorsProps) {
       }}
     >
       {children}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+      <div
+        ref={layer}
+        className="pointer-events-none absolute inset-0 overflow-hidden"
+        aria-hidden="true"
+      >
         {[...byConnection].map(([connectionId, { id, point }]) => (
           <RemoteCursor key={connectionId} root={root} point={point} id={id} />
         ))}
@@ -104,7 +122,7 @@ function RemoteCursor({ root, point, id }: RemoteCursorProps) {
     const element = root.current
     const node = marker.current
     if (!element || !node) return
-    const position = () => {
+    const position = (animate = false) => {
       let x = point.x - element.scrollLeft
       let y = point.y - element.scrollTop
       if (point.target) {
@@ -117,29 +135,35 @@ function RemoteCursor({ root, point, id }: RemoteCursorProps) {
         }
         const bounds = element.getBoundingClientRect()
         const rect = target.getBoundingClientRect()
-        x = rect.left - bounds.left + rect.width * (point.targetX ?? 0)
-        y = rect.top - bounds.top + rect.height * (point.targetY ?? 0)
+        x = rect.left - bounds.left - element.clientLeft + rect.width * (point.targetX ?? 0)
+        y = rect.top - bounds.top - element.clientTop + rect.height * (point.targetY ?? 0)
+      }
+      const transform = `translate(${x}px, ${y}px)`
+      if (node.hidden || node.style.transform !== transform) {
+        // Smooth pointer updates; place new cursors and layout corrections immediately.
+        node.dataset.moving = animate && !node.hidden ? 'true' : 'false'
+        node.style.transform = transform
       }
       node.hidden = false
-      node.style.transform = `translate(${x}px, ${y}px)`
     }
-    position()
-    const observer = new ResizeObserver(position)
+    position(true)
+    const reposition = () => position()
+    const observer = new ResizeObserver(reposition)
     observer.observe(element)
-    const changes = new MutationObserver(position)
+    const changes = new MutationObserver(reposition)
     changes.observe(element, {
       childList: true,
       subtree: true,
       attributes: true,
       attributeFilter: ['data-collab-target']
     })
-    element.addEventListener('scroll', position, true)
-    window.addEventListener('resize', position)
+    element.addEventListener('scroll', reposition, true)
+    window.addEventListener('resize', reposition)
     return () => {
       observer.disconnect()
       changes.disconnect()
-      element.removeEventListener('scroll', position, true)
-      window.removeEventListener('resize', position)
+      element.removeEventListener('scroll', reposition, true)
+      window.removeEventListener('resize', reposition)
     }
   }, [root, point])
   return <Cursor ref={marker} id={id} />
@@ -147,38 +171,18 @@ function RemoteCursor({ root, point, id }: RemoteCursorProps) {
 
 type CursorProps = {
   id: string
-  // Pointer tip in the parent's coordinate space. Leave both out to place the
-  // node yourself through `ref`.
-  x?: number
-  y?: number
-  label?: boolean
-  className?: string
   ref?: Ref<HTMLSpanElement>
 }
-function Cursor({ id, x, y, label = true, className, ref }: CursorProps) {
+function Cursor({ id, ref }: CursorProps) {
   const user = useUser(id)
-  const node = useRef<HTMLSpanElement | null>(null)
-  const attach = useCallback(
-    (element: HTMLSpanElement | null) => {
-      node.current = element
-      if (typeof ref === 'function') ref(element)
-      else if (ref) ref.current = element
-    },
-    [ref]
-  )
-  useLayoutEffect(() => {
-    if (node.current && x !== undefined && y !== undefined)
-      node.current.style.transform = `translate(${x}px, ${y}px)`
-  }, [x, y])
   return (
     <span
-      ref={attach}
+      ref={ref}
+      // Position before revealing it, so the first update cannot animate from (0, 0).
+      hidden
       aria-hidden="true"
       data-collab-color={user?.color ?? 'unknown'}
-      className={cn(
-        'pointer-events-none absolute top-0 left-0 transition-transform duration-100 ease-linear motion-reduce:transition-none',
-        className
-      )}
+      className="pointer-events-none absolute top-0 left-0 transition-transform duration-100 ease-linear data-[moving=false]:transition-none motion-reduce:transition-none"
     >
       <span className="relative block animate-in duration-200 zoom-in-75 fade-in">
         <IconPointer2
@@ -186,11 +190,9 @@ function Cursor({ id, x, y, label = true, className, ref }: CursorProps) {
           stroke={1.5}
           className="-translate-x-0.5 -translate-y-0.5 fill-collab stroke-white drop-shadow-xs"
         />
-        {label && (
-          <Badge className="absolute top-3.5 left-3.5 bg-collab text-collab-foreground">
-            <span className="truncate">{user ? userDisplayName(user) : 'Someone'}</span>
-          </Badge>
-        )}
+        <Badge className="absolute top-3.5 left-3.5 bg-collab text-collab-foreground">
+          <span className="truncate">{user ? userDisplayName(user) : 'Someone'}</span>
+        </Badge>
       </span>
     </span>
   )
