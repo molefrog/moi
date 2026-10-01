@@ -205,7 +205,7 @@ export function AvatarGroupExample() {
 
 ## Avatar Group Count
 
-Use `<AvatarGroupCount>` to add a count to the group.
+Use `<AvatarGroupCount>` to add a count to the group. Pass the same size as the avatars in the group.
 
 ```tsx
 import {
@@ -466,8 +466,9 @@ The `AvatarGroup` component displays a group of avatars with overlapping styling
 
 The `AvatarGroupCount` component displays a count indicator in an avatar group, typically showing the number of additional avatars.
 
-| Prop        | Type     | Default |
-| ----------- | -------- | ------- |
-| `className` | `string` | -       |
+| Prop        | Type                                | Default     |
+| ----------- | ----------------------------------- | ----------- |
+| `className` | `string`                            | -           |
+| `size`      | `"xs" \| "sm" \| "default" \| "lg"` | `"default"` |
 
 For more information about Base UI Avatar props, see the [Base UI documentation](https://base-ui.com/react/components/avatar#api-reference).

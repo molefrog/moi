@@ -74,12 +74,22 @@ function AvatarGroup({ className, ...props }: React.ComponentProps<'div'>) {
   )
 }
 
-function AvatarGroupCount({ className, ...props }: React.ComponentProps<'div'>) {
+function AvatarGroupCount({
+  className,
+  size = 'default',
+  ...props
+}: React.ComponentProps<'div'> & {
+  size?: React.ComponentProps<typeof Avatar>['size']
+}) {
   return (
     <div
       data-slot="avatar-group-count"
+      data-size={size}
       className={cn(
-        'relative flex shrink-0 items-center justify-center rounded-full bg-muted text-sm text-muted-foreground ring-2 ring-background [&>svg]:size-4 [:where([class~="group/avatar-group"]):has([data-size=lg])_&]:size-10 [:where([class~="group/avatar-group"]):has([data-size=lg])_&]:[&>svg]:size-5 [:where([class~="group/avatar-group"]):has([data-size=sm])_&]:size-6 [:where([class~="group/avatar-group"]):has([data-size=sm])_&]:[&>svg]:size-3 [:where([class~="group/avatar-group"]):has([data-size=xs])_&]:size-5 [:where([class~="group/avatar-group"]):has([data-size=xs])_&]:[&>svg]:size-3 [:where([class~="group/avatar-group"]):not(:has([data-size=sm],[data-size=xs],[data-size=lg]))_&]:size-8',
+        'relative flex shrink-0 items-center justify-center rounded-full bg-muted text-sm text-muted-foreground ring-2 ring-background [&>svg]:size-4',
+        'data-[size=default]:size-8 data-[size=lg]:size-10 data-[size=sm]:size-6 data-[size=xs]:size-5',
+        'data-[size=sm]:text-xs data-[size=xs]:text-[11px]',
+        'data-[size=lg]:[&>svg]:size-5 data-[size=sm]:[&>svg]:size-3 data-[size=xs]:[&>svg]:size-3',
         className
       )}
       {...props}

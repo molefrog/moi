@@ -485,7 +485,7 @@ export function CollabPlayground() {
             title="User, UserAvatar, and AvatarGroup"
             hint="User shows an avatar and name; UserAvatar shows the avatar alone. AvatarGroup groups avatars with an overflow count. Profile edits update all three; removed IDs become unknown."
             code={
-              '<User id="alex" size="xs" description="Online" />\n<User id="alex" size="sm" />\n<User id="alex" size="default" />\n<UserAvatar id="alex" size="sm" />\n<AvatarGroup ids={watcherIds} />'
+              '<User id="alex" size="xs" description="Online" />\n<User id="alex" size="sm" />\n<User id="alex" size="default" />\n<UserAvatar id="alex" size="sm" />\n<AvatarGroup ids={watcherIds} size="xs" />\n<AvatarGroup ids={watcherIds} size="sm" />\n<AvatarGroup ids={watcherIds} size="default" />\n<AvatarGroup ids={watcherIds} size="lg" />'
             }
           >
             <div className="flex flex-wrap items-center gap-5">
@@ -502,7 +502,12 @@ export function CollabPlayground() {
               <UserAvatar id="alex" size="sm" />
               <UserAvatar id="alex" size="default" />
               <UserAvatar id="alex" size="lg" />
-              <AvatarGroup ids={USERS.map(user => user.id)} />
+            </div>
+            <div className="flex flex-wrap items-center gap-4">
+              <AvatarGroup ids={USERS.map(user => user.id)} size="xs" />
+              <AvatarGroup ids={USERS.map(user => user.id)} size="sm" />
+              <AvatarGroup ids={USERS.map(user => user.id)} size="default" />
+              <AvatarGroup ids={USERS.map(user => user.id)} size="lg" />
             </div>
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="secondary" onClick={() => setRenamed(value => !value)}>

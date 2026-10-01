@@ -86,7 +86,7 @@ declare module 'moi/collab' {
   export type AvatarGroupProps = {
     ids: readonly string[]
     max?: number
-    size?: 'xs' | 'sm' | 'default'
+    size?: UserAvatarProps['size']
     // Status dots default to false in an avatar group.
     showStatusBadge?: boolean
     className?: string

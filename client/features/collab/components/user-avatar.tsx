@@ -13,7 +13,6 @@ export function UserAvatar({
 }: UserAvatarProps) {
   const user = useUser(id)
   const name = user ? userDisplayName(user) : 'Unknown user'
-  const smallAvatar = size === 'xs' || size === 'sm'
 
   return (
     <Avatar
@@ -35,7 +34,7 @@ export function UserAvatar({
             className="bg-collab text-collab-foreground"
           />
         ) : (
-          <IconUser size={smallAvatar ? 12 : 16} stroke={1.75} />
+          <IconUser size={size === 'xs' || size === 'sm' ? 12 : 16} stroke={1.75} />
         )}
       </AvatarFallback>
       {showStatusBadge && user?.status === 'active' && <AvatarBadge className="bg-success" />}
