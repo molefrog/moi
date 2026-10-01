@@ -489,7 +489,7 @@ export function CollabPlayground() {
             }
           >
             <div className="flex flex-wrap items-center gap-5">
-              <User id="fig" /> <User id="andrea" detail="Away" />{' '}
+              <User id="fig" size="sm" /> <User id="andrea" detail="Away" />{' '}
               <User id="david" detail={david ? 'Offline' : 'Removed'} /> <User id="unknown" />
             </div>
             <div className="flex flex-wrap items-center gap-5">

@@ -3,7 +3,7 @@ import { Link } from 'wouter'
 import { LocalUserSettings } from './local-user-settings'
 import { CollabPlayground } from './collab-playground'
 
-export function DevCollabPage() {
+export function CollabPage() {
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-6 py-10">
       <div>

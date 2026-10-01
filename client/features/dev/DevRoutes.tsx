@@ -7,13 +7,13 @@ import { DevIndexPage } from './DevIndexPage'
 import { HarnessDebugPage } from './HarnessDebugPage'
 import { TextureLabPage } from './TextureLabPage'
 import { ToolCallsPage } from './ToolCallsPage'
-import { UiComponentsPage } from './UiComponentsPage'
+import { UiComponentsPage } from './ui-components/ui-components-page'
 
 // All /dev/* routes live with their pages here and load only in development;
 // see the dynamic import in AppRouter. /dev itself is the index; list new
 // routes there too.
-const DevCollabPage = lazy(() =>
-  import('./collab/dev-collab-page').then(module => ({ default: module.DevCollabPage }))
+const CollabPage = lazy(() =>
+  import('./collab/collab-page').then(module => ({ default: module.CollabPage }))
 )
 
 export default function DevRoutes() {
@@ -24,7 +24,7 @@ export default function DevRoutes() {
       </Route>
       <Route path="/dev/collab">
         <Suspense fallback={null}>
-          <DevCollabPage />
+          <CollabPage />
         </Suspense>
       </Route>
       <Route path="/dev/harness" component={HarnessDebugPage} />
