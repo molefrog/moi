@@ -11,6 +11,7 @@ import type {
   PresenceValue,
   SelectionProps,
   UserProps,
+  UserAvatarProps,
   UsePeersOptions,
   UseWorkspaceUsersOptions
 } from 'moi/collab'
@@ -37,6 +38,7 @@ const fallback = {
   Activity: nothing,
   Selection: nothing,
   User: nothing,
+  UserAvatar: nothing,
   Facepile: nothing,
   PresenceFrame: nothing,
   PresenceGroup: nothing,
@@ -84,6 +86,9 @@ export function Selection(props: SelectionProps) {
 }
 export function User(props: UserProps) {
   return createElement(api().User, props)
+}
+export function UserAvatar(props: UserAvatarProps) {
+  return createElement(api().UserAvatar, props)
 }
 export function Facepile(props: FacepileProps) {
   return createElement(api().Facepile, props)

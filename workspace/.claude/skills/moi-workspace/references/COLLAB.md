@@ -1,123 +1,183 @@
 # Collab
 
-moi workspaces can be shared with multiple users. Use `moi/collab` in views and widgets for
-user lookup, connected users, cursors, focus, and selections.
+moi workspaces can be shared with multiple users. Use `moi/collab` in views and widgets to
+show users and share cursors, focus, selections, and custom presence. moi supplies identity,
+workspace membership, and the connection. Import the API directly; no provider or socket
+setup is needed.
 
-moi supplies the current user, workspace directory, and presence transport. Import the exports
-directly without setting up providers or sockets. See `.moi/collab.d.ts` for the full API and
-component props.
+See `.moi/collab.d.ts` for the full types and props.
 
 ## Users
 
-**Store only user IDs when writing user references to the server**, such as `authorId` or
-`assigneeIds`. Do not copy names, emails, colors, or avatars into application records. Resolve
-current profiles through hooks or components. Store applet-specific preferences and roles
-separately, keyed by user ID.
+Store **only** user IDs in application records, such as `authorId` or `assigneeIds`. Resolve their
+current profiles through hooks or components. Keep applet-specific roles and preferences
+separately, keyed by user ID. The host owns profile updates and workspace membership.
 
-```tsx
-import { User, Facepile } from 'moi/collab'
-;<>
-  <User id={authorId} />
-  <Facepile ids={assigneeIds} max={3} />
-</>
-```
+User results include a `status`:
 
-These components resolve profiles and handle missing names and unknown IDs for you.
+- `active`: at least one connected browser tab is visible in this workspace.
+- `away`: connected, with no visible tab in this workspace.
+- `offline`: no connection in this workspace.
 
-### Workspace users and connected users
+This tracks tab visibility, not idle time. A user on another page can still be active.
 
-Use the workspace directory for assignee pickers, including offline users. Use peers to show
-who is connected.
+### Hooks
 
-| Hook                               | Returns                                                             |
-| ---------------------------------- | ------------------------------------------------------------------- |
-| `useMe()`                          | The current user.                                                   |
-| `useUser(id)`                      | A user by ID, including an offline user.                            |
-| `useWorkspaceUsers()`              | All available workspace users, including you.                       |
-| `usePeers()`                       | Other connected users on the current page.                          |
-| `usePeers({ scope: 'workspace' })` | Other connected users anywhere in the workspace.                    |
+#### `useMe` and `useUser`
 
-User results include `status`: `active` when at least one browser tab is visible in this workspace,
-`away` when connected with no visible tab, or `offline` when disconnected. This tracks tab visibility,
-not idle time. A user on another page can still be active.
-`useWorkspaceUsers({ status: 'offline' })` filters the directory; it also accepts
-`active` or `away`. `usePeers` excludes your own user, combines multiple tabs into one user,
-and accepts an `active` or `away` status filter.
+`useMe()` resolves the current user. `useUser(id)` resolves a stored user reference,
+including an offline member. Both return `undefined` when the profile cannot be resolved,
+including while the workspace directory loads. Handle that before reading profile fields.
 
-`useMe()` and `useUser(id)` return `undefined` when the user cannot be resolved, including while
-the directory loads. A supplied directory can be empty. When no directory is supplied, user lists
-fall back to your profile and connected users and cannot discover offline users. Applets read profiles;
-the host owns profile updates and workspace membership.
+#### `useWorkspaceUsers` and `usePeers`
+
+Use `useWorkspaceUsers()` for assignee pickers and member lists. It includes your own user
+and offline members. Filter with `status: 'active'`, `'away'`, or `'offline'`.
+
+Use `usePeers()` to find other connected users on the current page. It excludes your own
+user and combines multiple browser tabs into one user. Set `scope: 'workspace'` to include
+other pages; its status filter accepts `'active'` or `'away'`.
+
+A host-supplied directory is authoritative, including an empty list. Without one, user
+lookups fall back to your profile and connected users; they cannot discover offline members.
+
+### Components
+
+#### `User` and `UserAvatar`
+
+`User` shows an avatar and name, with optional secondary `detail` text. `UserAvatar` shows
+only the avatar. Pass a user ID; both handle missing names and unknown users.
+
+#### `Facepile`
+
+Show several users together. IDs are deduplicated; `max` limits the visible avatars and
+remaining users appear as an overflow count.
+
+#### `Activity`
+
+Show your own user and other connected users on the current page. Use `scope="workspace"`
+to include other pages.
 
 ## Presence
 
-Presence is ephemeral state that describes what connected users are doing: where their pointer
-is, which field they are editing, or which item they selected. It is not persisted and only
-works while users are connected. It is removed when the applet becomes inactive, the browser
-tab is hidden, or the publishing component unmounts.
+Presence describes temporary activity: pointer positions, focused fields, selected items,
+or custom state. It is removed when its publishing component unmounts, the applet becomes
+inactive, or the browser tab is hidden.
 
-Presence does not save or synchronize application content. Continue saving documents, tasks,
-and other durable data through your applet's `.server.ts` functions and storage.
-With live presence disabled, user lookups remain available and applet content still renders.
+Save durable application content through your applet's `.server.ts` functions and storage.
+Presence does not persist it. With live presence disabled, user lookups remain available
+and applet content still renders.
 
-### Built-in presence
+Presence is scoped to the current page and applet. Matching IDs or channels in another
+view or widget do not share activity.
 
-| Component        | Use                                                                                   |
-| ---------------- | ------------------------------------------------------------------------------------- |
-| `Activity`       | Show you and other connected users; use `scope="workspace"` to include other pages.   |
-| `Cursors`        | Wrap an area to share and display pointers. Give separate areas distinct `id` values. |
-| `PresenceFrame`  | Wrap one element to show an outline and users focused inside it.                      |
-| `PresenceGutter` | Wrap one element to show focused users beside it.                                     |
-| `PresenceGroup`  | Scope descendant frame, gutter, and selection IDs. Adds no DOM element.               |
-| `Selection`      | Wrap an item with an `id` and controlled `selected` boolean to share its selection.   |
+### Hooks
+
+#### `usePresence` and `usePublishPresence`
+
+Use these together for activity that the built-in components do not cover.
+`usePublishPresence(channel, value)` publishes a value and replaces it when it changes.
+Values must be JSON and no larger than 4 KiB.
+
+`usePresence<T>(channel)` reads other connections' `{ connectionId, userId, value }` entries.
+Reading never publishes presence. One user can have multiple entries, including another tab
+of your own user. Resolve each `userId` with `User` or `useUser`.
 
 ```tsx
-import { Cursors, PresenceGroup, PresenceFrame, PresenceGutter } from 'moi/collab'
+import { usePresence, usePublishPresence, User } from 'moi/collab'
+
+type TaskPresenceProps = { taskId: string }
+
+// Mount this component only while the viewer is editing the task.
+function EditingPresence({ taskId }: TaskPresenceProps) {
+  usePublishPresence('editing', { taskId })
+  return null
+}
+
+function TaskEditors({ taskId }: TaskPresenceProps) {
+  const editors = usePresence<{ taskId: string }>('editing')
+  return editors
+    .filter(entry => entry.value.taskId === taskId)
+    .map(entry => <User key={entry.connectionId} id={entry.userId} />)
+}
+```
+
+Channel names are local to the applet and unaffected by `PresenceGroup`. Include record IDs
+in your values when activity belongs to a particular record. Unmount the publishing component
+to stop publishing; `false` and `null` are valid custom values, not removal signals.
+
+### Components
+
+#### `Cursors`
+
+Wrap the area where users should see each other's pointers. Give separate areas distinct
+`id` values. A single area can omit `id`, which defaults to `"default"`.
+
+```tsx
+import { Cursors } from 'moi/collab'
+
+<Cursors id="board">{children}</Cursors>
+```
+
+#### `PresenceFrame` and `PresenceGutter`
+
+Wrap a field or section to show users focused inside it. `PresenceFrame` adds an outline
+and user labels; `PresenceGutter` places avatars beside it. Each accepts exactly one React
+element, including a component containing multiple controls. Do not pass a fragment.
+
+```tsx
+import { PresenceFrame, PresenceGutter } from 'moi/collab'
 import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
-;<Cursors id="task-details">
-  <PresenceGroup id={task.id}>
-    <PresenceFrame id="title">
-      <Input defaultValue={task.title} />
-    </PresenceFrame>
-    <PresenceGutter id="notes">
-      <Textarea defaultValue={task.notes} />
-    </PresenceGutter>
-  </PresenceGroup>
-</Cursors>
+
+<>
+  <PresenceFrame id="title">
+    <Input aria-label="Title" />
+  </PresenceFrame>
+  <PresenceGutter id="notes">
+    <Textarea aria-label="Notes" />
+  </PresenceGutter>
+</>
 ```
 
-Frame and gutter accept exactly one React element, including a component with nested controls;
-do not use a fragment. They handle focus and user lookup. Use ordinary elements for layout.
+#### `Selection`
 
-Use stable record IDs and field names for `id`. Groups can nest: a field `title` inside task
-`42` inside group `tasks` identifies `tasks/42/title`. IDs must be nonblank and unique within
-their group. In lists, give each item a React `key` as well as a presence `id`; use record IDs,
-not array positions. When a dialog switches records, change its group ID.
-
-Focus, selections, and cursors are scoped to the current page and applet. Matching IDs in another
-view or widget do not share presence. Groups scope frame, gutter, and selection IDs. Cursor area IDs
-are local to the applet.
-`Cursors` defaults to `id="default"` when there is only one area.
-
-### Custom presence
-
-Use a named channel for activity that the built-in components do not cover. Inside a component:
+Wrap an item and pass your local selection through `selected`. The component displays
+other users who selected that item. Your app controls its selection state.
 
 ```tsx
-import { usePresence, usePublishPresence } from 'moi/collab'
+import { useState } from 'react'
+import { Selection } from 'moi/collab'
 
-usePublishPresence('editing', { taskId })
-const editors = usePresence<{ taskId: string }>('editing')
+type SelectableTaskProps = { taskId: string }
+
+function SelectableTask({ taskId }: SelectableTaskProps) {
+  const [selected, setSelected] = useState(false)
+  return (
+    <Selection id={taskId} selected={selected}>
+      <button onClick={() => setSelected(value => !value)}>Select task</button>
+    </Selection>
+  )
+}
 ```
 
-`usePublishPresence` publishes the current value and replaces it when it changes. Mount the
-publishing component only while that activity is happening. Values must be JSON and no larger
-than 4 KiB.
+#### `PresenceGroup`
 
-`usePresence` only reads. It returns `{ connectionId, userId, value }[]` for other connections
-on the same page and applet. Resolve each `userId` with `User` or `useUser`. One user can have
-separate presence values in multiple tabs, including another tab of your own user.
+Give repeated fields a namespace, such as a task ID. Descendant frame, gutter, and selection
+IDs combine with their groups. Groups can nest and add no DOM element.
 
-Channel names are local to the applet, not to `PresenceGroup`. Include record IDs in your
-values when an activity belongs to a particular record.
+```tsx
+import { PresenceGroup, PresenceFrame } from 'moi/collab'
+import { Input } from '../ui/input'
+
+<PresenceGroup id={task.id}>
+  <PresenceFrame id="title">
+    <Input aria-label="Task title" defaultValue={task.title} />
+  </PresenceFrame>
+</PresenceGroup>
+```
+
+Use stable record IDs and field names. For example, `title` inside group `42` inside group
+`tasks` identifies `tasks/42/title`. IDs must be nonblank and unique within their group.
+In lists, use record IDs for both React `key` and presence `id`. When a dialog switches
+records, change its group ID. Cursor area IDs are independent of groups.

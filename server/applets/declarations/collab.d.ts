@@ -69,18 +69,17 @@ declare module 'moi/collab' {
   }
   export function Selection(props: SelectionProps): ReactElement
 
-  export type UserProps = {
+  export type UserAvatarProps = {
     id: string
     size?: 'xs' | 'sm' | 'default' | 'lg'
-    // Show only the face.
-    avatarOnly?: boolean
-    you?: boolean
+    // Show a status dot when active. Defaults to true.
+    showStatusBadge?: boolean
+    className?: string
+  }
+  export function UserAvatar(props: UserAvatarProps): ReactElement
+  export type UserProps = UserAvatarProps & {
     // Secondary text alongside or below the name.
     detail?: ReactNode
-    // Show an active status dot. Defaults to true.
-    showStatus?: boolean
-    label?: string
-    className?: string
   }
   export function User(props: UserProps): ReactElement
   export type FacepileProps = {
@@ -88,7 +87,7 @@ declare module 'moi/collab' {
     max?: number
     size?: 'xs' | 'sm' | 'default'
     // Status dots default to false in a facepile.
-    showStatus?: boolean
+    showStatusBadge?: boolean
     className?: string
   }
   export function Facepile(props: FacepileProps): ReactElement

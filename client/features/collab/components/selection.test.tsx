@@ -59,3 +59,32 @@ test('selections reject blank IDs', () => {
     ).toThrow('nonempty id')
   }
 })
+
+test('a remote deselection removes the user from the selected item', () => {
+  const engine = createFocusRoom()
+  for (const selected of [true, false]) {
+    engine.setOtherConnections([
+      {
+        connectionId: 'remote',
+        userId: peer.id,
+        location: { page: 'board', status: 'active' },
+        presence: [
+          {
+            registrationId: 'selection',
+            appletId: 'views/board',
+            channel: presenceChannels.selection(presenceTarget('42')),
+            value: selected
+          }
+        ]
+      }
+    ])
+    const html = renderCollab(
+      engine,
+      <Selection id="42" selected={false}>
+        Task
+      </Selection>
+    )
+    expect(html.includes('Ada')).toBe(selected)
+    expect(html).toContain('Task')
+  }
+})

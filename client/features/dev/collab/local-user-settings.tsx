@@ -8,6 +8,7 @@ import { useAppConfig } from '@/client/api/app-config'
 import { USER_COLORS } from '@/lib/collab/colors'
 import type { UserProfile } from '@/lib/collab/types'
 import { User } from '@/client/features/collab/components/user'
+import { UserAvatar } from '@/client/features/collab/components/user-avatar'
 import { randomLocalUser } from '@/client/features/collab/local-user'
 import {
   getCurrentUser,
@@ -63,7 +64,7 @@ function AccessUser({ profile }: AccessUserProps) {
             : 'This server uses Cloudflare Access, but this page wasn’t opened through it. Open moi at its Cloudflare Access address to appear in workspaces.'}
         </p>
       </header>
-      {profile && <User id={profile.id} size="lg" showStatus={false} />}
+      {profile && <User id={profile.id} size="lg" showStatusBadge={false} />}
     </section>
   )
 }
@@ -93,10 +94,9 @@ function LocalUserEditor({ profile }: LocalUserEditorProps) {
             aria-label="Local user preview"
             className="size-16 shrink-0 overflow-hidden rounded-full"
           >
-            <User
+            <UserAvatar
               id={profile.id}
-              avatarOnly
-              showStatus={false}
+              showStatusBadge={false}
               className="data-[size=default]:size-full"
             />
           </div>

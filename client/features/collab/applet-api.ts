@@ -2,6 +2,7 @@ import type * as CollabApi from 'moi/collab'
 import { Activity } from './components/activity'
 import { Facepile } from './components/facepile'
 import { User } from './components/user'
+import { UserAvatar } from './components/user-avatar'
 import { Cursors } from './components/cursors'
 import { PresenceFrame } from './components/presence-frame'
 import { PresenceGroup } from './components/presence-group'
@@ -23,6 +24,7 @@ export const appletCollabApi = {
   Cursors,
   Facepile,
   User,
+  UserAvatar,
   PresenceFrame,
   PresenceGroup,
   PresenceGutter,

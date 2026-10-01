@@ -24,7 +24,7 @@ import type { WorkspaceTabId } from '@/lib/types'
 import { tabFromPath } from '@/lib/navigation'
 import { Avatar, AvatarFallback } from '@/ui-components/avatar'
 
-import { User } from './user'
+import { UserAvatar } from './user-avatar'
 import { pageFromPath, useCollabEnabled } from '../provider'
 import { useConnectionState, useWorkspaceUsers, useWorkspaceDirectory } from '../hooks'
 import {
@@ -110,11 +110,9 @@ export function WorkspaceCollabToolbar({
             }
           >
             {self && (
-              <User
-                avatarOnly
+              <UserAvatar
                 id={self.profile.id}
-                showStatus={false}
-                label={`${userDisplayName(self.profile)} (you)`}
+                showStatusBadge={false}
                 className="ring-2 ring-background"
               />
             )}
@@ -125,7 +123,7 @@ export function WorkspaceCollabToolbar({
           <PopoverTitle className="sr-only">Users in this workspace</PopoverTitle>
           {self && (
             <div className="flex items-center gap-3 px-2 pt-1">
-              <User avatarOnly id={self.profile.id} size="lg" showStatus={false} />
+              <UserAvatar id={self.profile.id} size="lg" showStatusBadge={false} />
               <span className="min-w-0 flex-1 truncate text-sm font-medium">
                 {userDisplayName(self.profile)}{' '}
                 <span className="font-normal text-muted-foreground">(you)</span>
@@ -216,10 +214,9 @@ function Face({ user, place, onJump }: FaceProps) {
           )
         }
       >
-        <User
-          avatarOnly
+        <UserAvatar
           id={user.profile.id}
-          showStatus={false}
+          showStatusBadge={false}
           className="ring-2 ring-background"
         />
       </TooltipTrigger>
@@ -238,7 +235,7 @@ function UserRow({ user, place, onJump }: UserRowProps) {
   const { Icon, where, target } = place
   const content = (
     <>
-      <User avatarOnly id={user.profile.id} size="default" />
+      <UserAvatar id={user.profile.id} size="default" />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-sm">{userDisplayName(user.profile)}</span>
         <span className="flex items-center gap-1 text-xs text-muted-foreground">

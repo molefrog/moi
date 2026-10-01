@@ -84,6 +84,7 @@ test('every collaboration component renders nothing without its bridge, includin
     const components = {
       Activity: <api.Activity />,
       User: <api.User id="alice" />,
+      UserAvatar: <api.UserAvatar id="alice" />,
       Facepile: <api.Facepile ids={['alice']} />,
       Cursors: <api.Cursors>{children}</api.Cursors>,
       Selection: (
@@ -116,7 +117,8 @@ test('the bridge delegates when attached and falls back again when disposed', as
     useUser: mock((_id: string) => user),
     useWorkspaceUsers: mock((_options?: CollabApi.UseWorkspaceUsersOptions) => [user]),
     usePublishPresence: mock((_channel: string, _value: unknown) => {}),
-    User: mock(() => createElement('span', null, 'Alice'))
+    User: mock(() => createElement('span', null, 'Alice')),
+    UserAvatar: mock((_props: CollabApi.UserAvatarProps) => createElement('span', null, 'Avatar'))
   }
   let alive = true
   try {
@@ -134,6 +136,13 @@ test('the bridge delegates when attached and falls back again when disposed', as
     expect(renderToStaticMarkup(createElement(api.User, { id: 'alice' }))).toBe(
       '<span>Alice</span>'
     )
+    expect(renderToStaticMarkup(createElement(api.UserAvatar, { id: 'alice', size: 'sm' }))).toBe(
+      '<span>Avatar</span>'
+    )
+    expect(host.UserAvatar.mock.calls[0]?.[0]).toEqual({
+      id: 'alice',
+      size: 'sm'
+    })
     expect(warning).not.toHaveBeenCalled()
 
     alive = false
@@ -143,6 +152,8 @@ test('the bridge delegates when attached and falls back again when disposed', as
     expect(renderToStaticMarkup(createElement(api.User, { id: 'alice' }))).toBe('')
     expect(host.usePublishPresence).toHaveBeenCalledTimes(1)
     expect(host.useWorkspaceUsers).toHaveBeenCalledTimes(1)
+    expect(renderToStaticMarkup(createElement(api.UserAvatar, { id: 'alice' }))).toBe('')
+    expect(host.UserAvatar).toHaveBeenCalledTimes(1)
     expect(host.User).toHaveBeenCalledTimes(1)
     expect(warning).toHaveBeenCalledTimes(1)
 

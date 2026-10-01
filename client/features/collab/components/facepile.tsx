@@ -1,13 +1,13 @@
 import type { FacepileProps } from 'moi/collab'
 import { cn } from '@/client/lib/cn'
 import { Avatar, AvatarFallback } from '@/ui-components/avatar'
-import { User } from './user'
+import { UserAvatar } from './user-avatar'
 
 export function Facepile({
   ids,
   max = 3,
   size = 'sm',
-  showStatus = false,
+  showStatusBadge = false,
   className
 }: FacepileProps) {
   const unique = [...new Set(ids)]
@@ -23,12 +23,11 @@ export function Facepile({
       aria-label={`${unique.length} users`}
     >
       {shown.map(id => (
-        <User
+        <UserAvatar
           key={id}
           id={id}
-          avatarOnly
           size={size}
-          showStatus={showStatus}
+          showStatusBadge={showStatusBadge}
           className="ring-2 ring-background"
         />
       ))}

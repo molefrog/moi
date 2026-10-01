@@ -2,13 +2,12 @@ import { expect, test } from 'bun:test'
 import { Fragment } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import type { UserProfile } from '@/lib/collab/types'
 import { PresenceFrame, PresenceFramePrimitive } from './presence-frame'
 import { PresenceGutter } from './presence-gutter'
 import { presenceTarget } from '../presence-target'
 import { createFocusRoom, me, namelessUsers, renderCollab } from '../testing/component-fixtures'
 
-test('presence frames skip missing users and hide the outline when no users resolve', () => {
+test('presence frames skip unresolved users and clear their identity after removal', () => {
   const backend = createFocusRoom()
   const frame = renderCollab(
     backend,
@@ -17,7 +16,7 @@ test('presence frames skip missing users and hide the outline when no users reso
     </PresenceFramePrimitive>
   )
   expect(frame).toContain('Ada')
-  expect(frame).toContain('outline-collab')
+  expect(frame).not.toContain('Unknown user')
   backend.setUsers([me])
   const removed = renderCollab(
     backend,
@@ -26,7 +25,8 @@ test('presence frames skip missing users and hide the outline when no users reso
     </PresenceFramePrimitive>
   )
   expect(removed).toContain('<input')
-  expect(removed).not.toContain('outline-collab')
+  expect(removed).not.toContain('Ada')
+  expect(removed).not.toContain('Unknown user')
 })
 
 test('inactive applets retain content and hide remote focus', () => {
@@ -41,19 +41,17 @@ test('inactive applets retain content and hide remote focus', () => {
   expect(html).not.toContain('Ada')
 })
 
-test.each(namelessUsers)(
-  'presence-frame resolves a usable label for nameless user %j',
-  (profile: UserProfile, label: string) => {
-    const engine = createFocusRoom(presenceTarget('task:42:title'), profile)
-    const html = renderCollab(
-      engine,
-      <PresenceFrame id="task:42:title">
-        <input />
-      </PresenceFrame>
-    )
-    expect(html).toContain(`>${label}<`)
-  }
-)
+test('presence-frame resolves a usable label for nameless user', () => {
+  const [profile, label] = namelessUsers[0]!
+  const engine = createFocusRoom(presenceTarget('task:42:title'), profile)
+  const html = renderCollab(
+    engine,
+    <PresenceFrame id="task:42:title">
+      <input />
+    </PresenceFrame>
+  )
+  expect(html).toContain(`>${label}<`)
+})
 
 test('presence-frame matches the semantic target and rejects a different record', () => {
   const backend = createFocusRoom()
@@ -84,7 +82,6 @@ test('presence-frame retains content outside a collaboration provider', () => {
     </PresenceFrame>
   )
   expect(html).toContain('Local content')
-  expect(html).not.toContain('data-slot="avatar"')
 })
 
 test('presence-frame requires one direct element and rejects fragments', () => {

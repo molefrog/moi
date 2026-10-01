@@ -9,7 +9,7 @@ import {
   usePresenceTarget,
   useTargetPresence
 } from './presence-helpers'
-import { User } from './user'
+import { UserAvatar } from './user-avatar'
 
 export function PresenceGutter({ id, children, className }: PresenceGutterProps) {
   const target = usePresenceTarget(id)
@@ -49,11 +49,10 @@ function PresenceGutterPrimitive({
       <div className="pointer-events-none absolute top-0 left-0 flex -space-x-3" aria-hidden="true">
         {users.map(({ id, connectionId }) => (
           <motion.span key={id} layoutId={animate ? `presence:${connectionId}` : undefined}>
-            <User
+            <UserAvatar
               id={id}
-              avatarOnly
               size="xs"
-              showStatus={false}
+              showStatusBadge={false}
               className="animate-in ring-2 ring-background duration-200 zoom-in-75 fade-in"
             />
           </motion.span>

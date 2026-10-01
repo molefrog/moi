@@ -6,7 +6,6 @@ import { TooltipProvider } from '@/client/components/ui/tooltip'
 import type { UserProfile, Connection } from '@/lib/collab/types'
 
 import { WorkspaceCollabToolbar } from './workspace-collab-toolbar'
-import { useCollabEnabled } from '../provider'
 import { createFakeEngine } from '../testing/fake-engine'
 import { CollabContext } from '../provider'
 import { getCurrentUser, setHostState } from '../host-state'
@@ -69,7 +68,7 @@ test('header shows active and away users without offline workspace users', () =>
 
   expect(html).toContain('aria-label="Active colleague"')
   expect(html).toContain('aria-label="Away colleague"')
-  expect(html).toContain('aria-label="Self (you)"')
+  expect(html).toContain('aria-label="Self"')
   expect(html).not.toContain('Offline colleague')
   expect(html).not.toMatch(/title="\d+ more"/)
 })
@@ -107,30 +106,10 @@ test('header gives nameless viewers and connected users nonempty accessible labe
     [connection(user, 'overview'), connection(noEmail, 'overview')],
     viewer
   )
-  expect(html).toContain('aria-label="nameless-self (you)"')
+  expect(html).toContain('aria-label="nameless-self"')
   expect(html).toContain('aria-label="user@example.test"')
   expect(html).toContain('aria-label="another-member"')
   expect(html).not.toContain('undefined')
   expect(html).not.toContain('aria-label=""')
   expect(html).not.toContain('Unknown user')
-})
-
-function CollabEnabled() {
-  return <output>{String(useCollabEnabled())}</output>
-}
-
-test('collab toolbar and browser-tab selection require runtime support and a current user', () => {
-  for (const [user, enabled, expected] of [
-    [undefined, true, false],
-    [self, false, false],
-    [self, true, true]
-  ] as const) {
-    const engine = createFakeEngine({ self: user })
-    const html = renderToStaticMarkup(
-      <CollabContext value={{ ...engine, enabled }}>
-        <CollabEnabled />
-      </CollabContext>
-    )
-    expect(html).toBe(`<output>${expected}</output>`)
-  }
 })

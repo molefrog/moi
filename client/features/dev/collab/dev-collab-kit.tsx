@@ -28,6 +28,7 @@ import { Cursors } from '@/client/features/collab/components/cursors'
 import { Activity } from '@/client/features/collab/components/activity'
 import { Facepile } from '@/client/features/collab/components/facepile'
 import { User } from '@/client/features/collab/components/user'
+import { UserAvatar } from '@/client/features/collab/components/user-avatar'
 import { createFakeEngine } from '@/client/features/collab/testing/fake-engine'
 import type { FakeEngine } from '@/client/features/collab/testing/fake-engine'
 import {
@@ -431,17 +432,19 @@ export function DevCollabKit() {
           <Section
             title="Users and directory updates"
             hint="Changing a profile updates every avatar and label. Removing an offline user makes their ID unknown."
-            code={'<User id="fig" />\n<Facepile ids={watcherIds} />'}
+            code={
+              '<User id="fig" />\n<UserAvatar id="alex" size="sm" />\n<Facepile ids={watcherIds} />'
+            }
           >
             <div className="flex flex-wrap items-center gap-5">
               <User id="fig" /> <User id="andrea" detail="Away" />{' '}
               <User id="david" detail={david ? 'Offline' : 'Removed'} /> <User id="unknown" />
             </div>
             <div className="flex flex-wrap items-center gap-5">
-              <User id="alex" avatarOnly size="xs" />
-              <User id="alex" avatarOnly size="sm" />
-              <User id="alex" avatarOnly size="default" />
-              <User id="alex" avatarOnly size="lg" />
+              <UserAvatar id="alex" size="xs" />
+              <UserAvatar id="alex" size="sm" />
+              <UserAvatar id="alex" size="default" />
+              <UserAvatar id="alex" size="lg" />
               <Facepile ids={USERS.map(user => user.id)} />
             </div>
             <div className="flex flex-wrap gap-2">
