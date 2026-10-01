@@ -176,28 +176,6 @@ Use the `className` prop to add custom styles to the badge such as custom colors
 </Avatar>
 ```
 
-## Badge with Icon
-
-You can also use an icon inside `<AvatarBadge>`.
-
-```tsx
-import { IconPlus } from '@tabler/icons-react'
-
-import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-
-export function AvatarBadgeIconExample() {
-  return (
-    <Avatar className="grayscale">
-      <AvatarImage src="https://github.com/pranathip.png" alt="@pranathip" />
-      <AvatarFallback>PP</AvatarFallback>
-      <AvatarBadge>
-        <IconPlus stroke={1.75} />
-      </AvatarBadge>
-    </Avatar>
-  )
-}
-```
-
 ## Avatar Group
 
 Use the `AvatarGroup` component to add a group of avatars.
