@@ -1,8 +1,7 @@
 import type { FacepileProps } from 'moi/collab'
 import { cn } from '@/client/lib/cn'
 import { Avatar, AvatarFallback } from '@/ui-components/avatar'
-import { AVATAR_SIZE, User } from './user'
-export type { FacepileProps } from 'moi/collab'
+import { User } from './user'
 
 export function Facepile({
   ids,
@@ -34,11 +33,7 @@ export function Facepile({
         />
       ))}
       {hidden > 0 && (
-        <Avatar
-          size={AVATAR_SIZE[size]}
-          className="ring-2 ring-background"
-          title={`${hidden} more`}
-        >
+        <Avatar size={size} className="ring-2 ring-background" title={`${hidden} more`}>
           <AvatarFallback>+{hidden}</AvatarFallback>
         </Avatar>
       )}

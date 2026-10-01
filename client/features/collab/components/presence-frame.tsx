@@ -8,7 +8,6 @@ import { useUsers } from '../hooks'
 import { userDisplayName } from '../users'
 import { presenceChild, usePresenceTarget, useTargetPresence } from './presence-helpers'
 import { UserTag } from './user-tag'
-export type { PresenceFrameProps } from 'moi/collab'
 
 export function PresenceFrame({ id, children, className }: PresenceFrameProps) {
   const target = usePresenceTarget(id)
@@ -25,7 +24,7 @@ export function PresenceFrame({ id, children, className }: PresenceFrameProps) {
   )
 }
 
-export type PresenceFramePrimitiveProps = HTMLAttributes<HTMLDivElement> & {
+type PresenceFramePrimitiveProps = HTMLAttributes<HTMLDivElement> & {
   ref?: Ref<HTMLDivElement>
   // Everyone at this element; the first user's color draws the frame.
   ids: readonly string[]

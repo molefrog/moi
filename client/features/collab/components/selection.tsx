@@ -3,7 +3,6 @@ import { IconPointer } from '@tabler/icons-react'
 import { presenceChannels, usePresenceChannel, usePublishPresenceChannel } from '../hooks'
 import { PresenceFramePrimitive } from './presence-frame'
 import { hasPresence, usePresenceTarget } from './presence-helpers'
-export type { SelectionProps } from 'moi/collab'
 
 export function Selection({ id, selected, children, className }: SelectionProps) {
   const target = usePresenceTarget(id)

@@ -3,7 +3,6 @@ import { useContext, useId, useMemo } from 'react'
 import { LayoutGroup, MotionConfig } from 'motion/react'
 import { presenceTarget } from '../presence-target'
 import { PresenceGroupContext } from './presence-helpers'
-export type { PresenceGroupProps } from 'moi/collab'
 
 export function PresenceGroup({ id, children }: PresenceGroupProps) {
   const parent = useContext(PresenceGroupContext)

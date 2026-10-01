@@ -69,10 +69,9 @@ declare module 'moi/collab' {
   }
   export function Selection(props: SelectionProps): ReactElement
 
-  export type UserSize = 'xs' | 'sm' | 'md' | 'lg'
   export type UserProps = {
     id: string
-    size?: UserSize
+    size?: 'xs' | 'sm' | 'default' | 'lg'
     // Show only the face.
     avatarOnly?: boolean
     you?: boolean
@@ -87,7 +86,7 @@ declare module 'moi/collab' {
   export type FacepileProps = {
     ids: readonly string[]
     max?: number
-    size?: 'xs' | 'sm' | 'md'
+    size?: 'xs' | 'sm' | 'default'
     // Status dots default to false in a facepile.
     showStatus?: boolean
     className?: string

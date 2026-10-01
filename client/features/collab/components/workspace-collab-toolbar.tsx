@@ -39,7 +39,7 @@ import type { WorkspaceUserInfo } from '../users'
 export type TabInfo = { label: string; Icon: TabIcon }
 type DescribeTab = (tab: WorkspaceTabId) => TabInfo | null
 
-export type WorkspaceCollabToolbarProps = {
+type WorkspaceCollabToolbarProps = {
   workspaceId: string
   describeTab: DescribeTab
   onOpenTab: (tab: WorkspaceTabId) => void
@@ -238,7 +238,7 @@ function UserRow({ user, place, onJump }: UserRowProps) {
   const { Icon, where, target } = place
   const content = (
     <>
-      <User avatarOnly id={user.profile.id} size="md" />
+      <User avatarOnly id={user.profile.id} size="default" />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-sm">{userDisplayName(user.profile)}</span>
         <span className="flex items-center gap-1 text-xs text-muted-foreground">

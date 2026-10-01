@@ -440,7 +440,7 @@ export function DevCollabKit() {
             <div className="flex flex-wrap items-center gap-5">
               <User id="alex" avatarOnly size="xs" />
               <User id="alex" avatarOnly size="sm" />
-              <User id="alex" avatarOnly size="md" />
+              <User id="alex" avatarOnly size="default" />
               <User id="alex" avatarOnly size="lg" />
               <Facepile ids={USERS.map(user => user.id)} />
             </div>

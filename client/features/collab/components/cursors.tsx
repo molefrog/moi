@@ -10,8 +10,6 @@ import { userDisplayName } from '../users'
 import { UserTag } from './user-tag'
 import { hasPresence } from './presence-helpers'
 
-export type { CursorsProps } from 'moi/collab'
-
 type PointerPosition = { x: number; y: number; target?: string; targetX?: number; targetY?: number }
 function pointerPosition(value: JsonValue): PointerPosition | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null

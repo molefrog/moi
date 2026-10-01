@@ -10,7 +10,6 @@ import {
   useTargetPresence
 } from './presence-helpers'
 import { User } from './user'
-export type { PresenceGutterProps } from 'moi/collab'
 
 export function PresenceGutter({ id, children, className }: PresenceGutterProps) {
   const target = usePresenceTarget(id)

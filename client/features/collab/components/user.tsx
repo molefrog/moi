@@ -1,39 +1,16 @@
-import type { UserProps } from 'moi/collab'
+import type { UserProps, WorkspaceUser } from 'moi/collab'
 import { IconUser } from '@tabler/icons-react'
 import { Facehash } from 'facehash'
 import { cn } from '@/client/lib/cn'
 import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from '@/ui-components/avatar'
 import { useUser } from '../hooks'
 import { userDisplayName } from '../users'
-export type { UserProps, UserSize } from 'moi/collab'
 
-type UserFaceProps = { name: string }
-
-function UserFace({ name }: UserFaceProps) {
-  return (
-    <Facehash
-      name={name}
-      size="100%"
-      variant="solid"
-      intensity3d="none"
-      interactive={false}
-      colorClasses={['bg-collab']}
-      className="rounded-full text-collab-foreground"
-    />
-  )
-}
-
-// User components resolve IDs through the current workspace directory,
-// which resolves to the current name, face, and status through the workspace.
-
-export const AVATAR_SIZE = { xs: 'xs', sm: 'sm', md: 'default', lg: 'lg' } as const
-
-// Shown for an id nobody in this workspace has ever used.
 const UNKNOWN_NAME = 'Unknown user'
 
 export function User({
   id,
-  size = 'md',
+  size = 'default',
   avatarOnly = false,
   you = false,
   detail,
@@ -43,27 +20,16 @@ export function User({
 }: UserProps) {
   const user = useUser(id)
   const name = user ? userDisplayName(user) : UNKNOWN_NAME
-  // A profile without a picture gets the same generated face on every client,
-  // so nobody shows up as bare initials.
   const compact = size === 'xs'
   const avatar = (
-    <Avatar
-      size={AVATAR_SIZE[size]}
-      title={label ?? name}
-      aria-label={label ?? name}
-      data-collab-color={user?.color ?? 'unknown'}
+    <UserAvatar
+      user={user}
+      name={name}
+      size={size}
+      showStatus={showStatus}
+      label={label}
       className={avatarOnly ? className : undefined}
-    >
-      {user?.avatar && <AvatarImage src={user.avatar} alt="" />}
-      <AvatarFallback>
-        {user ? (
-          <UserFace name={name} />
-        ) : (
-          <IconUser size={size === 'xs' || size === 'sm' ? 12 : 16} stroke={1.75} />
-        )}
-      </AvatarFallback>
-      {showStatus && user?.status === 'active' && <AvatarBadge className="bg-success" />}
-    </Avatar>
+    />
   )
   if (avatarOnly) return avatar
   return (
@@ -94,5 +60,45 @@ export function User({
         )}
       </span>
     </span>
+  )
+}
+
+type UserAvatarProps = {
+  user: WorkspaceUser | undefined
+  name: string
+  size: NonNullable<UserProps['size']>
+  showStatus: boolean
+  label?: string
+  className?: string
+}
+
+function UserAvatar({ user, name, size, showStatus, label, className }: UserAvatarProps) {
+  const smallAvatar = size === 'xs' || size === 'sm'
+  return (
+    <Avatar
+      size={size}
+      title={label ?? name}
+      aria-label={label ?? name}
+      data-collab-color={user?.color ?? 'unknown'}
+      className={className}
+    >
+      {user?.avatar && <AvatarImage src={user.avatar} alt="" />}
+      <AvatarFallback>
+        {user ? (
+          <Facehash
+            name={name}
+            size="100%"
+            variant="solid"
+            intensity3d="none"
+            interactive={false}
+            colorClasses={['bg-collab']}
+            className="rounded-full text-collab-foreground"
+          />
+        ) : (
+          <IconUser size={smallAvatar ? 12 : 16} stroke={1.75} />
+        )}
+      </AvatarFallback>
+      {showStatus && user?.status === 'active' && <AvatarBadge className="bg-success" />}
+    </Avatar>
   )
 }
