@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
+import type { PresenceAvatarsProps } from 'moi/collab'
 
 import { IconChevronDown, IconPlus, IconTrash } from '@tabler/icons-react'
 
@@ -17,6 +18,14 @@ import {
 } from '@/client/components/ui/dialog'
 import { Input } from '@/client/components/ui/input'
 import { Textarea } from '@/client/components/ui/textarea'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/ui-components/select'
 import type { UserProfile, Connection } from '@/lib/collab/types'
 
 import { PresenceFrame } from '@/client/features/collab/components/presence-frame'
@@ -110,17 +119,46 @@ const INITIAL_TASKS: Task[] = [
   { id: 'notes', title: 'Write the announcement' }
 ]
 
+const AVATAR_ALIGNMENTS = [
+  { value: 'start', label: 'Start (top)' },
+  { value: 'center', label: 'Center (default)' },
+  { value: 'end', label: 'End (bottom)' }
+] as const
+
 function TargetPresenceDemo() {
   const [selected, setSelected] = useState(false)
   const [editing, setEditing] = useState(false)
+  const [avatarAlign, setAvatarAlign] =
+    useState<NonNullable<PresenceAvatarsProps['align']>>('center')
   return (
     <Section
       title="Automatic and controlled presence"
       hint="Each automatic target contains two fields. Move between them: the other pane keeps showing presence at that target. Cards publish the boolean you control with their button, even when focus moves away."
       code={
-        '<PresenceGroup id="comparison">\n  <PresenceFrame id="focus">\n    <Input />\n    <Input />\n  </PresenceFrame>\n  <PresenceAvatars id="avatars">\n    <>\n      <Input />\n      <Input />\n    </>\n  </PresenceAvatars>\n  <PresenceAvatars id="controlled-avatars" present={editing}>{children}</PresenceAvatars>\n  <PresenceFrame id="selection" present={selected} align="start">\n    <Button onClick={() => setSelected(value => !value)}>Select item</Button>\n  </PresenceFrame>\n</PresenceGroup>'
+        '<PresenceGroup id="comparison">\n  <PresenceFrame id="focus">\n    <Input />\n    <Input />\n  </PresenceFrame>\n  <PresenceAvatars id="avatars" align={avatarAlign}>\n    <>\n      <Input />\n      <Input />\n    </>\n  </PresenceAvatars>\n  <PresenceAvatars id="controlled-avatars" present={editing} align={avatarAlign}>{children}</PresenceAvatars>\n  <PresenceFrame id="selection" present={selected} align="start">\n    <Button onClick={() => setSelected(value => !value)}>Select item</Button>\n  </PresenceFrame>\n</PresenceGroup>'
       }
     >
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-muted-foreground">Avatar alignment in this pane</span>
+        <Select
+          items={AVATAR_ALIGNMENTS}
+          value={avatarAlign}
+          onValueChange={value => value && setAvatarAlign(value)}
+        >
+          <SelectTrigger size="sm" aria-label="Avatar alignment">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {AVATAR_ALIGNMENTS.map(({ value, label }) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </div>
       <PresenceGroup id="comparison">
         <div className="grid gap-8 py-3 sm:grid-cols-2">
           <PresenceFrame id="focus" className="space-y-2">
@@ -133,7 +171,7 @@ function TargetPresenceDemo() {
               placeholder="Another field, same target"
             />
           </PresenceFrame>
-          <PresenceAvatars id="avatars">
+          <PresenceAvatars id="avatars" align={avatarAlign}>
             <>
               <label className="flex flex-col gap-2 text-sm">
                 PresenceAvatars
@@ -164,7 +202,7 @@ function TargetPresenceDemo() {
             </p>
           </div>
         </PresenceFrame>
-        <PresenceAvatars id="controlled-avatars" present={editing}>
+        <PresenceAvatars id="controlled-avatars" present={editing} align={avatarAlign}>
           <div className="flex flex-col items-start gap-3 rounded-lg bg-accent p-4">
             <p className="text-sm">Controlled avatars: editing a card</p>
             <Button
