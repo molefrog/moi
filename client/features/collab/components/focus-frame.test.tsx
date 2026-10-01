@@ -2,8 +2,8 @@ import { expect, test } from 'bun:test'
 import { Fragment } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { PresenceFrame, PresenceFramePrimitive } from './presence-frame'
-import { PresenceGutter } from './presence-gutter'
+import { FocusFrame, PresenceOutline } from './focus-frame'
+import { FocusAvatars } from './focus-avatars'
 import { presenceTarget } from '../presence-target'
 import { createFocusRoom, me, namelessUsers, renderCollab } from '../testing/component-fixtures'
 
@@ -11,18 +11,18 @@ test('presence frames skip unresolved users and clear their identity after remov
   const backend = createFocusRoom()
   const frame = renderCollab(
     backend,
-    <PresenceFramePrimitive ids={['missing', 'peer']}>
+    <PresenceOutline ids={['missing', 'peer']}>
       <input />
-    </PresenceFramePrimitive>
+    </PresenceOutline>
   )
   expect(frame).toContain('Ada')
   expect(frame).not.toContain('Unknown user')
   backend.setUsers([me])
   const removed = renderCollab(
     backend,
-    <PresenceFramePrimitive ids={['missing', 'peer']}>
+    <PresenceOutline ids={['missing', 'peer']}>
       <input />
-    </PresenceFramePrimitive>
+    </PresenceOutline>
   )
   expect(removed).toContain('<input')
   expect(removed).not.toContain('Ada')
@@ -32,59 +32,59 @@ test('presence frames skip unresolved users and clear their identity after remov
 test('inactive applets retain content and hide remote focus', () => {
   const html = renderCollab(
     createFocusRoom(),
-    <PresenceFrame id="task:42:title">
+    <FocusFrame id="task:42:title">
       <input aria-label="Title" />
-    </PresenceFrame>,
+    </FocusFrame>,
     false
   )
   expect(html).toContain('Title')
   expect(html).not.toContain('Ada')
 })
 
-test('presence-frame resolves a usable label for nameless user', () => {
+test('focus-frame resolves a usable label for nameless user', () => {
   const [profile, label] = namelessUsers[0]!
   const engine = createFocusRoom(presenceTarget('task:42:title'), profile)
   const html = renderCollab(
     engine,
-    <PresenceFrame id="task:42:title">
+    <FocusFrame id="task:42:title">
       <input />
-    </PresenceFrame>
+    </FocusFrame>
   )
   expect(html).toContain(`>${label}<`)
 })
 
-test('presence-frame matches the semantic target and rejects a different record', () => {
+test('focus-frame matches the semantic target and rejects a different record', () => {
   const backend = createFocusRoom()
   expect(
     renderCollab(
       backend,
-      <PresenceFrame id="task:42:title">
+      <FocusFrame id="task:42:title">
         <input />
-      </PresenceFrame>
+      </FocusFrame>
     )
   ).toContain('Ada')
   expect(
     renderCollab(
       backend,
-      <PresenceFrame id="task:43:title">
+      <FocusFrame id="task:43:title">
         <input />
-      </PresenceFrame>
+      </FocusFrame>
     )
   ).not.toContain('Ada')
 })
 
-test('presence-frame retains content outside a collaboration provider', () => {
+test('focus-frame retains content outside a collaboration provider', () => {
   const html = renderToStaticMarkup(
-    <PresenceFrame id="task:42:title">
-      <PresenceGutter id="task:42:notes">
+    <FocusFrame id="task:42:title">
+      <FocusAvatars id="task:42:notes">
         <span>Local content</span>
-      </PresenceGutter>
-    </PresenceFrame>
+      </FocusAvatars>
+    </FocusFrame>
   )
   expect(html).toContain('Local content')
 })
 
-test('presence-frame requires one direct element and rejects fragments', () => {
+test('focus-frame requires one direct element and rejects fragments', () => {
   const invalidChildren: ReactNode[] = [
     null,
     false,
@@ -107,31 +107,31 @@ test('presence-frame requires one direct element and rejects fragments', () => {
     expect(() =>
       renderCollab(
         createFocusRoom(),
-        <PresenceFrame id="title">{children as ReactElement}</PresenceFrame>
+        <FocusFrame id="title">{children as ReactElement}</FocusFrame>
       )
     ).toThrow('exactly one child element')
   }
   expect(
     renderCollab(
       createFocusRoom(),
-      <PresenceFrame id="title">
+      <FocusFrame id="title">
         <label>
           Title
           <input />
         </label>
-      </PresenceFrame>
+      </FocusFrame>
     )
   ).toContain('Title')
 })
 
-test('presence-frame rejects blank IDs', () => {
+test('focus-frame rejects blank IDs', () => {
   for (const id of ['', '   ']) {
     expect(() =>
       renderCollab(
         createFocusRoom(),
-        <PresenceFrame id={id}>
+        <FocusFrame id={id}>
           <input />
-        </PresenceFrame>
+        </FocusFrame>
       )
     ).toThrow('nonempty id')
   }

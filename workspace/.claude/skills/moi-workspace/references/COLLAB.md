@@ -48,7 +48,7 @@ lookups fall back to your profile and connected users; they cannot discover offl
 `User` shows an avatar and name, with optional secondary `detail` text. `UserAvatar` shows
 only the avatar. Pass a user ID; both handle missing names and unknown users.
 
-#### `Facepile`
+#### `AvatarGroup`
 
 Show several users together. IDs are deduplicated; `max` limits the visible avatars and
 remaining users appear as an overflow count.
@@ -119,24 +119,24 @@ import { Cursors } from 'moi/collab'
 <Cursors id="board">{children}</Cursors>
 ```
 
-#### `PresenceFrame` and `PresenceGutter`
+#### `FocusFrame` and `FocusAvatars`
 
-Wrap a field or section to show users focused inside it. `PresenceFrame` adds an outline
-and user labels; `PresenceGutter` places avatars beside it. Each accepts exactly one React
+Wrap a field or section to show users focused inside it. `FocusFrame` adds an outline
+and user labels; `FocusAvatars` places avatars beside it. Each accepts exactly one React
 element, including a component containing multiple controls. Do not pass a fragment.
 
 ```tsx
-import { PresenceFrame, PresenceGutter } from 'moi/collab'
+import { FocusFrame, FocusAvatars } from 'moi/collab'
 import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
 
 <>
-  <PresenceFrame id="title">
+  <FocusFrame id="title">
     <Input aria-label="Title" />
-  </PresenceFrame>
-  <PresenceGutter id="notes">
+  </FocusFrame>
+  <FocusAvatars id="notes">
     <Textarea aria-label="Notes" />
-  </PresenceGutter>
+  </FocusAvatars>
 </>
 ```
 
@@ -167,13 +167,13 @@ Give repeated fields a namespace, such as a task ID. Descendant frame, gutter, a
 IDs combine with their groups. Groups can nest and add no DOM element.
 
 ```tsx
-import { PresenceGroup, PresenceFrame } from 'moi/collab'
+import { PresenceGroup, FocusFrame } from 'moi/collab'
 import { Input } from '../ui/input'
 
 <PresenceGroup id={task.id}>
-  <PresenceFrame id="title">
+  <FocusFrame id="title">
     <Input aria-label="Task title" defaultValue={task.title} />
-  </PresenceFrame>
+  </FocusFrame>
 </PresenceGroup>
 ```
 

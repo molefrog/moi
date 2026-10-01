@@ -1,4 +1,4 @@
-import type { PresenceGutterProps } from 'moi/collab'
+import type { FocusAvatarsProps } from 'moi/collab'
 import { useContext } from 'react'
 import type { HTMLAttributes, ReactNode, Ref } from 'react'
 import { motion } from 'motion/react'
@@ -11,23 +11,23 @@ import {
 } from './presence-helpers'
 import { UserAvatar } from './user-avatar'
 
-export function PresenceGutter({ id, children, className }: PresenceGutterProps) {
+export function FocusAvatars({ id, children, className }: FocusAvatarsProps) {
   const target = usePresenceTarget(id)
   const presence = useTargetPresence(target)
   const grouped = useContext(PresenceGroupContext).length > 0
   return (
-    <PresenceGutterPrimitive
+    <FocusAvatarsPrimitive
       {...presence.props}
       users={presence.users}
       animate={grouped}
       className={className}
     >
       {presenceChild(children)}
-    </PresenceGutterPrimitive>
+    </FocusAvatarsPrimitive>
   )
 }
 
-type PresenceGutterPrimitiveProps = HTMLAttributes<HTMLDivElement> & {
+type FocusAvatarsPrimitiveProps = HTMLAttributes<HTMLDivElement> & {
   ref?: Ref<HTMLDivElement>
   users: readonly { id: string; connectionId: string }[]
   children: ReactNode
@@ -36,13 +36,13 @@ type PresenceGutterPrimitiveProps = HTMLAttributes<HTMLDivElement> & {
 
 // A target owns its own gutter. Optional group-scoped layout IDs let the same
 // user's face glide between targets without searching or guessing DOM order.
-function PresenceGutterPrimitive({
+function FocusAvatarsPrimitive({
   users,
   children,
   animate = false,
   className,
   ...rest
-}: PresenceGutterPrimitiveProps) {
+}: FocusAvatarsPrimitiveProps) {
   return (
     <div className={cn('relative pl-8', className)} {...rest}>
       {children}

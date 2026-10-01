@@ -1,12 +1,12 @@
 import type * as CollabApi from 'moi/collab'
 import { Activity } from './components/activity'
-import { Facepile } from './components/facepile'
+import { AvatarGroup } from './components/avatar-group'
 import { User } from './components/user'
 import { UserAvatar } from './components/user-avatar'
 import { Cursors } from './components/cursors'
-import { PresenceFrame } from './components/presence-frame'
+import { FocusFrame } from './components/focus-frame'
 import { PresenceGroup } from './components/presence-group'
-import { PresenceGutter } from './components/presence-gutter'
+import { FocusAvatars } from './components/focus-avatars'
 import { Selection } from './components/selection'
 import {
   useMe,
@@ -22,12 +22,12 @@ export type AppletCollabApi = typeof CollabApi
 export const appletCollabApi = {
   Activity,
   Cursors,
-  Facepile,
+  AvatarGroup,
   User,
   UserAvatar,
-  PresenceFrame,
+  FocusFrame,
   PresenceGroup,
-  PresenceGutter,
+  FocusAvatars,
   Selection,
   useMe,
   usePeers,

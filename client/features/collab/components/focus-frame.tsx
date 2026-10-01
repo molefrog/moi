@@ -1,4 +1,4 @@
-import type { PresenceFrameProps } from 'moi/collab'
+import type { FocusFrameProps } from 'moi/collab'
 import { useLayoutEffect, useRef } from 'react'
 import type { HTMLAttributes, ReactNode, Ref } from 'react'
 import { IconCursorText } from '@tabler/icons-react'
@@ -9,22 +9,22 @@ import { userDisplayName } from '../users'
 import { presenceChild, usePresenceTarget, useTargetPresence } from './presence-helpers'
 import { UserTag } from './user-tag'
 
-export function PresenceFrame({ id, children, className }: PresenceFrameProps) {
+export function FocusFrame({ id, children, className }: FocusFrameProps) {
   const target = usePresenceTarget(id)
   const presence = useTargetPresence(target)
   return (
-    <PresenceFramePrimitive
+    <PresenceOutline
       {...presence.props}
       ids={presence.users.map(user => user.id)}
       icon={<IconCursorText size={12} stroke={1.75} />}
       className={className}
     >
       {presenceChild(children)}
-    </PresenceFramePrimitive>
+    </PresenceOutline>
   )
 }
 
-type PresenceFramePrimitiveProps = HTMLAttributes<HTMLDivElement> & {
+type PresenceOutlineProps = HTMLAttributes<HTMLDivElement> & {
   ref?: Ref<HTMLDivElement>
   // Everyone at this element; the first user's color draws the frame.
   ids: readonly string[]
@@ -35,13 +35,7 @@ type PresenceFramePrimitiveProps = HTMLAttributes<HTMLDivElement> & {
 // Wraps anything. With one element inside, the frame hugs that element and
 // takes its corner radius, so a field, a card, a button, and a round avatar
 // each get a frame of their own shape with no styling from the caller.
-export function PresenceFramePrimitive({
-  ids,
-  icon,
-  children,
-  className,
-  ...rest
-}: PresenceFramePrimitiveProps) {
+export function PresenceOutline({ ids, icon, children, className, ...rest }: PresenceOutlineProps) {
   const resolved = useUsers(ids).filter(user => user !== undefined)
   const lead = resolved[0]
   return (

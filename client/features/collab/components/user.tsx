@@ -20,12 +20,12 @@ export function User({
     <span
       className={cn(
         'inline-flex min-w-0 items-center',
-        size === 'lg' ? 'gap-3' : size === 'xs' ? 'gap-1.5' : 'gap-2',
+        size === 'lg' ? 'gap-3' : 'gap-2',
         className
       )}
     >
       <UserAvatar id={id} size={size} showStatusBadge={showStatusBadge} />
-      <span className={cn('flex min-w-0', size === 'xs' ? 'items-baseline gap-1' : 'flex-col')}>
+      <span className={cn('flex min-w-0 flex-col')}>
         <span
           className={cn(
             'truncate text-sm',
@@ -35,12 +35,7 @@ export function User({
         >
           {name}
         </span>
-        {detail && (
-          <span className="truncate text-xs text-muted-foreground">
-            {size === 'xs' && <span aria-hidden="true">· </span>}
-            {detail}
-          </span>
-        )}
+        {detail && <span className="truncate text-xs text-muted-foreground">{detail}</span>}
       </span>
     </span>
   )

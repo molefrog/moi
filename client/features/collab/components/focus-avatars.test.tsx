@@ -2,52 +2,52 @@ import { expect, test } from 'bun:test'
 import { Fragment } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { PresenceGutter } from './presence-gutter'
+import { FocusAvatars } from './focus-avatars'
 import { presenceTarget } from '../presence-target'
 import { createFocusRoom, namelessUsers, renderCollab } from '../testing/component-fixtures'
 
-test('presence-gutter resolves a usable label for nameless user', () => {
+test('focus-avatars resolves a usable label for nameless user', () => {
   const [profile, label] = namelessUsers[0]!
   const engine = createFocusRoom(presenceTarget('task:42:title'), profile)
   const html = renderCollab(
     engine,
-    <PresenceGutter id="task:42:title">
+    <FocusAvatars id="task:42:title">
       <input />
-    </PresenceGutter>
+    </FocusAvatars>
   )
   expect(html).toContain(`aria-label="${label}"`)
 })
 
-test('presence-gutter matches the semantic target and rejects a different record', () => {
+test('focus-avatars matches the semantic target and rejects a different record', () => {
   const backend = createFocusRoom()
   expect(
     renderCollab(
       backend,
-      <PresenceGutter id="task:42:title">
+      <FocusAvatars id="task:42:title">
         <input />
-      </PresenceGutter>
+      </FocusAvatars>
     )
   ).toContain('Ada')
   expect(
     renderCollab(
       backend,
-      <PresenceGutter id="task:43:title">
+      <FocusAvatars id="task:43:title">
         <input />
-      </PresenceGutter>
+      </FocusAvatars>
     )
   ).not.toContain('Ada')
 })
 
-test('presence-gutter retains content outside a collaboration provider', () => {
+test('focus-avatars retains content outside a collaboration provider', () => {
   const html = renderToStaticMarkup(
-    <PresenceGutter id="task:42:title">
+    <FocusAvatars id="task:42:title">
       <span>Local content</span>
-    </PresenceGutter>
+    </FocusAvatars>
   )
   expect(html).toContain('Local content')
 })
 
-test('presence-gutter requires one direct element and rejects fragments', () => {
+test('focus-avatars requires one direct element and rejects fragments', () => {
   const invalidChildren: ReactNode[] = [
     null,
     false,
@@ -70,31 +70,31 @@ test('presence-gutter requires one direct element and rejects fragments', () => 
     expect(() =>
       renderCollab(
         createFocusRoom(),
-        <PresenceGutter id="title">{children as ReactElement}</PresenceGutter>
+        <FocusAvatars id="title">{children as ReactElement}</FocusAvatars>
       )
     ).toThrow('exactly one child element')
   }
   expect(
     renderCollab(
       createFocusRoom(),
-      <PresenceGutter id="title">
+      <FocusAvatars id="title">
         <label>
           Title
           <input />
         </label>
-      </PresenceGutter>
+      </FocusAvatars>
     )
   ).toContain('Title')
 })
 
-test('presence-gutter rejects blank IDs', () => {
+test('focus-avatars rejects blank IDs', () => {
   for (const id of ['', '   ']) {
     expect(() =>
       renderCollab(
         createFocusRoom(),
-        <PresenceGutter id={id}>
+        <FocusAvatars id={id}>
           <input />
-        </PresenceGutter>
+        </FocusAvatars>
       )
     ).toThrow('nonempty id')
   }

@@ -1,15 +1,15 @@
-import type { FacepileProps } from 'moi/collab'
+import type { AvatarGroupProps } from 'moi/collab'
 import { cn } from '@/client/lib/cn'
 import { Avatar, AvatarFallback } from '@/ui-components/avatar'
 import { UserAvatar } from './user-avatar'
 
-export function Facepile({
+export function AvatarGroup({
   ids,
   max = 3,
   size = 'sm',
   showStatusBadge = false,
   className
-}: FacepileProps) {
+}: AvatarGroupProps) {
   const unique = [...new Set(ids)]
   const shown = unique.slice(0, max)
   const hidden = unique.length - shown.length

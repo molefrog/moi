@@ -85,15 +85,15 @@ test('every collaboration component renders nothing without its bridge, includin
       Activity: <api.Activity />,
       User: <api.User id="alice" />,
       UserAvatar: <api.UserAvatar id="alice" />,
-      Facepile: <api.Facepile ids={['alice']} />,
+      AvatarGroup: <api.AvatarGroup ids={['alice']} />,
       Cursors: <api.Cursors>{children}</api.Cursors>,
       Selection: (
         <api.Selection id="task:1" selected>
           {children}
         </api.Selection>
       ),
-      PresenceFrame: <api.PresenceFrame id="task:1">{children}</api.PresenceFrame>,
-      PresenceGutter: <api.PresenceGutter id="task:1">{children}</api.PresenceGutter>,
+      FocusFrame: <api.FocusFrame id="task:1">{children}</api.FocusFrame>,
+      FocusAvatars: <api.FocusAvatars id="task:1">{children}</api.FocusAvatars>,
       PresenceGroup: <api.PresenceGroup id="tasks">{children}</api.PresenceGroup>
     }
     for (const component of Object.values(components))

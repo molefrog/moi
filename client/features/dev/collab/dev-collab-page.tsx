@@ -1,7 +1,7 @@
 import { Link } from 'wouter'
 
 import { LocalUserSettings } from './local-user-settings'
-import { DevCollabKit } from './dev-collab-kit'
+import { CollabPlayground } from './collab-playground'
 
 export function DevCollabPage() {
   return (
@@ -18,7 +18,7 @@ export function DevCollabPage() {
         </header>
       </div>
       <LocalUserSettings />
-      <DevCollabKit />
+      <CollabPlayground />
     </main>
   )
 }

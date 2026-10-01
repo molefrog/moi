@@ -46,18 +46,18 @@ declare module 'moi/collab' {
 
   // Stable local IDs compose with enclosing PresenceGroup IDs across browsers.
   // Each focus wrapper accepts one element (not a fragment) and tracks its descendants.
-  export type PresenceFrameProps = {
+  export type FocusFrameProps = {
     id: string
     children: ReactElement
     className?: string
   }
-  export function PresenceFrame(props: PresenceFrameProps): ReactElement
-  export type PresenceGutterProps = {
+  export function FocusFrame(props: FocusFrameProps): ReactElement
+  export type FocusAvatarsProps = {
     id: string
     children: ReactElement
     className?: string
   }
-  export function PresenceGutter(props: PresenceGutterProps): ReactElement
+  export function FocusAvatars(props: FocusAvatarsProps): ReactElement
   // Adds a namespace and a local gutter animation group; no DOM or publication.
   export type PresenceGroupProps = { id: string; children: ReactNode }
   export function PresenceGroup(props: PresenceGroupProps): ReactElement
@@ -77,18 +77,19 @@ declare module 'moi/collab' {
     className?: string
   }
   export function UserAvatar(props: UserAvatarProps): ReactElement
-  export type UserProps = UserAvatarProps & {
+  export type UserProps = Pick<UserAvatarProps, 'id' | 'showStatusBadge' | 'className'> & {
+    size?: 'sm' | 'default' | 'lg'
     // Secondary text alongside or below the name.
     detail?: ReactNode
   }
   export function User(props: UserProps): ReactElement
-  export type FacepileProps = {
+  export type AvatarGroupProps = {
     ids: readonly string[]
     max?: number
     size?: 'xs' | 'sm' | 'default'
-    // Status dots default to false in a facepile.
+    // Status dots default to false in an avatar group.
     showStatusBadge?: boolean
     className?: string
   }
-  export function Facepile(props: FacepileProps): ReactElement
+  export function AvatarGroup(props: AvatarGroupProps): ReactElement
 }

@@ -1,11 +1,11 @@
 import { expect, test } from 'bun:test'
-import { Facepile } from './facepile'
+import { AvatarGroup } from './avatar-group'
 import { createRoom, renderCollab } from '../testing/component-fixtures'
 
-test('facepiles deduplicate user IDs and count the remaining users in overflow', () => {
+test('avatar groups deduplicate user IDs and count the remaining users in overflow', () => {
   const html = renderCollab(
     createRoom(),
-    <Facepile ids={['peer', 'peer', 'me', 'missing']} max={1} />
+    <AvatarGroup ids={['peer', 'peer', 'me', 'missing']} max={1} />
   )
   expect(html).toContain('aria-label="3 users"')
   expect(html.match(/aria-label="Ada"/g)).toHaveLength(1)

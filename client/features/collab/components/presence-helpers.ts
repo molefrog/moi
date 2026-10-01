@@ -15,7 +15,7 @@ export function usePresenceTarget(id: string): string {
 export function presenceChild(children: ReactNode): ReactElement {
   if (!isValidElement(children) || children.type === Fragment) {
     throw new Error(
-      'PresenceFrame and PresenceGutter require exactly one child element. ' +
+      'FocusFrame and FocusAvatars require exactly one child element. ' +
         'Wrap a list with PresenceGroup and give each item its own wrapper; fragments are not supported.'
     )
   }

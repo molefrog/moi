@@ -4,10 +4,10 @@ import type { JsonValue } from 'moi'
 import type {
   ActivityProps,
   CursorsProps,
-  FacepileProps,
-  PresenceFrameProps,
+  AvatarGroupProps,
+  FocusFrameProps,
   PresenceGroupProps,
-  PresenceGutterProps,
+  FocusAvatarsProps,
   PresenceValue,
   SelectionProps,
   UserProps,
@@ -39,10 +39,10 @@ const fallback = {
   Selection: nothing,
   User: nothing,
   UserAvatar: nothing,
-  Facepile: nothing,
-  PresenceFrame: nothing,
+  AvatarGroup: nothing,
+  FocusFrame: nothing,
   PresenceGroup: nothing,
-  PresenceGutter: nothing
+  FocusAvatars: nothing
 }
 let warned = false
 function api() {
@@ -90,15 +90,15 @@ export function User(props: UserProps) {
 export function UserAvatar(props: UserAvatarProps) {
   return createElement(api().UserAvatar, props)
 }
-export function Facepile(props: FacepileProps) {
-  return createElement(api().Facepile, props)
+export function AvatarGroup(props: AvatarGroupProps) {
+  return createElement(api().AvatarGroup, props)
 }
-export function PresenceFrame(props: PresenceFrameProps) {
-  return createElement(api().PresenceFrame, props)
+export function FocusFrame(props: FocusFrameProps) {
+  return createElement(api().FocusFrame, props)
 }
 export function PresenceGroup(props: PresenceGroupProps) {
   return createElement(api().PresenceGroup, props)
 }
-export function PresenceGutter(props: PresenceGutterProps) {
-  return createElement(api().PresenceGutter, props)
+export function FocusAvatars(props: FocusAvatarsProps) {
+  return createElement(api().FocusAvatars, props)
 }
