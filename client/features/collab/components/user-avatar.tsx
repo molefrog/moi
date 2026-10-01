@@ -33,7 +33,7 @@ export function UserAvatar({
             intensity3d="none"
             interactive={false}
             colorClasses={['bg-collab']}
-            className="rounded-full text-collab-foreground"
+            className="text-collab-foreground"
           />
         ) : (
           <IconUser size={smallAvatar ? 12 : 16} stroke={1.75} />

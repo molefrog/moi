@@ -78,9 +78,9 @@ declare module 'moi/collab' {
   }
   export function UserAvatar(props: UserAvatarProps): ReactElement
   export type UserProps = Pick<UserAvatarProps, 'id' | 'showStatusBadge' | 'className'> & {
-    size?: 'sm' | 'default' | 'lg'
+    size?: 'xs' | 'sm' | 'default'
     // Secondary text alongside or below the name.
-    detail?: ReactNode
+    description?: ReactNode
   }
   export function User(props: UserProps): ReactElement
   export type AvatarGroupProps = {

@@ -45,7 +45,7 @@ lookups fall back to your profile and connected users; they cannot discover offl
 
 #### `User` and `UserAvatar`
 
-`User` shows an avatar and name, with optional secondary `detail` text. `UserAvatar` shows
+`User` shows an avatar and name, with optional secondary `description` text. `UserAvatar` shows
 only the avatar. Pass a user ID; both handle missing names and unknown users.
 
 #### `AvatarGroup`

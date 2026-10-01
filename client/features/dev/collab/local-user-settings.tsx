@@ -64,7 +64,7 @@ function AccessUser({ profile }: AccessUserProps) {
             : 'This server uses Cloudflare Access, but this page wasn’t opened through it. Open moi at its Cloudflare Access address to appear in workspaces.'}
         </p>
       </header>
-      {profile && <User id={profile.id} size="lg" showStatusBadge={false} />}
+      {profile && <User id={profile.id} showStatusBadge={false} />}
     </section>
   )
 }

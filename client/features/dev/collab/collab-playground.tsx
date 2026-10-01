@@ -485,12 +485,17 @@ export function CollabPlayground() {
             title="User, UserAvatar, and AvatarGroup"
             hint="User shows an avatar and name; UserAvatar shows the avatar alone. AvatarGroup groups avatars with an overflow count. Profile edits update all three; removed IDs become unknown."
             code={
-              '<User id="fig" />\n<UserAvatar id="alex" size="sm" />\n<AvatarGroup ids={watcherIds} />'
+              '<User id="alex" size="xs" description="Online" />\n<User id="alex" size="sm" />\n<User id="alex" size="default" />\n<UserAvatar id="alex" size="sm" />\n<AvatarGroup ids={watcherIds} />'
             }
           >
             <div className="flex flex-wrap items-center gap-5">
-              <User id="fig" size="sm" /> <User id="andrea" detail="Away" />{' '}
-              <User id="david" detail={david ? 'Offline' : 'Removed'} /> <User id="unknown" />
+              <User id="fig" /> <User id="andrea" description="Away" />{' '}
+              <User id="david" description={david ? 'Offline' : 'Removed'} /> <User id="unknown" />
+            </div>
+            <div className="flex flex-wrap items-center gap-5">
+              <User id="alex" size="xs" description="Online" />
+              <User id="alex" size="sm" description="Online" />
+              <User id="alex" size="default" description="Online" />
             </div>
             <div className="flex flex-wrap items-center gap-5">
               <UserAvatar id="alex" size="xs" />

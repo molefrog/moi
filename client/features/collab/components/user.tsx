@@ -10,32 +10,32 @@ export function User({
   id,
   size = 'default',
   showStatusBadge = true,
-  detail,
+  description,
   className
 }: UserProps) {
   const user = useUser(id)
   const name = user ? userDisplayName(user) : UNKNOWN_NAME
 
   return (
-    <span
-      className={cn(
-        'inline-flex min-w-0 items-center',
-        size === 'lg' ? 'gap-3' : 'gap-2',
-        className
-      )}
-    >
+    <span className={cn('inline-flex min-w-0 items-center gap-2', className)}>
       <UserAvatar id={id} size={size} showStatusBadge={showStatusBadge} />
-      <span className={cn('flex min-w-0 flex-col')}>
-        <span
-          className={cn(
-            'truncate text-sm',
-            size === 'lg' && 'font-medium',
-            !user && 'text-muted-foreground'
-          )}
-        >
-          {name}
-        </span>
-        {detail && <span className="truncate text-xs text-muted-foreground">{detail}</span>}
+      <span className={cn('flex min-w-0 text-sm', size === 'xs' ? 'items-baseline' : 'flex-col')}>
+        <span className={cn('truncate', !user && 'text-muted-foreground')}>{name}</span>
+        {description && (
+          <span
+            className={cn(
+              'truncate text-muted-foreground',
+              size === 'sm' && 'text-xs leading-tight'
+            )}
+          >
+            {size === 'xs' && (
+              <span aria-hidden="true" className="whitespace-pre">
+                {' · '}
+              </span>
+            )}
+            {description}
+          </span>
+        )}
       </span>
     </span>
   )
