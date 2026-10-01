@@ -1,3 +1,4 @@
+import type * as CollabApi from 'moi/collab'
 import { Activity } from './components/activity'
 import { Facepile } from './components/facepile'
 import { User } from './components/user'
@@ -15,6 +16,8 @@ import {
   useWorkspaceUsers
 } from './hooks'
 
+export type AppletCollabApi = typeof CollabApi
+
 export const appletCollabApi = {
   Activity,
   Cursors,
@@ -30,6 +33,4 @@ export const appletCollabApi = {
   useWorkspaceUsers,
   usePresence,
   usePublishPresence
-}
-
-export type AppletCollabApi = typeof appletCollabApi
+} satisfies AppletCollabApi

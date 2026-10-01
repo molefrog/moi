@@ -7,7 +7,11 @@ import type * as CollabApi from 'moi/collab'
 import type * as CollabRuntime from './collab'
 
 type TestModule = typeof CollabApi & { __attachBridge(bridge: unknown): void }
-type RuntimeModule = typeof CollabRuntime & { __attachBridge(bridge: unknown): void }
+// Check the bundled runtime against the standalone public contract without loading it.
+type CheckedRuntime<T extends typeof CollabApi> = T
+type RuntimeModule = CheckedRuntime<typeof CollabRuntime> & {
+  __attachBridge(bridge: unknown): void
+}
 
 async function loadModule(): Promise<TestModule> {
   const result = await Bun.build({
