@@ -25,9 +25,10 @@ This tracks tab visibility, not idle time. A user on another page can still be a
 
 #### `useMe` and `useUser`
 
-`useMe()` resolves the current user. `useUser(id)` resolves a stored user reference,
-including an offline member. Both return `undefined` when the profile cannot be resolved,
-including while the workspace directory loads. Handle that before reading profile fields.
+Use `useMe()` when an action needs the current user's identity, such as assigning a task
+to yourself. Use `useUser(id)` to resolve a stored author or assignee, including an offline
+member. Both return `undefined` when the profile cannot be resolved, including while the
+workspace directory loads. Handle that before reading profile fields.
 
 #### `useWorkspaceUsers` and `usePeers`
 
@@ -69,13 +70,20 @@ and applet content still renders.
 Presence is scoped to the current page and applet. Matching IDs or channels in another
 view or widget do not share activity.
 
+Add presence where knowing what someone is working on helps people coordinate. Choose the
+smallest meaningful target: a field, document block, task row, or selected card. Several
+controls can share a target when they belong to one activity. Keep static content and
+routine navigation free of presence indicators unless activity there matters to others.
+Presence communicates activity; it does not lock records or prevent conflicting edits.
+
 ### Hooks
 
 #### `usePresence` and `usePublishPresence`
 
-Use these together for activity that the built-in components do not cover.
-`usePublishPresence(channel, value)` publishes a value and replaces it when it changes.
-Values must be JSON and no larger than 4 KiB.
+Use these hooks when activity needs a custom value or display, such as an editing summary,
+an active tool, or a drag preview. Publish near the interaction and read the channel wherever
+that information is useful in the applet. `usePublishPresence(channel, value)` publishes a
+value and replaces it when it changes. Values must be JSON and no larger than 4 KiB.
 
 `usePresence<T>(channel)` reads other connections' `{ connectionId, userId, value }` entries.
 Reading never publishes presence. One user can have multiple entries, including another tab
@@ -108,8 +116,14 @@ to a particular record. Unmount the publishing component to stop publishing;
 
 #### `Cursors`
 
-Wrap the area where users should see each other's pointers. Give separate areas distinct
-`id` values. A single area can omit `id`, which defaults to `"default"`.
+Use `Cursors` for spatial work where seeing someone point or move helps, such as a board,
+canvas, or arrangement of cards. For ordinary forms and lists, presence at the active field
+or row is often enough.
+
+Wrap the shared surface once, keeping local menus and navigation outside the cursor area.
+It can contain many `PresenceFrame` or `PresenceAvatars` targets: cursors show movement,
+while those targets show where someone is focused or present. Give separate cursor areas
+distinct `id` values. A single area can omit `id`, which defaults to `"default"`.
 
 ```tsx
 import { Cursors } from 'moi/collab'
@@ -119,9 +133,19 @@ import { Cursors } from 'moi/collab'
 
 #### `PresenceFrame` and `PresenceAvatars`
 
-Choose how to show other participants at an element. `PresenceFrame` adds an outline
-and user names; `PresenceAvatars` places avatars beside it. Both use the same target presence
-and support the two modes below.
+Both components show other participants at a target and support the same automatic and
+controlled modes below. Choose the appearance that fits the target's shape and how much
+attention the activity needs.
+
+Use `PresenceFrame` for a compact target whose boundaries should stand out, such as a form
+field, a small group of controls, or a selected card. It draws an outline and shows user
+names above it. A frame around a very wide or tall block can dominate the screen; keep the
+target to the specific field or block being worked on.
+
+Use `PresenceAvatars` for a quieter cue beside short content, such as a document line, list
+row, compact field, or low-height block. It reserves a left gutter for avatars and works
+well with wide rows because it marks one spot along the edge. For tall content, split it
+into meaningful targets so the avatar stays close to the activity.
 
 Both components accept `align` to position their user indicators. For `PresenceFrame`,
 it aligns the name badge above the frame: `"start"` (left) or `"end"` (right, default).
