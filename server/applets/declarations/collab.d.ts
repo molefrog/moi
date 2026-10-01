@@ -48,11 +48,13 @@ declare module 'moi/collab' {
   export type PresenceFrameProps = {
     id: string
     present?: boolean
+    // Name badge alignment above the frame. Defaults to 'end'.
+    align?: 'start' | 'end'
     children: ReactNode
     className?: string
   }
   export function PresenceFrame(props: PresenceFrameProps): ReactElement
-  export type PresenceAvatarsProps = PresenceFrameProps
+  export type PresenceAvatarsProps = Omit<PresenceFrameProps, 'align'>
   export function PresenceAvatars(props: PresenceAvatarsProps): ReactElement
   // Adds a namespace and a local gutter animation group; no DOM or publication.
   export type PresenceGroupProps = { id: string; children: ReactNode }

@@ -118,7 +118,7 @@ function TargetPresenceDemo() {
       title="Automatic and controlled presence"
       hint="Each automatic target contains two fields. Move between them: the other pane keeps showing presence at that target. Cards publish the boolean you control with their button, even when focus moves away."
       code={
-        '<PresenceGroup id="comparison">\n  <PresenceFrame id="focus">\n    <Input />\n    <Input />\n  </PresenceFrame>\n  <PresenceAvatars id="avatars">\n    <>\n      <Input />\n      <Input />\n    </>\n  </PresenceAvatars>\n  <PresenceAvatars id="controlled-avatars" present={editing}>{children}</PresenceAvatars>\n  <PresenceFrame id="selection" present={selected}>\n    <Button onClick={() => setSelected(value => !value)}>Select item</Button>\n  </PresenceFrame>\n</PresenceGroup>'
+        '<PresenceGroup id="comparison">\n  <PresenceFrame id="focus">\n    <Input />\n    <Input />\n  </PresenceFrame>\n  <PresenceAvatars id="avatars">\n    <>\n      <Input />\n      <Input />\n    </>\n  </PresenceAvatars>\n  <PresenceAvatars id="controlled-avatars" present={editing}>{children}</PresenceAvatars>\n  <PresenceFrame id="selection" present={selected} align="start">\n    <Button onClick={() => setSelected(value => !value)}>Select item</Button>\n  </PresenceFrame>\n</PresenceGroup>'
       }
     >
       <PresenceGroup id="comparison">
@@ -147,8 +147,8 @@ function TargetPresenceDemo() {
             </>
           </PresenceAvatars>
         </div>
-        <PresenceFrame id="selection" present={selected}>
-          <div className="flex flex-col items-start gap-3 rounded-lg bg-muted p-4">
+        <PresenceFrame id="selection" present={selected} align="start">
+          <div className="flex flex-col items-start gap-3 rounded-lg bg-accent p-4">
             <p className="text-sm">Selection: a task card</p>
             <Button
               size="sm"
@@ -165,7 +165,7 @@ function TargetPresenceDemo() {
           </div>
         </PresenceFrame>
         <PresenceAvatars id="controlled-avatars" present={editing}>
-          <div className="flex flex-col items-start gap-3 rounded-lg bg-muted p-4">
+          <div className="flex flex-col items-start gap-3 rounded-lg bg-accent p-4">
             <p className="text-sm">Controlled avatars: editing a card</p>
             <Button
               size="sm"

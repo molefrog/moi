@@ -8,13 +8,14 @@ import { useUsers } from '../hooks'
 import { userDisplayName } from '../users'
 import { usePresenceTarget, useTargetPresence } from './presence-helpers'
 
-export function PresenceFrame({ id, present, children, className }: PresenceFrameProps) {
+export function PresenceFrame({ id, present, align, children, className }: PresenceFrameProps) {
   const target = usePresenceTarget(id)
   const presence = useTargetPresence(target, present)
   return (
     <PresenceOutline
       {...presence.props}
       ids={presence.users.map(user => user.id)}
+      align={align}
       className={className}
     >
       {children}
@@ -27,25 +28,33 @@ type PresenceOutlineProps = HTMLAttributes<HTMLDivElement> & {
   // Everyone at this element; the first user's color draws the frame.
   ids: readonly string[]
   children: ReactNode
+  align?: PresenceFrameProps['align']
 }
 
-// Wraps anything. With one element inside, the frame hugs that element and
-// takes its corner radius, so a field, a card, a button, and a round avatar
-// each get a frame of their own shape with no styling from the caller.
-export function PresenceOutline({ ids, children, className, ...rest }: PresenceOutlineProps) {
+// One visible element gets a frame matching its shape; other content gets one shared frame.
+export function PresenceOutline({
+  ids,
+  align,
+  children,
+  className,
+  ...rest
+}: PresenceOutlineProps) {
   const resolved = useUsers(ids).filter(user => user !== undefined)
-  const lead = resolved[0]
   return (
     <div className={cn('relative', className)} {...rest}>
+      {/* Keep the overlay first so showing it never changes the content's spacing. */}
+      <FrameOutline
+        names={resolved.map(userDisplayName).join(', ')}
+        color={resolved[0]?.color}
+        align={align}
+      />
       {children}
-      {lead && <FrameOutline names={resolved.map(userDisplayName).join(', ')} color={lead.color} />}
     </div>
   )
 }
 
-// A name does not fit within a frame narrower than this, so its tag starts at
-// the frame's left edge and runs past it instead of ending at the right edge.
-const NARROW_FRAME = 160
+const FRAME_GAP = 4
+const FRAME_RADIUS = 6
 
 const CORNERS = [
   'borderTopLeftRadius',
@@ -54,20 +63,21 @@ const CORNERS = [
   'borderBottomLeftRadius'
 ] as const
 
-type FrameOutlineProps = { names: string; color: UserColor | undefined }
+type FrameOutlineProps = {
+  names: string
+  color: UserColor | undefined
+  align?: PresenceFrameProps['align']
+}
 
-function FrameOutline({ names, color }: FrameOutlineProps) {
+function FrameOutline({ names, color, align = 'end' }: FrameOutlineProps) {
   const node = useRef<HTMLDivElement | null>(null)
-  // Runs after every render, because whatever is wrapped may have changed shape
-  // in the same render, and again whenever the wrapped element resizes.
+  // Refit after rendering and whenever the content resizes.
   useLayoutEffect(() => {
     const outline = node.current
     const frame = outline?.parentElement
-    if (!outline || !frame) return
+    if (!names || !outline || !frame) return
     const fit = () => {
-      // The one in-flow element inside is what the frame is about; hidden
-      // inputs and other out-of-flow helpers beside it do not count. With
-      // several elements, or bare text, the frame goes around all of it.
+      // Ignore the overlay, hidden elements, and helpers outside normal flow.
       const inside = [...frame.children].filter(child => {
         if (child === outline) return false
         const { display, position } = getComputedStyle(child)
@@ -78,23 +88,21 @@ function FrameOutline({ names, color }: FrameOutlineProps) {
       )
       const only = inside.length === 1 && !bareText ? inside[0] : null
       const subject = only instanceof HTMLElement ? only : null
+      const target = subject ?? frame
+      const bounds = target.getBoundingClientRect()
+      const origin = frame.getBoundingClientRect()
       const box = outline.style
-      box.left = subject ? `${subject.offsetLeft}px` : ''
-      box.top = subject ? `${subject.offsetTop}px` : ''
-      box.right = subject ? 'auto' : ''
-      box.bottom = subject ? 'auto' : ''
-      box.width = subject ? `${subject.offsetWidth}px` : ''
-      box.height = subject ? `${subject.offsetHeight}px` : ''
-      // Square elements, usually bare text, keep the outline's own slight
-      // rounding and get more air so the content does not touch the line.
-      const shape = getComputedStyle(subject ?? frame)
-      const rounded = CORNERS.some(corner => parseFloat(shape[corner]) > 0)
-      for (const corner of CORNERS) box[corner] = rounded ? shape[corner] : ''
-      // Both states are spelled out, and every class that depends on them is a
-      // variant: inside an applet, the applet's own copy of a bare utility
-      // outranks a host variant that tries to override it.
-      outline.dataset.shape = rounded ? 'rounded' : 'square'
-      outline.dataset.tag = (subject ?? frame).offsetWidth < NARROW_FRAME ? 'start' : 'end'
+      // Rectangles preserve fractions; absolute positions start inside the wrapper's border.
+      box.left = `${bounds.left - origin.left - frame.clientLeft + frame.scrollLeft - FRAME_GAP}px`
+      box.top = `${bounds.top - origin.top - frame.clientTop + frame.scrollTop - FRAME_GAP}px`
+      box.width = `${bounds.width + FRAME_GAP * 2}px`
+      box.height = `${bounds.height + FRAME_GAP * 2}px`
+      box.setProperty('--presence-target-width', `${bounds.width}px`)
+      // Expand one element's corners by the gap; otherwise use the default radius.
+      const shape = subject ? getComputedStyle(subject) : null
+      for (const corner of CORNERS) {
+        box[corner] = shape ? `calc(${shape[corner]} + ${FRAME_GAP}px)` : `${FRAME_RADIUS}px`
+      }
     }
     fit()
     const observer = new ResizeObserver(fit)
@@ -105,10 +113,12 @@ function FrameOutline({ names, color }: FrameOutlineProps) {
   return (
     <div
       ref={node}
+      hidden={!names}
+      data-align={align}
       data-collab-color={color ?? 'unknown'}
-      className="group/frame pointer-events-none absolute inset-0 animate-in rounded-sm outline-2 outline-collab duration-150 fade-in data-[shape=rounded]:outline-offset-2 data-[shape=square]:outline-offset-4"
+      className="group/frame pointer-events-none absolute m-0! animate-in ring-2 ring-collab duration-150 fade-in"
     >
-      <Badge className="absolute bottom-full bg-collab text-collab-foreground group-data-[shape=rounded]/frame:mb-1.5 group-data-[shape=square]/frame:mb-2 group-data-[tag=end]/frame:right-0 group-data-[tag=end]/frame:max-w-full group-data-[tag=start]/frame:left-0 group-data-[tag=start]/frame:max-w-40">
+      <Badge className="absolute bottom-full mb-1.5 max-w-[min(var(--presence-target-width),10rem)] bg-collab text-collab-foreground group-data-[align=end]/frame:-right-0.5 group-data-[align=start]/frame:-left-0.5">
         <span className="truncate">{names}</span>
       </Badge>
     </div>

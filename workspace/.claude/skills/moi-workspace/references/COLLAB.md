@@ -123,6 +123,10 @@ Choose how to show other participants at an element. `PresenceFrame` adds an out
 and user names; `PresenceAvatars` places avatars beside it. Both use the same target presence
 and support the two modes below.
 
+The frame's name badge sits above it. `align` defaults to `"end"` (right); use
+`align="start"` to place it on the left. Its width is limited to the target's width
+or 160px, whichever is smaller. Long names are truncated.
+
 Use the same `id` across clients for the same activity. Give separate activities distinct IDs.
 Each component publishes your own presence and displays other connections, including another
 tab of your own user. Multiple connections for one user display once at each target.
@@ -140,7 +144,7 @@ import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
 
 <>
-  <PresenceFrame id="title">
+  <PresenceFrame id="title" align="start">
     <label htmlFor="title">Title</label>
     <Input id="title" />
   </PresenceFrame>
