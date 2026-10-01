@@ -1,6 +1,5 @@
 import type * as CollabApi from 'moi/collab'
-import { Activity } from './components/activity'
-import { AvatarGroup } from './components/avatar-group'
+import { UserAvatarGroup } from './components/user-avatar-group'
 import { User } from './components/user'
 import { UserAvatar } from './components/user-avatar'
 import { Cursors } from './components/cursors'
@@ -20,9 +19,8 @@ import {
 export type AppletCollabApi = typeof CollabApi
 
 export const appletCollabApi = {
-  Activity,
   Cursors,
-  AvatarGroup,
+  UserAvatarGroup,
   User,
   UserAvatar,
   FocusFrame,

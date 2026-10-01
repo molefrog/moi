@@ -5,12 +5,7 @@ import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from '@/ui-component
 import { useUser } from '../hooks'
 import { userDisplayName } from '../users'
 
-export function UserAvatar({
-  id,
-  size = 'default',
-  showStatusBadge = true,
-  className
-}: UserAvatarProps) {
+export function UserAvatar({ id, size = 'default', showStatusBadge, className }: UserAvatarProps) {
   const user = useUser(id)
   const name = user ? userDisplayName(user) : 'Unknown user'
 

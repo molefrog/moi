@@ -48,15 +48,13 @@ lookups fall back to your profile and connected users; they cannot discover offl
 `User` shows an avatar and name, with optional secondary `description` text. `UserAvatar` shows
 only the avatar. Pass a user ID; both handle missing names and unknown users.
 
-#### `AvatarGroup`
+`User` and `UserAvatar` hide the status badge by default; pass `showStatusBadge` to show it
+for active users.
+
+#### `UserAvatarGroup`
 
 Show several users together. IDs are deduplicated; `max` limits the visible avatars and
 remaining users appear as an overflow count.
-
-#### `Activity`
-
-Show your own user and other connected users on the current page. Use `scope="workspace"`
-to include other pages.
 
 ## Presence
 

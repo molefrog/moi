@@ -6,13 +6,7 @@ import { userDisplayName } from '../users'
 
 const UNKNOWN_NAME = 'Unknown user'
 
-export function User({
-  id,
-  size = 'default',
-  showStatusBadge = true,
-  description,
-  className
-}: UserProps) {
+export function User({ id, size = 'default', showStatusBadge, description, className }: UserProps) {
   const user = useUser(id)
   const name = user ? userDisplayName(user) : UNKNOWN_NAME
 

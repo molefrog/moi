@@ -2,9 +2,8 @@
 import { createElement } from 'react'
 import type { JsonValue } from 'moi'
 import type {
-  ActivityProps,
   CursorsProps,
-  AvatarGroupProps,
+  UserAvatarGroupProps,
   FocusFrameProps,
   PresenceGroupProps,
   FocusAvatarsProps,
@@ -35,11 +34,10 @@ const fallback = {
   },
   usePublishPresence() {},
   Cursors: nothing,
-  Activity: nothing,
   Selection: nothing,
   User: nothing,
   UserAvatar: nothing,
-  AvatarGroup: nothing,
+  UserAvatarGroup: nothing,
   FocusFrame: nothing,
   PresenceGroup: nothing,
   FocusAvatars: nothing
@@ -78,9 +76,6 @@ export function usePublishPresence<T extends JsonValue>(channel: string, value: 
 export function Cursors(props: CursorsProps) {
   return createElement(api().Cursors, props)
 }
-export function Activity(props: ActivityProps) {
-  return createElement(api().Activity, props)
-}
 export function Selection(props: SelectionProps) {
   return createElement(api().Selection, props)
 }
@@ -90,8 +85,8 @@ export function User(props: UserProps) {
 export function UserAvatar(props: UserAvatarProps) {
   return createElement(api().UserAvatar, props)
 }
-export function AvatarGroup(props: AvatarGroupProps) {
-  return createElement(api().AvatarGroup, props)
+export function UserAvatarGroup(props: UserAvatarGroupProps) {
+  return createElement(api().UserAvatarGroup, props)
 }
 export function FocusFrame(props: FocusFrameProps) {
   return createElement(api().FocusFrame, props)

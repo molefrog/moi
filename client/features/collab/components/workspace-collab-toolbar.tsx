@@ -109,13 +109,7 @@ export function WorkspaceCollabToolbar({
               />
             }
           >
-            {self && (
-              <UserAvatar
-                id={self.profile.id}
-                showStatusBadge={false}
-                className="ring-2 ring-background"
-              />
-            )}
+            {self && <UserAvatar id={self.profile.id} className="ring-2 ring-background" />}
             <IconChevronDown stroke={1.75} className="text-muted-foreground" />
           </PopoverTrigger>
         </span>
@@ -123,7 +117,7 @@ export function WorkspaceCollabToolbar({
           <PopoverTitle className="sr-only">Users in this workspace</PopoverTitle>
           {self && (
             <div className="flex items-center gap-3 px-2 pt-1">
-              <UserAvatar id={self.profile.id} size="lg" showStatusBadge={false} />
+              <UserAvatar id={self.profile.id} size="lg" />
               <span className="min-w-0 flex-1 truncate text-sm font-medium">
                 {userDisplayName(self.profile)}{' '}
                 <span className="font-normal text-muted-foreground">(you)</span>
@@ -214,11 +208,7 @@ function Face({ user, place, onJump }: FaceProps) {
           )
         }
       >
-        <UserAvatar
-          id={user.profile.id}
-          showStatusBadge={false}
-          className="ring-2 ring-background"
-        />
+        <UserAvatar id={user.profile.id} className="ring-2 ring-background" />
       </TooltipTrigger>
       <TooltipContent side="bottom">
         <span className="flex flex-col">

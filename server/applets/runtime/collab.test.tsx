@@ -82,10 +82,9 @@ test('every collaboration component renders nothing without its bridge, includin
   try {
     const children = <span>Applet child content</span>
     const components = {
-      Activity: <api.Activity />,
       User: <api.User id="alice" />,
       UserAvatar: <api.UserAvatar id="alice" />,
-      AvatarGroup: <api.AvatarGroup ids={['alice']} />,
+      UserAvatarGroup: <api.UserAvatarGroup ids={['alice']} />,
       Cursors: <api.Cursors>{children}</api.Cursors>,
       Selection: (
         <api.Selection id="task:1" selected>

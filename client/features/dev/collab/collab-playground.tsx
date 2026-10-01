@@ -25,8 +25,7 @@ import { PresenceGroup } from '@/client/features/collab/components/presence-grou
 import { FocusAvatars } from '@/client/features/collab/components/focus-avatars'
 import { Selection } from '@/client/features/collab/components/selection'
 import { Cursors } from '@/client/features/collab/components/cursors'
-import { Activity } from '@/client/features/collab/components/activity'
-import { AvatarGroup } from '@/client/features/collab/components/avatar-group'
+import { UserAvatarGroup } from '@/client/features/collab/components/user-avatar-group'
 import { User } from '@/client/features/collab/components/user'
 import { UserAvatar } from '@/client/features/collab/components/user-avatar'
 import { createFakeEngine } from '@/client/features/collab/testing/fake-engine'
@@ -397,6 +396,36 @@ function Output({ value }: OutputProps) {
   )
 }
 
+function ConnectedUsersDemo() {
+  const me = useMe()
+  const pagePeers = usePeers()
+  const workspacePeers = usePeers({ scope: 'workspace' })
+  const ownIds = me ? [me.id] : []
+  const pageIds = [...ownIds, ...pagePeers.map(user => user.id)]
+  const workspaceIds = [...ownIds, ...workspacePeers.map(user => user.id)]
+
+  return (
+    <Section
+      title="Connected users"
+      hint="Compose useMe and usePeers with UserAvatarGroup to choose who appears. Workspace scope includes other pages and away users. Offline users are excluded."
+      code={
+        "const me = useMe()\nconst peers = usePeers() // Or { scope: 'workspace' }\nconst ids = [...(me ? [me.id] : []), ...peers.map(user => user.id)]\n<UserAvatarGroup ids={ids} max={ids.length} />"
+      }
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="flex flex-col items-start gap-2">
+          <p className="text-sm text-muted-foreground">This page</p>
+          <UserAvatarGroup ids={pageIds} max={pageIds.length} />
+        </div>
+        <div className="flex flex-col items-start gap-2">
+          <p className="text-sm text-muted-foreground">Workspace</p>
+          <UserAvatarGroup ids={workspaceIds} max={workspaceIds.length} />
+        </div>
+      </div>
+    </Section>
+  )
+}
+
 function HooksDemo() {
   const me = useMe()
   const peers = usePeers({ scope: 'workspace' })
@@ -482,10 +511,10 @@ export function CollabPlayground() {
             </p>
           </header>
           <Section
-            title="User, UserAvatar, and AvatarGroup"
-            hint="User shows an avatar and name; UserAvatar shows the avatar alone. AvatarGroup groups avatars with an overflow count. Profile edits update all three; removed IDs become unknown."
+            title="User, UserAvatar, and UserAvatarGroup"
+            hint="User shows an avatar and name; UserAvatar shows the avatar alone. UserAvatarGroup groups avatars with an overflow count. Profile edits update all three; removed IDs become unknown."
             code={
-              '<User id="alex" size="xs" description="Online" />\n<User id="alex" size="sm" />\n<User id="alex" size="default" />\n<UserAvatar id="alex" size="sm" />\n<AvatarGroup ids={watcherIds} size="xs" />\n<AvatarGroup ids={watcherIds} size="sm" />\n<AvatarGroup ids={watcherIds} size="default" />\n<AvatarGroup ids={watcherIds} size="lg" />'
+              '<User id="alex" size="xs" description="Online" />\n<User id="alex" size="sm" />\n<User id="alex" size="default" />\n<UserAvatar id="alex" size="sm" />\n<UserAvatarGroup ids={watcherIds} size="xs" />\n<UserAvatarGroup ids={watcherIds} size="sm" />\n<UserAvatarGroup ids={watcherIds} size="default" />\n<UserAvatarGroup ids={watcherIds} size="lg" />'
             }
           >
             <div className="flex flex-wrap items-center gap-5">
@@ -504,10 +533,10 @@ export function CollabPlayground() {
               <UserAvatar id="alex" size="lg" />
             </div>
             <div className="flex flex-wrap items-center gap-4">
-              <AvatarGroup ids={USERS.map(user => user.id)} size="xs" />
-              <AvatarGroup ids={USERS.map(user => user.id)} size="sm" />
-              <AvatarGroup ids={USERS.map(user => user.id)} size="default" />
-              <AvatarGroup ids={USERS.map(user => user.id)} size="lg" />
+              <UserAvatarGroup ids={USERS.map(user => user.id)} size="xs" />
+              <UserAvatarGroup ids={USERS.map(user => user.id)} size="sm" />
+              <UserAvatarGroup ids={USERS.map(user => user.id)} size="default" />
+              <UserAvatarGroup ids={USERS.map(user => user.id)} size="lg" />
             </div>
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="secondary" onClick={() => setRenamed(value => !value)}>
@@ -518,22 +547,7 @@ export function CollabPlayground() {
               </Button>
             </div>
           </Section>
-          <Section
-            title="Activity"
-            hint="Includes you and connected users. Workspace scope also includes Pierre on another page and Andrea while away. Offline users are excluded."
-            code={'<Activity />\n<Activity scope="workspace" />'}
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex flex-col items-start gap-2">
-                <p className="text-sm text-muted-foreground">This page</p>
-                <Activity />
-              </div>
-              <div className="flex flex-col items-start gap-2">
-                <p className="text-sm text-muted-foreground">Workspace</p>
-                <Activity scope="workspace" />
-              </div>
-            </div>
-          </Section>
+          <ConnectedUsersDemo />
           <Section
             title="Fig’s focus"
             hint="Choose where Fig is focused in the examples below. His cursor follows that field through scrolling and reordering, and disappears when the field is removed."

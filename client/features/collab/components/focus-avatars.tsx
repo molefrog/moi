@@ -52,7 +52,6 @@ function FocusAvatarsPrimitive({
             <UserAvatar
               id={id}
               size="xs"
-              showStatusBadge={false}
               className="animate-in ring-2 ring-background duration-200 zoom-in-75 fade-in"
             />
           </motion.span>

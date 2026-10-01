@@ -64,7 +64,7 @@ function AccessUser({ profile }: AccessUserProps) {
             : 'This server uses Cloudflare Access, but this page wasn’t opened through it. Open moi at its Cloudflare Access address to appear in workspaces.'}
         </p>
       </header>
-      {profile && <User id={profile.id} showStatusBadge={false} />}
+      {profile && <User id={profile.id} />}
     </section>
   )
 }
@@ -94,11 +94,7 @@ function LocalUserEditor({ profile }: LocalUserEditorProps) {
             aria-label="Local user preview"
             className="size-16 shrink-0 overflow-hidden rounded-full"
           >
-            <UserAvatar
-              id={profile.id}
-              showStatusBadge={false}
-              className="data-[size=default]:size-full"
-            />
+            <UserAvatar id={profile.id} className="data-[size=default]:size-full" />
           </div>
           <div className="flex w-full max-w-sm min-w-0 flex-col gap-4">
             <label className="flex flex-col gap-1.5 text-sm">

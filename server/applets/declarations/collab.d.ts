@@ -38,8 +38,6 @@ declare module 'moi/collab' {
   // Publishes the current value reactively, releasing it on hide or unmount.
   export function usePublishPresence<T extends JsonValue>(channel: string, value: T): void
 
-  export type ActivityProps = { scope?: 'page' | 'workspace'; className?: string }
-  export function Activity(props: ActivityProps): ReactElement
   // Identifies a cursor area within the applet; defaults to 'default'.
   export type CursorsProps = { id?: string; children: ReactNode; className?: string }
   export function Cursors(props: CursorsProps): ReactElement
@@ -72,7 +70,7 @@ declare module 'moi/collab' {
   export type UserAvatarProps = {
     id: string
     size?: 'xs' | 'sm' | 'default' | 'lg'
-    // Show a status dot when active. Defaults to true.
+    // Show a status dot when active. Defaults to false.
     showStatusBadge?: boolean
     className?: string
   }
@@ -83,13 +81,11 @@ declare module 'moi/collab' {
     description?: ReactNode
   }
   export function User(props: UserProps): ReactElement
-  export type AvatarGroupProps = {
+  export type UserAvatarGroupProps = {
     ids: readonly string[]
     max?: number
     size?: UserAvatarProps['size']
-    // Status dots default to false in an avatar group.
-    showStatusBadge?: boolean
     className?: string
   }
-  export function AvatarGroup(props: AvatarGroupProps): ReactElement
+  export function UserAvatarGroup(props: UserAvatarGroupProps): ReactElement
 }
