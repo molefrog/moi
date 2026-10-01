@@ -17,8 +17,7 @@ import {
 } from '@/client/components/ui/dialog'
 import { Input } from '@/client/components/ui/input'
 import { Textarea } from '@/client/components/ui/textarea'
-import type { JsonValue } from 'moi'
-import type { UserProfile, Connection, PresenceRegistration } from '@/lib/collab/types'
+import type { UserProfile, Connection } from '@/lib/collab/types'
 
 import { FocusFrame } from '@/client/features/collab/components/focus-frame'
 import { PresenceGroup } from '@/client/features/collab/components/presence-group'
@@ -31,7 +30,6 @@ import { UserAvatar } from '@/client/features/collab/components/user-avatar'
 import { createFakeEngine } from '@/client/features/collab/testing/fake-engine'
 import type { FakeEngine } from '@/client/features/collab/testing/fake-engine'
 import {
-  presenceChannels,
   useMe,
   usePeers,
   usePresence,
@@ -40,7 +38,7 @@ import {
   useWorkspaceUsers
 } from '@/client/features/collab/hooks'
 import { AppletPresenceProvider, CollabContext } from '@/client/features/collab/provider'
-import { presenceTarget } from '@/client/features/collab/presence-target'
+import { connectPlaygroundParticipants } from './playground-room'
 
 const YOU: UserProfile = {
   id: 'you',
@@ -58,71 +56,21 @@ const USERS: UserProfile[] = [
 ]
 const PAGE = 'kit'
 const APPLET_ID = 'views/kit'
-const TARGETS = [
-  ['First task', presenceTarget('tasks', 'launch')],
-  ['Second task', presenceTarget('tasks', 'notes')],
-  ['Nested form', presenceTarget('project', 'launch', 'fields', 'name')],
-  ['Launch dialog', presenceTarget('todo', 'launch', 'dialog', 'title')]
-] as const
-
-function registration(userId: string, channel: string, value: JsonValue): PresenceRegistration {
-  return { registrationId: `${userId}:${channel}`, appletId: APPLET_ID, channel, value }
-}
-
-function sampleConnections(target: string, tick = 0, alexSelected = true): Connection[] {
-  return [
-    {
-      connectionId: 'bot-fig',
-      userId: 'fig',
-      location: { page: PAGE, status: 'active' },
-      presence: [
-        registration('fig', presenceChannels.field(target), true),
-        registration('fig', presenceChannels.field(presenceTarget('comparison', 'focus')), true),
-        registration('fig', presenceChannels.cursor('examples'), {
-          x: 100,
-          y: 50,
-          target,
-          targetX: 0.45 + Math.sin(tick / 10) * 0.15,
-          targetY: 0.6
-        }),
-        registration('fig', presenceChannels.custom('mood'), 'Reviewing')
-      ]
-    },
-    {
-      connectionId: 'bot-alex',
-      userId: 'alex',
-      location: { page: PAGE, status: 'active' },
-      presence: [
-        registration(
-          'alex',
-          presenceChannels.selection(presenceTarget('comparison', 'selection')),
-          alexSelected
-        ),
-        registration('alex', presenceChannels.field(presenceTarget('comparison', 'avatars')), true),
-        registration('alex', presenceChannels.custom('mood'), 'Ready')
-      ]
-    },
-    {
-      connectionId: 'bot-pierre',
-      userId: 'pierre',
-      location: { page: 'views/board', status: 'active' },
-      presence: []
-    },
-    { connectionId: 'bot-andrea', userId: 'andrea', location: null, presence: [] }
-  ]
-}
-
-function useBots(room: FakeEngine, target: string, alexSelected: boolean) {
-  useEffect(() => {
-    let tick = 0
-    room.setOtherConnections(sampleConnections(target, 0, alexSelected))
-    const timer = setInterval(
-      () => room.setOtherConnections(sampleConnections(target, ++tick, alexSelected)),
-      100
-    )
-    return () => clearInterval(timer)
-  }, [room, target, alexSelected])
-}
+const BACKGROUND_CONNECTIONS: Connection[] = [
+  {
+    connectionId: 'sample-alex',
+    userId: 'alex',
+    location: { page: PAGE, status: 'active' },
+    presence: []
+  },
+  {
+    connectionId: 'sample-pierre',
+    userId: 'pierre',
+    location: { page: 'views/board', status: 'active' },
+    presence: []
+  },
+  { connectionId: 'sample-andrea', userId: 'andrea', location: null, presence: [] }
+]
 
 type CodeExampleProps = { code: string }
 function CodeExample({ code }: CodeExampleProps) {
@@ -163,14 +111,12 @@ const INITIAL_TASKS: Task[] = [
   { id: 'notes', title: 'Write the announcement' }
 ]
 
-type FocusAndSelectionDemoProps = { alexSelected: boolean; onToggleAlex: () => void }
-
-function FocusAndSelectionDemo({ alexSelected, onToggleAlex }: FocusAndSelectionDemoProps) {
+function FocusAndSelectionDemo() {
   const [selected, setSelected] = useState(false)
   return (
     <Section
       title="FocusFrame, FocusAvatars, and Selection"
-      hint="FocusFrame tracks focus inside a field and shows an outline with names. FocusAvatars tracks the same activity and shows avatars beside the field. Selection follows the selected value your app supplies and stays selected when focus moves away."
+      hint="Focus either field here and watch the other pane. Select the card, then focus another field: selection stays visible there until you clear it."
       code={
         '<PresenceGroup id="comparison">\n  <FocusFrame id="focus"><Input /></FocusFrame>\n  <FocusAvatars id="avatars"><Input /></FocusAvatars>\n  <Selection id="selection" selected={selected}>\n    <Button onClick={() => setSelected(value => !value)}>Select item</Button>\n  </Selection>\n</PresenceGroup>'
       }
@@ -179,13 +125,13 @@ function FocusAndSelectionDemo({ alexSelected, onToggleAlex }: FocusAndSelection
         <div className="grid gap-8 py-3 sm:grid-cols-2">
           <FocusFrame id="focus">
             <label className="flex flex-col gap-2 text-sm">
-              FocusFrame: Fig is editing
+              FocusFrame
               <Input aria-label="FocusFrame example" defaultValue="Focus this field" />
             </label>
           </FocusFrame>
           <FocusAvatars id="avatars">
             <label className="flex flex-col gap-2 text-sm">
-              FocusAvatars: Alex is editing
+              FocusAvatars
               <Input aria-label="FocusAvatars example" defaultValue="Focus this field" />
             </label>
           </FocusAvatars>
@@ -208,9 +154,6 @@ function FocusAndSelectionDemo({ alexSelected, onToggleAlex }: FocusAndSelection
           </div>
         </Selection>
       </PresenceGroup>
-      <Button size="sm" variant="secondary" className="self-start" onClick={onToggleAlex}>
-        {alexSelected ? 'Clear Alex’s selection' : 'Select item as Alex'}
-      </Button>
     </Section>
   )
 }
@@ -220,7 +163,7 @@ function EditableList() {
   return (
     <Section
       title="FocusAvatars and stable list IDs"
-      hint="PresenceGroup gives each task a stable focus ID. Reorder or remove rows: Fig’s focus avatar and cursor stay with the same task. Text edits stay local."
+      hint="PresenceGroup gives each task a stable focus ID. Focus a task in the other pane, then reorder or remove rows here. These buttons keep that field focused. Remote avatars and cursors follow the task ID, and disappear if it is removed. Text edits stay local."
       code={
         '<PresenceGroup id="tasks">\n  <div className="space-y-4">\n    {tasks.map(task => (\n      <FocusAvatars key={task.id} id={task.id}>\n        <Input value={task.title} onChange={...} />\n      </FocusAvatars>\n    ))}\n  </div>\n</PresenceGroup>'
       }
@@ -229,6 +172,7 @@ function EditableList() {
         <Button
           size="sm"
           variant="secondary"
+          onMouseDown={event => event.preventDefault()}
           onClick={() => setTasks(current => [...current].reverse())}
         >
           Reverse order
@@ -267,6 +211,7 @@ function EditableList() {
                   size="icon-sm"
                   variant="ghost"
                   aria-label={`Remove ${task.title}`}
+                  onMouseDown={event => event.preventDefault()}
                   onClick={() => setTasks(current => current.filter(item => item.id !== task.id))}
                 >
                   <IconTrash stroke={1.75} />
@@ -330,56 +275,61 @@ function NestedForm() {
   )
 }
 
+type RecordEditorProps = { record: Task; onChange: (record: Task) => void }
+function RecordEditor({ record, onChange }: RecordEditorProps) {
+  return (
+    <PresenceGroup id="todo">
+      <PresenceGroup id={record.id}>
+        <FocusFrame id="title">
+          <label className="flex flex-col gap-2 text-sm">
+            Record title ({record.id})
+            <Input
+              value={record.title}
+              onChange={event => onChange({ ...record, title: event.target.value })}
+            />
+          </label>
+        </FocusFrame>
+      </PresenceGroup>
+    </PresenceGroup>
+  )
+}
+
 function RecordDialogs() {
-  const [record, setRecord] = useState<Task | null>(null)
+  const [record, setRecord] = useState(INITIAL_TASKS[0]!)
+  const [open, setOpen] = useState(false)
   return (
     <Section
-      title="One dialog, different records"
-      hint="Choose Launch dialog in Fig’s controls, then open each record. Fig only appears on the matching record, even though both use the same dialog component."
+      title="Record scope and dialogs"
+      hint="Choose the same record in both panes, then focus its title. Change the record in the receiving pane: the remote frame disappears. Open a dialog to test presence across a portal."
       code={
-        '<PresenceGroup id="todo">\n  <PresenceGroup id={record.id}>\n    <PresenceGroup id="dialog">\n      <FocusFrame id="title">\n        <Input value={record.title} onChange={...} />\n      </FocusFrame>\n    </PresenceGroup>\n  </PresenceGroup>\n</PresenceGroup>'
+        '<PresenceGroup id="todo">\n  <PresenceGroup id={record.id}>\n    <FocusFrame id="title"><Input /></FocusFrame>\n  </PresenceGroup>\n</PresenceGroup>'
       }
     >
       <div className="flex flex-wrap gap-2">
         {INITIAL_TASKS.map(task => (
-          <Button key={task.id} size="sm" variant="secondary" onClick={() => setRecord(task)}>
-            Open {task.id}
+          <Button
+            key={task.id}
+            size="sm"
+            variant="secondary"
+            aria-pressed={record.id === task.id}
+            onMouseDown={event => event.preventDefault()}
+            onClick={() => setRecord(task)}
+          >
+            {task.id}
           </Button>
         ))}
+        <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
+          Open dialog
+        </Button>
       </div>
-      <Dialog
-        open={record !== null}
-        onOpenChange={open => {
-          if (!open) setRecord(null)
-        }}
-      >
+      {!open && <RecordEditor record={record} onChange={setRecord} />}
+      <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
-          <DialogTitle className="font-medium">Edit {record?.id}</DialogTitle>
-          <DialogDescription>Presence follows the record’s stable ID.</DialogDescription>
-          {record && (
-            <Cursors id="examples" className="pt-6">
-              <PresenceGroup id="todo">
-                <PresenceGroup id={record.id}>
-                  <PresenceGroup id="dialog">
-                    <FocusFrame id="title">
-                      <Input
-                        aria-label="Record title"
-                        value={record.title}
-                        onChange={event => setRecord({ ...record, title: event.target.value })}
-                      />
-                    </FocusFrame>
-                  </PresenceGroup>
-                </PresenceGroup>
-              </PresenceGroup>
-            </Cursors>
-          )}
-          <div className="flex gap-2">
-            {INITIAL_TASKS.filter(task => task.id !== record?.id).map(task => (
-              <Button key={task.id} size="sm" variant="secondary" onClick={() => setRecord(task)}>
-                Switch to {task.id}
-              </Button>
-            ))}
-          </div>
+          <DialogTitle className="font-medium">Edit {record.id}</DialogTitle>
+          <DialogDescription>Watch the matching record in the other pane.</DialogDescription>
+          <Cursors id="examples" className="pt-6">
+            <RecordEditor record={record} onChange={setRecord} />
+          </Cursors>
         </DialogContent>
       </Dialog>
     </Section>
@@ -426,79 +376,109 @@ function ConnectedUsersDemo() {
   )
 }
 
-function HooksDemo() {
-  const me = useMe()
-  const peers = usePeers({ scope: 'workspace' })
-  const workspaceUsers = useWorkspaceUsers()
-  const offline = useWorkspaceUsers({ status: 'offline' })
-  const user = useUser('david')
+function MoodDemo() {
   const [mood, setMood] = useState('Exploring')
   usePublishPresence('mood', mood)
   const presence = usePresence<string>('mood')
   return (
     <Section
-      title="User and presence hooks"
-      hint="Profiles and connection status are separate from ephemeral channel values. Reading a channel does not publish to it."
-      code={
-        "const me = useMe()\nconst peers = usePeers({ scope: 'workspace' })\nconst workspaceUsers = useWorkspaceUsers() // Includes you and offline users\nconst offline = useWorkspaceUsers({ status: 'offline' })\nconst user = useUser('david')\nusePublishPresence('mood', mood)\nconst presence = usePresence<string>('mood')"
-      }
+      title="Custom presence"
+      hint="Change your mood here and watch it update in the other pane. Reading presence returns the other participants’ values."
+      code={"usePublishPresence('mood', mood)\nconst presence = usePresence<string>('mood')"}
     >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-2">
-          <code className="font-mono text-xs">useMe()</code>
-          <Output value={me} />
-        </div>
-        <div className="flex flex-col gap-2">
-          <code className="font-mono text-xs">usePeers({'{ scope: "workspace" }'})</code>
-          <Output value={peers} />
-        </div>
-        <div className="flex flex-col gap-2">
-          <code className="font-mono text-xs">useWorkspaceUsers()</code>
-          <Output value={workspaceUsers} />
-        </div>
-        <div className="flex flex-col gap-2">
-          <code className="font-mono text-xs">useWorkspaceUsers({'{ status: "offline" }'})</code>
-          <Output value={offline} />
-        </div>
-        <div className="flex flex-col gap-2">
-          <code className="font-mono text-xs">useUser('david')</code>
-          <Output value={user} />
-        </div>
-        <div className="flex flex-col gap-2">
-          <code className="font-mono text-xs">usePublishPresence('mood', mood)</code>
-          <label className="flex flex-col gap-2 text-sm">
-            Your mood
-            <Input value={mood} onChange={event => setMood(event.target.value)} />
-          </label>
-          <code className="font-mono text-xs">usePresence('mood')</code>
-          <Output value={presence} />
-        </div>
+      <label className="flex flex-col gap-2 text-sm">
+        Your mood
+        <Input value={mood} onChange={event => setMood(event.target.value)} />
+      </label>
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-muted-foreground">Received from the other pane</p>
+        {presence.map(entry => (
+          <div key={entry.connectionId} className="flex flex-col gap-1">
+            <User id={entry.userId} size="sm" />
+            <p className="text-sm">{entry.value || '(empty)'}</p>
+          </div>
+        ))}
+        {!presence.length && <p className="text-sm">No presence received yet.</p>}
       </div>
     </Section>
   )
 }
 
-export function CollabPlayground() {
-  const [room] = useState(() =>
-    createFakeEngine({
-      self: YOU,
-      page: PAGE,
-      otherConnections: sampleConnections(TARGETS[0][1]),
-      users: USERS
-    })
+function HooksInspector() {
+  const me = useMe()
+  const peers = usePeers({ scope: 'workspace' })
+  const workspaceUsers = useWorkspaceUsers()
+  const offline = useWorkspaceUsers({ status: 'offline' })
+  const user = useUser('david')
+  const presence = usePresence<string>('mood')
+  const values = [
+    ['useMe()', me],
+    ["usePeers({ scope: 'workspace' })", peers],
+    ['useWorkspaceUsers()', workspaceUsers],
+    ["useWorkspaceUsers({ status: 'offline' })", offline],
+    ["useUser('david')", user],
+    ["usePresence('mood')", presence]
+  ] as const
+  return (
+    <Collapsible className="flex min-w-0 flex-col items-start gap-2">
+      <CollapsibleTrigger render={<Button variant="ghost" size="sm" />}>
+        <IconChevronDown stroke={1.75} />
+        Inspect hook values
+      </CollapsibleTrigger>
+      <CollapsibleContent className="flex w-full min-w-0 flex-col gap-4">
+        {values.map(([label, value]) => (
+          <div key={label} className="flex min-w-0 flex-col gap-2">
+            <code className="font-mono text-xs">{label}</code>
+            <Output value={value} />
+          </div>
+        ))}
+      </CollapsibleContent>
+    </Collapsible>
   )
-  const [target, setTarget] = useState<string>(TARGETS[0][1])
+}
+
+type ParticipantPaneProps = { room: FakeEngine; user: UserProfile }
+function ParticipantPane({ room, user }: ParticipantPaneProps) {
+  return (
+    <CollabContext value={room}>
+      <AppletPresenceProvider appletId={APPLET_ID}>
+        <section
+          aria-label={user.id === YOU.id ? 'Your playground' : `${user.name}’s playground`}
+          className="flex min-w-0 flex-col gap-4"
+        >
+          <User id={user.id} description="Interact here; presence appears in the other pane" />
+          <div className="h-96 overflow-auto rounded-lg border border-border p-4">
+            <Cursors id="examples" className="flex flex-col gap-8">
+              <FocusAndSelectionDemo />
+              <EditableList />
+              <NestedForm />
+              <RecordDialogs />
+              <MoodDemo />
+              <HooksInspector />
+            </Cursors>
+          </div>
+        </section>
+      </AppletPresenceProvider>
+    </CollabContext>
+  )
+}
+
+export function CollabPlayground() {
+  const [rooms] = useState(() =>
+    [YOU, USERS[1]!].map(self => createFakeEngine({ self, page: PAGE, users: USERS }))
+  )
+  const room = rooms[0]!
   const [renamed, setRenamed] = useState(false)
   const [david, setDavid] = useState(true)
-  const [alexSelected, setAlexSelected] = useState(true)
-  useBots(room, target, alexSelected)
+  useEffect(() => connectPlaygroundParticipants(rooms, BACKGROUND_CONNECTIONS), [rooms])
   useEffect(() => {
-    room.setUsers(
-      USERS.filter(user => david || user.id !== 'david').map(user =>
-        user.id === 'fig' && renamed ? { ...user, name: 'Fig Newton', color: 'emerald' } : user
-      )
+    const users = USERS.filter(user => david || user.id !== 'david').map(user =>
+      user.id === 'fig' && renamed
+        ? { ...user, name: 'Fig Newton', color: 'emerald' as const }
+        : user
     )
-  }, [room, renamed, david])
+    rooms.forEach(room => room.setUsers(users))
+  }, [rooms, renamed, david])
   return (
     <CollabContext value={room}>
       <AppletPresenceProvider appletId={APPLET_ID}>
@@ -506,8 +486,9 @@ export function CollabPlayground() {
           <header>
             <h2 className="text-base font-medium">Presence playground</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              An in-memory room with sample users. Fig and Alex are here, Pierre is on another page,
-              Andrea is away, and David is offline.
+              Two participants share presence in memory. You control both panes. Alex is on this
+              page, Pierre is on another page, Andrea is away, and David is offline. No server
+              connection is used.
             </p>
           </header>
           <Section
@@ -549,38 +530,17 @@ export function CollabPlayground() {
           </Section>
           <ConnectedUsersDemo />
           <Section
-            title="Fig’s focus"
-            hint="Choose where Fig is focused in the examples below. His cursor follows that field through scrolling and reordering, and disappears when the field is removed."
+            title="Try collaboration"
+            hint="Focus, select, or move your pointer in either pane and watch the other. Each pane scrolls independently. Field values stay local: collaboration shares presence, not document content."
+            code={
+              '<Cursors id="examples">\n  <FocusFrame id="title"><Input /></FocusFrame>\n  <FocusAvatars id="notes"><Input /></FocusAvatars>\n  <Selection id="card" selected={selected}>{children}</Selection>\n</Cursors>'
+            }
           >
-            <div className="flex flex-wrap gap-2">
-              {TARGETS.map(([label, value]) => (
-                <Button
-                  key={value}
-                  size="sm"
-                  variant={target === value ? 'default' : 'secondary'}
-                  onClick={() => setTarget(value)}
-                >
-                  {label}
-                </Button>
-              ))}
+            <div className="grid gap-6 md:grid-cols-2">
+              <ParticipantPane room={rooms[0]!} user={YOU} />
+              <ParticipantPane room={rooms[1]!} user={USERS[1]!} />
             </div>
           </Section>
-          <FocusAndSelectionDemo
-            alexSelected={alexSelected}
-            onToggleAlex={() => setAlexSelected(value => !value)}
-          />
-          <Section
-            title="Cursors"
-            hint="Cursors shares pointers within its wrapped area. Fig’s pointer is anchored to the field selected above; scroll, reorder rows, or open the matching dialog to see it follow the same record."
-            code={'<Cursors id="examples">{children}</Cursors>'}
-          >
-            <Cursors id="examples" className="flex flex-col gap-10">
-              <EditableList />
-              <NestedForm />
-              <RecordDialogs />
-            </Cursors>
-          </Section>
-          <HooksDemo />
         </div>
       </AppletPresenceProvider>
     </CollabContext>

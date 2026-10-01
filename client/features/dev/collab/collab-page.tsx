@@ -5,7 +5,7 @@ import { CollabPlayground } from './collab-playground'
 
 export function CollabPage() {
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-6 py-10">
+    <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 py-10">
       <div>
         <Link href="/dev" className="text-sm text-muted-foreground hover:text-foreground">
           ← Dev pages
