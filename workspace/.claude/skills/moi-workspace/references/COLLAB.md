@@ -100,9 +100,9 @@ function TaskEditors({ taskId }: TaskPresenceProps) {
 }
 ```
 
-Channel names are local to the applet and unaffected by `PresenceGroup`. Include record IDs
-in your values when activity belongs to a particular record. Unmount the publishing component
-to stop publishing; `false` and `null` are valid custom values, not removal signals.
+Channel names are local to the applet. Include record IDs in your values when activity belongs
+to a particular record. Unmount the publishing component to stop publishing;
+`false` and `null` are valid custom values, not removal signals.
 
 ### Components
 
@@ -117,65 +117,117 @@ import { Cursors } from 'moi/collab'
 <Cursors id="board">{children}</Cursors>
 ```
 
-#### `FocusFrame` and `FocusAvatars`
+#### `PresenceFrame` and `PresenceAvatars`
 
-Wrap a field or section to show users focused inside it. `FocusFrame` adds an outline
-and user labels; `FocusAvatars` places avatars beside it. Each accepts exactly one React
-element, including a component containing multiple controls. Do not pass a fragment.
+Choose how to show other participants at an element. `PresenceFrame` adds an outline
+and user names; `PresenceAvatars` places avatars beside it. Both use the same target presence
+and support the two modes below.
+
+Use the same `id` across clients for the same activity. Give separate activities distinct IDs.
+Each component publishes your own presence and displays other connections, including another
+tab of your own user. Multiple connections for one user display once at each target.
+
+##### Automatic focus
+
+Without `present`, the component automatically publishes your presence while a descendant
+has focus. Children can be any React content, including lists and fragments. All children
+share one target; moving focus between them keeps it active. The nearest automatic wrapper
+owns focus when wrappers are nested.
 
 ```tsx
-import { FocusFrame, FocusAvatars } from 'moi/collab'
+import { PresenceFrame, PresenceAvatars } from 'moi/collab'
 import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
 
 <>
-  <FocusFrame id="title">
-    <Input aria-label="Title" />
-  </FocusFrame>
-  <FocusAvatars id="notes">
+  <PresenceFrame id="title">
+    <label htmlFor="title">Title</label>
+    <Input id="title" />
+  </PresenceFrame>
+  <PresenceAvatars id="notes">
     <Textarea aria-label="Notes" />
-  </FocusAvatars>
+  </PresenceAvatars>
 </>
 ```
 
-#### `Selection`
+##### Controlled presence
 
-Wrap an item and pass your local selection through `selected`. The component displays
-other users who selected that item. Your app controls its selection state.
+Pass `present` when application state determines presence, such as selecting an item or editing
+a record. `true` publishes your presence; `false` clears it. Focus tracking is disabled, and
+other participants still appear when your own value is false.
 
 ```tsx
-import { useState } from 'react'
-import { Selection } from 'moi/collab'
-
-type SelectableTaskProps = { taskId: string }
-
-function SelectableTask({ taskId }: SelectableTaskProps) {
-  const [selected, setSelected] = useState(false)
-  return (
-    <Selection id={taskId} selected={selected}>
-      <button onClick={() => setSelected(value => !value)}>Select task</button>
-    </Selection>
-  )
-}
+<>
+  <PresenceFrame id={`selection/${task.id}`} present={selected}>
+    <TaskCard onClick={() => setSelected(value => !value)} />
+  </PresenceFrame>
+  <PresenceAvatars id={`editing/${task.id}`} present={editing}>
+    <TaskEditor />
+  </PresenceAvatars>
+</>
 ```
+
+Controlled presence lasts while `present` is true, subject to the cleanup described above.
+Each mounted component owns its publication; clearing one leaves other publications intact.
 
 #### `PresenceGroup`
 
-Give repeated fields a namespace, such as a task ID. Descendant frame, gutter, and selection
-IDs combine with their groups. Groups can nest and add no DOM element.
+An optional wrapper for related presence targets. It has two jobs:
+
+- Prefix descendant target IDs so repeated fields can use the same names.
+- Let automatic `PresenceAvatars` glide between targets in a shared animation scope.
+
+It adds no DOM element and does not publish presence itself. Frames and avatars work
+without it.
+
+##### Scope repeated fields
+
+Wrap each record in a group so its fields belong to that record.
 
 ```tsx
-import { PresenceGroup, FocusFrame } from 'moi/collab'
+import { PresenceGroup, PresenceFrame } from 'moi/collab'
 import { Input } from '../ui/input'
 
 <PresenceGroup id={task.id}>
-  <FocusFrame id="title">
+  <PresenceFrame id="title">
     <Input aria-label="Task title" defaultValue={task.title} />
-  </FocusFrame>
+  </PresenceFrame>
+  <PresenceFrame id="assignee">
+    <AssigneePicker />
+  </PresenceFrame>
 </PresenceGroup>
 ```
 
-Use stable record IDs and field names. For example, `title` inside group `42` inside group
-`tasks` identifies `tasks/42/title`. IDs must be nonblank and unique within their group.
-In lists, use record IDs for both React `key` and presence `id`. When a dialog switches
-records, change its group ID. Cursor area IDs are independent of groups.
+For task `42`, these targets become `42/title` and `42/assignee`. Groups can nest: adding
+an outer group `tasks` gives `tasks/42/title`. Use stable record IDs and field names;
+IDs must be nonblank and unique within their group. When a dialog switches records,
+change its group ID.
+
+##### Move avatars between targets
+
+Put the targets in one common group. When another connection moves focus between them,
+its avatar glides from the previous target to the next.
+
+```tsx
+import { PresenceGroup, PresenceAvatars } from 'moi/collab'
+import { Input } from '../ui/input'
+
+<PresenceGroup id="tasks">
+  {tasks.map(task => (
+    <PresenceAvatars key={task.id} id={task.id}>
+      <Input aria-label={task.title} defaultValue={task.title} />
+    </PresenceAvatars>
+  ))}
+</PresenceGroup>
+```
+
+Use record IDs for both React `key` and presence `id`. A nested group creates its own
+animation scope, so avatars glide between targets within that group. Separate row groups
+will not animate movement across rows. Without a group, avatars animate their appearance
+at each target. Movement respects the user's reduced-motion preference.
+
+Controlled avatars do not glide between targets: a user can be present at several at once.
+`PresenceFrame` does not share movement between targets.
+
+Group IDs apply to `PresenceFrame` and `PresenceAvatars`. Cursor area IDs and custom
+hook channels are independent of groups.

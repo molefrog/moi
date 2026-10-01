@@ -39,7 +39,7 @@ export function createFocusRoom(target = presenceTarget('task:42:title'), profil
     {
       registrationId: 'focus',
       appletId: 'views/board',
-      channel: presenceChannels.field(target),
+      channel: presenceChannels.target(target),
       value: true
     }
   ])

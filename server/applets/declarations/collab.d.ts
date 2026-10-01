@@ -43,30 +43,20 @@ declare module 'moi/collab' {
   export function Cursors(props: CursorsProps): ReactElement
 
   // Stable local IDs compose with enclosing PresenceGroup IDs across browsers.
-  // Each focus wrapper accepts one element (not a fragment) and tracks its descendants.
-  export type FocusFrameProps = {
+  // Without present, each wrapper tracks focus anywhere inside its children.
+  // With present, publication is controlled; false clears your presence, not peers.
+  export type PresenceFrameProps = {
     id: string
-    children: ReactElement
-    className?: string
-  }
-  export function FocusFrame(props: FocusFrameProps): ReactElement
-  export type FocusAvatarsProps = {
-    id: string
-    children: ReactElement
-    className?: string
-  }
-  export function FocusAvatars(props: FocusAvatarsProps): ReactElement
-  // Adds a namespace and a local gutter animation group; no DOM or publication.
-  export type PresenceGroupProps = { id: string; children: ReactNode }
-  export function PresenceGroup(props: PresenceGroupProps): ReactElement
-  export type SelectionProps = {
-    id: string
-    selected: boolean
+    present?: boolean
     children: ReactNode
     className?: string
   }
-  export function Selection(props: SelectionProps): ReactElement
-
+  export function PresenceFrame(props: PresenceFrameProps): ReactElement
+  export type PresenceAvatarsProps = PresenceFrameProps
+  export function PresenceAvatars(props: PresenceAvatarsProps): ReactElement
+  // Adds a namespace and a local gutter animation group; no DOM or publication.
+  export type PresenceGroupProps = { id: string; children: ReactNode }
+  export function PresenceGroup(props: PresenceGroupProps): ReactElement
   export type UserAvatarProps = {
     id: string
     size?: 'xs' | 'sm' | 'default' | 'lg'

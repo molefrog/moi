@@ -2,7 +2,7 @@
 // a group boundary. React-generated IDs never form part of shared targets.
 export function presenceTarget(...ids: string[]): string {
   if (!ids.length || ids.some(id => typeof id !== 'string' || !id.trim())) {
-    throw new Error('PresenceGroup, FocusFrame, FocusAvatars, and Selection require a nonempty id.')
+    throw new Error('PresenceGroup, PresenceFrame, and PresenceAvatars require a nonempty id.')
   }
   return ids.map(id => encodeURIComponent(id)).join('/')
 }

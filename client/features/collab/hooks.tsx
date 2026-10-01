@@ -80,8 +80,7 @@ export function usePeers(options: UsePeersOptions = {}): WorkspaceUser[] {
 export const presenceChannels = {
   custom: (channel: string) => `custom:${channel}`,
   cursor: (id: string) => `cursor:${id}`,
-  field: (target: string) => `field:${target}`,
-  selection: (target: string) => `selection:${target}`
+  target: (target: string) => `field:${target}`
 }
 export type { PresenceValue } from 'moi/collab'
 

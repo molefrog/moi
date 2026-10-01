@@ -1,25 +1,23 @@
-import type { FocusFrameProps } from 'moi/collab'
+import type { PresenceFrameProps } from 'moi/collab'
 import { useLayoutEffect, useRef } from 'react'
 import type { HTMLAttributes, ReactNode, Ref } from 'react'
-import { IconCursorText } from '@tabler/icons-react'
 import { cn } from '@/client/lib/cn'
 import type { UserColor } from '@/lib/collab/colors'
 import { Badge } from '@/ui-components/badge'
 import { useUsers } from '../hooks'
 import { userDisplayName } from '../users'
-import { presenceChild, usePresenceTarget, useTargetPresence } from './presence-helpers'
+import { usePresenceTarget, useTargetPresence } from './presence-helpers'
 
-export function FocusFrame({ id, children, className }: FocusFrameProps) {
+export function PresenceFrame({ id, present, children, className }: PresenceFrameProps) {
   const target = usePresenceTarget(id)
-  const presence = useTargetPresence(target)
+  const presence = useTargetPresence(target, present)
   return (
     <PresenceOutline
       {...presence.props}
       ids={presence.users.map(user => user.id)}
-      icon={<IconCursorText size={12} stroke={1.75} />}
       className={className}
     >
-      {presenceChild(children)}
+      {children}
     </PresenceOutline>
   )
 }
@@ -28,26 +26,19 @@ type PresenceOutlineProps = HTMLAttributes<HTMLDivElement> & {
   ref?: Ref<HTMLDivElement>
   // Everyone at this element; the first user's color draws the frame.
   ids: readonly string[]
-  icon?: ReactNode
   children: ReactNode
 }
 
 // Wraps anything. With one element inside, the frame hugs that element and
 // takes its corner radius, so a field, a card, a button, and a round avatar
 // each get a frame of their own shape with no styling from the caller.
-export function PresenceOutline({ ids, icon, children, className, ...rest }: PresenceOutlineProps) {
+export function PresenceOutline({ ids, children, className, ...rest }: PresenceOutlineProps) {
   const resolved = useUsers(ids).filter(user => user !== undefined)
   const lead = resolved[0]
   return (
     <div className={cn('relative', className)} {...rest}>
       {children}
-      {lead && (
-        <FrameOutline
-          names={resolved.map(userDisplayName).join(', ')}
-          color={lead.color}
-          icon={icon}
-        />
-      )}
+      {lead && <FrameOutline names={resolved.map(userDisplayName).join(', ')} color={lead.color} />}
     </div>
   )
 }
@@ -63,9 +54,9 @@ const CORNERS = [
   'borderBottomLeftRadius'
 ] as const
 
-type FrameOutlineProps = { names: string; color: UserColor | undefined; icon?: ReactNode }
+type FrameOutlineProps = { names: string; color: UserColor | undefined }
 
-function FrameOutline({ names, color, icon }: FrameOutlineProps) {
+function FrameOutline({ names, color }: FrameOutlineProps) {
   const node = useRef<HTMLDivElement | null>(null)
   // Runs after every render, because whatever is wrapped may have changed shape
   // in the same render, and again whenever the wrapped element resizes.
@@ -118,7 +109,6 @@ function FrameOutline({ names, color, icon }: FrameOutlineProps) {
       className="group/frame pointer-events-none absolute inset-0 animate-in rounded-sm outline-2 outline-collab duration-150 fade-in data-[shape=rounded]:outline-offset-2 data-[shape=square]:outline-offset-4"
     >
       <Badge className="absolute bottom-full bg-collab text-collab-foreground group-data-[shape=rounded]/frame:mb-1.5 group-data-[shape=square]/frame:mb-2 group-data-[tag=end]/frame:right-0 group-data-[tag=end]/frame:max-w-full group-data-[tag=start]/frame:left-0 group-data-[tag=start]/frame:max-w-40">
-        {icon}
         <span className="truncate">{names}</span>
       </Badge>
     </div>

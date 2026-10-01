@@ -19,10 +19,9 @@ import { Input } from '@/client/components/ui/input'
 import { Textarea } from '@/client/components/ui/textarea'
 import type { UserProfile, Connection } from '@/lib/collab/types'
 
-import { FocusFrame } from '@/client/features/collab/components/focus-frame'
+import { PresenceFrame } from '@/client/features/collab/components/presence-frame'
 import { PresenceGroup } from '@/client/features/collab/components/presence-group'
-import { FocusAvatars } from '@/client/features/collab/components/focus-avatars'
-import { Selection } from '@/client/features/collab/components/selection'
+import { PresenceAvatars } from '@/client/features/collab/components/presence-avatars'
 import { Cursors } from '@/client/features/collab/components/cursors'
 import { UserAvatarGroup } from '@/client/features/collab/components/user-avatar-group'
 import { User } from '@/client/features/collab/components/user'
@@ -111,32 +110,44 @@ const INITIAL_TASKS: Task[] = [
   { id: 'notes', title: 'Write the announcement' }
 ]
 
-function FocusAndSelectionDemo() {
+function TargetPresenceDemo() {
   const [selected, setSelected] = useState(false)
+  const [editing, setEditing] = useState(false)
   return (
     <Section
-      title="FocusFrame, FocusAvatars, and Selection"
-      hint="Focus either field here and watch the other pane. Select the card, then focus another field: selection stays visible there until you clear it."
+      title="Automatic and controlled presence"
+      hint="Each automatic target contains two fields. Move between them: the other pane keeps showing presence at that target. Cards publish the boolean you control with their button, even when focus moves away."
       code={
-        '<PresenceGroup id="comparison">\n  <FocusFrame id="focus"><Input /></FocusFrame>\n  <FocusAvatars id="avatars"><Input /></FocusAvatars>\n  <Selection id="selection" selected={selected}>\n    <Button onClick={() => setSelected(value => !value)}>Select item</Button>\n  </Selection>\n</PresenceGroup>'
+        '<PresenceGroup id="comparison">\n  <PresenceFrame id="focus">\n    <Input />\n    <Input />\n  </PresenceFrame>\n  <PresenceAvatars id="avatars">\n    <>\n      <Input />\n      <Input />\n    </>\n  </PresenceAvatars>\n  <PresenceAvatars id="controlled-avatars" present={editing}>{children}</PresenceAvatars>\n  <PresenceFrame id="selection" present={selected}>\n    <Button onClick={() => setSelected(value => !value)}>Select item</Button>\n  </PresenceFrame>\n</PresenceGroup>'
       }
     >
       <PresenceGroup id="comparison">
         <div className="grid gap-8 py-3 sm:grid-cols-2">
-          <FocusFrame id="focus">
+          <PresenceFrame id="focus" className="space-y-2">
             <label className="flex flex-col gap-2 text-sm">
-              FocusFrame
-              <Input aria-label="FocusFrame example" defaultValue="Focus this field" />
+              PresenceFrame
+              <Input aria-label="PresenceFrame example" defaultValue="Focus this field" />
             </label>
-          </FocusFrame>
-          <FocusAvatars id="avatars">
-            <label className="flex flex-col gap-2 text-sm">
-              FocusAvatars
-              <Input aria-label="FocusAvatars example" defaultValue="Focus this field" />
-            </label>
-          </FocusAvatars>
+            <Input
+              aria-label="PresenceFrame second field"
+              placeholder="Another field, same target"
+            />
+          </PresenceFrame>
+          <PresenceAvatars id="avatars">
+            <>
+              <label className="flex flex-col gap-2 text-sm">
+                PresenceAvatars
+                <Input aria-label="PresenceAvatars example" defaultValue="Focus this field" />
+              </label>
+              <Input
+                aria-label="PresenceAvatars second field"
+                className="mt-2"
+                placeholder="Another field, same target"
+              />
+            </>
+          </PresenceAvatars>
         </div>
-        <Selection id="selection" selected={selected}>
+        <PresenceFrame id="selection" present={selected}>
           <div className="flex flex-col items-start gap-3 rounded-lg bg-muted p-4">
             <p className="text-sm">Selection: a task card</p>
             <Button
@@ -152,7 +163,24 @@ function FocusAndSelectionDemo() {
               this selection.
             </p>
           </div>
-        </Selection>
+        </PresenceFrame>
+        <PresenceAvatars id="controlled-avatars" present={editing}>
+          <div className="flex flex-col items-start gap-3 rounded-lg bg-muted p-4">
+            <p className="text-sm">Controlled avatars: editing a card</p>
+            <Button
+              size="sm"
+              variant="secondary"
+              aria-pressed={editing}
+              onClick={() => setEditing(value => !value)}
+            >
+              {editing ? 'Stop editing' : 'Start editing'}
+            </Button>
+            <Input
+              aria-label="Controlled editing example"
+              defaultValue="Focus alone does not publish here"
+            />
+          </div>
+        </PresenceAvatars>
       </PresenceGroup>
     </Section>
   )
@@ -162,10 +190,10 @@ function EditableList() {
   const [tasks, setTasks] = useState(INITIAL_TASKS)
   return (
     <Section
-      title="FocusAvatars and stable list IDs"
+      title="PresenceAvatars and stable list IDs"
       hint="PresenceGroup gives each task a stable focus ID. Focus a task in the other pane, then reorder or remove rows here. These buttons keep that field focused. Remote avatars and cursors follow the task ID, and disappear if it is removed. Text edits stay local."
       code={
-        '<PresenceGroup id="tasks">\n  <div className="space-y-4">\n    {tasks.map(task => (\n      <FocusAvatars key={task.id} id={task.id}>\n        <Input value={task.title} onChange={...} />\n      </FocusAvatars>\n    ))}\n  </div>\n</PresenceGroup>'
+        '<PresenceGroup id="tasks">\n  <div className="space-y-4">\n    {tasks.map(task => (\n      <PresenceAvatars key={task.id} id={task.id}>\n        <Input value={task.title} onChange={...} />\n      </PresenceAvatars>\n    ))}\n  </div>\n</PresenceGroup>'
       }
     >
       <div className="flex flex-wrap gap-2">
@@ -193,7 +221,7 @@ function EditableList() {
       <PresenceGroup id="tasks">
         <div className="flex flex-col gap-8 py-3">
           {tasks.map(task => (
-            <FocusAvatars key={task.id} id={task.id}>
+            <PresenceAvatars key={task.id} id={task.id}>
               <div className="flex items-center gap-2">
                 <Input
                   className="min-w-0 flex-1"
@@ -217,7 +245,7 @@ function EditableList() {
                   <IconTrash stroke={1.75} />
                 </Button>
               </div>
-            </FocusAvatars>
+            </PresenceAvatars>
           ))}
         </div>
       </PresenceGroup>
@@ -233,30 +261,30 @@ function NestedForm() {
   const [notes, setNotes] = useState('Confirm the venue by Friday.')
   return (
     <Section
-      title="FocusFrame and nested groups"
-      hint="PresenceGroup combines IDs without adding layout. FocusFrame automatically tracks the controls inside each label. The nearest frame owns focus, so the outer frame stays quiet."
+      title="PresenceFrame and nested groups"
+      hint="PresenceGroup combines IDs without adding layout. PresenceFrame automatically tracks the controls inside each label. The nearest frame owns focus, so the outer frame stays quiet."
       code={
-        '<PresenceGroup id="project">\n  <PresenceGroup id="launch">\n    <FocusFrame id="section">\n      <div className="space-y-6">\n        <PresenceGroup id="fields">\n          <FocusFrame id="name">\n            <label>Project name <Input /></label>\n          </FocusFrame>\n          <FocusFrame id="notes">\n            <label>Project notes <Textarea /></label>\n          </FocusFrame>\n        </PresenceGroup>\n      </div>\n    </FocusFrame>\n  </PresenceGroup>\n</PresenceGroup>'
+        '<PresenceGroup id="project">\n  <PresenceGroup id="launch">\n    <PresenceFrame id="section">\n      <div className="space-y-6">\n        <PresenceGroup id="fields">\n          <PresenceFrame id="name">\n            <label>Project name <Input /></label>\n          </PresenceFrame>\n          <PresenceFrame id="notes">\n            <label>Project notes <Textarea /></label>\n          </PresenceFrame>\n        </PresenceGroup>\n      </div>\n    </PresenceFrame>\n  </PresenceGroup>\n</PresenceGroup>'
       }
     >
       <PresenceGroup id="project">
         <PresenceGroup id="launch">
-          <FocusFrame id="section">
+          <PresenceFrame id="section">
             <div className="flex flex-col gap-6 rounded-lg bg-muted p-4">
               <PresenceGroup id="fields">
-                <FocusFrame id="name">
+                <PresenceFrame id="name">
                   <label className="flex flex-col gap-2 text-sm">
                     Project name
                     <Input value={name} onChange={event => setName(event.target.value)} />
                   </label>
-                </FocusFrame>
-                <FocusFrame id="notes">
+                </PresenceFrame>
+                <PresenceFrame id="notes">
                   <label className="flex flex-col gap-2 text-sm">
                     Project notes
                     <Textarea value={notes} onChange={event => setNotes(event.target.value)} />
                   </label>
-                </FocusFrame>
-                <FocusFrame id="reset">
+                </PresenceFrame>
+                <PresenceFrame id="reset">
                   <Button
                     size="sm"
                     variant="secondary"
@@ -265,10 +293,10 @@ function NestedForm() {
                   >
                     Reset notes
                   </Button>
-                </FocusFrame>
+                </PresenceFrame>
               </PresenceGroup>
             </div>
-          </FocusFrame>
+          </PresenceFrame>
         </PresenceGroup>
       </PresenceGroup>
     </Section>
@@ -280,7 +308,7 @@ function RecordEditor({ record, onChange }: RecordEditorProps) {
   return (
     <PresenceGroup id="todo">
       <PresenceGroup id={record.id}>
-        <FocusFrame id="title">
+        <PresenceFrame id="title">
           <label className="flex flex-col gap-2 text-sm">
             Record title ({record.id})
             <Input
@@ -288,7 +316,7 @@ function RecordEditor({ record, onChange }: RecordEditorProps) {
               onChange={event => onChange({ ...record, title: event.target.value })}
             />
           </label>
-        </FocusFrame>
+        </PresenceFrame>
       </PresenceGroup>
     </PresenceGroup>
   )
@@ -302,7 +330,7 @@ function RecordDialogs() {
       title="Record scope and dialogs"
       hint="Choose the same record in both panes, then focus its title. Change the record in the receiving pane: the remote frame disappears. Open a dialog to test presence across a portal."
       code={
-        '<PresenceGroup id="todo">\n  <PresenceGroup id={record.id}>\n    <FocusFrame id="title"><Input /></FocusFrame>\n  </PresenceGroup>\n</PresenceGroup>'
+        '<PresenceGroup id="todo">\n  <PresenceGroup id={record.id}>\n    <PresenceFrame id="title"><Input /></PresenceFrame>\n  </PresenceGroup>\n</PresenceGroup>'
       }
     >
       <div className="flex flex-wrap gap-2">
@@ -449,7 +477,7 @@ function ParticipantPane({ room, user }: ParticipantPaneProps) {
           <User id={user.id} description="Interact here; presence appears in the other pane" />
           <div className="h-96 overflow-auto rounded-lg border border-border p-4">
             <Cursors id="examples" className="flex flex-col gap-8">
-              <FocusAndSelectionDemo />
+              <TargetPresenceDemo />
               <EditableList />
               <NestedForm />
               <RecordDialogs />
@@ -533,7 +561,7 @@ export function CollabPlayground() {
             title="Try collaboration"
             hint="Focus, select, or move your pointer in either pane and watch the other. Each pane scrolls independently. Field values stay local: collaboration shares presence, not document content."
             code={
-              '<Cursors id="examples">\n  <FocusFrame id="title"><Input /></FocusFrame>\n  <FocusAvatars id="notes"><Input /></FocusAvatars>\n  <Selection id="card" selected={selected}>{children}</Selection>\n</Cursors>'
+              '<Cursors id="examples">\n  <PresenceFrame id="title"><Input /></PresenceFrame>\n  <PresenceAvatars id="notes"><Input /></PresenceAvatars>\n  <PresenceFrame id="card" present={selected}>{children}</PresenceFrame>\n</Cursors>'
             }
           >
             <div className="grid gap-6 md:grid-cols-2">

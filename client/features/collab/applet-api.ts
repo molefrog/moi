@@ -3,10 +3,9 @@ import { UserAvatarGroup } from './components/user-avatar-group'
 import { User } from './components/user'
 import { UserAvatar } from './components/user-avatar'
 import { Cursors } from './components/cursors'
-import { FocusFrame } from './components/focus-frame'
+import { PresenceFrame } from './components/presence-frame'
 import { PresenceGroup } from './components/presence-group'
-import { FocusAvatars } from './components/focus-avatars'
-import { Selection } from './components/selection'
+import { PresenceAvatars } from './components/presence-avatars'
 import {
   useMe,
   usePeers,
@@ -23,10 +22,9 @@ export const appletCollabApi = {
   UserAvatarGroup,
   User,
   UserAvatar,
-  FocusFrame,
+  PresenceFrame,
   PresenceGroup,
-  FocusAvatars,
-  Selection,
+  PresenceAvatars,
   useMe,
   usePeers,
   useUser,

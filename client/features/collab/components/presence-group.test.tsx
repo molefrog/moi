@@ -1,12 +1,12 @@
 import { expect, test } from 'bun:test'
 import { PresenceGroup } from './presence-group'
-import { FocusFrame } from './focus-frame'
-import { FocusAvatars } from './focus-avatars'
+import { PresenceFrame } from './presence-frame'
+import { PresenceAvatars } from './presence-avatars'
 import { presenceTarget } from '../presence-target'
 import { createFocusRoom, renderCollab } from '../testing/component-fixtures'
 
 test('grouped wrappers resolve remote focus by semantic ID regardless of child order', () => {
-  for (const Wrapper of [FocusFrame, FocusAvatars]) {
+  for (const Wrapper of [PresenceFrame, PresenceAvatars]) {
     const backend = createFocusRoom(presenceTarget('task:42', 'title'))
     const title = (
       <Wrapper key="title" id="title">
@@ -61,14 +61,14 @@ test('nested groups scope composed children and keep sibling groups independent'
     <PresenceGroup id="users">
       <div className="grid gap-4">
         <PresenceGroup id="user:42">
-          <FocusAvatars id="address">
+          <PresenceAvatars id="address">
             <Address />
-          </FocusAvatars>
+          </PresenceAvatars>
         </PresenceGroup>
         <PresenceGroup id="user:43">
-          <FocusAvatars id="address">
+          <PresenceAvatars id="address">
             <Address />
-          </FocusAvatars>
+          </PresenceAvatars>
         </PresenceGroup>
       </div>
     </PresenceGroup>
@@ -102,21 +102,21 @@ test('path-like IDs stay separate from nested group boundaries in rendered contr
     createFocusRoom(presenceTarget('a/b', 'title')),
     <>
       <PresenceGroup id="a/b">
-        <FocusFrame id="title">
+        <PresenceFrame id="title">
           <input />
-        </FocusFrame>
+        </PresenceFrame>
       </PresenceGroup>
       <PresenceGroup id="a">
         <PresenceGroup id="b">
-          <FocusFrame id="title">
+          <PresenceFrame id="title">
             <input />
-          </FocusFrame>
+          </PresenceFrame>
         </PresenceGroup>
       </PresenceGroup>
       <PresenceGroup id="a%2Fb">
-        <FocusFrame id="title">
+        <PresenceFrame id="title">
           <input />
-        </FocusFrame>
+        </PresenceFrame>
       </PresenceGroup>
     </>
   )

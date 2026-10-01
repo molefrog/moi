@@ -1,6 +1,6 @@
 import type { JsonValue } from 'moi'
-import { Fragment, createContext, isValidElement, useContext, useLayoutEffect, useRef } from 'react'
-import type { FocusEvent, ReactElement, ReactNode } from 'react'
+import { createContext, useContext, useLayoutEffect, useRef } from 'react'
+import type { FocusEvent } from 'react'
 import { presenceChannels, usePresenceChannel, usePresencePublisher } from '../hooks'
 import { presenceTarget } from '../presence-target'
 
@@ -12,19 +12,10 @@ export function usePresenceTarget(id: string): string {
   return presenceTarget(...useContext(PresenceGroupContext), id)
 }
 
-export function presenceChild(children: ReactNode): ReactElement {
-  if (!isValidElement(children) || children.type === Fragment) {
-    throw new Error(
-      'FocusFrame and FocusAvatars require exactly one child element. ' +
-        'Wrap a list with PresenceGroup and give each item its own wrapper; fragments are not supported.'
-    )
-  }
-  return children
-}
-
-export function useTargetPresence(target: string) {
+export function useTargetPresence(target: string, present?: boolean) {
+  const automatic = present === undefined
   const root = useRef<HTMLDivElement>(null)
-  const channel = presenceChannels.field(target)
+  const channel = presenceChannels.target(target)
   const others = usePresenceChannel<boolean>(channel)
   const publish = usePresencePublisher<boolean>(channel, false, hasPresence)
   const ownsFocus = (element: EventTarget | null, owner: HTMLDivElement | null) =>
@@ -32,8 +23,8 @@ export function useTargetPresence(target: string) {
     element instanceof Element &&
     element.closest('[data-presence-target]') === owner
   useLayoutEffect(() => {
-    publish(ownsFocus(document.activeElement, root.current))
-  }, [target, publish])
+    publish(present ?? ownsFocus(document.activeElement, root.current))
+  }, [target, present, publish])
   const users = new Map<string, { id: string; connectionId: string }>()
   for (const entry of others) {
     if (entry.value === true && !users.has(entry.userId)) {
@@ -45,11 +36,15 @@ export function useTargetPresence(target: string) {
     props: {
       ref: root,
       'data-collab-target': target,
-      'data-presence-target': target,
-      onFocusCapture: (event: FocusEvent<HTMLDivElement>) =>
-        publish(ownsFocus(event.target, event.currentTarget)),
-      onBlurCapture: (event: FocusEvent<HTMLDivElement>) =>
-        publish(ownsFocus(event.relatedTarget, event.currentTarget))
+      'data-presence-target': automatic ? target : undefined,
+      onFocusCapture: automatic
+        ? (event: FocusEvent<HTMLDivElement>) =>
+            publish(ownsFocus(event.target, event.currentTarget))
+        : undefined,
+      onBlurCapture: automatic
+        ? (event: FocusEvent<HTMLDivElement>) =>
+            publish(ownsFocus(event.relatedTarget, event.currentTarget))
+        : undefined
     }
   }
 }

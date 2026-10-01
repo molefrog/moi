@@ -4,11 +4,10 @@ import type { JsonValue } from 'moi'
 import type {
   CursorsProps,
   UserAvatarGroupProps,
-  FocusFrameProps,
+  PresenceFrameProps,
   PresenceGroupProps,
-  FocusAvatarsProps,
+  PresenceAvatarsProps,
   PresenceValue,
-  SelectionProps,
   UserProps,
   UserAvatarProps,
   UsePeersOptions,
@@ -34,13 +33,12 @@ const fallback = {
   },
   usePublishPresence() {},
   Cursors: nothing,
-  Selection: nothing,
   User: nothing,
   UserAvatar: nothing,
   UserAvatarGroup: nothing,
-  FocusFrame: nothing,
+  PresenceFrame: nothing,
   PresenceGroup: nothing,
-  FocusAvatars: nothing
+  PresenceAvatars: nothing
 }
 let warned = false
 function api() {
@@ -76,9 +74,6 @@ export function usePublishPresence<T extends JsonValue>(channel: string, value: 
 export function Cursors(props: CursorsProps) {
   return createElement(api().Cursors, props)
 }
-export function Selection(props: SelectionProps) {
-  return createElement(api().Selection, props)
-}
 export function User(props: UserProps) {
   return createElement(api().User, props)
 }
@@ -88,12 +83,12 @@ export function UserAvatar(props: UserAvatarProps) {
 export function UserAvatarGroup(props: UserAvatarGroupProps) {
   return createElement(api().UserAvatarGroup, props)
 }
-export function FocusFrame(props: FocusFrameProps) {
-  return createElement(api().FocusFrame, props)
+export function PresenceFrame(props: PresenceFrameProps) {
+  return createElement(api().PresenceFrame, props)
 }
 export function PresenceGroup(props: PresenceGroupProps) {
   return createElement(api().PresenceGroup, props)
 }
-export function FocusAvatars(props: FocusAvatarsProps) {
-  return createElement(api().FocusAvatars, props)
+export function PresenceAvatars(props: PresenceAvatarsProps) {
+  return createElement(api().PresenceAvatars, props)
 }

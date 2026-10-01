@@ -1,33 +1,29 @@
-import type { FocusAvatarsProps } from 'moi/collab'
+import type { PresenceAvatarsProps } from 'moi/collab'
 import { useContext } from 'react'
 import type { HTMLAttributes, ReactNode, Ref } from 'react'
 import { motion } from 'motion/react'
 import { cn } from '@/client/lib/cn'
-import {
-  PresenceGroupContext,
-  presenceChild,
-  usePresenceTarget,
-  useTargetPresence
-} from './presence-helpers'
+import { PresenceGroupContext, usePresenceTarget, useTargetPresence } from './presence-helpers'
 import { UserAvatar } from './user-avatar'
 
-export function FocusAvatars({ id, children, className }: FocusAvatarsProps) {
+export function PresenceAvatars({ id, present, children, className }: PresenceAvatarsProps) {
   const target = usePresenceTarget(id)
-  const presence = useTargetPresence(target)
+  const presence = useTargetPresence(target, present)
   const grouped = useContext(PresenceGroupContext).length > 0
   return (
-    <FocusAvatarsPrimitive
+    <PresenceAvatarsPrimitive
       {...presence.props}
       users={presence.users}
-      animate={grouped}
+      // Controlled presence can occupy several targets at once; only focus moves between them.
+      animate={grouped && present === undefined}
       className={className}
     >
-      {presenceChild(children)}
-    </FocusAvatarsPrimitive>
+      {children}
+    </PresenceAvatarsPrimitive>
   )
 }
 
-type FocusAvatarsPrimitiveProps = HTMLAttributes<HTMLDivElement> & {
+type PresenceAvatarsPrimitiveProps = HTMLAttributes<HTMLDivElement> & {
   ref?: Ref<HTMLDivElement>
   users: readonly { id: string; connectionId: string }[]
   children: ReactNode
@@ -36,13 +32,13 @@ type FocusAvatarsPrimitiveProps = HTMLAttributes<HTMLDivElement> & {
 
 // A target owns its own gutter. Optional group-scoped layout IDs let the same
 // user's face glide between targets without searching or guessing DOM order.
-function FocusAvatarsPrimitive({
+function PresenceAvatarsPrimitive({
   users,
   children,
   animate = false,
   className,
   ...rest
-}: FocusAvatarsPrimitiveProps) {
+}: PresenceAvatarsPrimitiveProps) {
   return (
     <div className={cn('relative pl-8', className)} {...rest}>
       {children}
