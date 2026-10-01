@@ -25,9 +25,11 @@ Without a host bridge, or after its disposal, `moi/collab` warns once per bundle
 return `undefined`, lists return `[]`, and components render nothing, including wrapper children.
 A disabled runtime still supplies a bridge.
 
-The current user starts as `undefined`. `/dev/collab` can set a local test user in the browser
-tab's `sessionStorage`. An outer host owns the current user once injected, including sign-out.
-Without a current user there is no presence connection.
+Startup checks configuration and proxy identity before mounting. With collaboration enabled and
+no external identity provider, it restores or creates a local user in the browser tab's
+`sessionStorage`. `/dev/collab` edits that profile and saves changes immediately. Failed identity
+checks do not activate a local fallback. An outer host owns the current user once injected,
+including sign-out. Without a current user there is no presence connection.
 
 ## Architecture
 
@@ -68,7 +70,7 @@ is ignored with a warning. The team domain accepts a team name, host, or HTTPS U
 [Token verification](../server/collab/cloudflare-access.ts) checks the Access JWT's signature,
 issuer, audience, and expiry. User profiles come from `sub` and `email`; service tokens supply
 no user. `GET /api/proxy-user` returns `{ provider, profile }` with caching disabled. The app loads
-it before mounting and after reconnect. A configured proxy replaces local test users; without a
+it before mounting and after reconnect. A configured proxy replaces local users; without a
 valid user token, the tab stays signed out.
 
 The socket upgrade also verifies the token and rejects unauthenticated requests. The server
@@ -108,7 +110,7 @@ Share calls the host's handler or copies the workspace URL; copying does not gra
 
 ## Development and verification
 
-`/dev/collab` includes local test user setup and an isolated playground. The playground uses the
+`/dev/collab` includes a local user editor and an isolated playground. The playground uses the
 same engine contract with fixtures, works without a live workspace, and resets on reopening.
 Each browser tab has its own fake room.
 

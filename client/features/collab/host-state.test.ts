@@ -34,7 +34,8 @@ afterEach(() => {
 async function setup(
   getHostState?: () => HostStateInput | undefined,
   profile?: UserProfile,
-  beforeInstall?: (state: typeof HostStateModule) => void
+  beforeInstall?: (state: typeof HostStateModule) => void,
+  initializeSaved = true
 ) {
   const host: {
     moi?: {
@@ -57,30 +58,105 @@ async function setup(
   const collab: typeof HostStateModule = await import(path)
   beforeInstall?.(collab)
   collab.installHostApi()
+  if (profile && initializeSaved) collab.initializeLocalUser(true, {})
   // Installation replaces the bootstrap getter with the complete bridge.
   const api = host.moi?.collab as HostApi
   return { ...collab, host, api, saved }
 }
 
-test('current user starts empty and persists only an explicitly enabled dev profile', async () => {
+test('bridge installation leaves local identity pending until initialization', async () => {
   const collab = await setup()
   expect(collab.getCurrentUser()).toBeUndefined()
   expect(collab.getCurrentUserSource()).toBeUndefined()
   expect(collab.getHostState()).toBeUndefined()
   expect(collab.getWorkspaceDirectory('a')).toBeUndefined()
   expect(collab.saved.has(PROFILE_KEY)).toBe(false)
-  collab.setDevUser(alice)
+  collab.setLocalUser(alice)
   expect(collab.getCurrentUser()).toEqual(alice)
-  expect(collab.getCurrentUserSource()).toBe('dev')
+  expect(collab.getCurrentUserSource()).toBe('local')
   expect(collab.getHostState()).toBeUndefined()
   expect(collab.getWorkspaceDirectory('a')).toBeUndefined()
   expect(JSON.parse(collab.saved.get(PROFILE_KEY) ?? 'null')).toEqual(alice)
 })
 
-test('an explicitly saved dev profile restores when no external provider is configured', async () => {
-  const collab = await setup(undefined, alice)
+test('a saved local profile restores after confirmed local initialization', async () => {
+  const legacyProfile = { ...alice, id: 'dev-legacy' }
+  const collab = await setup(undefined, legacyProfile)
+  expect(collab.getCurrentUser()).toEqual(legacyProfile)
+  expect(collab.getCurrentUserSource()).toBe('local')
+  expect(JSON.parse(collab.saved.get(PROFILE_KEY)!)).toEqual(legacyProfile)
+})
+
+test('startup creates one local profile after configuration and identity checks, then autosaves the same id', async () => {
+  const collab = await setup()
+  let changes = 0
+  collab.subscribeCurrentUserStore(() => changes++)
+  collab.initializeLocalUser(false, {})
+  collab.initializeLocalUser(true, undefined)
+  collab.initializeLocalUser(true, { provider: 'cloudflare-access' })
+  expect(collab.getCurrentUser()).toBeUndefined()
+  expect(collab.saved.has(PROFILE_KEY)).toBe(false)
+  collab.initializeLocalUser(true, {})
+  const profile = collab.getCurrentUser()!
+  expect(profile.id).toStartWith('local-')
+  expect(profile.name).toBeTruthy()
+  expect(collab.normalizeUserProfile(profile)).toEqual(profile)
+  expect(collab.getCurrentUserSource()).toBe('local')
+  expect(JSON.parse(collab.saved.get(PROFILE_KEY)!)).toEqual(profile)
+  collab.initializeLocalUser(true, {})
+  expect(collab.getCurrentUser()).toBe(profile)
+  expect(changes).toBe(1)
+  collab.setLocalUser({ ...profile, name: ' Ada Lovelace ', color: 'cyan' })
+  expect(collab.getCurrentUser()).toEqual({ ...profile, name: 'Ada Lovelace', color: 'cyan' })
+  expect(JSON.parse(collab.saved.get(PROFILE_KEY)!)).toEqual(collab.getCurrentUser())
+  expect(collab.getWorkspaceDirectory('a')).toBeUndefined()
+})
+
+test('saved local users stay inactive until collaboration is enabled and the proxy check succeeds', async () => {
+  const collab = await setup(undefined, alice, undefined, false)
+  expect(collab.getCurrentUser()).toBeUndefined()
+  collab.initializeLocalUser(false, {})
+  collab.initializeLocalUser(true, undefined)
+  expect(collab.getCurrentUser()).toBeUndefined()
+  expect(JSON.parse(collab.saved.get(PROFILE_KEY)!)).toEqual(alice)
+  collab.initializeLocalUser(true, {})
   expect(collab.getCurrentUser()).toEqual(alice)
-  expect(collab.getCurrentUserSource()).toBe('dev')
+  expect(collab.getCurrentUserSource()).toBe('local')
+})
+
+test.each([accessed, { provider: 'cloudflare-access' } as const])(
+  'proxy identity and sign-out prevent local restoration or creation: %j',
+  async proxyUser => {
+    const collab = await setup(undefined, alice, undefined, false)
+    collab.setProxyUserState(proxyUser)
+    collab.initializeLocalUser(true, proxyUser)
+    collab.initializeLocalUser(true, {})
+    expect(collab.getCurrentUser()).toEqual('profile' in proxyUser ? carol : undefined)
+    expect(collab.getCurrentUserSource()).toBe('cloudflare-access')
+    expect(JSON.parse(collab.saved.get(PROFILE_KEY)!)).toEqual(alice)
+  }
+)
+
+test('invalid or unavailable local storage still allows a confirmed local user', async () => {
+  const collab = await setup()
+  collab.saved.set(PROFILE_KEY, 'invalid json')
+  collab.initializeLocalUser(true, {})
+  expect(JSON.parse(collab.saved.get(PROFILE_KEY)!)).toEqual(collab.getCurrentUser())
+  const inaccessible = await setup()
+  Object.defineProperty(globalThis, 'sessionStorage', {
+    configurable: true,
+    value: {
+      getItem: () => {
+        throw new Error('Storage unavailable')
+      },
+      setItem: () => {
+        throw new Error('Storage unavailable')
+      }
+    }
+  })
+  inaccessible.initializeLocalUser(true, {})
+  expect(inaccessible.getCurrentUserSource()).toBe('local')
+  expect(inaccessible.getCurrentUser()).toBeDefined()
 })
 
 test.each([
@@ -98,23 +174,23 @@ test.each([
   expect(collab.getCurrentUser()).toEqual(expected)
   expect(collab.getCurrentUserSource()).toBe('external')
   expect(collab.getWorkspaceDirectory('a')).toEqual({ status: 'loading' })
-  collab.setDevUser(alice)
+  collab.setLocalUser(alice)
   expect(collab.getCurrentUser()).toEqual(expected)
   expect(JSON.parse(collab.saved.get(PROFILE_KEY) ?? 'null')).toEqual(alice)
   collab.api.setHostState({ currentUser: bob, workspaces: {} })
   expect(collab.getCurrentUser()).toEqual(bob)
 })
 
-test('Cloudflare Access replaces a saved test user, locks edits, and ignores repeats', async () => {
+test('Cloudflare Access replaces a saved local user, locks edits, and ignores repeats', async () => {
   const collab = await setup(undefined, alice)
   collab.setProxyUserState({})
   expect(collab.getCurrentUser()).toEqual(alice)
-  expect(collab.getCurrentUserSource()).toBe('dev')
+  expect(collab.getCurrentUserSource()).toBe('local')
   let notifications = 0
   collab.subscribeCurrentUserStore(() => notifications++)
   collab.setProxyUserState(accessed)
   collab.setProxyUserState({ ...accessed, profile: { ...carol } })
-  collab.setDevUser(bob)
+  collab.setLocalUser(bob)
   expect(collab.getCurrentUser()).toEqual(carol)
   expect(collab.getCurrentUserSource()).toBe('cloudflare-access')
   expect(collab.getWorkspaceDirectory('a')).toBeUndefined()
@@ -128,7 +204,7 @@ test('Cloudflare Access replaces a saved test user, locks edits, and ignores rep
   expect(collab.getCurrentUserSource()).toBeUndefined()
 })
 
-test('Access arriving before setup beats a saved test user, and an outer host beats Access', async () => {
+test('Access arriving before setup beats a saved local user, and an outer host beats Access', async () => {
   const early = await setup(undefined, alice, state => state.setProxyUserState(accessed))
   expect(early.getCurrentUser()).toEqual(carol)
   const hosted = await setup(
@@ -378,7 +454,7 @@ test('loading, empty, removed workspaces, and removed members remain distinct an
   expect(collab.getWorkspaceDirectory('empty')).toEqual({ status: 'loading' })
 })
 
-test('sign-out atomically clears directories and remains authoritative over a saved dev user', async () => {
+test('sign-out atomically clears directories and remains authoritative over a saved local user', async () => {
   const collab = await setup(undefined, alice)
   collab.setHostState({
     currentUser: bob,
@@ -388,7 +464,7 @@ test('sign-out atomically clears directories and remains authoritative over a sa
   const unsubscribe = collab.subscribeHostState(state => observed.push(state))
   expect(observed).toEqual([collab.getHostState()])
   collab.setHostState({ workspaces: collab.getHostState()!.workspaces })
-  collab.setDevUser(alice)
+  collab.setLocalUser(alice)
   expect(collab.getCurrentUser()).toBeUndefined()
   expect(collab.getCurrentUserSource()).toBe('external')
   expect(collab.getHostState()).toEqual({ workspaces: {} })
@@ -408,7 +484,7 @@ test('invalid updates do not partially publish current user, directory, source, 
       workspaces: { invalid: { status: 'ready', users: [invalidUser] } }
     })
   ).toThrow()
-  expect(collab.getCurrentUserSource()).toBe('dev')
+  expect(collab.getCurrentUserSource()).toBe('local')
   expect(collab.getCurrentUser()).toEqual(alice)
   expect(collab.getHostState()).toBeUndefined()
   collab.setHostState({

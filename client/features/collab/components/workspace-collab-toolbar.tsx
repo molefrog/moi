@@ -80,7 +80,7 @@ export function WorkspaceCollabToolbar({
     setOpen(false)
     onOpenTab(tab)
   }
-  const canEdit = getCurrentUserSource() === 'dev'
+  const canEdit = getCurrentUserSource() === 'local'
   if (!enabled || !currentUser) return null
   return (
     <div className="flex items-center gap-1">

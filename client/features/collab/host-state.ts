@@ -1,6 +1,7 @@
 import { isUserProfile } from '@/lib/collab/protocol'
 import { colorForId, isUserColor } from '@/lib/collab/colors'
 import type { AuthProvider, ProxyUserState, UserProfile } from '@/lib/collab/types'
+import { createLocalUser } from './local-user'
 
 export type ShareContext = { workspaceId: string; url: string }
 export type ShareHandler = (context: ShareContext) => Promise<{ url: string }>
@@ -21,10 +22,9 @@ export type HostApi = {
   setShareHandler: (handler: ShareHandler | null) => void
 }
 // Who supplies the current user: local setup, an outer host, or an auth proxy.
-export type CurrentUserSource = 'dev' | 'external' | AuthProvider
+export type CurrentUserSource = 'local' | 'external' | AuthProvider
 
-// Earlier development builds generated a dev user automatically. Only this
-// explicit profile key opts a tab into collaboration and workspace controls.
+// Keep the existing key so local profiles survive the startup change.
 const PROFILE_KEY = 'moi:collab:dev-profile'
 let currentUser: UserProfile | undefined
 let installed = false
@@ -169,12 +169,12 @@ export function getCurrentUserSource(): CurrentUserSource | undefined {
   return currentUserSource
 }
 
-// An auth proxy takes precedence over local test users; an outer host takes
+// An auth proxy takes precedence over local users; an outer host takes
 // precedence over the proxy. A configured proxy with no user signs this tab out.
 export function setProxyUserState({ provider, profile }: ProxyUserState): void {
   if (currentUserSource === 'external') return
   if (provider === undefined) {
-    if (currentUserSource === undefined || currentUserSource === 'dev') return
+    if (currentUserSource === undefined || currentUserSource === 'local') return
     currentUserSource = undefined
     currentUser = undefined
   } else {
@@ -190,7 +190,7 @@ export function setProxyUserState({ provider, profile }: ProxyUserState): void {
   listeners.forEach(listener => listener())
 }
 
-function persistDevUser(): void {
+function persistLocalUser(): void {
   try {
     sessionStorage.setItem(PROFILE_KEY, JSON.stringify(currentUser))
   } catch {
@@ -198,14 +198,30 @@ function persistDevUser(): void {
   }
 }
 
-export function setDevUser(next: UserProfile): void {
-  // A provider may take over between rendering the dev form and handling input.
-  if (currentUserSource !== undefined && currentUserSource !== 'dev') return
+export function setLocalUser(next: UserProfile): void {
+  // A provider may take over between rendering the local user form and handling input.
+  if (currentUserSource !== undefined && currentUserSource !== 'local') return
   const normalized = normalizeUserProfile(next)
-  currentUserSource = 'dev'
+  currentUserSource = 'local'
   currentUser = normalized
-  persistDevUser()
+  persistLocalUser()
   listeners.forEach(listener => listener())
+}
+
+// Called after startup config and proxy identity settle, before React mounts.
+export function initializeLocalUser(enabled: boolean, proxyUser: ProxyUserState | undefined): void {
+  if (!enabled || !proxyUser || proxyUser.provider !== undefined || currentUserSource !== undefined)
+    return
+  try {
+    const saved = sessionStorage.getItem(PROFILE_KEY)
+    if (saved) {
+      setLocalUser(JSON.parse(saved) as UserProfile)
+      return
+    }
+  } catch {
+    /* Invalid or unavailable storage starts a fresh local profile. */
+  }
+  setLocalUser(createLocalUser())
 }
 
 export async function shareWorkspace(workspaceId: string): Promise<'copied'> {
@@ -239,18 +255,8 @@ export function installHostApi(): void {
     try {
       setHostState(previous.getHostState() ?? { workspaces: {} })
     } catch {
-      // An unavailable host remains authoritative; never restore a dev profile.
+      // An unavailable host remains authoritative; never restore a local profile.
       setHostState({ workspaces: {} })
-    }
-  } else if (currentUserSource === undefined) {
-    try {
-      const saved = sessionStorage.getItem(PROFILE_KEY)
-      if (saved) {
-        currentUser = normalizeUserProfile(JSON.parse(saved) as UserProfile)
-        currentUserSource = 'dev'
-      }
-    } catch {
-      /* Missing, invalid, or unavailable storage leaves the current user unset. */
     }
   }
   host.moi ??= {}

@@ -9,7 +9,7 @@ export type { UserProps, UserSize } from 'moi/collab'
 
 type UserFaceProps = { name: string }
 
-export function UserFace({ name }: UserFaceProps) {
+function UserFace({ name }: UserFaceProps) {
   return (
     <Facehash
       name={name}

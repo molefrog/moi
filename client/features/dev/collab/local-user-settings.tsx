@@ -1,25 +1,23 @@
-import { useMemo, useState, useSyncExternalStore } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 
 import { IconArrowsShuffle } from '@tabler/icons-react'
 
 import { Button } from '@/client/components/ui/button'
 import { Input } from '@/client/components/ui/input'
+import { useAppConfig } from '@/client/api/app-config'
 import { USER_COLORS } from '@/lib/collab/colors'
 import type { UserProfile } from '@/lib/collab/types'
-import { Avatar, AvatarFallback, AvatarImage } from '@/ui-components/avatar'
-
-import { UserFace } from '@/client/features/collab/components/user'
-import { userDisplayName } from '@/client/features/collab/users'
-import { createDevUser, devUserProfile, randomDevUser } from './dev-user'
-import type { DevUserDraft } from './dev-user'
+import { User } from '@/client/features/collab/components/user'
+import { randomLocalUser } from '@/client/features/collab/local-user'
 import {
   getCurrentUser,
   getCurrentUserSource,
-  setDevUser,
+  setLocalUser,
   subscribeCurrentUserStore
 } from '@/client/features/collab/host-state'
 
-export function DevUserSetup() {
+export function LocalUserSettings() {
+  const { experimental } = useAppConfig()
   const source = useSyncExternalStore(
     subscribeCurrentUserStore,
     getCurrentUserSource,
@@ -28,7 +26,24 @@ export function DevUserSetup() {
   const profile = useSyncExternalStore(subscribeCurrentUserStore, getCurrentUser, getCurrentUser)
   if (source === 'external') return null
   if (source === 'cloudflare-access') return <AccessUser profile={profile} />
-  return <DevUserForm key={profile?.id ?? 'setup'} savedUser={profile} />
+  if (profile) return <LocalUserEditor key={profile.id} profile={profile} />
+  return (
+    <section aria-labelledby="local-user-title" className="flex flex-col gap-5">
+      <h2 id="local-user-title" className="text-base font-medium">
+        Local user
+      </h2>
+      <p className="text-sm text-muted-foreground">
+        {experimental.collab ? (
+          'Couldn’t resolve your user identity. Reload moi to try again.'
+        ) : (
+          <>
+            Start moi with <code className="font-mono">--experimental-collab</code> to create a
+            local user automatically. The playground below uses its own sample users.
+          </>
+        )}
+      </p>
+    </section>
+  )
 }
 
 type AccessUserProps = { profile: UserProfile | undefined }
@@ -36,7 +51,6 @@ type AccessUserProps = { profile: UserProfile | undefined }
 // Behind Cloudflare Access the profile is inherited, so there is nothing to edit.
 // Access profiles carry no name, so the label is the email, as in workspaces.
 function AccessUser({ profile }: AccessUserProps) {
-  const label = profile ? userDisplayName(profile) : null
   return (
     <section aria-labelledby="access-user-title" className="flex flex-col gap-5">
       <header>
@@ -49,73 +63,56 @@ function AccessUser({ profile }: AccessUserProps) {
             : 'This server uses Cloudflare Access, but this page wasn’t opened through it. Open moi at its Cloudflare Access address to appear in workspaces.'}
         </p>
       </header>
-      {label && (
-        <div className="flex items-center gap-3">
-          <Avatar size="lg" data-collab-color={profile?.color ?? 'unknown'}>
-            {profile?.avatar && <AvatarImage src={profile.avatar} alt="" />}
-            <AvatarFallback>
-              <UserFace name={label} />
-            </AvatarFallback>
-          </Avatar>
-          <span className="min-w-0 truncate text-sm font-medium">{label}</span>
-        </div>
-      )}
+      {profile && <User id={profile.id} size="lg" showStatus={false} />}
     </section>
   )
 }
 
-type DevUserFormProps = { savedUser: UserProfile | undefined }
+type LocalUserEditorProps = { profile: UserProfile }
 
-function DevUserForm({ savedUser }: DevUserFormProps) {
-  const [initial] = useState(() => savedUser ?? createDevUser())
-  const [draft, setDraft] = useState<DevUserDraft>({
-    name: initial.name ?? '',
-    color: initial.color
-  })
-  const name = draft.name.trim()
-  const profile = useMemo(
-    () => devUserProfile(initial.id, { name, color: draft.color }),
-    [initial.id, name, draft.color]
-  )
-  const changed = name !== (savedUser?.name ?? '') || draft.color !== savedUser?.color
+function LocalUserEditor({ profile }: LocalUserEditorProps) {
+  // Keep raw input so normalization doesn't eat spaces while a name is being typed.
+  const [name, setName] = useState(profile.name ?? '')
 
   return (
-    <section aria-labelledby="dev-user-title" className="flex flex-col gap-5">
+    <section aria-labelledby="local-user-title" className="flex flex-col gap-5">
       <header>
-        <h2 id="dev-user-title" className="text-base font-medium">
-          Local test user
+        <h2 id="local-user-title" className="text-base font-medium">
+          Local user
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Set up a local test user for this browser tab. To test with two users, set up another test
-          user in a second browser tab.
+          Edit the local user for this browser tab. Changes save immediately. To test with two
+          users, open moi in another browser tab.
         </p>
       </header>
-      <form
-        className="flex flex-col gap-5"
-        onSubmit={event => {
-          event.preventDefault()
-          setDevUser(profile)
-        }}
-      >
+      <div className="flex flex-col gap-5">
         <div className="flex flex-col items-start gap-5 sm:flex-row">
           <div
             data-collab-color={profile.color}
             role="img"
-            aria-label="Test user preview"
+            aria-label="Local user preview"
             className="size-16 shrink-0 overflow-hidden rounded-full"
           >
-            <UserFace name={userDisplayName(profile)} />
+            <User
+              id={profile.id}
+              avatarOnly
+              showStatus={false}
+              className="data-[size=default]:size-full"
+            />
           </div>
           <div className="flex w-full max-w-sm min-w-0 flex-col gap-4">
             <label className="flex flex-col gap-1.5 text-sm">
               Name (optional)
               <Input
-                value={draft.name}
+                value={name}
                 maxLength={80}
                 placeholder="Type a name"
                 autoComplete="off"
                 spellCheck={false}
-                onChange={event => setDraft({ ...draft, name: event.target.value })}
+                onChange={event => {
+                  setName(event.target.value)
+                  setLocalUser({ ...profile, name: event.target.value })
+                }}
               />
             </label>
             <div className="flex flex-col gap-1.5 text-sm">
@@ -132,8 +129,8 @@ function DevUserForm({ savedUser }: DevUserFormProps) {
                       name="color"
                       value={color}
                       aria-label={color[0].toUpperCase() + color.slice(1)}
-                      checked={draft.color === color}
-                      onChange={() => setDraft({ ...draft, color })}
+                      checked={profile.color === color}
+                      onChange={() => setLocalUser({ ...profile, color })}
                       className="peer sr-only"
                     />
                     <svg
@@ -148,14 +145,15 @@ function DevUserForm({ savedUser }: DevUserFormProps) {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button type="submit" size="sm" disabled={!changed}>
-                {savedUser ? 'Save test user' : 'Use test user'}
-              </Button>
               <Button
                 type="button"
                 variant="secondary"
                 size="sm"
-                onClick={() => setDraft(randomDevUser(draft))}
+                onClick={() => {
+                  const next = randomLocalUser({ name, color: profile.color })
+                  setName(next.name)
+                  setLocalUser({ ...profile, ...next })
+                }}
               >
                 <IconArrowsShuffle stroke={1.75} />
                 Randomize
@@ -164,13 +162,9 @@ function DevUserForm({ savedUser }: DevUserFormProps) {
           </div>
         </div>
         <p className="text-sm text-muted-foreground">
-          {savedUser
-            ? 'Your test user is saved in this browser tab. '
-            : 'Setting up a test user is optional. '}
-          Start moi with <code className="font-mono">--experimental-collab</code> to use it in
-          workspaces. The playground below uses its own sample users.
+          Your user is saved in this browser tab. The playground below uses its own sample users.
         </p>
-      </form>
+      </div>
     </section>
   )
 }

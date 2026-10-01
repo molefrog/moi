@@ -248,6 +248,20 @@ test('errors after joining keep the connection available for further presence', 
   })
 })
 
+test('profile edits publish immediately without changing the user id or reconnecting', () => {
+  const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
+  setHostState({ currentUser: alice, workspaces: {} })
+  const engine = new CollabClient('workspace')
+  stop = engine.start()
+  sockets[0]!.open()
+  const edited = { ...alice, name: 'Ada Lovelace', color: 'cyan' } as const
+  setHostState({ currentUser: edited, workspaces: {} })
+  expect(sockets).toHaveLength(1)
+  expect(sockets[0]!.readyState).toBe(TestSocket.OPEN)
+  expect(sockets[0]!.sent.at(-1)).toEqual({ type: 'profile', profile: edited })
+  expect(engine.getSnapshot().users).toEqual([edited])
+})
+
 test('changing user reconnects and never sends the host directory over the socket', async () => {
   setHostState({ currentUser: { id: 'alice', name: 'Alice', color: 'emerald' }, workspaces: {} })
   const engine = new CollabClient('workspace')

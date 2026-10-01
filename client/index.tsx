@@ -4,7 +4,7 @@ import './structured-clone-shim'
 import 'blobatar/motion.css'
 import './index.css'
 
-import { installHostApi } from './features/collab/host-state'
+import { initializeLocalUser, installHostApi } from './features/collab/host-state'
 
 import { startHmrWatchdog } from './runtime/hmr-watchdog'
 
@@ -27,11 +27,12 @@ export async function init(el: HTMLElement) {
   installHostApi()
   // Startup config and any proxy-verified user load in parallel with the
   // main chunk, so both are available synchronously from the first render.
-  const [{ mount }] = await Promise.all([
+  const [{ mount }, config, proxyUser] = await Promise.all([
     import('./main'),
     import('./api/app-config').then(m => m.loadAppConfig()),
     import('./features/collab/proxy-user').then(m => m.loadProxyUser())
   ])
+  initializeLocalUser(config?.experimental.collab === true, proxyUser)
   mount(el)
 }
 
