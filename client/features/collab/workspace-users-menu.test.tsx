@@ -101,19 +101,36 @@ test('avatar overflow counts connected peers once, excluding offline users and o
   expect(html).not.toContain('aria-label="Fourth colleague"')
 })
 
-test('menu lists self, connected and away users, then informational offline members', () => {
+test('menu groups active, away and offline users, keeping self first and stable order within groups', () => {
+  const activeSecond = {
+    id: 'active-second',
+    name: 'Another active colleague',
+    color: 'blue'
+  } as const
+  const awaySecond = { id: 'away-second', name: 'Another away colleague', color: 'blue' } as const
   const html = renderUsers(
     {
       self,
-      users: [offline[0], away, self, active],
-      otherConnections: [connection(active, 'scratchpad'), connection(away, null)]
+      users: [offline[0], away, activeSecond, self, offline[1], active, awaySecond],
+      otherConnections: [
+        connection(active, 'scratchpad'),
+        connection(away, null),
+        connection(activeSecond, 'overview'),
+        { ...connection(awaySecond, 'overview'), location: { page: 'overview', status: 'away' } }
+      ]
     },
     true
   )
   expect(html).toContain('>Overview<')
-  expect(html.indexOf('aria-label="Self"')).toBeLessThan(html.indexOf('Away colleague'))
-  expect(html.indexOf('Active colleague')).toBeLessThan(html.indexOf('Offline colleague'))
+  const expectedOrder = [self, activeSecond, active, away, awaySecond, offline[0], offline[1]]
+  for (let index = 1; index < expectedOrder.length; index++) {
+    const previous = html.indexOf(`aria-label="${expectedOrder[index - 1].name}"`)
+    const current = html.indexOf(`aria-label="${expectedOrder[index].name}"`)
+    expect(previous).toBeGreaterThanOrEqual(0)
+    expect(current).toBeGreaterThan(previous)
+  }
   expect(html).toContain('>Away<')
+  expect(html).toContain('>Overview · Away<')
   expect(html).toContain('>Offline<')
   expect(html).toContain('title="Go to Scratchpad"')
   expect(html.match(/<button/g)).toHaveLength(1)

@@ -1,6 +1,6 @@
 import type { UserAvatarProps } from 'moi/collab'
 import { IconUser } from '@tabler/icons-react'
-import { Facehash } from 'facehash'
+import { Blobatar } from '@blobatar/react'
 import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from '@/ui-components/avatar'
 import { useUser } from '../hooks'
 import { userDisplayName } from '../users'
@@ -19,13 +19,16 @@ export function UserAvatar({ id, size = 'default', showStatusBadge, className }:
       {user?.avatar && <AvatarImage src={user.avatar} alt="" />}
       <AvatarFallback>
         {user ? (
-          <Facehash
-            name={name}
-            size="100%"
-            variant="solid"
-            intensity3d="none"
-            interactive={false}
-            className="bg-collab text-collab-foreground"
+          <Blobatar
+            name={id}
+            animate="hover"
+            background="circle"
+            traits={{ shape: 0, 'body.r': 1 }}
+            palette={{
+              bg: 'var(--collab)',
+              head: 'var(--collab)',
+              eye: 'var(--collab-foreground)'
+            }}
           />
         ) : (
           <IconUser size={size === 'xs' || size === 'sm' ? 12 : 16} stroke={1.75} />

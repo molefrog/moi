@@ -25,6 +25,7 @@ import type { WorkspaceUserInfo } from './users'
 
 export type TabInfo = { label: string; Icon: TabIcon }
 type DescribeTab = (tab: WorkspaceTabId) => TabInfo | null
+const USER_STATUS_ORDER = { active: 0, away: 1, offline: 2 }
 
 type WorkspaceUsersMenuProps = {
   workspaceId: string
@@ -114,8 +115,7 @@ export function WorkspaceUsersList({
 }: WorkspaceUsersListProps) {
   const sorted = users.toSorted(
     (a, b) =>
-      Number(b.self) - Number(a.self) ||
-      Number(a.status === 'offline') - Number(b.status === 'offline')
+      USER_STATUS_ORDER[a.status] - USER_STATUS_ORDER[b.status] || Number(b.self) - Number(a.self)
   )
   return (
     <ul className="flex max-h-80 scroll-fade flex-col overflow-y-auto">
@@ -152,7 +152,7 @@ function UserRow({ user, page, describeTab, onOpenTab }: UserRowProps) {
       ? 'Offline'
       : user.status === 'away'
         ? labels
-          ? `Away · ${labels}`
+          ? `${labels} · Away`
           : 'Away'
         : labels || 'Another tab'
   const Icon = user.status === 'offline' ? undefined : tabs[0]?.info?.Icon
