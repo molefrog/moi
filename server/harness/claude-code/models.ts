@@ -5,6 +5,7 @@ import type { Model } from '@/lib/types'
 
 import { requireHarnessExecutable } from '../executable'
 import { type ClaudeCli, claudeCliKey, probeClaudeCli } from './cli'
+import { claudeSpawnEnv } from './spawn-env'
 
 // The metadata query needs a cwd; its catalog is cached across workspaces.
 async function fetchClaudeModels(cwd: string, executable: string): Promise<ModelInfo[]> {
@@ -15,7 +16,7 @@ async function fetchClaudeModels(cwd: string, executable: string): Promise<Model
       pathToClaudeCodeExecutable: executable,
       persistSession: false,
       settingSources: ['user', 'project'],
-      env: { ...process.env, CLAUDECODE: undefined }
+      env: claudeSpawnEnv()
     }
   })
   const models = await q.supportedModels()
