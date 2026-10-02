@@ -66,9 +66,12 @@ test('location changes notify page observers immediately and identical presence 
   store.setLocation({ page: 'views/board', status: 'active' })
   expect(notifications).toBe(1)
   expect(store.getLocation()).toEqual({ page: 'views/board', status: 'active' })
-  store.setPresence(field)
-  store.setPresence({ ...field })
+  const selection = { ...field, value: { target: 'title', selection: [1, 2] } }
+  store.setPresence(selection)
+  store.setPresence(structuredClone(selection))
   expect(sent.filter(message => message.type === 'presence:set')).toHaveLength(1)
+  store.setPresence({ ...selection, value: { target: 'title', selection: [2, 3] } })
+  expect(sent.filter(message => message.type === 'presence:set')).toHaveLength(2)
 })
 
 const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const

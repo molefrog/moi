@@ -29,8 +29,8 @@ function publishState(next) {
 }
 ```
 
-moi reads `getHostState` during initialization, then installs its bridge. Use `moi:collab-ready`
-to register an optional `setShareHandler` for invitation links.
+moi reads `getHostState` during initialization, then installs its bridge and dispatches
+`moi:collab-ready`. The host can publish subsequent state changes through `setHostState`.
 
 ## Publish changes
 

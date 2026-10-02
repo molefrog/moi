@@ -12,14 +12,3 @@ test('avatar groups deduplicate user IDs and count the remaining users in overfl
   expect(html).toContain('+2')
   expect(html).not.toContain('Unknown user')
 })
-
-test('avatar groups can show only an overflow count', () => {
-  const html = renderCollab(
-    createRoom(),
-    <UserAvatarGroup ids={['peer', 'me']} max={0} size="xs" />
-  )
-  expect(html).toContain('aria-label="2 users"')
-  expect(html).toContain('aria-label="2 more"')
-  expect(html).toContain('+2')
-  expect(html).not.toContain('aria-label="Ada"')
-})

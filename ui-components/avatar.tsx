@@ -68,8 +68,8 @@ function AvatarGroup({ className, ...props }: React.ComponentProps<'div'>) {
       className={cn(
         'group/avatar-group flex items-center -space-x-2 [--avatar-radius:--spacing(4)]',
         '*:data-[size=lg]:[--avatar-radius:--spacing(5)] *:data-[size=sm]:[--avatar-radius:--spacing(3)] *:data-[size=xs]:[--avatar-radius:--spacing(2.5)]',
-        // Leave a transparent gap around the next avatar, including an overflow count.
-        '[&>[data-slot=avatar]:not(:last-child)]:mask-[radial-gradient(circle_at_calc(100%_+_var(--avatar-radius)_-_--spacing(2))_50%,transparent_calc(var(--avatar-radius)_+_2px),black_calc(var(--avatar-radius)_+_2.5px))]',
+        // Leave a transparent gap around the previous avatar, including on an overflow count.
+        '[&>:is([data-slot=avatar],[data-slot=avatar-group-count]):not(:first-child)]:mask-[radial-gradient(circle_at_calc(--spacing(2)_-_var(--avatar-radius))_50%,transparent_calc(var(--avatar-radius)_+_2px),black_calc(var(--avatar-radius)_+_2.5px))]',
         className
       )}
       {...props}

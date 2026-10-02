@@ -3,8 +3,6 @@ import { colorForId, isUserColor } from '@/lib/collab/colors'
 import type { AuthProvider, ProxyUserState, UserProfile } from '@/lib/collab/types'
 import { createLocalUser } from './local-user'
 
-export type ShareContext = { workspaceId: string; url: string }
-export type ShareHandler = (context: ShareContext) => Promise<{ url: string }>
 export type UserProfileInput = Omit<UserProfile, 'color'> & { color?: UserProfile['color'] }
 export type WorkspaceDirectory<Profile = UserProfile> =
   | { readonly status: 'loading' }
@@ -19,7 +17,6 @@ export type HostApi = {
   getHostState: () => HostState | undefined
   setHostState: (state: HostStateInput) => void
   subscribeHostState: (listener: (state: HostState | undefined) => void) => () => void
-  setShareHandler: (handler: ShareHandler | null) => void
 }
 // Who supplies the current user: local setup, an outer host, or an auth proxy.
 export type CurrentUserSource = 'local' | 'external' | AuthProvider
@@ -28,7 +25,6 @@ export type CurrentUserSource = 'local' | 'external' | AuthProvider
 const PROFILE_KEY = 'moi:collab:dev-profile'
 let currentUser: UserProfile | undefined
 let installed = false
-let shareHandler: ShareHandler | null = null
 let currentUserSource: CurrentUserSource | undefined
 const listeners = new Set<() => void>()
 const workspaceListeners = new Map<string, Set<() => void>>()
@@ -224,20 +220,6 @@ export function initializeLocalUser(enabled: boolean, proxyUser: ProxyUserState 
   setLocalUser(createLocalUser())
 }
 
-export async function shareWorkspace(workspaceId: string): Promise<'copied'> {
-  const url = new URL(`/workspace/${encodeURIComponent(workspaceId)}`, location.origin).href
-  if (shareHandler) {
-    const shared = await shareHandler({ workspaceId, url })
-    const target = new URL(shared.url)
-    if (target.protocol !== 'https:' && target.protocol !== 'http:')
-      throw new Error('The share handler returned an invalid URL.')
-    await navigator.clipboard.writeText(target.href)
-    return 'copied'
-  }
-  await navigator.clipboard.writeText(url)
-  return 'copied'
-}
-
 // A host supplies one initial atomic snapshot before loading moi's modules.
 export function installHostApi(): void {
   if (typeof window === 'undefined' || installed) return
@@ -263,10 +245,7 @@ export function installHostApi(): void {
   const api: HostApi = {
     getHostState,
     setHostState,
-    subscribeHostState,
-    setShareHandler(handler) {
-      shareHandler = handler
-    }
+    subscribeHostState
   }
   host.moi.collab = api
   if (typeof window.dispatchEvent === 'function') {

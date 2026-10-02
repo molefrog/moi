@@ -36,15 +36,17 @@ test('presence frames skip unresolved users and clear their identity after remov
 })
 
 test('inactive applets retain content and hide remote focus', () => {
-  const html = renderCollab(
-    createFocusRoom(),
-    <PresenceFrame id="task:42:title">
-      <input aria-label="Title" />
-    </PresenceFrame>,
-    false
-  )
-  expect(html).toContain('Title')
-  expect(html).not.toContain('Ada')
+  for (const Wrapper of [PresenceFrame, PresenceAvatars]) {
+    const html = renderCollab(
+      createFocusRoom(),
+      <Wrapper id="task:42:title">
+        <input aria-label="Title" />
+      </Wrapper>,
+      false
+    )
+    expect(html).toContain('Title')
+    expect(html).not.toContain('Ada')
+  }
 })
 
 test('presence-frame resolves a usable label for nameless user', () => {
@@ -59,24 +61,26 @@ test('presence-frame resolves a usable label for nameless user', () => {
   expect(html).toContain(`>${label}<`)
 })
 
-test('presence-frame matches the semantic target and rejects a different record', () => {
-  const backend = createFocusRoom()
-  expect(
-    renderCollab(
-      backend,
-      <PresenceFrame id="task:42:title">
-        <input />
-      </PresenceFrame>
-    )
-  ).toContain('Ada')
-  expect(
-    renderCollab(
-      backend,
-      <PresenceFrame id="task:43:title">
-        <input />
-      </PresenceFrame>
-    )
-  ).not.toContain('Ada')
+test('presence wrappers show peers only on the matching record', () => {
+  for (const Wrapper of [PresenceFrame, PresenceAvatars]) {
+    const backend = createFocusRoom()
+    expect(
+      renderCollab(
+        backend,
+        <Wrapper id="task:42:title">
+          <input />
+        </Wrapper>
+      )
+    ).toContain('Ada')
+    expect(
+      renderCollab(
+        backend,
+        <Wrapper id="task:43:title">
+          <input />
+        </Wrapper>
+      )
+    ).not.toContain('Ada')
+  }
 })
 
 test('presence-frame retains content outside a collaboration provider', () => {
@@ -105,16 +109,18 @@ test('automatic targets show remote presence across list and fragment children',
   }
 })
 
-test('presence-frame rejects blank IDs', () => {
-  for (const id of ['', '   ']) {
-    expect(() =>
-      renderCollab(
-        createFocusRoom(),
-        <PresenceFrame id={id}>
-          <input />
-        </PresenceFrame>
-      )
-    ).toThrow('nonempty id')
+test('presence wrappers reject blank IDs in automatic and controlled modes', () => {
+  for (const Wrapper of [PresenceFrame, PresenceAvatars]) {
+    for (const present of [undefined, false]) {
+      expect(() =>
+        renderCollab(
+          createFocusRoom(),
+          <Wrapper id=" " present={present}>
+            <input />
+          </Wrapper>
+        )
+      ).toThrow('nonempty id')
+    }
   }
 })
 
@@ -158,19 +164,6 @@ test('controlled presence uses group scope while preserving flexible children', 
   expect(targets[1]).toContain('Details')
   expect(targets[2]).toStartWith('"projects/42"')
   expect(targets[2]).not.toContain('Ada')
-})
-
-test('controlled frames reject blank IDs', () => {
-  for (const id of ['', '   ']) {
-    expect(() =>
-      renderCollab(
-        createFocusRoom(),
-        <PresenceFrame id={id} present={false}>
-          Content
-        </PresenceFrame>
-      )
-    ).toThrow('nonempty id')
-  }
 })
 
 test('both appearances reflect remote controlled presence clearing', () => {

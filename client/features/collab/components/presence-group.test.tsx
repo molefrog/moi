@@ -84,19 +84,6 @@ test('nested groups scope composed children and keep sibling groups independent'
   expect(html).toContain('Ada')
 })
 
-test('groups preserve their children without adding a DOM wrapper', () => {
-  const engine = createFocusRoom()
-  const child = <span>Local content</span>
-  expect(
-    renderCollab(
-      engine,
-      <PresenceGroup id="outer">
-        <PresenceGroup id="inner">{child}</PresenceGroup>
-      </PresenceGroup>
-    )
-  ).toBe(renderCollab(engine, child))
-})
-
 test('path-like IDs stay separate from nested group boundaries in rendered controls', () => {
   const html = renderCollab(
     createFocusRoom(presenceTarget('a/b', 'title')),

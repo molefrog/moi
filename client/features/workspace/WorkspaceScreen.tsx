@@ -21,7 +21,7 @@ import type { WelcomeDestination } from '@/client/features/chat/messages/ChatEmp
 import { ChatPopup } from '@/client/features/chat/ChatPopup'
 import { ThemePanel } from '@/client/features/workspace/ThemePanel'
 import { Overview } from '@/client/features/overview/Overview'
-import { WorkspaceCollabToolbar } from '@/client/features/collab'
+import { WorkspaceUsersMenu } from '@/client/features/collab'
 import { PanelHeader } from '@/client/components/shared/PanelHeader'
 import { WorkspaceIcon } from '@/client/components/shared/WorkspaceIcon'
 import { Button } from '@/client/components/ui/button'
@@ -751,7 +751,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
             onReorder={reorderTabs}
           />
         </div>
-        <WorkspaceCollabToolbar
+        <WorkspaceUsersMenu
           workspaceId={workspaceId}
           describeTab={tab => tabItemFor(tab, views, builders, false, false, () => false)}
           onOpenTab={openTab}
