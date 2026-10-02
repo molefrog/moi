@@ -1,6 +1,6 @@
 import { useState, useSyncExternalStore } from 'react'
 
-import { IconArrowRight, IconChevronDown } from '@tabler/icons-react'
+import { IconChevronDown } from '@tabler/icons-react'
 import type { Icon as TabIcon } from '@tabler/icons-react'
 import { useRouter } from 'wouter'
 import { usePathname } from 'wouter/use-browser-location'
@@ -59,7 +59,9 @@ export function WorkspaceUsersMenu({
     .filter(user => user.self || user.status !== 'offline')
     .map(user => user.profile.id)
   const [open, setOpen] = useState(false)
+
   if (!enabled) return null
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
@@ -73,9 +75,9 @@ export function WorkspaceUsersMenu({
         }
       >
         <UserAvatarGroup ids={avatarIds} size="xs" max={4} />
-        <IconChevronDown stroke={2} className="size-3! text-muted-foreground" />
+        <IconChevronDown stroke={2.5} className="size-3! text-muted-foreground" />
       </PopoverTrigger>
-      <PopoverContent align="end" className="gap-2 p-2">
+      <PopoverContent align="end" className="max-w-64 p-1">
         <PopoverTitle className="sr-only">Users in this workspace</PopoverTitle>
         <WorkspaceUsersList
           users={users}
@@ -155,24 +157,20 @@ function UserRow({ user, page, describeTab, onOpenTab }: UserRowProps) {
         : labels || 'Another tab'
   const Icon = user.status === 'offline' ? undefined : tabs[0]?.info?.Icon
   const content = (
-    <>
-      <User
-        id={user.profile.id}
-        className="flex-1"
-        size="sm"
-        description={
-          <span className="flex items-center gap-1 text-xs">
-            {Icon && <Icon size={12} stroke={1.75} className="shrink-0" />}
-            <span className="truncate">{user.self ? `You · ${where}` : where}</span>
-          </span>
-        }
-      />
-      <span className="flex w-4 shrink-0 justify-end text-muted-foreground">
-        {target && <IconArrowRight size={16} stroke={1.75} />}
-      </span>
-    </>
+    <User
+      id={user.profile.id}
+      className="flex-1"
+      size="sm"
+      description={
+        <span className="flex items-center gap-1 text-xs">
+          {Icon && <Icon size={12} stroke={1.75} className="shrink-0" />}
+          <span className="truncate">{where}</span>
+        </span>
+      }
+    />
   )
-  const row = 'flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left'
+  const row = 'flex w-full items-center gap-2.5 rounded-md px-2 py-1 text-left'
+
   return (
     <li>
       {target ? (

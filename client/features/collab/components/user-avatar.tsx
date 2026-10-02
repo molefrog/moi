@@ -12,7 +12,6 @@ export function UserAvatar({ id, size = 'default', showStatusBadge, className }:
   return (
     <Avatar
       size={size}
-      title={name}
       aria-label={name}
       data-collab-color={user?.color ?? 'unknown'}
       className={className}

@@ -110,7 +110,7 @@ test('menu lists self, connected and away users, then informational offline memb
     },
     true
   )
-  expect(html).toContain('You · Overview')
+  expect(html).toContain('>Overview<')
   expect(html.indexOf('aria-label="Self"')).toBeLessThan(html.indexOf('Away colleague'))
   expect(html.indexOf('Active colleague')).toBeLessThan(html.indexOf('Offline colleague'))
   expect(html).toContain('>Away<')
