@@ -3,7 +3,7 @@
 > Implemented. How an applet (widget/view) reaches the outside: bundled assets
 > it imports, server functions, and workspace files. One base, three transports.
 > Compiler: `server/applets/build-applet.ts`; serve/guards: `server/applets/index.ts`; routes:
-> `server/web.ts`.
+> `server/api.ts`.
 
 ## One base, swapped at serve
 
@@ -15,9 +15,9 @@ on-disk bundle is workspace-agnostic, and the served copy carries its base:
 %%MOI_APPLET_API_BASE%%  →  /api/workspaces/<id>
 ```
 
-`rpc` and `fs` are **workspace-scoped** — they hang off this base. Bundle files
+`rpc` and `files` are **workspace-scoped** — they hang off this base. Bundle files
 (entry/chunk/asset) are **applet-scoped** and don't need the sentinel; assets
-self-locate via `import.meta.url`. This replaces the `window.__MEI_WS__` global.
+self-locate via `import.meta.url`.
 
 ```
 .moi/.build/views/editor/      served at  /api/workspaces/<id>/views/editor/
@@ -36,7 +36,7 @@ shadow the sibling routes (`/sessions`, `/env`, …). The `*` tail is `<name>/<f
 ```
 GET  /api/workspaces/:id/widgets/*         ┐ applet file: <name>/<file>
 GET  /api/workspaces/:id/views/*           ┘ (entry / chunk / asset)
-GET  /api/workspaces/:id/fs/*              → workspace-root file (explicit range)
+GET  /api/workspaces/:id/files/*           → workspace-root file (explicit range)
 POST /api/workspaces/:id/rpc/<module>/<fn> → workspace worker (run server fn)
 ```
 
@@ -46,7 +46,7 @@ Example paths (widget `clips`, workspace `wsab12`):
 entry   /api/workspaces/wsab12/widgets/clips/module?v=0
 asset   /api/workspaces/wsab12/widgets/clips/logo-9f3a2b1c.png
 chunk   /api/workspaces/wsab12/widgets/clips/chunk-7d4e1a09.js
-fs      /api/workspaces/wsab12/fs/clips/001_copenhagen.mp4
+files   /api/workspaces/wsab12/files/clips/001_copenhagen.mp4
 rpc     /api/workspaces/wsab12/rpc/widgets/clips/listClips
 ```
 
@@ -90,7 +90,7 @@ Consequences to keep in mind when touching this:
   so it's cheap insurance for any shared cache that stores the response anyway.
   `no-cache` (not `no-store`) is deliberate — the browser keeps the bytes and
   revalidates, which the origin answers with a bodyless 304.
-- Other stable-url routes on cacheable extensions (`/fs/*`, `/preview/*`,
+- Other stable-url routes on cacheable extensions (`/files/*`, `/preview/*`,
   `/vendor/react/*.js`) have the same exposure and are **not** fixed by this;
   their urls can't drop the extension as cheaply.
 
@@ -103,67 +103,29 @@ via the module URL, so it needs **no** base. Tiny files: `loader: dataurl` inlin
 as base64.
 
 **Server calls — `import { x } from './x.server'`** (RPC, behavior unchanged). The
-stub becomes `fetch(BASE + '/rpc/' + module + '/' + name, …)` (devalue in/out),
-replacing today's `/_rpc/<ws>/fn/…` and the global lookup.
+stub becomes `fetch(BASE + '/rpc/' + module + '/' + name, …)` (devalue in/out).
 
-**Workspace files — `fileUrl(path)`** (runtime, off disk). `BASE + '/fs/' + path`,
-streamed with HTTP range. For media/binary that must not go through RPC. The path
-is _data_ (e.g. a clip id from a `.server.ts`), so it's a helper, not an import.
-
-## What the agent writes
-
-```tsx
-import logo from './logo.png'              // its own asset
-import { fileUrl } from 'moi'              // workspace files
-import { listClips } from './clips.server' // data + file paths
-
-<img src={logo} />
-<video src={fileUrl(clip.file)} controls /> // clip.file = 'clips/001_….mp4'
-```
-
-Rule of thumb: own-code asset → `import`; small data → `.server.ts`; large/
-streamable file → `.server.ts` returns the **path**, render with `fileUrl()`.
+**Workspace files — `resolveUrl('moi:/files/...')`** (runtime, off disk). Resolves to
+`BASE + '/files/' + encodedPath`, streamed with HTTP range. See
+[Files and assets](../workspace/.claude/skills/moi-workspace/SKILL.md#files-and-assets)
+for static and dynamic path examples.
 
 ## Types (editor DX only — the build needs none)
 
-The bundler resolves asset imports and `moi` without any declarations; types are
-only for the agent's editor / `tsc`. One ambient `.moi/applet-env.d.ts`, scaffolded
-by `moi init`:
+`moi init` installs [base.d.ts](../server/applets/declarations/base.d.ts) as `.moi/base.d.ts`;
+`moi skill update` refreshes it. It declares the public `moi` API and bundled asset imports
+for editors and `moi check`. The bundler needs no declarations.
 
-```ts
-declare module 'moi' {
-  // required: build-provided module, Bun won't type it
-  export function fileUrl(path: string): string
-  export function navigate(href: string): void
-  export function resolveHref(href: string): string
-  export type WidgetConfig = {
-    colSpan: 1 | 2 | 3 | 4
-    rowSpan: 1 | 2 | 3 | 4
-    requiredEnv?: string[]
-  }
-  export type ViewConfig = { title?: string; requiredEnv?: string[] }
-}
-declare module '*.png' {
-  const s: string
-  export default s
-} // optional: jpg/svg/webp…
-```
-
-- RPC types are free — the agent imports the real `.server.ts`, so signatures flow
-  from source (the build swaps it for the stub only at bundle time).
-- `moi` is the one that _must_ be declared (the build plugin provides the impl).
-- Image modules are optional: `bun-types` declares text/data formats
-  (txt/yaml/json5/html) but **not** images — add these only for squiggle-free asset
-  imports in the editor.
-- Keep the `.d.ts` at `.moi/` **root** — inside `widgets/`/`views/` it matches the
-  `.ts` build glob and would be compiled as an applet.
+RPC types come directly from the imported `.server.ts` source. Keep declarations at the `.moi/`
+root; files inside `widgets/` or `views/` are treated as applet sources.
 
 ## How it's built
 
 - **Build** (`build-applet.ts`): asset `onLoad` plugin emits each imported image/
   font as a content-hashed sibling and rewrites the import to
-  `new URL('./<name>-<hash>.<ext>', import.meta.url)`. The `mei:rpc` + `moi`
-  runtime modules bake `%%MOI_APPLET_API_BASE%%` into the rpc stub + `fileUrl`.
+  `new URL('./<name>-<hash>.<ext>', import.meta.url)`. The
+  [applet runtime sources](../server/applets/runtime/) use `%%MOI_APPLET_API_BASE%%`
+  in the RPC stub and file URL resolution.
   Output is a multi-file artifact written to `.build/<kind>/<name>/` (entry
   `index.js`, `chunk-*.js`, assets). `naming.entry` must be `index.[ext]` — bun
   emits the entry's CSS sibling as an "entry" output too, so a literal `index.js`
@@ -173,7 +135,7 @@ declare module '*.png' {
   `module` to `index.js`; `.js` is sentinel-swapped and sent as `text/javascript`,
   anything else streams raw (`Bun.file` infers content-type).
   `…/<id>/rpc/<module>/<fn>` reuses the existing worker call.
-- **`/fs`** (`server/applets/index.ts` `serveWorkspaceFile`): reject empty/`.`/`..`/dotfile
+- **`/files`** (`server/applets/index.ts` `serveWorkspaceFile`): reject empty/`.`/`..`/dotfile
   segments and anything resolving outside the root, allowlist media extensions —
   the secret-leak guard, not the localhost bind. Range is handled **explicitly**
   (slice the BunFile → 206 + `Content-Range`): bun's implicit range handling

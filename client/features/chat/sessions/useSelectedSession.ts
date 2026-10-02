@@ -1,3 +1,8 @@
+import { useCollabEnabled } from '@/client/features/collab'
+import {
+  readSelectedSession,
+  writeSelectedSession
+} from '@/client/features/chat/sessions/browser-tab-state'
 import { useCallback, useMemo } from 'react'
 
 import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -8,7 +13,7 @@ import { jsonRequest, requestJson } from '@/client/api/http'
 import { toast } from '@/client/components/ui/toast'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
-import type { SelectedSessionState } from '@/lib/types'
+import type { SelectedSessionScope, SelectedSessionState } from '@/lib/types'
 
 type SaveSelectedSessionInput = {
   sessionId: string | null
@@ -24,16 +29,22 @@ type SelectedSessionResult = readonly [
 
 export type SelectedSessionSaveResult = 'applied' | 'conflict' | 'ignored'
 
-function selectedSessionMutationKey(workspaceId: string) {
-  return [...appUiKeys.selectedSession(workspaceId), 'save'] as const
+export function selectedSessionKey(workspaceId: string, scope: SelectedSessionScope = 'shared') {
+  const key = appUiKeys.selectedSession(workspaceId)
+  return scope === 'browser-tab' ? ([...key, 'browser-tab'] as const) : key
+}
+
+function selectedSessionMutationKey(workspaceId: string, scope: SelectedSessionScope) {
+  return [...selectedSessionKey(workspaceId, scope), 'save'] as const
 }
 
 export function optimisticallySetSelectedSession(
   queryClient: QueryClient,
   workspaceId: string,
-  sessionId: string | null
+  sessionId: string | null,
+  scope: SelectedSessionScope = 'shared'
 ): SaveSelectedSessionInput | null {
-  const queryKey = appUiKeys.selectedSession(workspaceId)
+  const queryKey = selectedSessionKey(workspaceId, scope)
   const current = queryClient.getQueryData<SelectedSessionState>(queryKey)
   const previousSessionId = current?.sessionId ?? null
   if (current && previousSessionId === sessionId) return null
@@ -46,9 +57,10 @@ export function settleSelectedSessionSave(
   queryClient: QueryClient,
   workspaceId: string,
   saved: SelectedSessionState,
-  input: SaveSelectedSessionInput
+  input: SaveSelectedSessionInput,
+  scope: SelectedSessionScope = 'shared'
 ): SelectedSessionSaveResult {
-  const queryKey = appUiKeys.selectedSession(workspaceId)
+  const queryKey = selectedSessionKey(workspaceId, scope)
   const current = queryClient.getQueryData<SelectedSessionState>(queryKey)
 
   if (saved.sessionId !== input.sessionId && current?.sessionId !== saved.sessionId) {
@@ -80,24 +92,36 @@ export function renameSelectedSessionInCache(
   from: string,
   to: string
 ): void {
-  queryClient.setQueryData<SelectedSessionState>(appUiKeys.selectedSession(workspaceId), current =>
-    current?.sessionId === from ? { sessionId: to } : current
-  )
+  for (const scope of ['shared', 'browser-tab'] as const) {
+    queryClient.setQueryData<SelectedSessionState>(
+      selectedSessionKey(workspaceId, scope),
+      current => (current?.sessionId === from ? { sessionId: to } : current)
+    )
+  }
+  if (readSelectedSession(workspaceId) === from) writeSelectedSession(workspaceId, to)
 }
 
 export function useSelectedSession(): SelectedSessionResult {
   const workspaceId = useWorkspaceId()
+  const collabEnabled = useCollabEnabled()
+  const scope: SelectedSessionScope = collabEnabled ? 'browser-tab' : 'shared'
   const queryClient = useQueryClient()
-  const queryKey = useMemo(() => appUiKeys.selectedSession(workspaceId), [workspaceId])
-  const mutationKey = useMemo(() => selectedSessionMutationKey(workspaceId), [workspaceId])
+  const queryKey = useMemo(() => selectedSessionKey(workspaceId, scope), [workspaceId, scope])
+  const mutationKey = useMemo(
+    () => selectedSessionMutationKey(workspaceId, scope),
+    [workspaceId, scope]
+  )
   const pendingSaves = useIsMutating({ mutationKey, exact: true })
 
-  // WorkspaceLoader remains an observer for the active workspace. Nested hook
+  // WorkspaceContent remains an observer for the active workspace. Nested hook
   // users reuse its result without refetching; once the route unmounts, dropping
   // the cache makes the next visit load the server-owned selection again.
   const query = useQuery<SelectedSessionState>({
     queryKey,
-    queryFn: () => requestJson(`/api/workspaces/${workspaceId}/selected-session`),
+    queryFn: () =>
+      scope === 'browser-tab'
+        ? Promise.resolve({ sessionId: readSelectedSession(workspaceId) })
+        : requestJson(`/api/workspaces/${workspaceId}/selected-session`),
     staleTime: Infinity,
     gcTime: 0,
     refetchOnMount: false,
@@ -111,14 +135,19 @@ export function useSelectedSession(): SelectedSessionResult {
   >({
     mutationKey,
     scope: { id: `selected-session:${workspaceId}` },
-    mutationFn: input =>
-      requestJson(
+    mutationFn: input => {
+      if (scope === 'browser-tab') {
+        writeSelectedSession(workspaceId, input.sessionId)
+        return Promise.resolve({ sessionId: input.sessionId })
+      }
+      return requestJson<SelectedSessionState>(
         `/api/workspaces/${workspaceId}/selected-session`,
         jsonRequest('PUT', input),
         'Couldn’t save selected chat'
-      ),
+      )
+    },
     onSuccess: (saved, input) => {
-      const result = settleSelectedSessionSave(queryClient, workspaceId, saved, input)
+      const result = settleSelectedSessionSave(queryClient, workspaceId, saved, input, scope)
       if (result !== 'conflict') return
 
       toast.add({ title: 'Couldn’t save selected chat', type: 'error' })
@@ -135,14 +164,19 @@ export function useSelectedSession(): SelectedSessionResult {
 
   const setSelectedSessionId = useCallback<SetSelectedSession>(
     sessionId => {
-      const input = optimisticallySetSelectedSession(queryClient, workspaceId, sessionId)
+      const input = optimisticallySetSelectedSession(queryClient, workspaceId, sessionId, scope)
       if (input) saveSelectedSession(input)
     },
-    [queryClient, saveSelectedSession, workspaceId]
+    [queryClient, saveSelectedSession, workspaceId, scope]
   )
 
   useWorkspaceEvent(event => {
-    if (event.type !== 'selected-session:updated' || event.workspaceId !== workspaceId) return
+    if (
+      scope === 'browser-tab' ||
+      event.type !== 'selected-session:updated' ||
+      event.workspaceId !== workspaceId
+    )
+      return
     applySelectedSessionEvent(queryClient, workspaceId, event.sessionId, pendingSaves > 0)
   })
 

@@ -4,28 +4,31 @@ Intents let an applet act beyond its own UI: open another view, add context to c
 agent to do something. Import these functions from `moi` and call them from user event handlers,
 such as a button click; moi handles the action in the workspace.
 
-## Navigation: `navigate(href)` and `resolveHref(href)`
+## Navigation and files
 
-Use the shared [workspace navigation convention](../SKILL.md#workspace-navigation) for addresses
-and query params. Applets navigate through these functions:
+Use [workspace addresses](../SKILL.md#workspace-navigation) and query params for pages.
+`resolveUrl` also accepts workspace files and HTTP(S) addresses:
 
 ```ts
-function navigate(href: string): void
-function resolveHref(href: string): string
+function navigate(url: string): void
+function resolveUrl(url: string): string
 ```
 
 ```tsx
-import { navigate, resolveHref } from 'moi'
+import { navigate, resolveUrl } from 'moi'
 
 const query = new URLSearchParams({ order: 'o-1024' })
 const href = `moi:/views/orders?${query}`
 
 // Prefer anchors for links: copy, middle-click, and new browser tabs work.
-<a href={resolveHref(href)}>Open order</a>
+<a href={resolveUrl(href)}>Open order</a>
 
 // Use the same address from an event handler.
 <button onClick={() => navigate(href)}>Open order</button>
 ```
+
+`navigate` opens workspace pages within moi and files or HTTP(S) URLs in the current browser tab.
+See [Files and assets](../SKILL.md#files-and-assets) for file examples and path encoding.
 
 ### View params and history
 

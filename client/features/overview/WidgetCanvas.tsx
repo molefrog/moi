@@ -7,6 +7,8 @@ import { GridLayout, type Layout, useContainerWidth, verticalCompactor } from 'r
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
 
+import { appletId } from '@/client/features/applets/applet-cache'
+
 import { packItems } from './grid'
 import type { GridPosition, PositionedGridItem } from './grid'
 import { WidgetFrame } from './WidgetFrame'
@@ -103,7 +105,7 @@ function WidgetGrid({
             <div key={item.i}>
               <motion.div
                 layoutId={item.i}
-                data-applet-thumbnail={`widget:${item.i}`}
+                data-applet-thumbnail={appletId('widgets', item.i)}
                 className="size-full"
                 transition={WIDGET_LAYOUT_TRANSITION}
               >

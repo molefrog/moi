@@ -176,28 +176,6 @@ Use the `className` prop to add custom styles to the badge such as custom colors
 </Avatar>
 ```
 
-## Badge with Icon
-
-You can also use an icon inside `<AvatarBadge>`.
-
-```tsx
-import { IconPlus } from '@tabler/icons-react'
-
-import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-
-export function AvatarBadgeIconExample() {
-  return (
-    <Avatar className="grayscale">
-      <AvatarImage src="https://github.com/pranathip.png" alt="@pranathip" />
-      <AvatarFallback>PP</AvatarFallback>
-      <AvatarBadge>
-        <IconPlus stroke={1.75} />
-      </AvatarBadge>
-    </Avatar>
-  )
-}
-```
-
 ## Avatar Group
 
 Use the `AvatarGroup` component to add a group of avatars.
@@ -299,7 +277,7 @@ export function AvatarGroupCountIconExample() {
 
 ## Sizes
 
-Use the `size` prop to change the size of the avatar.
+Use the `size` prop to change the size of the avatar and the group count.
 
 ```tsx
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -445,10 +423,10 @@ export function AvatarRtl() {
 
 The `Avatar` component is the root component that wraps the avatar image and fallback.
 
-| Prop        | Type                        | Default     |
-| ----------- | --------------------------- | ----------- |
-| `size`      | `"default" \| "sm" \| "lg"` | `"default"` |
-| `className` | `string`                    | -           |
+| Prop        | Type                                | Default     |
+| ----------- | ----------------------------------- | ----------- |
+| `size`      | `"default" \| "sm" \| "lg" \| "xs"` | `"default"` |
+| `className` | `string`                            | -           |
 
 ### AvatarImage
 
@@ -480,6 +458,8 @@ The `AvatarBadge` component displays a badge indicator on the avatar, typically 
 
 The `AvatarGroup` component displays a group of avatars with overlapping styling.
 
+Use the same size for all avatars and the count in a group. Transparent cutouts separate overlapping avatars, so the gaps show the surrounding background.
+
 | Prop        | Type     | Default |
 | ----------- | -------- | ------- |
 | `className` | `string` | -       |
@@ -488,8 +468,9 @@ The `AvatarGroup` component displays a group of avatars with overlapping styling
 
 The `AvatarGroupCount` component displays a count indicator in an avatar group, typically showing the number of additional avatars.
 
-| Prop        | Type     | Default |
-| ----------- | -------- | ------- |
-| `className` | `string` | -       |
+| Prop        | Type                                | Default     |
+| ----------- | ----------------------------------- | ----------- |
+| `className` | `string`                            | -           |
+| `size`      | `"xs" \| "sm" \| "default" \| "lg"` | `"default"` |
 
 For more information about Base UI Avatar props, see the [Base UI documentation](https://base-ui.com/react/components/avatar#api-reference).

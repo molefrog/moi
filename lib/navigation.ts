@@ -67,13 +67,33 @@ export function workspaceTabPath(workspaceId: string, tab: WorkspaceTabId): stri
   return addressPath(workspaceId, { tab, search: '' })
 }
 
-export function resolveWorkspaceHref(workspaceId: string, href: string, base = ''): string {
-  if (href.startsWith('moi:')) return addressPath(workspaceId, parseMoiHref(href), base)
+type ResolveUrlContext = { apiBase: string; workspacePath?: string }
+
+export function resolveUrl(url: string, context: ResolveUrlContext): string {
+  if (url.startsWith('moi:/files/')) {
+    const tail = url.slice('moi:/files/'.length)
+    const suffixIndex = tail.search(/[?#]/)
+    const pathname = suffixIndex < 0 ? tail : tail.slice(0, suffixIndex)
+    const suffix = suffixIndex < 0 ? '' : tail.slice(suffixIndex)
+    const segments = pathname.split('/').map(segment => {
+      const decoded = decodeURIComponent(segment)
+      if (!decoded || decoded === '.' || decoded === '..' || /[/\\\0]/.test(decoded)) {
+        throw new Error('Invalid workspace file path')
+      }
+      return encodeURIComponent(decoded)
+    })
+    return `${context.apiBase}/files/${segments.join('/')}${suffix}`
+  }
+  if (url.startsWith('moi:')) {
+    const { tab, search } = parseMoiHref(url)
+    return context.workspacePath ? `${context.workspacePath}/${tab}${search}` : ''
+  }
   // Only explicit ordinary web addresses may leave the workspace through the
   // imperative API. Native anchors keep their existing protocol policy.
-  const url = new URL(href)
-  if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error('Unsupported URL')
-  return url.href
+  const resolved = new URL(url)
+  if (resolved.protocol !== 'https:' && resolved.protocol !== 'http:')
+    throw new Error('Unsupported URL')
+  return resolved.href
 }
 
 export type NavigationRequest = {

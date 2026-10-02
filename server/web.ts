@@ -1,13 +1,18 @@
+import type { UserProfile } from '@/lib/collab/types'
 import { isMessageAttachments } from '@/lib/message-attachments'
 import type { ClientMessage, StatusSnapshotMessage } from '@/lib/types'
-import { isMoiContext } from '@/lib/moi-context'
+import { isMoiContext, type MoiContext } from '@/lib/moi-context'
 
 import index from '../client/index.html'
 import { api } from './api'
 import { AttachmentUploadError } from './attachment-message'
 import { PORT } from './constants'
 import { control } from './control'
-import { EVENTS_TOPIC, publishEvent, setEventServer } from './events'
+import { proxyUserState } from './collab/cloudflare-access'
+import { getCollabReferencePath, isCollabEnabled } from './collab/config'
+import { selectChatSession } from './chat-selection'
+import { collabManager } from './collab/manager'
+import { EVENTS_TOPIC, setEventServer } from './events'
 import { killBuildWorkers } from './applets/build-worker'
 import { killAllWorkers } from './functions'
 import { startScratchpadSweeper } from './scratchpad'
@@ -15,7 +20,6 @@ import { navigationRelay } from './navigation-relay'
 import { resolveScratchOp } from './scratchpad-relay'
 import { allHarnesses, harnessFor } from './harness/registry'
 import { getWorkspace } from './registry'
-import { saveSelectedSession } from './selected-session'
 import {
   addClient,
   broadcast,
@@ -29,7 +33,13 @@ import { distShell, prebuilt } from './static'
 import { renderStatus } from './status'
 import { serveVendorEmojibase, serveVendorReact } from './vendor'
 
-type WsData = { channel: 'chat' | 'events'; workspaceId: string }
+type WsData = {
+  channel: 'chat' | 'events' | 'collab'
+  workspaceId: string
+  workspacePath?: string
+  // The collab profile a proxy (Cloudflare Access) verified for the upgrade.
+  verifiedProfile?: UserProfile
+}
 
 function isClientMessage(value: unknown): value is ClientMessage {
   if (typeof value !== 'object' || value === null || !('type' in value)) return false
@@ -39,6 +49,7 @@ function isClientMessage(value: unknown): value is ClientMessage {
     sessionId?: unknown
     content?: unknown
     isNew?: unknown
+    selectedSessionScope?: unknown
     optimisticId?: unknown
     model?: unknown
     effort?: unknown
@@ -54,6 +65,9 @@ function isClientMessage(value: unknown): value is ClientMessage {
       typeof v.content === 'string' &&
       typeof v.sessionId === 'string' &&
       typeof v.isNew === 'boolean' &&
+      (v.selectedSessionScope === undefined ||
+        v.selectedSessionScope === 'shared' ||
+        v.selectedSessionScope === 'browser-tab') &&
       (v.optimisticId === undefined || typeof v.optimisticId === 'string') &&
       (v.model === undefined || typeof v.model === 'string') &&
       (v.effort === undefined || typeof v.effort === 'string') &&
@@ -129,14 +143,38 @@ export const app = Bun.serve<WsData>({
     // routes it ahead of the Hono-served `/api/workspaces/:id`; the upgrade
     // happens in-handler via the route's `server` argument.
     '/api/workspaces/ws': (req: Request, server: Bun.Server<WsData>) =>
-      upgrade(server, req, { channel: 'events', workspaceId: '' })
+      upgrade(server, req, { channel: 'events', workspaceId: '' }),
+
+    '/api/workspaces/:id/collab/ws': async (req: Request, server: Bun.Server<WsData>) => {
+      const workspaceId = decodeURIComponent(new URL(req.url).pathname.split('/')[3] ?? '')
+      const workspace = await getWorkspace(workspaceId)
+      if (!workspace) return new Response('Workspace not found', { status: 404 })
+      if (!isCollabEnabled()) {
+        return new Response('Collab is not enabled for this workspace', { status: 403 })
+      }
+      // Behind Cloudflare Access, presence is joined only as the verified viewer.
+      const { provider, profile } = await proxyUserState(req)
+      if (provider && !profile) {
+        return new Response('Sign in through Cloudflare Access to join', { status: 401 })
+      }
+      return upgrade(server, req, {
+        channel: 'collab',
+        workspaceId,
+        workspacePath: workspace.path,
+        ...(profile ? { verifiedProfile: profile } : {})
+      })
+    }
   },
   // Anything not matched above (the whole HTTP API + prod static assets + 404)
   // is handled by Hono.
   fetch: req => api.fetch(req),
   websocket: {
     open(ws) {
-      if (ws.data.channel === 'chat') {
+      if (ws.data.channel === 'collab') {
+        if (ws.data.workspacePath)
+          collabManager.open(ws, ws.data.workspacePath, ws.data.verifiedProfile)
+        else ws.close(1008, 'Missing workspace')
+      } else if (ws.data.channel === 'chat') {
         addClient(ws)
         // Authoritative snapshot of every non-idle session across all
         // harnesses so the client can light/clear spinners correctly even for
@@ -147,6 +185,10 @@ export const app = Bun.serve<WsData>({
       }
     },
     async message(ws, message) {
+      if (ws.data.channel === 'collab') {
+        collabManager.message(ws, message)
+        return
+      }
       if (ws.data.channel === 'events') {
         try {
           navigationRelay.receive(ws, JSON.parse(String(message)))
@@ -161,15 +203,16 @@ export const app = Bun.serve<WsData>({
         if (data.type === 'chat' && (data.content?.trim() || data.attachments?.length)) {
           const workspace = await getWorkspace(data.workspaceId)
           if (!workspace) return
+          const collabReference = await getCollabReferencePath(workspace.path, workspace.type)
+          const context: MoiContext | undefined =
+            data.context || collabReference
+              ? {
+                  ...(data.context ?? { activeTab: 'agent' }),
+                  collabReference
+                }
+              : undefined
           if (data.isNew) {
-            const selection = await saveSelectedSession(workspace.path, data.sessionId, null)
-            if (selection.changed) {
-              publishEvent({
-                type: 'selected-session:updated',
-                workspaceId: workspace.id,
-                sessionId: selection.sessionId
-              })
-            }
+            await selectChatSession(workspace, data.sessionId, data.selectedSessionScope, null)
           }
           // Harnesses ignore fields they don't support (see SendMessageInput).
           // Their failures surface internally; attachment resolution happens
@@ -187,7 +230,7 @@ export const app = Bun.serve<WsData>({
               effort: data.effort,
               fastMode: data.fastMode,
               stream: data.stream,
-              context: data.context,
+              context,
               agentId: workspace.agentId
             })
             .catch(error => {
@@ -214,7 +257,8 @@ export const app = Bun.serve<WsData>({
       } catch {}
     },
     close(ws) {
-      if (ws.data.channel === 'chat') removeClient(ws)
+      if (ws.data.channel === 'collab') collabManager.close(ws)
+      else if (ws.data.channel === 'chat') removeClient(ws)
       else {
         navigationRelay.remove(ws)
         ws.unsubscribe(EVENTS_TOPIC)
@@ -248,7 +292,10 @@ startServiceLogMaintenance()
 // changes; in any context Ctrl-C sends SIGINT. Close both servers and kill the
 // per-workspace function workers and any in-flight applet build child so no
 // child processes are orphaned.
-function shutdown() {
+let shuttingDown = false
+async function shutdown() {
+  if (shuttingDown) return
+  shuttingDown = true
   try {
     app.stop(true)
   } catch {}
@@ -258,6 +305,7 @@ function shutdown() {
   for (const h of allHarnesses()) h.shutdown?.()
   killAllWorkers()
   killBuildWorkers()
+  await collabManager.shutdown()
   process.exit()
 }
 process.on('SIGTERM', shutdown)

@@ -1,13 +1,21 @@
-import { expect, test } from 'bun:test'
+import { expect, spyOn, test } from 'bun:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { Route, Router } from 'wouter'
 
 import type { ViewInfo } from '@/lib/types'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
+import * as workspaceEvents from '@/client/runtime/useWorkspaceEvents'
 import { WorkspaceLayoutContext } from './WorkspaceLayoutContext'
 import { useWorkspaceNavigation } from './useWorkspaceNavigation'
 
-function readNavigation(path: string, search: string, views: ViewInfo[], base = '') {
+function readNavigation(
+  path: string,
+  search: string,
+  views: ViewInfo[],
+  base = '',
+  navigate?: (path: string) => void
+) {
+  const prefix = base === '/' ? '' : base
   function Probe() {
     const { activeTab, appletParams, isUnavailable } = useWorkspaceNavigation({
       views,
@@ -21,7 +29,12 @@ function readNavigation(path: string, search: string, views: ViewInfo[], base = 
     )
   }
   const html = renderToStaticMarkup(
-    <Router base={base} ssrPath={`${base}/workspace/abc/${path}`} ssrSearch={search}>
+    <Router
+      base={base}
+      ssrPath={`${prefix}/workspace/abc/${path}`}
+      ssrSearch={search}
+      hook={navigate ? () => [`${prefix}/workspace/abc/${path}`, navigate] : undefined}
+    >
       <Route path="/workspace/:id/*?">
         <WorkspaceLayoutContext
           value={{
@@ -75,3 +88,54 @@ test('legacy browser paths select the same view under a deployment base', () => 
   expect(result.appletParams).toEqual({ eventId: '123' })
   expect(readNavigation('view:%2565vents', '', views).isUnavailable).toBe(true)
 })
+
+test.each(['', '/', '/prefix'])(
+  'the navigation controller routes pages and files with router base "%s"',
+  base => {
+    const prefix = base === '/' ? '' : base
+    const nativePaths: string[] = []
+    const routedPaths: string[] = []
+    let navigate = (_path: string): void => {
+      throw new Error('Navigation controller was not registered')
+    }
+    const windowDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'window')
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {
+        location: {
+          pathname: `${prefix}/workspace/abc/overview`,
+          search: '',
+          hash: '',
+          assign: (path: string) => nativePaths.push(path)
+        }
+      }
+    })
+    const registration = spyOn(workspaceEvents, 'useNavigationClient').mockImplementation(
+      (_workspaceId, callback) => {
+        navigate = callback
+      }
+    )
+    try {
+      readNavigation('overview', '', [{ id: 'orders', config: {} }], base, path => {
+        routedPaths.push(path)
+      })
+      navigate('moi:/views/orders?order=o-1')
+      navigate('moi:/files/clips/a%20b.mp4?version=2#t=5')
+      navigate('https://example.com/')
+      expect(routedPaths).toEqual([`${prefix}/workspace/abc/views/orders?order=o-1`])
+      expect(nativePaths).toEqual([
+        '/api/workspaces/abc/files/clips/a%20b.mp4?version=2#t=5',
+        'https://example.com/'
+      ])
+      expect(() => navigate('moi:/views/missing')).toThrow('unavailable')
+      expect(() => navigate('moi:/files/../photo.png')).toThrow()
+      expect(() => navigate('javascript:alert(1)')).toThrow()
+      expect(routedPaths).toHaveLength(1)
+      expect(nativePaths).toHaveLength(2)
+    } finally {
+      registration.mockRestore()
+      if (windowDescriptor) Object.defineProperty(globalThis, 'window', windowDescriptor)
+      else Reflect.deleteProperty(globalThis, 'window')
+    }
+  }
+)

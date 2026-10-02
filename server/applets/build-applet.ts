@@ -18,7 +18,7 @@ export type { AppletKind }
 // Extensions an applet may `import` as a bundled asset. Each is emitted as a
 // content-hashed sibling of `index.js` and the import resolves to its URL via
 // `import.meta.url`. Deliberately images + fonts only: large media (video/audio)
-// belongs in the workspace and should stream via `fileUrl()`, not bloat the
+// belongs in the workspace and should stream via `resolveUrl()`, not bloat the
 // bundle dir.
 const ASSET_EXTENSIONS = /\.(png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf)$/i
 
@@ -32,6 +32,7 @@ const EXTERNAL_MODULES = [
 
 const RPC_MODULE_PATH = join(import.meta.dir, 'runtime', 'rpc.ts')
 const MOI_MODULE_PATH = join(import.meta.dir, 'runtime', 'moi.ts')
+const COLLAB_MODULE_PATH = join(import.meta.dir, 'runtime', 'collab.ts')
 
 type ServerModule = {
   name: string
@@ -145,6 +146,10 @@ function appletRuntimePlugin(
         path: Bun.resolveSync('devalue', import.meta.dir)
       }))
 
+      // Collaboration forwards to the same host bridge as the applet runtime.
+      build.onResolve({ filter: /^moi\/collab$/ }, () => ({
+        path: COLLAB_MODULE_PATH
+      }))
       // The applet-facing runtime. A bare specifier, so match it exactly.
       build.onResolve({ filter: /^moi$/ }, () => ({ path: MOI_MODULE_PATH }))
 
@@ -450,10 +455,11 @@ export async function buildApplet(
 
   if (cssOutput) {
     // Scope every rule to the applet's mount container (`[data-applet=
-    // "<kind>:<name>"]`, see applet-css.ts) so the bundle's Tailwind never
+    // "<widgets|views>/<name>"]`, see applet-css.ts) so the bundle's Tailwind never
     // leaks into the host page. Kind-namespaced so a widget and a view sharing
     // a name scope independently.
-    const css = scopeAppletCss(await cssOutput.text(), `${kind}:${widgetName}`)
+    const segment = kind === 'widget' ? 'widgets' : 'views'
+    const css = scopeAppletCss(await cssOutput.text(), `${segment}/${widgetName}`)
     js = injectCss(js, css)
   }
 

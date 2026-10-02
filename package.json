@@ -85,6 +85,7 @@
     "frimousse": "^0.3.0",
     "highlight.js": "^10.7.3",
     "hono": "^4.13.7",
+    "jose": "^6.2.12",
     "lru-cache": "^11.5.2",
     "modern-screenshot": "^4.7.0",
     "motion": "^12.43.0",

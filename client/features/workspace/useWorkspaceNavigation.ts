@@ -6,6 +6,8 @@ import { usePathname, useSearch } from 'wouter/use-browser-location'
 import { toast } from '@/client/components/ui/toast'
 import { reportAppletError } from '@/client/features/applets/applet-log'
 import { useAppletEvent } from '@/client/features/applets/applet-runtime'
+import { useCollabEnabled } from '@/client/features/collab'
+import { useWorkspaceTabs } from '@/client/features/workspace/browser-tab-state'
 import { normalizeTabsState, resolveActiveTab, tabAvailable } from './tab-resolution'
 import { useWorkspaceLayoutCtx } from './WorkspaceLayoutContext'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
@@ -17,7 +19,7 @@ import {
   legacyTabFromPath,
   parseMoiHref,
   readViewParams,
-  resolveWorkspaceHref,
+  resolveUrl,
   tabFromPath,
   workspacePath
 } from '@/lib/navigation'
@@ -31,6 +33,7 @@ type UseWorkspaceNavigationOptions = { views: ViewInfo[]; builders: ViewBuilder[
 
 export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceNavigationOptions) {
   const { layout, setLayout, workspaceId } = useWorkspaceLayoutCtx()
+  const collabEnabled = useCollabEnabled()
   const [, navigate] = useLocation()
   const router = useRouter()
   const { base } = router
@@ -39,7 +42,12 @@ export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceN
   const path = usePathname(router).slice(workspacePath(workspaceId, base).length + 1)
   const search = canonicalSearch(useSearch(router))
   const appletParams = useMemo(() => readViewParams(search), [search])
-  const tabsState = normalizeTabsState(layout.tabs)
+  const [workspaceTabs, setLocalTabs] = useWorkspaceTabs(
+    workspaceId,
+    collabEnabled,
+    normalizeTabsState(layout.tabs)
+  )
+  const tabsState = normalizeTabsState(workspaceTabs)
   const tabsStateRef = useLatestRef(tabsState)
   const remembered = useMemo(() => {
     let entries = rememberedAddresses.get(workspaceId)
@@ -56,9 +64,10 @@ export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceN
   const setTabs = useCallback(
     (tabs: WorkspaceTabsState) => {
       tabsStateRef.current = tabs
-      setLayout({ tabs })
+      if (collabEnabled) setLocalTabs(tabs)
+      else setLayout({ tabs })
     },
-    [setLayout, tabsStateRef]
+    [setLayout, tabsStateRef, collabEnabled, setLocalTabs]
   )
 
   const go = useCallback(
@@ -79,17 +88,20 @@ export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceN
 
   const navigateHref = useCallback(
     (href: string) => {
-      if (!href.startsWith('moi:')) {
-        const target = resolveWorkspaceHref(workspaceId, href, base)
+      const target = resolveUrl(href, {
+        apiBase: `/api/workspaces/${encodeURIComponent(workspaceId)}`,
+        workspacePath: workspacePath(workspaceId)
+      })
+      if (href.startsWith('moi:/files/') || !href.startsWith('moi:')) {
         window.location.assign(target)
         return
       }
       const address = parseMoiHref(href)
       if (!tabAvailable(address.tab, views, builders))
         throw new Error('This destination is unavailable in this workspace')
-      go(addressPath(workspaceId, address))
+      go(target)
     },
-    [base, builders, go, views, workspaceId]
+    [builders, go, views, workspaceId]
   )
 
   const reportError = useCallback(

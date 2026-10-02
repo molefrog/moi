@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { resolvePackageTypeRoot, typecheckApplets } from '../applet-typecheck'
+import { COLLAB_DECLARATION_SOURCE_PATH } from '../applets/declarations'
 
 let workspaceRoot = ''
 
@@ -21,9 +22,12 @@ describe('applet typecheck', () => {
   test('checks applet and Bun ambient types without a workspace tsconfig', async () => {
     await Bun.write(
       join(workspaceRoot, '.moi', 'views', 'notes.tsx'),
-      `import type { ViewConfig } from 'moi'
+      `import { resolveUrl, sendChatMessage, type ChatMessageInput, type ViewConfig } from 'moi'
+const photoUrl: string = resolveUrl('moi:/files/photo.png')
+const message: ChatMessageInput = { message: 'Look at this', attachments: [{ type: 'file', path: 'photo.png' }] }
+export function share() { sendChatMessage(message) }
 export const config = { title: 'Notes' } satisfies ViewConfig
-export default function Notes() { return null }
+export default function Notes() { return resolveUrl('moi:/views/notes') + photoUrl }
 `
     )
     await Bun.write(
@@ -36,6 +40,32 @@ export default function Notes() { return null }
 
     expect(result.files).toHaveLength(2)
     expect(result.diagnostics).toEqual([])
+  })
+
+  test('refreshes installed collab types before checking an applet', async () => {
+    const dts = join(workspaceRoot, '.moi', 'collab.d.ts')
+    await Bun.write(dts, "declare module 'moi/collab' {}\n")
+    await Bun.write(
+      join(workspaceRoot, '.moi', 'views', 'users.tsx'),
+      `import type { JsonValue } from 'moi'
+import { useMe, useUser, usePresence, usePublishPresence, type WorkspaceUser } from 'moi/collab'
+export default function Users() {
+  const me: WorkspaceUser | undefined = useMe()
+  const user: WorkspaceUser | undefined = useUser('alice')
+  const value: JsonValue = { nested: [null, true, 1, 'hello'] }
+  usePublishPresence('test', value)
+  const presence = usePresence<JsonValue>('test')
+  // @ts-expect-error Functions are not JSON values.
+  usePublishPresence('test', () => {})
+  return me?.id ?? user?.id ?? null
+}
+`
+    )
+
+    const result = await typecheckApplets(workspaceRoot, 'views')
+
+    expect(result.diagnostics).toEqual([])
+    expect(await Bun.file(dts).text()).toBe(await Bun.file(COLLAB_DECLARATION_SOURCE_PATH).text())
   })
 
   test('uses the @types/bun shipped with moi, not one installed in the workspace', async () => {

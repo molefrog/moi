@@ -1,6 +1,7 @@
 import * as appletLog from './applet-log'
 import { describe, expect, test, spyOn } from 'bun:test'
 import { toast } from '@/client/components/ui/toast'
+import type { AppletBridge } from '@/lib/types'
 
 import {
   appletKey,
@@ -9,7 +10,6 @@ import {
   setCachedApplet
 } from './applet-cache'
 import {
-  type AppletBridge,
   type AppletChatMessage,
   type AppletIdentity,
   appletRuntime,
@@ -45,27 +45,39 @@ describe('bridge validation', () => {
     const log = spyOn(appletLog, 'reportAppletError').mockImplementation(() => {})
     bridge.navigate('moi:/views/orders?order=o-1')
     bridge.navigate('moi:/overview')
+    bridge.navigate('moi:/files/clips/video.mp4#t=5')
     bridge.navigate(['invalid'])
     bridge.navigate('javascript:alert(1)')
-    expect(calls).toEqual(['moi:/views/orders?order=o-1', 'moi:/overview'])
-    expect(log).toHaveBeenCalledTimes(2)
+    bridge.navigate('moi:/files/clips/%2Fvideo.mp4')
+    expect(calls).toEqual([
+      'moi:/views/orders?order=o-1',
+      'moi:/overview',
+      'moi:/files/clips/video.mp4#t=5'
+    ])
+    expect(log).toHaveBeenCalledTimes(3)
     log.mockRestore()
   })
 
   test('resolves native anchor hrefs in the source workspace and disposes safely', () => {
     const { bridge, dispose } = appletRuntime('ws-1').connect(VIEW)
-    expect(bridge.resolveHref('moi:/views/orders?order=o-1')).toBe(
+    expect(bridge.resolveUrl('moi:/views/orders?order=o-1')).toBe(
       '/workspace/ws-1/views/orders?order=o-1'
     )
-    expect(bridge.resolveHref('https://example.com/')).toBe('https://example.com/')
-    expect(() => bridge.resolveHref('javascript:alert(1)')).toThrow()
+    expect(bridge.resolveUrl('https://example.com/')).toBe('https://example.com/')
+    expect(bridge.resolveUrl('moi:/files/clips/a%20b.mp4')).toBe(
+      '/api/workspaces/ws-1/files/clips/a%20b.mp4'
+    )
+    expect(() => bridge.resolveUrl('javascript:alert(1)')).toThrow()
     dispose()
-    expect(bridge.resolveHref('moi:/overview')).toBe('')
+    expect(bridge.resolveUrl('moi:/overview')).toBe('')
   })
 
   test('resolves applet links with the host router base', () => {
     const { bridge } = appletRuntime('prefixed').connect(VIEW, '/prefix')
-    expect(bridge.resolveHref('moi:/views/orders')).toBe('/prefix/workspace/prefixed/views/orders')
+    expect(bridge.resolveUrl('moi:/views/orders')).toBe('/prefix/workspace/prefixed/views/orders')
+    expect(bridge.resolveUrl('moi:/files/photo.png')).toBe(
+      '/api/workspaces/prefixed/files/photo.png'
+    )
   })
 
   test('drops calls with malformed addresses instead of emitting', () => {
@@ -334,6 +346,22 @@ describe('sendChatMessage rate limiting', () => {
 })
 
 describe('disposal', () => {
+  test('collaboration shares the host API and is revoked with its connection', () => {
+    const runtime = appletRuntime(`ws-${crypto.randomUUID()}`)
+    const view = runtime.connect(VIEW)
+    const widget = runtime.connect(WIDGET)
+    const api = view.bridge.collab
+
+    expect(typeof api?.usePeers).toBe('function')
+    expect(typeof api?.useWorkspaceUsers).toBe('function')
+    expect(widget.bridge.collab).toBe(api)
+
+    view.dispose()
+    expect(view.bridge.collab).toBeUndefined()
+    expect(widget.bridge.collab).toBe(api)
+    widget.dispose()
+  })
+
   test('a disposed connection is inert even while subscribers are live', () => {
     const ws = `ws-${crypto.randomUUID()}`
     const { calls } = subscribeNavigation(ws)

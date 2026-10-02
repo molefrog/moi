@@ -12,10 +12,11 @@ import {
 import { prepareChatAttachments, type ChatSendOptions, type PreparedAttachments } from './chat-send'
 import { useLayoutEffect } from 'react'
 import { useQueryClient, type QueryClient } from '@tanstack/react-query'
-import { appUiKeys } from '@/client/api/app-ui-keys'
 import { toast } from '@/client/components/ui/toast'
+import { selectedSessionKey } from '@/client/features/chat/sessions/useSelectedSession'
+import { useCollabEnabled } from '@/client/features/collab'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
-import type { SelectedSessionState } from '@/lib/types'
+import type { SelectedSessionScope, SelectedSessionState } from '@/lib/types'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import type { AgentAvailability } from '@/client/lib/agent-availability'
 
@@ -51,12 +52,13 @@ export function appletSendBlockedReason(availability: AgentAvailability): string
 export function createAppletMessageHandler(
   workspaceId: string,
   queryClient: QueryClient,
-  getOptions: () => UseAppletChatMessageOptions
+  getOptions: () => UseAppletChatMessageOptions,
+  scope: SelectedSessionScope = 'shared'
 ) {
   const pending = new Set<() => void>()
   let disposed = false
   const selectedSession = () =>
-    queryClient.getQueryData<SelectedSessionState>(appUiKeys.selectedSession(workspaceId))
+    queryClient.getQueryData<SelectedSessionState>(selectedSessionKey(workspaceId, scope))
       ?.sessionId ?? null
 
   async function handle(event: AppletChatMessage): Promise<void> {
@@ -148,9 +150,15 @@ export function createAppletMessageHandler(
 export function useAppletChatMessage(options: UseAppletChatMessageOptions): void {
   const workspaceId = useWorkspaceId()
   const queryClient = useQueryClient()
+  const collabEnabled = useCollabEnabled()
   const latest = useLatestRef(options)
   useLayoutEffect(() => {
-    const handler = createAppletMessageHandler(workspaceId, queryClient, () => latest.current)
+    const handler = createAppletMessageHandler(
+      workspaceId,
+      queryClient,
+      () => latest.current,
+      collabEnabled ? 'browser-tab' : 'shared'
+    )
     const unsubscribe = appletRuntime(workspaceId).on('sendChatMessage', event => {
       void handler.handle(event)
     })
@@ -158,7 +166,7 @@ export function useAppletChatMessage(options: UseAppletChatMessageOptions): void
       unsubscribe()
       handler.dispose()
     }
-  }, [workspaceId, queryClient, latest])
+  }, [workspaceId, queryClient, latest, collabEnabled])
 }
 
 export function useAppletChatAttachment(sessionId: string | null, revealChat: () => void): void {
