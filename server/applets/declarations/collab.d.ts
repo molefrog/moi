@@ -72,6 +72,8 @@ declare module 'moi/collab' {
   export function UserAvatar(props: UserAvatarProps): ReactElement
   export type UserProps = Pick<UserAvatarProps, 'id' | 'showStatusBadge' | 'className'> & {
     size?: 'xs' | 'sm' | 'default'
+    // Show a "(You)" label beside the current user's name. Defaults to false.
+    showYouLabel?: boolean
     // Secondary text alongside or below the name.
     description?: ReactNode
   }

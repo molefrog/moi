@@ -161,6 +161,7 @@ function UserRow({ user, page, describeTab, onOpenTab }: UserRowProps) {
       id={user.profile.id}
       className="flex-1"
       size="sm"
+      showYouLabel
       description={
         <span className="flex items-center gap-1 text-xs">
           {Icon && <Icon size={12} stroke={1.75} className="shrink-0" />}
