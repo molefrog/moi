@@ -10,8 +10,8 @@ import { WorkspaceRoute } from './routes/WorkspaceRoute'
 // Dev-only playground routes: colocated in features/dev and loaded as a
 // separate lazy chunk. The NODE_ENV gate is statically false in the prod
 // build (scripts/build-client.ts defines it), so the bundler drops the
-// dynamic import and none of features/dev is emitted into dist at all —
-// same mechanism as DevAgentation in main.tsx. In prod /dev redirects home.
+// dynamic import and none of features/dev is emitted into dist at all.
+// In prod /dev redirects home.
 const DevRoutes =
   process.env.NODE_ENV === 'development'
     ? lazy(() => import('@/client/features/dev/DevRoutes'))

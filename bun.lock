@@ -18,7 +18,6 @@
         "@tldraw/tlschema": "5.2.3",
         "@tldraw/utils": "5.2.3",
         "@types/bun": "1.3.10",
-        "agentation": "^2.3.3",
         "blobatar": "^2.7.0",
         "bun-plugin-tailwind": "^0.1.2",
         "citty": "^0.2.2",
@@ -715,8 +714,6 @@
     "accepts": ["accepts@2.0.0", "", { "dependencies": { "mime-types": "^3.0.0", "negotiator": "^1.0.0" } }, "sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng=="],
 
     "agent-base": ["agent-base@7.1.4", "", {}, "sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ=="],
-
-    "agentation": ["agentation@2.3.3", "", { "peerDependencies": { "react": ">=18.0.0", "react-dom": ">=18.0.0" }, "optionalPeers": ["react", "react-dom"] }, "sha512-AUZgFCdBQ/nAohlFsHByM9S2Dp7ECMNqVjlOke4hv/90v+wTiwrGladEkgWS60RDQp+CJ5p97meeCthYgTFlKQ=="],
 
     "ajv": ["ajv@8.18.0", "", { "dependencies": { "fast-deep-equal": "^3.1.3", "fast-uri": "^3.0.1", "json-schema-traverse": "^1.0.0", "require-from-string": "^2.0.2" } }, "sha512-PlXPeEWMXMZ7sPYOHqmDyCJzcfNrUr3fGNKtezX14ykXOEIvyK81d+qydx89KY5O71FKMPaQ2vBfBFI5NHR63A=="],
 
