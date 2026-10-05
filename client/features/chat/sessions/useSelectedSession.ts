@@ -55,10 +55,15 @@ export function optimisticallySetSelectedSession(
   const queryKey = selectedSessionKey(workspaceId, scope)
   const current = queryClient.getQueryData<WorkspaceSessionSelection>(queryKey)
   const previousSessionId = current?.selected[tabId] ?? null
-  if (current && previousSessionId === sessionId) return null
+  if (
+    current &&
+    previousSessionId === sessionId &&
+    (scope === 'shared' || tabId in current.selected)
+  )
+    return null
 
   const selected = { ...current?.selected }
-  if (sessionId === null) delete selected[tabId]
+  if (sessionId === null && scope === 'shared') delete selected[tabId]
   else selected[tabId] = sessionId
   queryClient.setQueryData<WorkspaceSessionSelection>(queryKey, {
     selected,
@@ -86,7 +91,7 @@ export function settleSelectedSessionSave(
   }
 
   const selected = { ...current?.selected }
-  if (saved.sessionId === null) delete selected[input.tabId]
+  if (saved.sessionId === null && input.scope === 'shared') delete selected[input.tabId]
   else selected[input.tabId] = saved.sessionId
   queryClient.setQueryData<WorkspaceSessionSelection>(queryKey, {
     selected,
@@ -146,6 +151,17 @@ export function useCurrentTabId(): WorkspaceTabId {
   return tabFromPath(useParams()['*'] ?? '') ?? 'overview'
 }
 
+export function selectedSessionForTab(
+  shared: WorkspaceSessionSelection | undefined,
+  tabId: WorkspaceTabId,
+  local?: WorkspaceSessionSelection
+): string | null | undefined {
+  if (!shared) return undefined
+  if (shared.pinned) return shared.pinned
+  if (local && tabId in local.selected) return local.selected[tabId] ?? null
+  return shared.selected[tabId] ?? null
+}
+
 export function useSelectedSession(explicitTabId?: WorkspaceTabId): SelectedSessionResult {
   const routeTabId = useCurrentTabId()
   const tabId = explicitTabId ?? routeTabId
@@ -175,7 +191,7 @@ export function useSelectedSession(explicitTabId?: WorkspaceTabId): SelectedSess
     refetchOnWindowFocus: false
   })
   // A pin is shared with CLI creation and applies to every workspace tab.
-  const pinned = useWorkspaceSessionSelection().data?.pinned
+  const sharedSelection = useWorkspaceSessionSelection().data
 
   const { mutate: saveSelectedSession } = useMutation<
     SelectedSessionState,
@@ -243,9 +259,13 @@ export function useSelectedSession(explicitTabId?: WorkspaceTabId): SelectedSess
   })
 
   const selectedSessionId =
-    query.data === undefined || pinned === undefined
+    query.data === undefined || sharedSelection === undefined
       ? undefined
-      : (pinned ?? query.data.selected[tabId] ?? null)
+      : selectedSessionForTab(
+          sharedSelection,
+          tabId,
+          scope === 'browser-tab' ? query.data : undefined
+        )
   return [selectedSessionId, setSelectedSessionId]
 }
 

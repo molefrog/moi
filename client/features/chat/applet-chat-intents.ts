@@ -13,7 +13,10 @@ import { prepareChatAttachments, type ChatSendOptions, type PreparedAttachments 
 import { useLayoutEffect } from 'react'
 import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { toast } from '@/client/components/ui/toast'
-import { selectedSessionKey } from '@/client/features/chat/sessions/useSelectedSession'
+import {
+  selectedSessionForTab,
+  selectedSessionKey
+} from '@/client/features/chat/sessions/useSelectedSession'
 import { useCollabEnabled } from '@/client/features/collab'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import type { SelectedSessionScope, WorkspaceSessionSelection, WorkspaceTabId } from '@/lib/types'
@@ -63,10 +66,16 @@ export function createAppletMessageHandler(
     const state = queryClient.getQueryData<WorkspaceSessionSelection>(
       selectedSessionKey(workspaceId, scope)
     )
-    const pinned = queryClient.getQueryData<WorkspaceSessionSelection>(
+    const shared = queryClient.getQueryData<WorkspaceSessionSelection>(
       selectedSessionKey(workspaceId)
-    )?.pinned
-    return pinned ?? state?.selected[getOptions().tabId] ?? null
+    )
+    return (
+      selectedSessionForTab(
+        shared,
+        getOptions().tabId,
+        scope === 'browser-tab' ? state : undefined
+      ) ?? null
+    )
   }
 
   async function handle(event: AppletChatMessage): Promise<void> {

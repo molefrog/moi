@@ -5,6 +5,8 @@ import { appUiKeys } from '@/client/api/app-ui-keys'
 import {
   applySelectedSessionEvent,
   optimisticallySetSelectedSession,
+  selectedSessionForTab,
+  selectedSessionKey,
   settleSelectedSessionSave
 } from '@/client/features/chat/sessions/useSelectedSession'
 import type { WorkspaceSessionSelection } from '@/lib/types'
@@ -18,6 +20,40 @@ function selectedSessionId(queryClient: QueryClient): string | null | undefined 
 }
 
 describe('selected session cache', () => {
+  test('a CLI-created view chat is selected until this browser tab chooses otherwise', () => {
+    const queryClient = new QueryClient()
+    const tabId = 'views/new-view' as const
+    const shared: WorkspaceSessionSelection = {
+      selected: { [tabId]: 'cli-child' },
+      pinned: null
+    }
+    const localKey = selectedSessionKey(WORKSPACE_ID, 'browser-tab')
+    queryClient.setQueryData<WorkspaceSessionSelection>(localKey, {
+      selected: {},
+      pinned: null
+    })
+    expect(
+      selectedSessionForTab(
+        shared,
+        tabId,
+        queryClient.getQueryData<WorkspaceSessionSelection>(localKey)
+      )
+    ).toBe('cli-child')
+
+    optimisticallySetSelectedSession(queryClient, WORKSPACE_ID, null, tabId, 'browser-tab')
+    expect(
+      queryClient.getQueryData<WorkspaceSessionSelection>(localKey)?.selected[tabId]
+    ).toBeNull()
+    expect(
+      selectedSessionForTab(
+        shared,
+        tabId,
+        queryClient.getQueryData<WorkspaceSessionSelection>(localKey)
+      )
+    ).toBeNull()
+    expect(selectedSessionForTab({ ...shared, pinned: 'pinned-chat' }, tabId)).toBe('pinned-chat')
+  })
+
   test('settling one tab preserves other tab selections and the workspace pin', () => {
     const queryClient = new QueryClient()
     const key = appUiKeys.sessionSelection(WORKSPACE_ID)

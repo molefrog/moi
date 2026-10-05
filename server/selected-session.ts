@@ -85,7 +85,7 @@ export async function getSelectedSession(
   tabId: WorkspaceTabId = 'overview'
 ): Promise<string | undefined> {
   const store = await readStore()
-  return store[workspacePath]?.selected[tabId]
+  return store[workspacePath]?.selected[tabId] ?? undefined
 }
 
 export async function getWorkspaceSessionSelection(

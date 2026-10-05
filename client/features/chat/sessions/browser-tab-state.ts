@@ -18,7 +18,9 @@ export function readSelectedSession(workspaceId: string): WorkspaceSessionSelect
       return emptySelection()
     return {
       selected: Object.fromEntries(
-        Object.entries(selected).filter(([, sessionId]) => typeof sessionId === 'string')
+        Object.entries(selected).filter(
+          ([, sessionId]) => typeof sessionId === 'string' || sessionId === null
+        )
       ),
       pinned: null
     }

@@ -104,6 +104,11 @@ describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope
 
   beforeEach(() => {
     queryClient = new QueryClient()
+    if (scope === 'browser-tab')
+      queryClient.setQueryData(selectedSessionKey(workspaceId), {
+        selected: {},
+        pinned: null
+      })
     select('session-1')
     availability = { status: 'available' }
     send = mock(() => {})

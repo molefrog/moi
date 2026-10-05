@@ -44,6 +44,10 @@ removes the pending record. There is no completion-time chat or tab reassignment
 
 `DATA_DIR/sessions.json` holds attribution, fork provenance, and run settings.
 `DATA_DIR/selected-sessions.json` holds per-tab selections and the workspace pin.
+With Collab enabled, unpinned selections are local to each browser tab. Until a
+browser tab chooses a chat, it uses the server selection so CLI view handoffs open
+on their child chat. Choosing New chat saves an explicit empty selection locally.
+The workspace pin remains shared.
 Browser composer drafts use session identity or the fresh view-tab identity.
 Native session renames move those session references together.
 

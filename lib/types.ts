@@ -334,7 +334,9 @@ export type SelectedSessionState = {
 }
 
 export type WorkspaceSessionSelection = {
-  selected: Partial<Record<WorkspaceTabId, string>>
+  // A browser tab can explicitly choose an empty chat (null). An absent key
+  // inherits the server selection, including CLI-created view handoffs.
+  selected: Partial<Record<WorkspaceTabId, string | null>>
   pinned: string | null
 }
 
