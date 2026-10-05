@@ -252,25 +252,6 @@ export function ChatSelector({ className }: ChatSelectorProps) {
   const [selectedSessionId] = useSelectedSession()
   const { data: sessions = [] } = useWorkspaceSessions(workspaceId)
   if (!loaded) return null
-  const pinButton = selectedSessionId ? (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className={className}
-            onClick={() => pin(pinnedSessionId ? null : selectedSessionId)}
-            aria-label={pinnedSessionId ? 'Unpin chat' : 'Pin chat'}
-            aria-pressed={!!pinnedSessionId}
-          >
-            {pinnedSessionId ? <IconPinFilled stroke={1.75} /> : <IconPin stroke={1.75} />}
-          </Button>
-        }
-      />
-      <TooltipContent>{pinnedSessionId ? 'Unpin chat' : 'Pin chat'}</TooltipContent>
-    </Tooltip>
-  ) : null
 
   if (pinnedSessionId) {
     const title = sessions.find(session => session.sessionId === pinnedSessionId)?.summary
@@ -283,7 +264,23 @@ export function ChatSelector({ className }: ChatSelectorProps) {
         )}
       >
         <span className="min-w-0 flex-1 truncate">{title}</span>
-        {pinButton}
+        <Tooltip key="unpin">
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className={className}
+                onClick={() => pin(null)}
+                aria-label="Unpin chat"
+                aria-pressed={true}
+              >
+                <IconPinFilled stroke={1.75} />
+              </Button>
+            }
+          />
+          <TooltipContent>Unpin chat</TooltipContent>
+        </Tooltip>
       </div>
     )
   }
@@ -291,7 +288,25 @@ export function ChatSelector({ className }: ChatSelectorProps) {
   return (
     <div className="flex w-full min-w-0 items-center justify-between gap-1">
       <SessionSelector className={className} sessions={sessions} />
-      {pinButton}
+      {selectedSessionId && (
+        <Tooltip key="pin">
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className={className}
+                onClick={() => pin(selectedSessionId)}
+                aria-label="Pin chat to workspace"
+                aria-pressed={false}
+              >
+                <IconPin stroke={1.75} />
+              </Button>
+            }
+          />
+          <TooltipContent>Pin chat to workspace</TooltipContent>
+        </Tooltip>
+      )}
     </div>
   )
 }
@@ -346,19 +361,14 @@ function SessionSelector({ className, sessions }: SessionSelectorProps) {
           render={
             <TooltipTrigger
               render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Chat history"
-                  className={className}
-                >
+                <Button variant="ghost" size="icon-sm" aria-label="History" className={className}>
                   <IconHistory stroke={1.75} />
                 </Button>
               }
             />
           }
         />
-        <TooltipContent>Chat history</TooltipContent>
+        <TooltipContent>History</TooltipContent>
       </Tooltip>
       <DropdownMenuContent
         align="start"

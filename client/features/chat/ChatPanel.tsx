@@ -205,9 +205,8 @@ export function ChatPanel({
         >
           <div className="mx-auto flex w-full max-w-(--chat-max-container) flex-1 flex-col gap-6">
             {forkedFromSessionId && (
-              <div role="note" className="flex flex-col gap-1 text-sm text-muted-foreground">
-                <span className="font-medium">View chat started</span>
-                <span>Context inherited from {sourceName || 'another chat'}</span>
+              <div role="note" className="flex flex-col gap-1 text-sm">
+                Context inherited from {sourceName || 'another chat'}
               </div>
             )}
             {showEmptyState && (
