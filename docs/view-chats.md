@@ -22,14 +22,17 @@ that read succeeds, moi saves the last inherited turn as a display cutoff before
 creating the view and sending its requirements. Unsupported forking starts a
 fresh chat. Other errors stop startup.
 
-The CLI returns `viewId`, `mode: "handoff"`, and `sessionId` after send acceptance.
-It returns no URL and does not navigate. The source agent links to the view using
-its ID. Both agents leave the user's current tab alone.
+After send acceptance, the CLI opens the pending view and its child chat through
+the acknowledged navigation channel, then returns `viewId`, `mode: "handoff"`, and
+`sessionId`. Navigation failure reports a warning while preserving the successful
+creation result. The source agent ends its turn with a view link. The child continues
+building without navigating again on completion.
 
 With a pinned chat, manual submission sends there without changing its attribution
 or the new view's empty selection. CLI creation returns `mode: "in-place"` and the
-view ID so the calling agent continues in its current turn. No fork or extra send
-occurs. Unpinning reveals the view's own selection, which may be an empty composer.
+view ID so the calling agent continues in its current turn. It opens the new view
+with the pinned chat still visible. No fork or extra send occurs. Unpinning reveals
+the view's own selection, which may be an empty composer.
 
 ## State and completion
 

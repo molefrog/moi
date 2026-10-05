@@ -238,12 +238,19 @@ export const control = Bun.serve({
           try {
             if (typeof data.sourceSessionId !== 'string' || typeof data.requirements !== 'string')
               throw new Error('Source session and requirements are required')
-            ws.send(
-              JSON.stringify({
-                ok: true,
-                ...(await createViewFromSession(match, data.sourceSessionId, data.requirements))
-              })
+            const result = await createViewFromSession(
+              match,
+              data.sourceSessionId,
+              data.requirements
             )
+            let warning: string | undefined
+            try {
+              await navigationRelay.navigate(match.id, moiHref(`views/${result.viewId}`))
+            } catch (error) {
+              const message = error instanceof Error ? error.message : 'Navigation failed'
+              warning = `View was created, but could not open it: ${message}. Open it with moi navigate 'moi:/views/${result.viewId}'.`
+            }
+            ws.send(JSON.stringify({ ok: true, ...result, ...(warning ? { warning } : {}) }))
           } catch (error) {
             ws.send(
               JSON.stringify({

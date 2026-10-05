@@ -308,10 +308,14 @@ When the user asks for a new view from an existing chat, run:
 moi views create --source-session <current-session-id> --requirements "<complete requirements>"
 ```
 
-Use the current session id from the hidden context. The command returns a permanent `viewId`. With
-`mode: "handoff"`, another chat continues the build, so reply with a link such as
-`[Open the view](moi:/views/<viewId>)` and keep the user's current tab open. With
-`mode: "in-place"`, continue the build in this turn using the returned id.
+Use the current session id from the hidden context. The command returns a permanent `viewId` and
+opens its view tab before returning.
+
+- `mode: "handoff"`: another chat continues the build. Finish this turn with a link such as
+  `[Open the view](moi:/views/<viewId>)`.
+- `mode: "in-place"`: the pinned chat stays visible. Continue the build in this turn using the
+  returned id.
+- Navigation fails: include the same `[Open the view](moi:/views/<viewId>)` link in your reply.
 
 #### Pending view builds
 

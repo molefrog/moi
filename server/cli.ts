@@ -855,8 +855,9 @@ const viewsCreate = defineCommand({
         })
       )
     ws.onmessage = event => {
-      const result = JSON.parse(String(event.data))
+      const result: Record<string, unknown> = JSON.parse(String(event.data))
       console.log(JSON.stringify(result, null, 2))
+      if (result.warning) console.error(result.warning)
       ws.close()
       process.exit(result.error ? 1 : 0)
     }
