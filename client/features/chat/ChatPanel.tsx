@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { Link } from 'wouter'
 
-import { IconChevronDown, IconChevronsRight, IconX } from '@tabler/icons-react'
+import { IconArrowBackUp, IconChevronDown, IconChevronsRight, IconX } from '@tabler/icons-react'
 import { draftSessionId } from '@/lib/session-drafts'
+import { workspaceTabPath } from '@/lib/navigation'
 import { useCurrentTabId } from './sessions/useSelectedSession'
 
 import { canSubmitComposerAction, focusComposer } from '@/client/components/shared/Composer'
@@ -205,9 +207,25 @@ export function ChatPanel({
         >
           <div className="mx-auto flex w-full max-w-(--chat-max-container) flex-1 flex-col gap-6">
             {forkedFromSessionId && (
-              <div role="note" className="flex flex-col gap-1 text-sm">
-                Context inherited from {sourceName || 'another chat'}
-              </div>
+              <Link
+                href={workspaceTabPath(workspaceId, 'overview')}
+                className="block text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                <div className="flex items-center gap-3">
+                  <IconArrowBackUp
+                    size={20}
+                    stroke={1.5}
+                    aria-hidden="true"
+                    className="shrink-0 text-muted-foreground"
+                  />
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="text-muted-foreground">Started from another chat</span>
+                    <span className="truncate font-medium" title={sourceName}>
+                      {sourceName || 'Another chat'}
+                    </span>
+                  </div>
+                </div>
+              </Link>
             )}
             {showEmptyState && (
               <ChatEmptyState
