@@ -19,6 +19,7 @@ import {
   killCodexWorkspace
 } from './client'
 import { discoverCodexWorkspaces } from './discovery'
+import { getSessionConfig } from '../../session-config'
 import {
   ensureCodexSessionLive,
   getCodexActiveSessions,
@@ -44,8 +45,13 @@ export const codexHarness: Harness = {
   archiveSession: (ws, sessionId) => archiveCodexSession(ws.path, sessionId),
   forkSession: async (ws, sourceId) => {
     const client = await getCodexClient(ws.path)
+    const { model } = await getSessionConfig(ws.path, sourceId)
     const { thread } = await client
-      .rpc<{ thread: { id: string } }>('thread/fork', { threadId: sourceId })
+      .rpc<{ thread: { id: string } }>('thread/fork', {
+        threadId: sourceId,
+        // A live fork must start with its selected model, before its first turn.
+        ...(model ? { model } : {})
+      })
       .catch(error => {
         if (error instanceof CodexRpcError && error.code === -32601)
           throw new ForkUnsupportedError('This Codex runtime does not support chat forks')

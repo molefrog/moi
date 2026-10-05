@@ -1,6 +1,41 @@
-import { describe, expect, test } from 'bun:test'
-
+import { describe, expect, spyOn, test } from 'bun:test'
+import type { WorkspaceEntry } from '@/lib/types'
+import * as configs from '../../session-config'
+import * as clients from './client'
+import { harnessFor } from '../registry'
+import type { Json } from './transport'
 import { formatCodexStatusLines } from './status'
+
+test.each(['gpt-6.1-sol', undefined])(
+  'Codex fork applies saved model %s at creation',
+  async model => {
+    const ws: WorkspaceEntry = { id: 'workspace', path: '/workspace', type: 'codex', addedAt: '' }
+    const calls: { method: string; params?: Json }[] = []
+    const client: clients.CodexClient = {
+      workspacePath: ws.path,
+      cliVersion: '0.160.0',
+      supportsAdditionalContext: true,
+      isAlive: () => true,
+      onNotification: () => () => {},
+      rpc: async <T>(method: string, params?: Json) => {
+        calls.push({ method, params })
+        return { thread: { id: 'child' } } as T
+      }
+    }
+    const clientSpy = spyOn(clients, 'getCodexClient').mockResolvedValue(client)
+    const configSpy = spyOn(configs, 'getSessionConfig').mockResolvedValue(model ? { model } : {})
+    try {
+      expect(await harnessFor(ws).forkSession!(ws, 'source')).toBe('child')
+      expect(configSpy).toHaveBeenCalledWith(ws.path, 'source')
+      expect(calls).toEqual([
+        { method: 'thread/fork', params: { threadId: 'source', ...(model ? { model } : {}) } }
+      ])
+    } finally {
+      clientSpy.mockRestore()
+      configSpy.mockRestore()
+    }
+  }
+)
 
 describe('formatCodexStatusLines', () => {
   test('shows live app-servers even when they are idle', () => {
