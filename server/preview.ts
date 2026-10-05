@@ -3,7 +3,7 @@
 // Backs GET /api/workspaces/:id/preview/<path>, used by the chat's expanded
 // tool rows: when the agent `Read`s an image from the workspace, the row shows
 // the actual picture instead of just the path. Same hard guards as the raw
-// `/fs/` stream (resolveWorkspaceMediaFile), but scoped to image extensions and
+// `/files/` stream (resolveWorkspaceMediaFile), but scoped to image extensions and
 // resized server-side so a huge screenshot doesn't ship megabytes to render a
 // 300px-tall preview.
 //

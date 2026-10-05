@@ -4,7 +4,7 @@ import { Link } from 'wouter'
 
 import { Button } from '@/client/components/ui/button'
 import registry from '@/registry.json'
-import { UI_COMPONENT_PREVIEWS } from './UiComponentPreviews'
+import { UI_COMPONENT_PREVIEWS } from './ui-component-previews'
 
 const registryItems = registry.items.filter(item => item.type === 'registry:ui')
 

@@ -43,6 +43,16 @@ describe('moi context envelope', () => {
     )
   })
 
+  test('points the agent to the installed collab reference when available', () => {
+    const referencePath = '/workspace/.agents/skills/moi-workspace/references/COLLAB.md'
+    expect(renderMoiContext({ activeTab: 'overview', collabReference: referencePath })).toContain(
+      `# Collab\nThe collab runtime is available. Before writing collaborative applets, read ${referencePath}.`
+    )
+    expect(context).not.toContain('# Collab')
+    expect(isMoiContext({ activeTab: 'overview', collabReference: referencePath })).toBe(true)
+    expect(isMoiContext({ activeTab: 'overview', collabReference: 7 })).toBe(false)
+  })
+
   test('append + strip round-trips the user text', () => {
     const sent = appendMoiContext('Fix the header', context)
     expect(sent).toContain('<moi-context>')

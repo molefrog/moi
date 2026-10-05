@@ -7,9 +7,9 @@
 //
 // Flow: a structured `MoiContext` is assembled at send time — by the client
 // for chat sends (client/features/workspace/moi-context.ts, sent as the chat
-// frame's `context`), by the server for pending-view requests — and travels
-// structured all the way to the harness, which renders it with the transform
-// matching its conventions:
+// frame's `context`), by the server for pending-view requests. The server adds
+// the optional collab reference path before the harness renders the context
+// with the transform matching its conventions:
 //   - Claude Code  — `moiContextSystemReminder` as its own leading text block
 //     (mirrors how Claude Code itself injects ambient context; a string
 //     prefix would defeat the SDK's first-prompt extraction, which skips
@@ -45,6 +45,8 @@ export type MoiAppletMessage = {
 // the server for programmatic pending-view sends. Extend this (and
 // `renderMoiContext`) when new ambient fields land.
 export type MoiContext = {
+  // Server-resolved path to the installed COLLAB.md reference for this workspace.
+  collabReference?: string
   // The workspace tab the user is on when they hit send.
   activeTab: WorkspaceTabId
   // UI label of the active tab when it differs from the id — a view's
@@ -142,6 +144,10 @@ export function renderMoiContextBody(ctx: MoiContext): string {
   const tabParams = ctx.tabParams ? renderTabParams(ctx.tabParams) : null
   if (tabParams) tabLines.push(`Params it is rendering with right now: ${tabParams}`)
   const sections = [`# Active tab\n${tabLines.join('\n')}`]
+  if (ctx.collabReference)
+    sections.push(
+      `# Collab\nThe collab runtime is available. Before writing collaborative applets, read ${escapeTags(ctx.collabReference)}.`
+    )
   if (ctx.applet) {
     sections.push(
       `# Applet message\nThe message above was not typed by the user — the ${describeAppletSource(ctx.applet.source)} sent it when the user acted in its UI.`
@@ -165,6 +171,7 @@ export function renderMoiContext(ctx: MoiContext): string {
 export function isMoiContext(value: unknown): value is MoiContext {
   if (typeof value !== 'object' || value === null) return false
   const v = value as {
+    collabReference?: unknown
     activeTab?: unknown
     tabTitle?: unknown
     tabParams?: unknown
@@ -173,6 +180,7 @@ export function isMoiContext(value: unknown): value is MoiContext {
   }
   return (
     typeof v.activeTab === 'string' &&
+    (v.collabReference === undefined || typeof v.collabReference === 'string') &&
     (v.tabTitle === undefined || typeof v.tabTitle === 'string') &&
     (v.tabParams === undefined || isParamsRecord(v.tabParams)) &&
     (v.applet === undefined || isMoiAppletMessage(v.applet)) &&

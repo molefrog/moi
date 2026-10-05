@@ -2,6 +2,8 @@ import { afterAll, beforeAll, describe, expect, spyOn, test } from 'bun:test'
 import { rmSync } from 'node:fs'
 import { join } from 'path'
 
+import { appletId } from '@/client/features/applets/applet-cache'
+
 import { buildApplet } from '../applets/build-applet'
 import { extractViewConfig, extractWidgetConfig } from '../applets/config'
 
@@ -62,7 +64,7 @@ describe('buildApplet', () => {
     expect(result.js).not.toContain('document.createElement("style")')
     // Every rule is scoped to the applet's mount container.
     expect(result.js).toContain('[data-applet=')
-    expect(result.js).toContain('widget:hello')
+    expect(result.js).toContain('widgets/hello')
   })
 
   test('maps widget and view fonts to workspace-owned variables', async () => {
@@ -340,7 +342,7 @@ describe('buildApplet', () => {
     const css = injectedCss((await buildApplet(join(FIXTURES, 'hello.tsx'))).js)
 
     expect(css).toMatch(
-      /\[data-applet="widget:hello"\] \* \{\s*border-color: var\(--border\);\s*outline-color: var\(--ring\)/
+      /\[data-applet="widgets\/hello"\] \* \{\s*border-color: var\(--border\);\s*outline-color: var\(--ring\)/
     )
   })
 
@@ -473,13 +475,15 @@ describe("buildApplet kind='view'", () => {
   test('namespaces the CSS scope with the view kind', async () => {
     const result = await buildApplet(join(FIXTURES, 'with-view-config.tsx'), undefined, 'view')
     // Prevents a widget and a view sharing a name from clobbering each other.
-    expect(result.js).toContain('view:with-view-config')
+    expect(injectedCss(result.js)).toContain(
+      `[data-applet="${appletId('views', 'with-view-config')}"]`
+    )
   })
 
-  test('widget kind uses the widget: scope namespace', async () => {
+  test('widget kind uses the widgets/ scope namespace', async () => {
     const result = await buildApplet(join(FIXTURES, 'hello.tsx'), undefined, 'widget')
-    expect(result.js).toContain('widget:hello')
-    expect(result.js).not.toContain('view:hello')
+    expect(injectedCss(result.js)).toContain(`[data-applet="${appletId('widgets', 'hello')}"]`)
+    expect(injectedCss(result.js)).not.toContain(`[data-applet="${appletId('views', 'hello')}"]`)
   })
 })
 
@@ -504,12 +508,13 @@ describe('asset imports', () => {
   })
 })
 
-describe('moi fileUrl module', () => {
-  test('compiles fileUrl against the sentinel base + /fs/', async () => {
-    const result = await buildApplet(join(FIXTURES, 'with-fileurl.tsx'), undefined, 'view')
-    expect(result.js).toContain('function fileUrl')
+describe('moi resolveUrl module', () => {
+  test('compiles resolveUrl with workspace files resolved during module evaluation', async () => {
+    const result = await buildApplet(join(FIXTURES, 'with-resolve-url.tsx'), undefined, 'view')
+    expect(result.js).toContain('function resolveUrl')
     expect(result.js).toContain('%%MOI_APPLET_API_BASE%%')
-    expect(result.js).toContain('"/fs/"')
+    expect(result.js).toContain('/files/')
+    expect(result.js).toContain('moi:/files/clips/a b.mp4')
   })
 
   test('bundles navigate forwarding to the per-bundle bridge, not a global', async () => {
@@ -535,6 +540,15 @@ describe('moi fileUrl module', () => {
     const result = await buildApplet(join(FIXTURES, 'with-chatattachment.tsx'), undefined, 'view')
     expect(result.js).toContain('function addChatAttachment')
     expect(result.js).toContain('addChatAttachment(input)')
+  })
+
+  test('collaboration and attachments share the extracted applet runtime bridge', async () => {
+    const result = await buildApplet(join(FIXTURES, 'with-collab.tsx'), undefined, 'view')
+    expect(result.js).toContain('function useWorkspaceUsers')
+    expect(result.js).toContain('function addChatAttachment')
+    expect(result.js.match(/function __attachBridge\(/g)).toHaveLength(1)
+    expect(result.js.match(/function __getBridge\(/g)).toHaveLength(1)
+    expect(result.js).not.toContain('window.moi')
   })
 
   test('every bundle entry exports the bridge wiring, even without a moi import', async () => {

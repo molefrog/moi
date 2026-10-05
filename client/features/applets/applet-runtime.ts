@@ -14,12 +14,18 @@
 // — no central handlers object assembled by the screen. Applet → host only;
 // if a host → applet direction is ever added (`moi.on(...)`), `dispose` must
 // also unbind those listeners or a disposed module leaks.
+import { appletCollabApi, type AppletCollabApi } from '@/client/features/collab/applet-api'
 import {
   MAX_ATTACHMENT_LABEL_CHARS,
   MAX_TEXT_ATTACHMENT_CHARS,
   snapshotTextAttachment
 } from '@/lib/moi-attachments'
-import type { AppletBridge, AppletKind, AttachmentInput, AttachmentOrigin } from '@/lib/types'
+import type {
+  AppletBridge as SharedAppletBridge,
+  AppletKind,
+  AttachmentInput,
+  AttachmentOrigin
+} from '@/lib/types'
 import { isWorkspaceAttachmentPath, MAX_UPLOAD_BYTES } from '@/lib/message-attachments'
 import { useEffect } from 'react'
 
@@ -30,9 +36,11 @@ import { toast } from '@/client/components/ui/toast'
 import { createRateLimiter, type RateLimiter } from '@/client/lib/rate-limit'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import { isParamsRecord } from '@/lib/workspace-tabs'
-import { resolveWorkspaceHref } from '@/lib/navigation'
+import { resolveUrl, workspacePath } from '@/lib/navigation'
 
-export type { AppletBridge } from '@/lib/types'
+type HostAppletBridge = SharedAppletBridge & {
+  readonly collab: AppletCollabApi | undefined
+}
 
 // Which applet a bridge belongs to, supplied by the host at attach time.
 export type AppletIdentity = { kind: AppletKind; name: string }
@@ -118,7 +126,14 @@ function createRuntime(workspaceId: string) {
     connect(identity: AppletIdentity, base = '') {
       let alive = true
       const source = appletSource(identity)
-      const bridge: AppletBridge = {
+      const urlContext = {
+        apiBase: `/api/workspaces/${encodeURIComponent(workspaceId)}`,
+        workspacePath: workspacePath(workspaceId, base)
+      }
+      const bridge: HostAppletBridge = {
+        get collab() {
+          return alive ? appletCollabApi : undefined
+        },
         addChatAttachment(input) {
           if (!alive) return
           try {
@@ -130,20 +145,20 @@ function createRuntime(workspaceId: string) {
             drop(identity, `addChatAttachment() was dropped: ${message}`)
           }
         },
-        navigate(href) {
+        navigate(url) {
           if (!alive) return
           try {
-            if (typeof href !== 'string') throw new Error('Navigation needs a URL')
-            resolveWorkspaceHref(workspaceId, href, base)
-            emitter.emit('navigate', href)
+            if (typeof url !== 'string') throw new Error('Navigation needs a URL')
+            resolveUrl(url, urlContext)
+            emitter.emit('navigate', url)
           } catch (error) {
             drop(identity, `navigate() was dropped: ${errorMessage(error)}`)
           }
         },
-        resolveHref(href) {
+        resolveUrl(url) {
           if (!alive) return ''
-          if (typeof href !== 'string') throw new Error('A URL is required')
-          return resolveWorkspaceHref(workspaceId, href, base)
+          if (typeof url !== 'string') throw new Error('A URL is required')
+          return resolveUrl(url, urlContext)
         },
         sendChatMessage(input, legacyContext) {
           if (!alive) return
@@ -268,7 +283,7 @@ export function useAppletEvent<K extends keyof AppletEvents>(
 // The shape of the host wiring every bundle entry re-exports (see the entry
 // plugin in server/applets/build-applet.ts).
 type BridgeModule = {
-  __attachBridge?: (bridge: AppletBridge) => void
+  __attachBridge?: (bridge: Partial<SharedAppletBridge>) => void
 }
 
 // Live connections keyed by applet cache key (`${segment}/${workspaceId}/${name}`)

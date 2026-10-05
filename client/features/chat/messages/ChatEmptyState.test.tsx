@@ -87,7 +87,7 @@ describe('ChatEmptyState', () => {
     )
     expect(renderState('explore-workspace')).toContain('Explore the workspace')
     expect(renderState('overview-empty')).toContain('create widgets and views')
-    expect(renderState('tab-empty')).toContain('what you’re working on here')
+    expect(renderState('tab-empty')).toContain('manage the view from here')
     for (const kind of ['welcome', 'explore-workspace', 'overview-empty', 'tab-empty'] as const) {
       const html = renderState(kind)
       expect(html).toContain('mo-root')

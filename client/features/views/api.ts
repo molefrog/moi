@@ -1,4 +1,4 @@
-import type { MessageAttachment, PendingView, ViewInfo } from '@/lib/types'
+import type { MessageAttachment, PendingView, SelectedSessionScope, ViewInfo } from '@/lib/types'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
@@ -74,6 +74,7 @@ export type SubmitViewInput = {
   requirements: string
   sessionId: string
   optimisticId: string
+  selectedSessionScope?: SelectedSessionScope
   attachments?: MessageAttachment[]
   model?: string
   effort?: string

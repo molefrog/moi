@@ -1,0 +1,5 @@
+export { CollabProvider, AppletPresenceProvider, useCollabEnabled } from './provider'
+export { WorkspaceUsersMenu } from './workspace-users-menu'
+export type { TabInfo } from './workspace-users-menu'
+export { appletCollabApi } from './applet-api'
+export type { AppletCollabApi } from './applet-api'

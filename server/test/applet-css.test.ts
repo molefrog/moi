@@ -2,8 +2,8 @@ import { describe, expect, test } from 'bun:test'
 
 import { scopeAppletCss } from '../applets/applet-css'
 
-const SCOPE = 'widget:hello'
-const ATTR = '[data-applet="widget:hello"]'
+const SCOPE = 'widgets/hello'
+const ATTR = '[data-applet="widgets/hello"]'
 
 describe('scopeAppletCss', () => {
   test('prefixes plain selectors with the container attribute', () => {

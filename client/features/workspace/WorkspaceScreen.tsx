@@ -18,6 +18,7 @@ import type { WelcomeDestination } from '@/client/features/chat/messages/ChatEmp
 import { ChatPopup } from '@/client/features/chat/ChatPopup'
 import { ThemePanel } from '@/client/features/workspace/ThemePanel'
 import { Overview } from '@/client/features/overview/Overview'
+import { WorkspaceUsersMenu } from '@/client/features/collab'
 import { PanelHeader } from '@/client/components/shared/PanelHeader'
 import { Button } from '@/client/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
@@ -178,9 +179,9 @@ export function WorkspaceScreen({ widgets, views: allViews }: WorkspaceScreenPro
   // Split needs the open set to decide whether it's available at all, and the
   // navigation hook needs split to resolve the active tab — so the open set is
   // derived from the raw layout here, before either.
-  const openTabIds = effectiveOpenTabs(normalizeTabsState(layout.tabs), allViews)
-  const nonAgentOpenTabs = openTabIds.filter(tab => tab !== 'agent')
-  const hasWorkspaceContent = nonAgentOpenTabs.length > 0
+  const hasWorkspaceContent = effectiveOpenTabs(normalizeTabsState(layout.tabs), allViews).some(
+    tab => tab !== 'agent'
+  )
   const hasAppletWidgets = widgets.some(widget => !isDefaultWidget(widget.id))
   const hasWorkspaceApplets = hasAppletWidgets || views.length > 0
 
@@ -235,6 +236,8 @@ export function WorkspaceScreen({ widgets, views: allViews }: WorkspaceScreenPro
     }
   )
 
+  const openTabIds = effectiveOpenTabs(tabsState, allViews)
+  const nonAgentOpenTabs = openTabIds.filter(tab => tab !== 'agent')
   const openSet = new Set(tabsState.open)
 
   // Entering split with the agent tab on screen needs no special-casing
@@ -292,13 +295,11 @@ export function WorkspaceScreen({ widgets, views: allViews }: WorkspaceScreenPro
     const open = tabsState.open.filter(tab => tabAvailable(tab, allViews))
     if (open.length === tabsState.open.length) return
     const nextOpen = effectiveOpenTabs(tabsState, allViews)
-    setLayout({
-      tabs: {
-        open: nextOpen,
-        active: nextOpen.includes(tabsState.active) ? tabsState.active : nextOpen[0]
-      }
+    setTabs({
+      open: nextOpen,
+      active: nextOpen.includes(tabsState.active) ? tabsState.active : nextOpen[0]
     })
-  }, [allViews, setLayout, tabsState])
+  }, [allViews, setTabs, tabsState])
 
   useEffect(() => {
     if (mode !== 'fullscreen' || activeTab === 'agent') {
@@ -640,6 +641,11 @@ export function WorkspaceScreen({ widgets, views: allViews }: WorkspaceScreenPro
             onReorder={reorderTabs}
           />
         </div>
+        <WorkspaceUsersMenu
+          workspaceId={workspaceId}
+          describeTab={tab => tabItemFor(tab, allViews, false, false, () => false)}
+          onOpenTab={openTab}
+        />
         {hasWorkspaceContent && canUseSplit && mode === 'fullscreen' && (
           <Tooltip>
             <TooltipTrigger

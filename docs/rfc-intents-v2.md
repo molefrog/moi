@@ -1,5 +1,6 @@
 > Historical RFC. Its `focusTab`, `moi tabs focus`, and navigation-state examples describe a
-> superseded API. Use [Workspace navigation](navigation.md) for current routes and commands.
+> superseded API. For the current routes and commands, see [Workspace navigation](navigation.md)
+> and [Applet intents](../workspace/.claude/skills/moi-workspace/references/INTENTS.md).
 
 # RFC: workspace tab navigation and applet messaging (intents v2)
 
@@ -166,8 +167,7 @@ sendChatMessage(message: string, context?: Record<string, unknown>): void
   `sendChatMessage` self-attributes with the applet's `<kind>:<name>`, derived by the runtime —
   never passed by the caller.
 - The bridge wiring (`__attachBridge` / `__getBridge`, re-exported by every bundle entry) is host
-  plumbing: it stays out of the author-facing ambient types (`.moi/applet-env.d.ts`), which
-  declare only the public API — `fileUrl`, `focusTab`, and the config types.
+  plumbing: it stays out of the [public applet declarations](../server/applets/declarations/base.d.ts).
 - `focusTab` from an applet is client-local navigation (replace) — no server round-trip.
 - `sendChatMessage` always targets the **active chat**. Envelope discipline: `message` is the
   visible chat text; `{ source, context }` rides the `<moi-context>` envelope under an

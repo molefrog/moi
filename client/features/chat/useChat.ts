@@ -10,6 +10,7 @@ import {
 } from '@/client/features/chat/sessions/api'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import { useSelectedSession } from '@/client/features/chat/sessions/useSelectedSession'
+import { useCollabEnabled } from '@/client/features/collab'
 import {
   type WorkspaceTabAddress,
   useMoiUserMessageContext
@@ -56,6 +57,7 @@ export function useChat(address: WorkspaceTabAddress) {
   const qc = useQueryClient()
   const { layout } = useWorkspaceLayoutCtx()
   const [selectedSession, selectSession] = useSelectedSession(address.activeTab)
+  const collabEnabled = useCollabEnabled()
   const modelsData = useWorkspaceAgent(workspaceId).data
   const sessions = useWorkspaceSessions(workspaceId).data
   // A newly forked/native session can precede the provider's session listing.
@@ -174,6 +176,7 @@ export function useChat(address: WorkspaceTabAddress) {
         content: text,
         sessionId: sid,
         isNew,
+        selectedSessionScope: collabEnabled ? 'browser-tab' : 'shared',
         optimisticId,
         model,
         effort,
@@ -201,6 +204,7 @@ export function useChat(address: WorkspaceTabAddress) {
       sessionConfig?.effort,
       sessionConfig?.fastMode,
       selectSession,
+      collabEnabled,
       modelsData
     ]
   )

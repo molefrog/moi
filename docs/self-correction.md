@@ -132,7 +132,7 @@ always on, opting in is only about _reading_ it.
 - **Validation.** The POST route accepts only the browser-side sources
   (`load`/`render`/`window`), whitelists `kind`, pattern-checks `name`, caps message/stack
   lengths and events per request — it's an unauthenticated localhost route and is treated
-  with the same suspicion as `/fs/`.
+  with the same suspicion as `/files/`.
 
 ## Constraints & non-goals
 

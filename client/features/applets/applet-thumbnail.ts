@@ -4,6 +4,7 @@ import { useAppletThumbnailRecords, useSaveAppletThumbnails } from '@/client/fea
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import type { AppletKind, AppletThumbnail, AppletThumbnailUpdate } from '@/lib/types'
+import { appletId } from './applet-cache'
 
 export const THUMBNAIL_MAX_EDGE = 1_000
 export const THUMBNAIL_PIXEL_RATIO = 3
@@ -269,7 +270,7 @@ export function useAppletThumbnails({ kind, enabled, targets }: UseAppletThumbna
           targetsRef.current.map(target => ({
             ...target,
             element: document.querySelector<HTMLElement>(
-              `[data-applet-thumbnail="${CSS.escape(`${kind}:${target.id}`)}"]`
+              `[data-applet-thumbnail="${CSS.escape(appletId(kind === 'view' ? 'views' : 'widgets', target.id))}"]`
             )
           })),
           () =>

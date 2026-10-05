@@ -1,6 +1,11 @@
 import { join } from 'path'
 
-import type { AppletKind, WorkspaceLayout, WorkspacePreview } from '@/lib/types'
+import type {
+  AppletKind,
+  WorkspaceLayout,
+  WorkspaceLayoutSave,
+  WorkspacePreview
+} from '@/lib/types'
 import { createDefaultWorkspaceLayout, normalizeWorkspaceTabs } from '@/lib/workspace-layout'
 import { isWorkspaceIcon } from '@/lib/workspace-icon'
 
@@ -59,7 +64,7 @@ export async function saveLayout(layout: WorkspaceLayout, workspacePath: string)
 // as `name: undefined`.
 export function mergeLayoutForSave(
   existing: WorkspaceLayout,
-  body: WorkspaceLayout
+  body: WorkspaceLayoutSave
 ): WorkspaceLayout {
   const { name: _name, icon: _icon, ...editor } = body
   // Stale clients may still round-trip the pre-`.cache` thumbnail records;
@@ -67,7 +72,9 @@ export function mergeLayoutForSave(
   delete (editor as Record<string, unknown>).appletThumbnails
   return {
     ...editor,
-    tabs: normalizeWorkspaceTabs(editor.tabs),
+    // Personal navigation never writes tabs. Other layout edits must not
+    // round-trip a stale copy of the workspace's authored defaults.
+    tabs: editor.tabs === undefined ? existing.tabs : normalizeWorkspaceTabs(editor.tabs),
     ...(existing.name !== undefined && { name: existing.name }),
     ...(existing.icon !== undefined && { icon: existing.icon })
   }

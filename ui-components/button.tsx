@@ -4,7 +4,7 @@ import { type VariantProps, cva } from 'class-variance-authority'
 import { cn } from './utils'
 
 const buttonVariants = cva(
-  'inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-100 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0',
+  'inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-100 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 [&>svg]:pointer-events-none [&>svg]:shrink-0',
   {
     variants: {
       variant: {
@@ -19,15 +19,15 @@ const buttonVariants = cva(
           'bg-destructive text-white inset-shadow-[0_0_8px_color-mix(in_oklab,var(--color-white)_20%,transparent)] hover:bg-destructive/90 focus-visible:border-destructive/40 focus-visible:ring-destructive/20'
       },
       size: {
-        xs: 'h-6 gap-1 rounded-md px-2 text-xs has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg]:size-3',
-        sm: 'h-7 gap-1.5 rounded-md px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 [&_svg]:size-4',
+        xs: 'h-6 gap-1 rounded-md px-2 text-xs has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&>svg]:size-3',
+        sm: 'h-7 gap-1.5 rounded-md px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 [&>svg]:size-4',
         default:
-          'h-8 px-3 has-data-[icon=inline-end]:pr-2.5 has-data-[icon=inline-start]:pl-2.5 [&_svg]:size-5',
-        lg: 'h-9 rounded-xl px-3.5 has-data-[icon=inline-end]:pr-2.5 has-data-[icon=inline-start]:pl-2.5 [&_svg]:size-5',
-        'icon-xs': 'size-6 rounded-md [&_svg]:size-3',
-        'icon-sm': 'size-7 rounded-md [&_svg]:size-4',
-        icon: 'size-8 [&_svg]:size-5',
-        'icon-lg': 'size-9 rounded-xl [&_svg]:size-5'
+          'h-8 px-3 has-data-[icon=inline-end]:pr-2.5 has-data-[icon=inline-start]:pl-2.5 [&>svg]:size-5',
+        lg: 'h-9 rounded-xl px-3.5 has-data-[icon=inline-end]:pr-2.5 has-data-[icon=inline-start]:pl-2.5 [&>svg]:size-5',
+        'icon-xs': 'size-6 rounded-md [&>svg]:size-3',
+        'icon-sm': 'size-7 rounded-md [&>svg]:size-4',
+        icon: 'size-8 [&>svg]:size-5',
+        'icon-lg': 'size-9 rounded-xl [&>svg]:size-5'
       }
     },
     defaultVariants: {

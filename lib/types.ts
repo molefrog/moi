@@ -1,7 +1,11 @@
 import type { PreviewBlock, StreamEvent } from './format'
 import type { AppIconId } from './app-icons'
+import type { ExperimentalFeatures } from './experimental'
 import type { MoiContext } from './moi-context'
 import type { WorkspaceTheme } from './themes'
+import type { AttachmentInput, WidgetConfig } from 'moi'
+
+export type { AttachmentInput, ViewConfig, WidgetConfig } from 'moi'
 
 // A custom UI unit embedded in a workspace.
 export type AppletKind = 'view' | 'widget'
@@ -10,8 +14,8 @@ export type AppletKind = 'view' | 'widget'
 // Inputs stay unknown at this trust boundary; the browser host narrows them.
 export type AppletBridge = {
   addChatAttachment: (input: unknown) => void
-  navigate: (href: unknown) => void
-  resolveHref: (href: unknown) => string
+  navigate: (url: unknown) => void
+  resolveUrl: (url: unknown) => string
   sendChatMessage: (input: unknown, context?: unknown) => void
 }
 
@@ -22,15 +26,6 @@ export type AppletInfo = {
   revision?: string
 }
 
-export type WidgetConfig = {
-  rowSpan: 1 | 2 | 3 | 4
-  colSpan: 1 | 2 | 3 | 4
-  // Env vars this widget's `.server.ts` expects (e.g. `ELEVENLABS_API_KEY`).
-  // Purely advisory: it lets the UI surface a "missing key" hint. It never
-  // blocks loading — the server function still just reads `process.env`.
-  requiredEnv?: string[]
-}
-
 export type WidgetInfo = AppletInfo & {
   config: WidgetConfig
 }
@@ -38,15 +33,6 @@ export type WidgetInfo = AppletInfo & {
 // A view is a full-screen, agent-authored "app" (`.moi/views/<name>.tsx`),
 // shown one-at-a-time in the workspace nav. Same build/RPC machinery as a
 // widget, minus the grid: no sizing, the view owns its own layout and scroll.
-export type ViewConfig = {
-  // Nav tab label. Falls back to the file name when unset.
-  title?: string
-  // App icon registry id used by workspace tabs.
-  icon?: string
-  // Advisory env hints, same semantics as WidgetConfig.requiredEnv.
-  requiredEnv?: string[]
-}
-
 export type PendingView = {
   id: string
   status: 'draft' | 'starting' | 'submitted' | 'failed'
@@ -220,13 +206,7 @@ export type Attachment =
   | ({ type: 'image' } & ImageAttachment)
 
 // Caller input: text or a browser file / workspace-relative path.
-export type TextAttachmentInput = Pick<TextAttachment, 'label' | 'text'>
-
-type FileAttachmentInput = { file: File; path?: never } | { path: string; file?: never }
-
-export type AttachmentInput =
-  | ({ type: 'text' } & TextAttachmentInput)
-  | ({ type: 'file' } & FileAttachmentInput)
+export type TextAttachmentInput = Omit<Extract<AttachmentInput, { type: 'text' }>, 'type'>
 
 // Upload receipt: returned by the upload API before sending the message.
 // Bytes or an absolute file path live in the server's workspace-scoped store.
@@ -250,6 +230,8 @@ export type MessageAttachment =
   | ({ type: 'upload'; uploadId: string; purpose?: DrawingPurpose } & Partial<AttachmentOrigin>)
 
 // Client → server messages, routed by workspaceId over the shared WebSocket.
+export type SelectedSessionScope = 'shared' | 'browser-tab'
+
 export type ClientMessage =
   | {
       type: 'chat'
@@ -257,6 +239,9 @@ export type ClientMessage =
       content: string
       sessionId: string
       isNew: boolean
+      // Where this tab keeps its selected session. Browser-tab selection must
+      // not update the workspace's shared selection or switch other tabs.
+      selectedSessionScope?: SelectedSessionScope
       // Text and upload references for this turn. The server resolves uploads
       // and describes all attachments together, preserving their order.
       attachments?: MessageAttachment[]
@@ -362,19 +347,19 @@ export type AppSettings = {
   autoUpdateSkills: boolean
 }
 
-// Client-safe subset of the startup config (`config.json` in the data dir +
-// `MOI_*` env overrides), served by GET /api/config. Frozen for the process
-// lifetime — changing it requires a server restart, so clients may cache it
-// forever. See server/app-config.ts.
+// Client-safe startup config, served by GET /api/config. Deployment settings
+// come from config.json and MOI_* env overrides; experimental flags come from
+// explicit CLI options. See server/app-config.ts.
 export type ClientAppConfig = {
   // Cloud demo deployment: workspace creation is blocked; the UI offers the
   // cloud-demo promo dialog instead.
   cloudDemo: boolean
-  // Enabled experimental features, checked by slug.
-  experiments: string[]
+  experimental: ExperimentalFeatures
   // Link target for the cloud-demo promo dialog.
   demoInstallUrl: string
 }
+
+export type { ExperimentalFeatures } from './experimental'
 
 export type UpdateStatus = {
   runningVersion: string
@@ -625,6 +610,8 @@ export type WorkspaceTabsState = {
 
 export type { AgentTheme, ColorTheme, FontTheme, RadiusTheme, WorkspaceTheme } from './themes'
 
+export type WorkspaceLayoutSave = Omit<WorkspaceLayout, 'tabs'> & { tabs?: WorkspaceTabsState }
+
 export type WorkspaceLayout = {
   version: 1
   widgetGrid: LayoutGridItem[]
@@ -735,7 +722,8 @@ export type Model = {
   resolvedModel?: string
   // Human-readable label (Claude `displayName`; OpenClaw `name`).
   displayName: string
-  // " · "-joined blurb (Claude): "<headline> · <tagline> · …". Absent for OpenClaw.
+  // One-line blurb (Claude: "Most efficient for everyday tasks"). Not shown by
+  // the picker. Absent for OpenClaw.
   description?: string
   // Heading this model sits under in the picker (Hermes: the upstream provider,
   // e.g. 'Ollama'). Absent when the backend serves one flat catalog.

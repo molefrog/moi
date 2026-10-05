@@ -1,6 +1,6 @@
 {
   "name": "moi-computer",
-  "version": "0.11.1-next.2",
+  "version": "0.11.1-next.4",
   "description": "Local AI workspace powered by the Claude Agent SDK, Bun, React, and Tailwind. Requires Bun.",
   "license": "Elastic-2.0",
   "type": "module",
@@ -72,7 +72,6 @@
     "@tldraw/tlschema": "5.2.3",
     "@tldraw/utils": "5.2.3",
     "@types/bun": "1.3.10",
-    "agentation": "^2.3.3",
     "blobatar": "^2.7.0",
     "bun-plugin-tailwind": "^0.1.2",
     "citty": "^0.2.2",
@@ -85,6 +84,7 @@
     "frimousse": "^0.3.0",
     "highlight.js": "^10.7.3",
     "hono": "^4.13.7",
+    "jose": "^6.2.12",
     "lru-cache": "^11.5.2",
     "modern-screenshot": "^4.7.0",
     "motion": "^12.43.0",

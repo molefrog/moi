@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react'
 
-import { AppletMount } from '@/client/features/applets/AppletMount'
+import { AppletContainer } from '@/client/features/applets/AppletContainer'
 import { useWidget } from '@/client/features/applets/useApplet'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 
@@ -31,9 +31,9 @@ export function WidgetShell({ name }: WidgetShellProps) {
             workspaceId={workspaceId}
             resetKey={widget.version}
           >
-            <AppletMount segment="widgets" name={name} version={widget.version}>
+            <AppletContainer segment="widgets" name={name} version={widget.version}>
               <widget.Component />
-            </AppletMount>
+            </AppletContainer>
           </WidgetErrorBoundary>
         </motion.div>
       )}

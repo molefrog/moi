@@ -66,14 +66,16 @@ describe('selected session cache', () => {
     ).toEqual({
       sessionId: 'session-2',
       tabId: 'overview',
-      previousSessionId: 'session-1'
+      previousSessionId: 'session-1',
+      scope: 'shared'
     })
     expect(selectedSessionId(queryClient)).toBe('session-2')
 
     expect(optimisticallySetSelectedSession(queryClient, WORKSPACE_ID, null, 'overview')).toEqual({
       sessionId: null,
       tabId: 'overview',
-      previousSessionId: 'session-2'
+      previousSessionId: 'session-2',
+      scope: 'shared'
     })
     expect(selectedSessionId(queryClient)).toBeUndefined()
     expect(
@@ -84,7 +86,8 @@ describe('selected session cache', () => {
         {
           sessionId: null,
           previousSessionId: 'session-2',
-          tabId: 'overview'
+          tabId: 'overview',
+          scope: 'shared'
         }
       )
     ).toBe('applied')

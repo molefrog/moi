@@ -1,7 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Agentation } from 'agentation'
 import { createRoot } from 'react-dom/client'
-import { Router, useRoute } from 'wouter'
+import { Router } from 'wouter'
 
 import { Toaster } from '@/client/components/ui/toast'
 import { TooltipProvider } from '@/client/components/ui/tooltip'
@@ -10,14 +9,6 @@ import { initConnection } from '@/client/features/chat/connection/chat-connectio
 import { AppRouter } from './app/AppRouter'
 
 const queryClient = new QueryClient()
-
-// Agentation has no built-in route filter (checked v2.3.3 props), so gate the
-// mount ourselves: the harness debug page is a raw log surface where the
-// annotation toolbar just overlaps the panes.
-function DevAgentation() {
-  const [onHarnessDebug] = useRoute('/dev/harness')
-  return onHarnessDebug ? null : <Agentation />
-}
 
 // Open the single app-wide chat WebSocket once and hand it the query client so
 // live frames fold into the RQ transcript cache. Lives for the page's lifetime.
@@ -37,7 +28,6 @@ export function mount(el: HTMLElement) {
             <AppRouter />
           </Router>
           <Toaster />
-          {process.env.NODE_ENV === 'development' && <DevAgentation />}
         </TooltipProvider>
       </QueryClientProvider>
     )

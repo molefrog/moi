@@ -13,6 +13,7 @@ import type {
   AppletThumbnailBatch,
   AppSettings,
   HarnessAvailability,
+  SelectedSessionScope,
   UploadInfo,
   WorkspaceAgent,
   WorkspaceEntry,
@@ -20,6 +21,8 @@ import type {
 } from '@/lib/types'
 import { isWorkspaceTabId } from '@/lib/workspace-tabs'
 
+import { proxyUserState } from './collab/cloudflare-access'
+import { collabManager } from './collab/manager'
 import { agentStore } from './agent'
 import { clientAppConfig, getAppConfig } from './app-config'
 import { getAppSettings, pickAppSettingsPatch, saveAppSettings } from './app-settings'
@@ -275,6 +278,7 @@ one.post('/views/:viewId/submit', async c => {
     requirements?: string
     sessionId?: string
     optimisticId?: string
+    selectedSessionScope?: SelectedSessionScope
     model?: string
     effort?: string
     fastMode?: boolean
@@ -286,6 +290,13 @@ one.post('/views/:viewId/submit', async c => {
   }
   if (body.optimisticId !== undefined && typeof body.optimisticId !== 'string') {
     return c.text('Invalid optimisticId', 400)
+  }
+  if (
+    body.selectedSessionScope !== undefined &&
+    body.selectedSessionScope !== 'shared' &&
+    body.selectedSessionScope !== 'browser-tab'
+  ) {
+    return c.text('Invalid selectedSessionScope', 400)
   }
   const attachments = body.attachments ?? []
   if (!isMessageAttachments(attachments)) return c.text('Invalid attachments', 400)
@@ -301,6 +312,7 @@ one.post('/views/:viewId/submit', async c => {
     const result = await submitView(ws, c.req.param('viewId'), {
       requirements: body.requirements,
       sessionId: typeof body.sessionId === 'string' ? body.sessionId : undefined,
+      selectedSessionScope: body.selectedSessionScope,
       attachments,
       optimisticId: body.optimisticId,
       model: typeof body.model === 'string' ? body.model : undefined,
@@ -317,14 +329,14 @@ one.post('/views/:viewId/submit', async c => {
   }
 })
 
-// Workspace file stream — an applet's `fileUrl(path)` resolves here. Streams a
+// Workspace file stream — `resolveUrl('moi:/files/...')` resolves here. Streams a
 // media file from the workspace root (range-enabled). Guarded: traversal and
 // dotfiles (`.env`, `.moi`, `.git`) are rejected and only media/asset extensions
 // are allowed — the workspace holds secrets, and this route is unauthenticated.
 // localhost binding is NOT the guard.
-one.get('/fs/*', c => {
+one.get('/files/*', c => {
   const ws = c.get('ws')
-  const tail = new URL(c.req.url).pathname.split(`/api/workspaces/${ws.id}/fs/`)[1] ?? ''
+  const tail = new URL(c.req.url).pathname.split(`/api/workspaces/${ws.id}/files/`)[1] ?? ''
   return serveWorkspaceFile(ws.path, tail, c.req.header('range'), c.req.header('if-none-match'))
 })
 
@@ -385,7 +397,7 @@ one.post('/applet-log', async c => {
 })
 
 // Downscaled image preview of a workspace file. The chat's expanded tool rows
-// use this to show the picture an agent `Read` — same guards as /fs/ above,
+// use this to show the picture an agent `Read` — same guards as /files/ above,
 // images only, resized server-side (see server/preview.ts).
 one.get('/preview/*', c => {
   const ws = c.get('ws')
@@ -925,6 +937,7 @@ one.delete('/', async c => {
   const ok = await removeWorkspace(ws.id)
   if (!ok) return c.text('Workspace not found', 404)
   harnessFor(ws).stopWorkspace?.(ws.path)
+  await collabManager.stopWorkspace(ws.path)
   return c.body(null, 204)
 })
 
@@ -1085,6 +1098,13 @@ api.route('/api/workspaces', workspaces)
 // Startup config (config.json in the data dir + MOI_* env), client-safe
 // subset. Immutable for the process lifetime — clients cache it forever.
 api.get('/api/config', c => c.json(clientAppConfig()))
+
+// The viewer's profile as verified by a configured proxy (Cloudflare Access).
+// It differs per request, so neither browsers nor Cloudflare's edge may cache it.
+api.get('/api/proxy-user', async c => {
+  c.header('Cache-Control', 'private, no-store')
+  return c.json(await proxyUserState(c.req.raw))
+})
 
 // Served from a lazily-refreshed cache: this handler is a memory read, and the
 // registry is consulted on the schedule `getCachedUpdateStatus` owns rather

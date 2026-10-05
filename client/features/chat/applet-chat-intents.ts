@@ -12,10 +12,11 @@ import {
 import { prepareChatAttachments, type ChatSendOptions, type PreparedAttachments } from './chat-send'
 import { useLayoutEffect } from 'react'
 import { useQueryClient, type QueryClient } from '@tanstack/react-query'
-import { appUiKeys } from '@/client/api/app-ui-keys'
 import { toast } from '@/client/components/ui/toast'
+import { selectedSessionKey } from '@/client/features/chat/sessions/useSelectedSession'
+import { useCollabEnabled } from '@/client/features/collab'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
-import type { WorkspaceSessionSelection, WorkspaceTabId } from '@/lib/types'
+import type { SelectedSessionScope, WorkspaceSessionSelection, WorkspaceTabId } from '@/lib/types'
 import { useCurrentTabId } from './sessions/useSelectedSession'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import type { AgentAvailability } from '@/client/lib/agent-availability'
@@ -53,15 +54,19 @@ export function appletSendBlockedReason(availability: AgentAvailability): string
 export function createAppletMessageHandler(
   workspaceId: string,
   queryClient: QueryClient,
-  getOptions: () => UseAppletChatMessageOptions
+  getOptions: () => UseAppletChatMessageOptions,
+  scope: SelectedSessionScope = 'shared'
 ) {
   const pending = new Set<() => void>()
   let disposed = false
   const selectedSession = () => {
     const state = queryClient.getQueryData<WorkspaceSessionSelection>(
-      appUiKeys.sessionSelection(workspaceId)
+      selectedSessionKey(workspaceId, scope)
     )
-    return state?.pinned ?? state?.selected[getOptions().tabId] ?? null
+    const pinned = queryClient.getQueryData<WorkspaceSessionSelection>(
+      selectedSessionKey(workspaceId)
+    )?.pinned
+    return pinned ?? state?.selected[getOptions().tabId] ?? null
   }
 
   async function handle(event: AppletChatMessage): Promise<void> {
@@ -155,9 +160,15 @@ export function useAppletChatMessage(options: Omit<UseAppletChatMessageOptions, 
   const workspaceId = useWorkspaceId()
   const queryClient = useQueryClient()
   const tabId = useCurrentTabId()
+  const collabEnabled = useCollabEnabled()
   const latest = useLatestRef({ ...options, tabId })
   useLayoutEffect(() => {
-    const handler = createAppletMessageHandler(workspaceId, queryClient, () => latest.current)
+    const handler = createAppletMessageHandler(
+      workspaceId,
+      queryClient,
+      () => latest.current,
+      collabEnabled ? 'browser-tab' : 'shared'
+    )
     const unsubscribe = appletRuntime(workspaceId).on('sendChatMessage', event => {
       void handler.handle(event)
     })
@@ -165,7 +176,7 @@ export function useAppletChatMessage(options: Omit<UseAppletChatMessageOptions, 
       unsubscribe()
       handler.dispose()
     }
-  }, [workspaceId, queryClient, latest, tabId])
+  }, [workspaceId, queryClient, latest, tabId, collabEnabled])
 }
 
 export function useAppletChatAttachment(sessionId: string | null, revealChat: () => void): void {

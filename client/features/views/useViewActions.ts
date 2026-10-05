@@ -16,6 +16,7 @@ import {
   usePinnedSession
 } from '@/client/features/chat/sessions/useSelectedSession'
 import { workspaceKeys } from '@/client/api/workspace-keys'
+import { useCollabEnabled } from '@/client/features/collab'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import {
@@ -30,6 +31,8 @@ import { viewTabId } from '@/lib/workspace-tabs'
 
 export function useViewActions() {
   const queryClient = useQueryClient()
+  const collabEnabled = useCollabEnabled()
+  const selectionScope = collabEnabled ? 'browser-tab' : 'shared'
   const { workspaceId, layout } = useWorkspaceLayoutCtx()
   const { pinnedSessionId } = usePinnedSession()
   const modelData = useWorkspaceAgent(workspaceId).data
@@ -65,7 +68,8 @@ export function useViewActions() {
         queryClient,
         workspaceId,
         sessionId,
-        viewTabId(pendingView.id)
+        viewTabId(pendingView.id),
+        selectionScope
       )
     }
     const prepared = prepareOptimisticSend(
@@ -97,6 +101,7 @@ export function useViewActions() {
         sessionId,
         requirements: text,
         optimisticId: prepared.optimisticId,
+        selectedSessionScope: selectionScope,
         ...(attachments.length > 0
           ? {
               attachments: prepared.attachments
@@ -114,7 +119,8 @@ export function useViewActions() {
           queryClient,
           workspaceId,
           result.sessionId,
-          viewTabId(pendingView.id)
+          viewTabId(pendingView.id),
+          selectionScope
         )
       finishComposerSend(workspaceId, attachments)
       const draftKey = composerDraftKey(workspaceId, result.sessionId)
@@ -127,7 +133,8 @@ export function useViewActions() {
         pendingView.id,
         sessionId,
         text,
-        !!pinnedSessionId
+        !!pinnedSessionId,
+        selectionScope
       )
       throw error
     }

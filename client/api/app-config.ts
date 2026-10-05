@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 
 import type { ClientAppConfig } from '@/lib/types'
+import { EXPERIMENTAL_DEFAULTS } from '@/lib/experimental'
 
 import { onWorkspaceEventsReconnect } from '@/client/runtime/useWorkspaceEvents'
 
@@ -14,7 +15,7 @@ import { requestJson } from './http'
 
 const DEFAULTS: ClientAppConfig = {
   cloudDemo: false,
-  experiments: [],
+  experimental: { ...EXPERIMENTAL_DEFAULTS },
   demoInstallUrl: 'https://moi.computer'
 }
 
@@ -30,20 +31,22 @@ function subscribe(listener: () => void): () => void {
 
 // Failures keep the last known value (defaults on the very first fetch):
 // non-demo is the safe presentation, and the server still enforces its gates.
-async function fetchAppConfig(): Promise<void> {
+async function fetchAppConfig(): Promise<ClientAppConfig | undefined> {
   try {
     current = await requestJson<ClientAppConfig>('/api/config')
     for (const listener of listeners) listener()
+    return current
   } catch {}
 }
 
 // Called once from init() before the app mounts; never rejects, so a config
 // hiccup cannot block the app from starting.
-export async function loadAppConfig(): Promise<void> {
-  await fetchAppConfig()
+export async function loadAppConfig(): Promise<ClientAppConfig | undefined> {
+  const config = await fetchAppConfig()
   onWorkspaceEventsReconnect(() => {
     void fetchAppConfig()
   })
+  return config
 }
 
 export function useAppConfig(): ClientAppConfig {

@@ -9,7 +9,7 @@ import { dirname, join, resolve } from 'path'
 import pc from './cli-pc'
 
 import { isAgentCaller } from './agent-caller'
-import { getAppConfig } from './app-config'
+import { getAppConfig, initializeAppConfig } from './app-config'
 
 import { appletSelectorMatches, parseAppletSelector } from '@/lib/applet-selector'
 import type { AppletSelector } from '@/lib/applet-selector'
@@ -23,6 +23,8 @@ import {
 } from '@/lib/themes'
 import type { AgentTheme, ColorTheme, FontTheme, RadiusTheme } from '@/lib/themes'
 import { parseMoiHref } from '@/lib/navigation'
+import { EXPERIMENTAL_FEATURES, experimentalFlagName } from '@/lib/experimental'
+import type { ExperimentalFeatures } from '@/lib/experimental'
 import type {
   AppletLogEntry,
   ScratchArrowEnd,
@@ -45,6 +47,7 @@ import {
   resolveCwdWorkspace
 } from './cli-env'
 import { columns, keyValue } from './cli-ui'
+import { installCollabSkill } from './collab/skill'
 import { CONTROL_HOST, CONTROL_PORT, CONTROL_URL, PORT } from './constants'
 import { type ControlProbe, controlFailureMessage, probeControlServer } from './control-client'
 import {
@@ -157,14 +160,19 @@ async function openBrowser(url: string) {
 // (see runDevSupervisor).
 function spawnServer(
   cwd: string,
-  env: Record<string, string | undefined> = process.env
+  env: Record<string, string | undefined> = process.env,
+  experimentalFlags: string[] = []
 ): ReturnType<typeof Bun.spawn> {
-  return Bun.spawn(['bun', import.meta.filename, 'start'], {
+  const argv = ['bun', import.meta.filename, 'start', ...experimentalFlags]
+  return Bun.spawn(argv, {
     stdin: 'inherit',
     stdout: 'inherit',
     stderr: 'inherit',
     cwd,
-    env: { ...env, MOI_SERVER: '1' }
+    env: {
+      ...env,
+      MOI_SERVER: '1'
+    }
   })
 }
 
@@ -175,11 +183,12 @@ function spawnServer(
 // (closing servers + killing function workers), so restarts leak nothing.
 async function runDevSupervisor(
   projectRoot: string,
-  env: Record<string, string | undefined>
+  env: Record<string, string | undefined>,
+  experimentalFlags: string[]
 ): Promise<void> {
   const { watch } = await import('node:fs')
 
-  let child = spawnServer(projectRoot, env)
+  let child = spawnServer(projectRoot, env, experimentalFlags)
   let restarting = false
   let debounce: ReturnType<typeof setTimeout> | undefined
 
@@ -198,7 +207,7 @@ async function runDevSupervisor(
     await child.exited
     clearTimeout(sigkill)
     restarting = false
-    child = spawnServer(projectRoot, env)
+    child = spawnServer(projectRoot, env, experimentalFlags)
   }
 
   for (const dir of ['server', 'lib']) {
@@ -334,6 +343,11 @@ const init = defineCommand({
       default: false,
       description: 'Start the web server if not already running'
     },
+    'experimental-collab': {
+      type: 'boolean',
+      default: false,
+      description: 'Include the optional collaboration guide and applet types'
+    },
     id: {
       type: 'string',
       description:
@@ -396,6 +410,11 @@ const init = defineCommand({
     // package.json + bun install). An existing `.moi/` is left untouched.
     console.log()
     const { scaffold, skillsDir } = await provisionWorkspace(target, type)
+    if (args['experimental-collab']) {
+      const { referencePath } = await installCollabSkill(target, type)
+      console.log(pc.dim('  Collaboration guide installed to ' + referencePath))
+      console.log(pc.dim('  Live presence requires moi start --experimental-collab'))
+    }
     if (scaffold !== 'exists') {
       if (scaffold === 'installing') {
         console.log(pc.dim('  Widget dependencies still installing in .moi/ (background)'))
@@ -468,15 +487,38 @@ const init = defineCommand({
   }
 })
 
+const experimentalArgs = Object.fromEntries(
+  EXPERIMENTAL_FEATURES.map(feature => {
+    const name = experimentalFlagName(feature)
+    const label = name.slice('experimental-'.length).replaceAll('-', ' ')
+    return [name, { type: 'boolean' as const, description: `Enable experimental ${label}` }]
+  })
+)
+
 const start = defineCommand({
   meta: { name: 'start', description: 'Start the moi web server' },
   args: {
     port: {
       type: 'string',
       description: 'HTTP port to listen on (default: 13337)'
-    }
+    },
+    ...experimentalArgs
   },
-  async run({ args }) {
+  async run({ args, rawArgs }) {
+    const knownFlags = new Set(EXPERIMENTAL_FEATURES.map(experimentalFlagName))
+    for (const arg of rawArgs) {
+      if (arg.startsWith('--experimental-') && !knownFlags.has(arg.slice(2))) {
+        throw new Error(`Unknown experimental feature: ${arg.slice('--experimental-'.length)}`)
+      }
+    }
+    const experimental: Partial<ExperimentalFeatures> = {}
+    const experimentalFlags: string[] = []
+    for (const feature of EXPERIMENTAL_FEATURES) {
+      const flag = experimentalFlagName(feature)
+      if (args[flag] !== true) continue
+      experimental[feature] = true
+      experimentalFlags.push(`--${flag}`)
+    }
     const projectRoot = join(import.meta.dir, '..')
     // Undocumented: --dev runs the watch-and-full-restart dev supervisor.
     const dev = process.argv.includes('--dev')
@@ -529,17 +571,20 @@ const start = defineCommand({
         ...(debug ? { MOI_DEBUG: '1' } : {})
       }
       if (dev) {
-        await runDevSupervisor(projectRoot, env)
+        await runDevSupervisor(projectRoot, env, experimentalFlags)
         return
       }
       const cwd = serverCwd(projectRoot, dev)
-      const proc = spawnServer(cwd, env)
-      process.exit(await superviseServerUpdates(proc, () => spawnServer(cwd, env)))
+      const proc = spawnServer(cwd, env, experimentalFlags)
+      process.exit(
+        await superviseServerUpdates(proc, () => spawnServer(cwd, env, experimentalFlags))
+      )
     }
 
     // This IS the server process (MOI_SERVER=1). cwd is the package root when the
     // dev bundler runs (bunfig loaded at Bun startup) or a neutral dir for a
     // prebuilt install — see serverCwd().
+    initializeAppConfig(experimental)
     try {
       await import('./web')
     } catch (err) {
@@ -2451,7 +2496,7 @@ async function runSkillUpdate(cwd: string): Promise<void> {
   // Type-aware: an OpenClaw workspace keeps its skills in `skills/`, so the
   // update must target the same dir the agent actually loads from.
   const { root, type } = await resolveWorkspace(cwd)
-  const { before, status, changedSkills, appletTypesWritten } = await updateWorkspaceSkills(
+  const { before, status, changedSkills, updatedAppletTypes } = await updateWorkspaceSkills(
     root,
     type ?? 'claude-code'
   )
@@ -2460,8 +2505,8 @@ async function runSkillUpdate(cwd: string): Promise<void> {
 
   console.log('\n' + pc.green('✓') + ' ' + heading + pc.bold(root) + '\n')
   printSkillUpdateTable(before, after, changedSkills)
-  if (appletTypesWritten) {
-    console.log(pc.dim('  Ambient applet types regenerated: ') + pc.bold('.moi/applet-env.d.ts\n'))
+  for (const file of updatedAppletTypes) {
+    console.log(pc.dim('  Applet types regenerated: ') + pc.bold(`.moi/${file}\n`))
   }
 }
 

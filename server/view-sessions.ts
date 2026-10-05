@@ -1,7 +1,8 @@
 import { APP_ICON_IDS } from '@/lib/app-icons'
 import { viewBuildDirectives } from '@/lib/view-build-directives'
 import { viewIdFromTab, viewTabId } from '@/lib/workspace-tabs'
-import type { PendingView, WorkspaceEntry, WorkspaceTabId } from '@/lib/types'
+import type { PendingView, SelectedSessionScope, WorkspaceEntry, WorkspaceTabId } from '@/lib/types'
+import { getCollabReferencePath } from './collab/config'
 import { harnessFor } from './harness/registry'
 import type { SendMessageInput } from './harness/types'
 import { ForkUnsupportedError, inheritedHistoryBoundary } from './harness/fork'
@@ -30,17 +31,21 @@ export class ViewStartupError extends Error {
 type BuildSendOptions = Pick<
   SendMessageInput,
   'attachments' | 'optimisticId' | 'model' | 'effort' | 'fastMode' | 'stream'
->
+> & { selectedSessionScope?: SelectedSessionScope }
 export type SubmitViewInput = BuildSendOptions & { requirements: string; sessionId?: string }
 
 // Both ordinary chat and initial build requests use this boundary.
-export async function sendWorkspaceMessage(ws: WorkspaceEntry, input: SendMessageInput) {
+export async function sendWorkspaceMessage(
+  ws: WorkspaceEntry,
+  input: SendMessageInput & { selectedSessionScope?: SelectedSessionScope }
+) {
+  const { selectedSessionScope, ...message } = input
   const sessionId = resolveRenamedSession(ws.path, input.sessionId)
   const record = await getSessionRecord(ws.path, sessionId)
   const tabId = input.context?.activeTab ?? 'overview'
   if (input.isNew && record.tabId !== tabId) {
     record.tabId = tabId === 'overview' ? undefined : tabId
-    await attachSession(ws, tabId, sessionId, null)
+    await attachSession(ws, tabId, sessionId, null, selectedSessionScope)
   }
   const viewId = viewIdFromTab(tabId)
   const pending = viewId ? await getPendingView(ws.path, viewId) : undefined
@@ -48,12 +53,14 @@ export async function sendWorkspaceMessage(ws: WorkspaceEntry, input: SendMessag
     await patchPendingView(ws.id, ws.path, pending.id, {
       executionSessionId: sessionId
     })
+  const collabReference = await getCollabReferencePath(ws.path, ws.type)
   await harnessFor(ws).sendMessage({
-    ...input,
+    ...message,
     sessionId,
     context: {
       ...input.context,
       activeTab: tabId,
+      ...(collabReference ? { collabReference } : {}),
       directives: [
         ...(input.context?.directives ?? []),
         ...(pending ? viewBuildDirectives(pending.id, APP_ICON_IDS) : []),
@@ -82,12 +89,15 @@ async function attachSession(
   ws: WorkspaceEntry,
   tabId: WorkspaceTabId,
   sessionId: string,
-  previousSessionId?: string | null
+  previousSessionId?: string | null,
+  selectedSessionScope: SelectedSessionScope = 'shared'
 ) {
   await patchSessionRecord(ws.path, sessionId, { tabId: tabId === 'overview' ? undefined : tabId })
-  await saveSelectedSession(ws.path, sessionId, previousSessionId, tabId)
   broadcast(ws.id, { type: 'sessions_changed', sessionId })
-  publishEvent({ type: 'selected-session:updated', workspaceId: ws.id, sessionId })
+  if (selectedSessionScope === 'shared') {
+    await saveSelectedSession(ws.path, sessionId, previousSessionId, tabId)
+    publishEvent({ type: 'selected-session:updated', workspaceId: ws.id, sessionId })
+  }
 }
 async function sendBuild(
   ws: WorkspaceEntry,
@@ -144,7 +154,8 @@ export async function submitView(ws: WorkspaceEntry, viewId: string, input: Subm
     !!input.attachments?.length
   )
   try {
-    if (!pinned) await attachSession(ws, viewTabId(view.id), sessionId)
+    if (!pinned)
+      await attachSession(ws, viewTabId(view.id), sessionId, undefined, input.selectedSessionScope)
     await sendBuild(ws, view, sessionId, !pinned, input)
   } catch (error) {
     return failStartup(ws, error, sessionId, view)
