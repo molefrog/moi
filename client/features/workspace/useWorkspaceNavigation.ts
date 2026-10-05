@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo } from 'react'
 import type { MouseEvent } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useLocation, useRouter } from 'wouter'
 import { usePathname, useSearch } from 'wouter/use-browser-location'
 
 import { toast } from '@/client/components/ui/toast'
+import { workspaceKeys } from '@/client/api/workspace-keys'
 import { reportAppletError } from '@/client/features/applets/applet-log'
 import { useAppletEvent } from '@/client/features/applets/applet-runtime'
 import { useCollabEnabled } from '@/client/features/collab'
@@ -32,6 +34,7 @@ const rememberedAddresses = new Map<string, Map<WorkspaceTabId, string>>()
 type UseWorkspaceNavigationOptions = { views: ViewInfo[]; split: boolean }
 
 export function useWorkspaceNavigation({ views, split }: UseWorkspaceNavigationOptions) {
+  const queryClient = useQueryClient()
   const { layout, setLayout, workspaceId } = useWorkspaceLayoutCtx()
   const collabEnabled = useCollabEnabled()
   const [, navigate] = useLocation()
@@ -87,7 +90,7 @@ export function useWorkspaceNavigation({ views, split }: UseWorkspaceNavigationO
   )
 
   const navigateHref = useCallback(
-    (href: string) => {
+    (href: string, availableViews = views) => {
       const target = resolveUrl(href, {
         apiBase: `/api/workspaces/${encodeURIComponent(workspaceId)}`,
         workspacePath: workspacePath(workspaceId)
@@ -97,7 +100,7 @@ export function useWorkspaceNavigation({ views, split }: UseWorkspaceNavigationO
         return
       }
       const address = parseMoiHref(href)
-      if (!tabAvailable(address.tab, views))
+      if (!tabAvailable(address.tab, availableViews))
         throw new Error('This destination is unavailable in this workspace')
       go(target)
     },
@@ -120,7 +123,12 @@ export function useWorkspaceNavigation({ views, split }: UseWorkspaceNavigationO
       reportError(error)
     }
   })
-  useNavigationClient(workspaceId, navigateHref)
+  useNavigationClient(workspaceId, async href => {
+    const queryKey = workspaceKeys.views(workspaceId)
+    if (href.startsWith('moi:/views/') && !tabAvailable(parseMoiHref(href).tab, views))
+      await queryClient.refetchQueries({ queryKey, exact: true }, { throwOnError: true })
+    navigateHref(href, queryClient.getQueryData<ViewInfo[]>(queryKey) ?? views)
+  })
 
   // Bare workspace URLs, old bookmarks, and hidden singleton chat routes are
   // the only redirects. Missing destinations keep their URL and show recovery.

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { existsSync } from 'node:fs'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'path'
 
@@ -345,6 +345,18 @@ describe('findWorkspaceForPath', () => {
 
   test('returns null for an empty registry', () => {
     expect(findWorkspaceForPath([], '/anywhere')).toBeNull()
+  })
+
+  test('matches a symlink alias and keeps the registered workspace path', async () => {
+    const root = join(tmpDir, 'workspace')
+    const nested = join(root, '.moi')
+    const alias = join(tmpDir, 'alias')
+    await mkdir(nested, { recursive: true })
+    await symlink(root, alias, 'dir')
+    const registered = ws(alias)
+    expect(findWorkspaceForPath([registered], root)).toBe(registered)
+    expect(findWorkspaceForPath([registered], nested)).toBe(registered)
+    expect(findWorkspaceForPath([ws(root)], alias)).toEqual(ws(root))
   })
 })
 

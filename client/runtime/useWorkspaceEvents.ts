@@ -150,7 +150,10 @@ function sendNavigationPresence() {
 
 // This hook owns presence for the displayed workspace, including reconnects.
 // Requests received after a workspace switch never act on the new workspace.
-export function useNavigationClient(workspaceId: string, navigate: (href: string) => void) {
+export function useNavigationClient(
+  workspaceId: string,
+  navigate: (href: string) => void | Promise<void>
+) {
   useEffect(() => {
     navigationWorkspace = workspaceId
     sendNavigationPresence()
@@ -164,12 +167,12 @@ export function useNavigationClient(workspaceId: string, navigate: (href: string
     }
   }, [workspaceId])
 
-  useWorkspaceEvent(event => {
+  useWorkspaceEvent(async event => {
     if (event.type !== 'navigation:request' || event.workspaceId !== workspaceId) return
     const socket = ws
     try {
       if (navigationWorkspace !== workspaceId) throw new Error('The browser switched workspaces.')
-      navigate(event.href)
+      await navigate(event.href)
       socket?.send(
         JSON.stringify({ type: 'navigation:result', requestId: event.requestId, ok: true })
       )
