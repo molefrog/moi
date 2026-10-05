@@ -1,4 +1,6 @@
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, spyOn, test } from 'bun:test'
+import { toast } from '@/client/components/ui/toast'
+import { MAX_MESSAGE_ATTACHMENTS } from '@/lib/message-attachments'
 import { appletRuntime } from '../../../applets/applet-runtime'
 import { stageTextAttachment, stageChatAttachment } from './draft-attachments'
 import { attachmentKey, liveStore } from '../../chat-store'
@@ -37,14 +39,28 @@ describe('text staging and sends', () => {
     ])
   })
 
-  test('stages repeated text attachments without a limit', () => {
-    stageTextAttachment(target, attachment)
-    stageTextAttachment(target, structuredClone(attachment))
-    expect(attachmentsForSend(workspaceId, null)).toHaveLength(2)
-    for (let i = 1; i < 20; i++) stageTextAttachment(target, { ...attachment, text: String(i) })
-    expect(attachmentsForSend(workspaceId, null)).toHaveLength(21)
-    stageTextAttachment(target, attachment)
-    expect(attachmentsForSend(workspaceId, null)).toHaveLength(22)
+  test('caps rapid text staging per chat and frees a slot when an item is removed', () => {
+    const notices = spyOn(toast, 'add').mockImplementation(() => 'limit')
+    try {
+      for (let i = 0; i < MAX_MESSAGE_ATTACHMENTS + 2; i++)
+        stageTextAttachment(target, { ...attachment, text: String(i) })
+      const staged = attachmentsForSend(workspaceId, null)
+      expect(staged).toHaveLength(MAX_MESSAGE_ATTACHMENTS)
+      expect(notices).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Attachment limit reached',
+          type: 'error'
+        })
+      )
+      stageTextAttachment({ workspaceId, sessionId: 'other' }, attachment)
+      expect(attachmentsForSend(workspaceId, 'other')).toHaveLength(1)
+      liveStore.getState().removeAttachment(workspaceId, staged[0].localId)
+      stageTextAttachment(target, attachment)
+      expect(attachmentsForSend(workspaceId, null)).toHaveLength(MAX_MESSAGE_ATTACHMENTS)
+      expect(attachmentsForSend(workspaceId, null).at(-1)).toMatchObject(attachment)
+    } finally {
+      notices.mockRestore()
+    }
   })
 
   test('keeps chats isolated and follows session renames', () => {

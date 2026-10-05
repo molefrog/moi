@@ -4,12 +4,14 @@ import { toast } from '@/client/components/ui/toast'
 import {
   stageDrawing,
   stageDrawingDraft,
+  stageComposerFiles,
   stageChatAttachment,
   stageTextAttachment
 } from './draft-attachments'
 import { attachmentsForSend } from '../../chat-send'
 import * as appletLog from '../../../applets/applet-log'
 import { attachmentKey, liveStore } from '../../chat-store'
+import { MAX_MESSAGE_ATTACHMENTS } from '@/lib/message-attachments'
 
 const workspaceId = 'workspace-1'
 const sessionId = 'session-1'
@@ -31,6 +33,70 @@ afterEach(() => {
   globalThis.fetch = originalFetch
   liveStore.getState().clearAttachments(workspaceId, sessionId)
   liveStore.setState({ attachments: {} })
+})
+
+test('uploading files reserve draft slots and rejected files never upload', async () => {
+  for (let i = 0; i < MAX_MESSAGE_ATTACHMENTS - 1; i++)
+    stageTextAttachment(
+      { workspaceId, sessionId },
+      { source: 'view:files', label: String(i), text: String(i) }
+    )
+  const upload = Promise.withResolvers<Response>()
+  const fetchSpy = mock(() => upload.promise)
+  globalThis.fetch = fetchSpy as unknown as typeof fetch
+  const target = { workspaceId, sessionId }
+  const pending = stageChatAttachment(target, {
+    type: 'file',
+    source: 'view:files',
+    file: new File(['first'], 'first.txt')
+  })
+  stageComposerFiles(target, [new File(['second'], 'second.txt')])
+  await stageChatAttachment(target, { type: 'file', source: 'view:files', path: 'third.txt' })
+  expect(liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)]).toHaveLength(
+    MAX_MESSAGE_ATTACHMENTS
+  )
+  expect(fetchSpy).toHaveBeenCalledTimes(1)
+  expect(notices).toHaveBeenCalledWith(
+    expect.objectContaining({ title: 'Attachment limit reached' })
+  )
+  upload.resolve(
+    Response.json([
+      { id: 'upload-1', kind: 'file', filename: 'first.txt', mediaType: 'text/plain' }
+    ])
+  )
+  await pending
+  expect(attachmentsForSend(workspaceId, sessionId)).toHaveLength(MAX_MESSAGE_ATTACHMENTS)
+})
+
+test('a full draft can update its drawing but rejects new drawings before allocating previews or uploading', async () => {
+  const target = { workspaceId, sessionId }
+  const drawing = {
+    ...target,
+    localId: 'drawing',
+    purpose: 'annotation' as const,
+    source: 'overview' as const,
+    blob: new Blob(['first'], { type: 'image/png' })
+  }
+  stageDrawingDraft(drawing)
+  for (let i = 0; i < MAX_MESSAGE_ATTACHMENTS - 1; i++)
+    stageTextAttachment(target, { source: 'view:files', label: String(i), text: String(i) })
+  const preview = drawingAttachments()[0].previewUrl
+  expect(stageDrawingDraft({ ...drawing, blob: new Blob(['edited']) })).toBe(true)
+  expect(drawingAttachments()[0].previewUrl).not.toBe(preview)
+  const previewSpy = spyOn(URL, 'createObjectURL')
+  const fetchSpy = mock(() => Promise.reject(new Error('No upload expected')))
+  globalThis.fetch = fetchSpy as unknown as typeof fetch
+  try {
+    await stageDrawing({ ...drawing, localId: 'new-drawing', isCurrent: () => true })
+    expect(drawingAttachments()).toHaveLength(1)
+    expect(previewSpy).not.toHaveBeenCalled()
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(notices).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Attachment limit reached' })
+    )
+  } finally {
+    previewSpy.mockRestore()
+  }
 })
 
 describe('drawing draft staging', () => {

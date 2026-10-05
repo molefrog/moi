@@ -6,7 +6,8 @@ import type {
   WorkspaceTabId
 } from '@/lib/types'
 
-import { findAttachment, liveStore } from '../../chat-store'
+import { attachmentKey, findAttachment, liveStore } from '../../chat-store'
+import { MAX_MESSAGE_ATTACHMENTS } from '@/lib/message-attachments'
 import { uploadChatFile } from './uploads'
 import { reportAppletError } from '@/client/features/applets/applet-log'
 import { toast } from '@/client/components/ui/toast'
@@ -14,6 +15,18 @@ import { toast } from '@/client/components/ui/toast'
 type ComposerTarget = {
   workspaceId: string
   sessionId: string | null
+}
+
+function hasAttachmentRoom({ workspaceId, sessionId }: ComposerTarget): boolean {
+  const pending = liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)] ?? []
+  if (pending.length < MAX_MESSAGE_ATTACHMENTS) return true
+  toast.add({
+    id: 'draft-attachment-limit',
+    title: 'Attachment limit reached',
+    description: `You can attach up to ${MAX_MESSAGE_ATTACHMENTS} items. Remove one to add another.`,
+    type: 'error'
+  })
+  return false
 }
 
 export function stageComposerFiles(target: ComposerTarget, files: File[]): void {
@@ -27,6 +40,7 @@ async function stageFile(
   onError?: (message: string) => void,
   source?: string
 ): Promise<void> {
+  if (!hasAttachmentRoom({ workspaceId, sessionId })) return
   const file = typeof input === 'string' ? null : input
   const label = typeof input === 'string' ? input.split('/').at(-1)! : input.name || 'file'
   const localId = crypto.randomUUID()
@@ -99,11 +113,12 @@ export function stageDrawingDraft({
   purpose,
   source,
   blob
-}: StageDrawingDraftInput): void {
+}: StageDrawingDraftInput): boolean {
   const label = purpose === 'sketch' ? 'Sketch' : 'Annotation'
-  const previewUrl = URL.createObjectURL(blob)
   const store = liveStore.getState()
   const existing = findAttachment(store.attachments, workspaceId, localId)
+  if (!existing && !hasAttachmentRoom({ workspaceId, sessionId })) return false
+  const previewUrl = URL.createObjectURL(blob)
 
   if (existing) {
     store.updateAttachment(workspaceId, localId, {
@@ -125,6 +140,7 @@ export function stageDrawingDraft({
       }
     ])
   }
+  return true
 }
 
 type StageDrawingInput = StageDrawingDraftInput & {
@@ -137,7 +153,7 @@ type StageDrawingInput = StageDrawingDraftInput & {
 export async function stageDrawing(input: StageDrawingInput): Promise<void> {
   const { workspaceId, localId, purpose, blob, isCurrent } = input
   const label = purpose === 'sketch' ? 'Sketch' : 'Annotation'
-  stageDrawingDraft(input)
+  if (!stageDrawingDraft(input)) return
   liveStore.getState().updateAttachment(workspaceId, localId, { status: 'uploading' })
 
   try {
@@ -161,6 +177,7 @@ export function stageTextAttachment(
   { workspaceId, sessionId }: ComposerTarget,
   attachment: TextAttachment
 ): void {
+  if (!hasAttachmentRoom({ workspaceId, sessionId })) return
   const store = liveStore.getState()
   store.addAttachments(workspaceId, sessionId, [
     { kind: 'text', localId: crypto.randomUUID(), ...attachment }
