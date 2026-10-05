@@ -288,7 +288,7 @@ Views are full-screen apps, one per tab.
 ```ts
 export const config = {
   title: 'Customer overview', // sentence-case nav label — defaults to the file name
-  icon: 'user', // icon id; use the claimed icon for a view-builder request
+  icon: 'user', // icon id; use the selected icon for a pending view
   requiredEnv: ['CRM_API_KEY'] // optional env-key hints (advisory; see Environment and secrets)
 } as const
 ```
@@ -300,23 +300,36 @@ Keep shareable or reload-safe state in URL query params,
 read it from `params`, and update it with `navigate()`. Keep temporary state, such as drafts and
 hover, in React. See [Applet intents](references/INTENTS.md#view-params-and-history).
 
-#### View builder requests
+#### Creating views from chat
 
-When the message's hidden `<moi-context>` envelope is marked `View builder request`, this chat is
-linked to a pending view tab. Before reading files, planning, or writing code, infer a short stable
-id, a clear sentence-case title, and a relevant icon from the requirements. Capitalize only the
-first word of the title. Your first action must claim them:
+When the user asks for a new view from an existing chat, run:
 
 ```sh
-moi builder set <view-id> --builder <builder-id> --kind view --title "<title>" --icon <icon-id>
+moi views create --source-session <current-session-id> --requirements "<complete requirements>"
 ```
 
-Choose the icon id from the available view icons in the hidden context. The id must use lowercase
-letters, numbers, `_`, or `-`. The first call locks the id; running the same command again may update
-its title and icon. After claiming, write `.moi/views/<view-id>.tsx`, use the same icon id in its
-config, and build it with `moi bundle --only views/<view-id>`. The tab uses the claimed title and icon
-while you work and changes into the built view after a successful bundle. (Bundling marks the view
-ready; the build state is otherwise server-managed, so you never set it to done by hand.)
+Use the current session id from the hidden context. The command returns a permanent `viewId`. With
+`mode: "handoff"`, another chat continues the build, so reply with a link such as
+`[Open the view](moi:/views/<viewId>)` and keep the user's current tab open. With
+`mode: "in-place"`, continue the build in this turn using the returned id.
+
+#### Pending view builds
+
+When the hidden `<moi-context>` envelope is marked `View build request`, this chat is working on the
+pending view whose id is supplied in that request. This guidance also applies when
+`moi views create` returns `mode: "in-place"`. Read the applet design guidance before editing.
+When the direction is clear, choose a sentence-case title and relevant icon. Preserve proper names
+and acronyms. Set this provisional metadata before the first bundle:
+
+```sh
+moi views set <view-id> --title "<title>" --icon <icon-id>
+```
+
+Choose from the available view icons in the hidden context when that list is present. Then write
+`.moi/views/<view-id>.tsx` and use the same title and icon in its config. Run
+`moi check --only views/<view-id>` before `moi bundle --only views/<view-id>`. A successful bundle
+replaces the pending screen in the same tab. Keep the user's current tab open and finish with a
+`moi:/views/<view-id>` link.
 
 ### Styling and UI components
 
@@ -421,14 +434,15 @@ needs another focused check. Do not search for repo tests by default. Run an exi
 `moi call-server-fn` only when the change touches the behavior it covers. If native-app inspection is
 unavailable, keep verification in the browser instead of retrying the unsupported tool.
 
-After the final successful checks, always make navigation to the result the final workspace action:
+After the final successful checks, hand off the result according to the task:
 
 - After building or editing a widget, run `moi navigate 'moi:/overview'`.
-- After building or editing a view, run `moi navigate 'moi:/views/<view-id>'`, using its file name or claimed
-  builder id.
+- After editing an existing view, run `moi navigate 'moi:/views/<view-id>'`.
+- After a pending view build, keep the current tab open and link to `moi:/views/<view-id>` in the
+  final reply.
 
-The focused applet is the handoff. Keep the final reply brief and user-facing. Do not include file
-or storage links, file paths, or bundle, test, and runtime-log summaries.
+Keep the final reply brief and user-facing. Do not include file or storage links, file paths, or
+bundle, test, and runtime-log summaries.
 
 ### Debugging
 
