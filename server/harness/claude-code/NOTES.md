@@ -35,6 +35,20 @@ and version-manager shims. There is no SDK bundled-executable fallback. If the
 command is missing, setup and existing workspaces report:
 `Run curl -fsSL https://claude.ai/install.sh | sh in your terminal to install Claude`.
 
+**Spawn environment.** Every Claude Code subprocess builds its env through
+`claudeSpawnEnv()` in `spawn-env.ts` — chat sessions, the session-title run, the
+model catalog, the MCP probe, and the `auth status` / `auth login` spawns. It
+merges the caller's extra env (workspace env, `MOI_AGENT`,
+`DISABLE_AUTOUPDATER`) over `process.env` and always strips `CLAUDECODE`.
+Claude Code refuses to launch nested when that variable is set, and the server
+inherits it whenever moi is started from inside an agent session — which is
+what the install prompt does. Only the auth spawns were missing the strip, and
+because they also discarded stderr the refusal was invisible: the workspace sat
+on "Log in to your agent" and the login button did nothing. Both auth spawns
+now pipe stderr and print it as `[claude auth status stderr]` /
+`[claude auth login stderr]`, so any future refusal shows up in the server log.
+The exit-code mapping (0 logged in, 1 logged out) is unchanged.
+
 **In-place updates.** Claude Code can replace its binary at the same path
 while moi keeps running, changing which models are available.
 
@@ -44,6 +58,16 @@ while moi keeps running, changing which models are available.
 - The model catalog (`models.ts`) is keyed by executable path and the first
   line of `claude --version`. Each lookup probes that identity again. Changes
   refetch the catalog; a failed version probe at the same path retains it.
+- Capabilities are asked of the CLI, not of its version number. Every session
+  runs `permissionMode: 'auto'`, and a CLI that doesn't accept it kills the
+  first message with `option '--permission-mode <mode>' argument 'auto' is
+invalid`. `capabilities.ts` parses the accepted choices out of
+  `claude --help` — one spawn per CLI identity, cached beside the catalog's —
+  and `availability` reports `Claude Code <version> doesn't support auto
+permissions. Run claude update` before the auth probe, so the composer shows
+  one reason. There is no version floor: the changelog does not date when
+  `auto` arrived and the Agent SDK declares no minimum. A failed or unreadable
+  probe is unknown and never blocks, same as a failed version probe.
 - On a changed identity, `index.ts` marks existing subprocesses `staleCli`
   (`retireCCSessionsOnCliChange`). Invalidation never interrupts work. Before
   the next message, the dispatcher waits for the current turn and background
