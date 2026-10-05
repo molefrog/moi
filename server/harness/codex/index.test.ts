@@ -1,6 +1,5 @@
 import { describe, expect, spyOn, test } from 'bun:test'
 import type { WorkspaceEntry } from '@/lib/types'
-import * as configs from '../../session-config'
 import * as clients from './client'
 import { harnessFor } from '../registry'
 import type { Json } from './transport'
@@ -23,16 +22,15 @@ test.each(['gpt-6.1-sol', undefined])(
       }
     }
     const clientSpy = spyOn(clients, 'getCodexClient').mockResolvedValue(client)
-    const configSpy = spyOn(configs, 'getSessionConfig').mockResolvedValue(model ? { model } : {})
     try {
-      expect(await harnessFor(ws).forkSession!(ws, 'source')).toBe('child')
-      expect(configSpy).toHaveBeenCalledWith(ws.path, 'source')
+      expect(
+        await harnessFor(ws).forkSession!(ws, 'source', { model, effort: 'high', fastMode: false })
+      ).toBe('child')
       expect(calls).toEqual([
         { method: 'thread/fork', params: { threadId: 'source', ...(model ? { model } : {}) } }
       ])
     } finally {
       clientSpy.mockRestore()
-      configSpy.mockRestore()
     }
   }
 )

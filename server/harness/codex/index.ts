@@ -19,7 +19,6 @@ import {
   killCodexWorkspace
 } from './client'
 import { discoverCodexWorkspaces } from './discovery'
-import { getSessionConfig } from '../../session-config'
 import {
   ensureCodexSessionLive,
   getCodexActiveSessions,
@@ -43,9 +42,8 @@ export const codexHarness: Harness = {
   sendMessage: input => sendCodexMessage(input),
   interrupt: (workspaceId, sessionId) => interruptCodexRun({ workspaceId, sessionId }),
   archiveSession: (ws, sessionId) => archiveCodexSession(ws.path, sessionId),
-  forkSession: async (ws, sourceId) => {
+  forkSession: async (ws, sourceId, { model }) => {
     const client = await getCodexClient(ws.path)
-    const { model } = await getSessionConfig(ws.path, sourceId)
     const { thread } = await client
       .rpc<{ thread: { id: string } }>('thread/fork', {
         threadId: sourceId,

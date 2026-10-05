@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { WorkspaceEntry } from '@/lib/types'
-import { harnessFor } from './harness/registry'
+import { allHarnesses, harnessFor } from './harness/registry'
 import type { SendMessageInput } from './harness/types'
 import { ForkUnsupportedError } from './harness/fork'
 import {
@@ -37,7 +37,7 @@ import {
   DEFAULT_SELECTED_SESSION_PATH
 } from './selected-session'
 import { renameSessionReferences } from './session-lifecycle'
-import { saveSessionConfig } from './session-config'
+import { getSessionConfig, saveSessionConfig } from './session-config'
 import { DATA_DIR } from './data-dir'
 import { setEventServer } from './events'
 const harness = harnessFor('codex')
@@ -264,11 +264,46 @@ test('native rename preserves the execution reference and attached selection', a
   expect((await getPendingView(ws.path, result.viewId))?.executionSessionId).toBe('native')
   expect(await getSelectedSession(ws.path, `views/${result.viewId}`)).toBe('native')
 })
-test('source settings are copied into handoff', async () => {
-  await saveSessionConfig(ws.path, 'source', { model: 'model', effort: 'high', fastMode: true })
-  await createViewFromSession(ws, 'source', 'Build cards')
-  expect(sent[0]).toMatchObject({ model: 'model', effort: 'high', fastMode: true })
-})
+test.each(allHarnesses().map(harness => harness.id))(
+  '%s handoff inherits source settings through native fork or fresh fallback',
+  async type => {
+    const target = harnessFor(type)
+    const original = {
+      forkSession: target.forkSession,
+      sendMessage: target.sendMessage,
+      listSessions: target.listSessions,
+      sessionEvents: target.sessionEvents,
+      activeSessions: target.activeSessions
+    }
+    const config = { model: 'model', effort: 'high', fastMode: false }
+    const workspace = { ...ws, type, agentId: 'agent' }
+    await saveSessionConfig(ws.path, 'source', config)
+    target.listSessions = harness.listSessions
+    target.activeSessions = harness.activeSessions
+    target.sessionEvents = async () => []
+    target.sendMessage = async input => {
+      expect(await getSessionConfig(ws.path, input.sessionId)).toEqual(config)
+      sent.push(input)
+    }
+    target.forkSession = original.forkSession
+      ? async (_ws, sourceId, sourceConfig) => {
+          expect(sourceId).toBe('source')
+          expect(sourceConfig).toEqual(config)
+          // A later source edit must not change the settings of this fork.
+          await saveSessionConfig(ws.path, sourceId, { model: 'other', effort: 'low' })
+          return 'child'
+        }
+      : undefined
+    try {
+      const result = await createViewFromSession(workspace, 'source', 'Build cards')
+      expect(await getSessionConfig(ws.path, result.sessionId!)).toEqual(config)
+      expect(sent).toHaveLength(1)
+      expect(sent[0]).toMatchObject({ ...config, isNew: !original.forkSession })
+    } finally {
+      Object.assign(target, original)
+    }
+  }
+)
 test('restart fails a starting view without forking or sending', async () => {
   const view = await createPendingView(ws.id, ws.path, {
     status: 'starting',

@@ -192,8 +192,9 @@ export async function createViewFromSession(
   let sessionId: string | undefined
   let view: PendingView | undefined
   try {
+    const sourceConfig = await getSessionConfig(ws.path, sourceSessionId)
     try {
-      sessionId = await harness.forkSession?.(ws, sourceSessionId)
+      sessionId = await harness.forkSession?.(ws, sourceSessionId, sourceConfig)
     } catch (error) {
       if (!(error instanceof ForkUnsupportedError)) throw error
     }
@@ -210,11 +211,7 @@ export async function createViewFromSession(
           ...inheritedHistoryBoundary(history)
         })
     }
-    const config = await saveSessionConfig(
-      ws.path,
-      sessionId,
-      await getSessionConfig(ws.path, sourceSessionId)
-    )
+    const config = await saveSessionConfig(ws.path, sessionId, sourceConfig)
     view = await createPendingView(ws.id, ws.path, {
       status: 'starting',
       requirements: requirements.trim(),

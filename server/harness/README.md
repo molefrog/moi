@@ -244,6 +244,12 @@ doubles as the evaluation rubric for new harnesses.
 
 ### Per-request configuration
 
+- **Fork settings** — shared orchestration snapshots the source `SessionConfig`,
+  passes it to native `forkSession`, saves it on the child, and uses it for the
+  first send. Model, effort, and fast mode are inherited together. Adapters only
+  translate settings their native fork needs at creation; they do not read or
+  copy stored settings themselves. The fresh-chat fallback follows the same
+  rule when native forking is unavailable. Hermes currently has no effort control.
 - **List supported models**, including per-model metadata such as supported
   effort levels (drives the picker).
 - **Set model** — ideally live mid-session.
