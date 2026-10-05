@@ -123,6 +123,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@types/react-grid-layout": "^2.1.0",
+    "@types/react-resizable": "^3.0.8",
     "date-fns": "^4.4.0",
     "embla-carousel-react": "^8.6.0",
     "oxfmt": "^0.54.0",

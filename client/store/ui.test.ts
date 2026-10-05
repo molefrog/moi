@@ -17,7 +17,8 @@ beforeEach(() => {
     hasSentMessageFromMoi: false,
     workspaceIdsPendingAnalysis: [],
     composerDrafts: {},
-    dockedChatWidth: 360
+    dockedChatWidth: 360,
+    popupChatWidth: 440
   })
 })
 
@@ -59,6 +60,7 @@ describe('composer drafts', () => {
 
     expect(restoredStore.getState().composerDrafts).toEqual({})
     expect(restoredStore.getState().dockedChatWidth).toBe(360)
+    expect(restoredStore.getState().popupChatWidth).toBe(440)
   })
 
   test('persists drafts per workspace and restores them in a new store', () => {
@@ -133,6 +135,15 @@ describe('docked chat width', () => {
       state: { dockedChatWidth: 412 }
     })
   })
+})
+
+test('popup width survives reloads independently of the sidebar width', () => {
+  useUiStore.getState().setPopupChatWidth(1000)
+  useUiStore.getState().setDockedChatWidth(412)
+
+  const restoredStore = createUiStore(localStorage)
+  expect(restoredStore.getState().popupChatWidth).toBe(1000)
+  expect(restoredStore.getState().dockedChatWidth).toBe(412)
 })
 
 test('a pending view draft follows chat creation and native renames, including empty text', () => {
