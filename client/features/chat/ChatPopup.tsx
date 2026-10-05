@@ -88,7 +88,7 @@ export function ChatPopup({
         side="top"
         sideOffset={({ anchor }) => -anchor.height}
         align="end"
-        className="flex h-[calc(100vh-2rem)] w-[min(440px,calc(100vw-1rem))] flex-col gap-0 rounded-3xl p-0 sm:h-[calc(100vh-8rem)] sm:w-[min(440px,calc(100vw-2rem))] sm:p-1"
+        className="flex h-[calc(100vh-2rem)] w-[min(440px,calc(100vw-1rem))] flex-col gap-0 overflow-clip rounded-3xl p-0 sm:h-[calc(100vh-8rem)] sm:w-[min(440px,calc(100vw-2rem))]"
         keepMounted
       >
         {children(onClose)}

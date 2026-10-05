@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { IconArchive, IconEdit, IconHistory } from '@tabler/icons-react'
+import { IconArchive, IconEdit, IconHistory, IconPin, IconPinFilled } from '@tabler/icons-react'
 
 import { useArchiveWorkspaceSession, useWorkspaceSessions } from './api'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
@@ -248,20 +248,52 @@ export function groupSessionsForTab(
 
 export function ChatSelector({ className }: ChatSelectorProps) {
   const workspaceId = useWorkspaceId()
-  const { pinnedSessionId, loaded } = usePinnedSession()
+  const { pinnedSessionId, loaded, pin } = usePinnedSession()
+  const [selectedSessionId] = useSelectedSession()
   const { data: sessions = [] } = useWorkspaceSessions(workspaceId)
   if (!loaded) return null
+  const pinButton = selectedSessionId ? (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className={className}
+            onClick={() => pin(pinnedSessionId ? null : selectedSessionId)}
+            aria-label={pinnedSessionId ? 'Unpin chat' : 'Pin chat'}
+            aria-pressed={!!pinnedSessionId}
+          >
+            {pinnedSessionId ? <IconPinFilled stroke={1.75} /> : <IconPin stroke={1.75} />}
+          </Button>
+        }
+      />
+      <TooltipContent>{pinnedSessionId ? 'Unpin chat' : 'Pin chat'}</TooltipContent>
+    </Tooltip>
+  ) : null
+
   if (pinnedSessionId) {
     const title = sessions.find(session => session.sessionId === pinnedSessionId)?.summary
     if (!title) return null
     return (
-      <div className="flex h-7 min-w-0 items-center px-2.5 text-sm font-medium">
-        <span className="truncate">{title}</span>
+      <div
+        className={cn(
+          '-my-0.5 -ml-0.5 box-content h-7 max-w-56 rounded-lg py-0.5 pr-0.5 pl-3',
+          'flex min-w-0 items-center gap-1 bg-accent text-sm font-medium'
+        )}
+      >
+        <span className="min-w-0 flex-1 truncate">{title}</span>
+        {pinButton}
       </div>
     )
   }
 
-  return <SessionSelector className={className} sessions={sessions} />
+  return (
+    <div className="flex w-full min-w-0 items-center justify-between gap-1">
+      <SessionSelector className={className} sessions={sessions} />
+      {pinButton}
+    </div>
+  )
 }
 
 function SessionSelector({ className, sessions }: SessionSelectorProps) {

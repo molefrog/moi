@@ -1,14 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 
-import {
-  IconChevronDown,
-  IconChevronsRight,
-  IconPin,
-  IconPinFilled,
-  IconX
-} from '@tabler/icons-react'
+import { IconChevronDown, IconChevronsRight, IconX } from '@tabler/icons-react'
 import { draftSessionId } from '@/lib/session-drafts'
-import { useCurrentTabId, usePinnedSession } from './sessions/useSelectedSession'
+import { useCurrentTabId } from './sessions/useSelectedSession'
 
 import { canSubmitComposerAction, focusComposer } from '@/client/components/shared/Composer'
 import { AgentBlobatar } from '@/client/components/shared/AgentBlobatar'
@@ -101,7 +95,6 @@ export function ChatPanel({
   const { data: sessions } = useWorkspaceSessions(workspaceId)
   const sourceName = sessions?.find(session => session.sessionId === forkedFromSessionId)?.summary
   const tabId = useCurrentTabId()
-  const { pinnedSessionId, pin } = usePinnedSession()
   const composerRef = useRef<HTMLTextAreaElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const effectiveSessionId = viewDraft?.sessionId ?? sessionId ?? draftSessionId(tabId)
@@ -183,28 +176,9 @@ export function ChatPanel({
   return (
     <div className="flex min-h-0 flex-1 flex-col pt-2 pb-3">
       <header className="mx-auto flex w-full max-w-[calc(var(--chat-max-container)+40px)] min-w-0 items-center justify-between pr-2 pb-2 pl-2">
-        <div className="min-w-0 flex-1">
+        <div className="flex h-7 min-w-0 flex-1">
           <ChatSelector className={cn('text-foreground', docked && 'text-muted-foreground')} />
         </div>
-        {sessionId && (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className={cn(docked && 'text-muted-foreground')}
-                  onClick={() => pin(pinnedSessionId ? null : sessionId)}
-                  aria-label={pinnedSessionId ? 'Unpin chat' : 'Pin chat'}
-                  aria-pressed={!!pinnedSessionId}
-                >
-                  {pinnedSessionId ? <IconPinFilled stroke={1.75} /> : <IconPin stroke={1.75} />}
-                </Button>
-              }
-            />
-            <TooltipContent>{pinnedSessionId ? 'Unpin chat' : 'Pin chat'}</TooltipContent>
-          </Tooltip>
-        )}
         {onClose && docked && (
           <Tooltip>
             <TooltipTrigger
