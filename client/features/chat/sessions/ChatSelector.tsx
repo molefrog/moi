@@ -259,7 +259,7 @@ export function ChatSelector({ className }: ChatSelectorProps) {
     return (
       <div
         className={cn(
-          '-my-0.5 -ml-0.5 box-content h-7 max-w-56 rounded-lg py-0.5 pr-0.5 pl-3',
+          '-my-0.5 -ml-0.5 box-content h-7 max-w-64 rounded-lg py-0.5 pr-0.5 pl-3',
           'flex min-w-0 items-center gap-1 bg-accent text-sm font-medium'
         )}
       >
