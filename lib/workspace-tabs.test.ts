@@ -5,7 +5,6 @@ import { isParamsRecord, isWorkspaceTabId, viewIdFromTab, viewTabId } from './wo
 describe('isWorkspaceTabId', () => {
   test('accepts the static tabs', () => {
     expect(isWorkspaceTabId('overview')).toBe(true)
-    expect(isWorkspaceTabId('agent')).toBe(true)
     expect(isWorkspaceTabId('scratchpad')).toBe(true)
   })
 

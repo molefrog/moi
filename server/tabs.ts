@@ -9,13 +9,12 @@ export type TabRow = {
   id: WorkspaceTabId
   title: string
   isDefault: boolean
-  href?: string
+  href: string
 }
 
 // The always-present tabs, titled like the tab bar renders them.
 const STATIC_TABS: { id: WorkspaceTabId; title: string }[] = [
   { id: 'overview', title: 'Overview' },
-  { id: 'agent', title: 'Agent' },
   { id: 'scratchpad', title: 'Scratchpad' }
 ]
 
@@ -28,7 +27,7 @@ export function assembleTabRows(views: ViewInfo[], defaultTab: WorkspaceTabId): 
   ].map(row => ({
     ...row,
     isDefault: row.id === defaultTab,
-    ...(row.id === 'agent' ? {} : { href: moiHref(row.id) })
+    href: moiHref(row.id)
   }))
 }
 
@@ -36,7 +35,7 @@ export function assembleTabRows(views: ViewInfo[], defaultTab: WorkspaceTabId): 
 // browser to move. The browser repeats the availability check in case its view
 // list is stale in either direction.
 export function assertNavigableTab(tab: WorkspaceTabId, views: ViewInfo[]): void {
-  const rows = assembleTabRows(views, 'agent').filter(row => row.href)
+  const rows = assembleTabRows(views, 'overview')
   if (rows.some(row => row.id === tab)) return
   throw new Error(
     `Unknown destination "${moiHref(tab)}". Valid addresses: ${rows.map(row => row.href).join(', ')}`

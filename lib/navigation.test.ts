@@ -74,7 +74,6 @@ describe('workspace addresses', () => {
       'moi:/views/Gr%C3%BC%C3%9Fe%20events',
       'moi:/views/../overview',
       'moi:/views/a#part',
-      'moi:/agent',
       'moi:/view-builders/a',
       'moi:/chats/a',
       'moi:/files/a.md'
@@ -82,8 +81,8 @@ describe('workspace addresses', () => {
       expect(() => parseMoiHref(href)).toThrow()
     }
   })
-  test('host-only tabs still round trip without becoming portable destinations', () => {
-    for (const tab of ['agent', 'overview', 'scratchpad', 'views/events'] as const) {
+  test('current tabs round trip through browser paths', () => {
+    for (const tab of ['overview', 'scratchpad', 'views/events'] as const) {
       expect(tabFromPath(tab)).toBe(tab)
     }
   })

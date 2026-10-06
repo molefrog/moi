@@ -4,7 +4,6 @@ import { isWorkspaceTabId } from './workspace-tabs'
 export type ViewParams = Record<string, string>
 export type WorkspaceAddress = { tab: WorkspaceTabId; search: string }
 
-// Public destinations deliberately exclude the current singleton chat.
 export function parseMoiHref(href: unknown): WorkspaceAddress {
   if (typeof href !== 'string' || !href.startsWith('moi:/') || href.startsWith('moi://')) {
     throw new Error('Expected a workspace address such as moi:/views/events?eventId=123')
@@ -12,7 +11,7 @@ export function parseMoiHref(href: unknown): WorkspaceAddress {
   const path = href.slice(5).split(/[?#]/, 1)[0]
   if (href.includes('#') || /[\s\\]/.test(path)) throw new Error('Invalid workspace address')
   const tab = tabFromPath(path)
-  if (!tab || tab === 'agent') {
+  if (!tab) {
     throw new Error(`Unsupported workspace destination: ${path}`)
   }
   const query = href.indexOf('?')

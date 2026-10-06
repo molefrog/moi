@@ -46,7 +46,7 @@ Workspace features/pages:
   or completing a multi-step task.
 
 User can switch between these, but can access the chat (this conversation and other chats) from
-**any place in the app** (copilot mode), or on a dedicated page.
+**any place in the app** through the docked sidebar or floating popup.
 
 ## Working in the workspace
 

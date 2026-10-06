@@ -15,7 +15,7 @@ export function normalizeTabsState(tabs: WorkspaceTabsState | undefined): Worksp
 // Whether a tab id points at something that exists: static tabs always do,
 // view tabs only while their pending or compiled view exists.
 export function tabAvailable(tab: WorkspaceTabId, views: ViewInfo[]) {
-  if (tab === 'agent' || tab === 'overview' || tab === 'scratchpad') return true
+  if (tab === 'overview' || tab === 'scratchpad') return true
   const viewId = viewIdFromTab(tab)
   return viewId ? views.some(view => view.id === viewId) : false
 }
@@ -28,18 +28,16 @@ export function effectiveOpenTabs(tabs: WorkspaceTabsState, views: ViewInfo[]): 
 }
 
 // An explicit URL keeps its destination, including a missing view so the host
-// can show recovery and report the correct address to the agent. Only a bare
-// URL or the singleton chat hidden by split mode uses the saved default.
+// can show recovery and report the correct address to the agent. A bare URL
+// uses the saved default.
 export function resolveActiveTab(
   requested: WorkspaceTabId | null,
   tabs: WorkspaceTabsState,
-  views: ViewInfo[],
-  split: boolean
+  views: ViewInfo[]
 ): WorkspaceTabId {
-  if (requested !== null && !(split && requested === 'agent')) {
+  if (requested !== null) {
     return requested
   }
   const open = effectiveOpenTabs(tabs, views)
-  const visible = split ? open.filter(tab => tab !== 'agent') : open
-  return visible.includes(tabs.active) ? tabs.active : (visible[0] ?? 'overview')
+  return open.includes(tabs.active) ? tabs.active : (open[0] ?? 'overview')
 }

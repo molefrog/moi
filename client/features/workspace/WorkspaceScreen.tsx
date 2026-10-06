@@ -6,7 +6,6 @@ import {
   IconBrowserPlus,
   IconLayout2,
   IconLayoutSidebarRight,
-  IconMessages,
   IconSketching
 } from '@tabler/icons-react'
 
@@ -48,11 +47,7 @@ import {
 } from '@/client/features/chat/chat-store'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { WorkspaceMenu } from '@/client/features/workspace/WorkspaceMenu'
-import {
-  effectiveOpenTabs,
-  normalizeTabsState,
-  tabAvailable
-} from '@/client/features/workspace/tab-resolution'
+import { effectiveOpenTabs, tabAvailable } from '@/client/features/workspace/tab-resolution'
 import { useWorkspaceNavigation } from '@/client/features/workspace/useWorkspaceNavigation'
 import { cn } from '@/client/lib/cn'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
@@ -94,18 +89,8 @@ function tabItemFor(
   tab: WorkspaceTabId,
   views: ViewInfo[],
   closable: boolean,
-  agentRunning: boolean,
   viewRunning: (sessionId: string) => boolean
 ): WorkspaceTabItem | null {
-  if (tab === 'agent') {
-    return {
-      key: tab,
-      Icon: IconMessages,
-      label: 'Agent',
-      closable,
-      loading: agentRunning
-    }
-  }
   if (tab === 'overview') {
     return {
       key: tab,
@@ -139,16 +124,6 @@ function tabItemFor(
     : null
 }
 
-function applyVisibleTabOrder(
-  open: WorkspaceTabId[],
-  visible: WorkspaceTabId[],
-  orderedVisible: WorkspaceTabId[]
-) {
-  const visibleSet = new Set(visible)
-  let cursor = 0
-  return open.map(tab => (visibleSet.has(tab) ? orderedVisible[cursor++] : tab))
-}
-
 export function WorkspaceScreen({ widgets, views: allViews }: WorkspaceScreenProps) {
   const { layout, setLayout, workspaceId } = useWorkspaceLayoutCtx()
   const theme = resolveWorkspaceTheme(layout.theme)
@@ -176,20 +151,12 @@ export function WorkspaceScreen({ widgets, views: allViews }: WorkspaceScreenPro
 
   useWorkspaceTheme(layout.theme)
 
-  // Split needs the open set to decide whether it's available at all, and the
-  // navigation hook needs split to resolve the active tab — so the open set is
-  // derived from the raw layout here, before either.
-  const hasWorkspaceContent = effectiveOpenTabs(normalizeTabsState(layout.tabs), allViews).some(
-    tab => tab !== 'agent'
-  )
   const hasAppletWidgets = widgets.some(widget => !isDefaultWidget(widget.id))
   const hasWorkspaceApplets = hasAppletWidgets || views.length > 0
 
-  // Effective layout mode. Split is only visible with workspace content and
-  // enough row width; the saved mode remains the user's intent.
-  const wantsSplit = layout.layoutMode === 'split' && hasWorkspaceContent
+  // Split needs enough row width; the saved mode remains the user's intent.
+  const wantsSplit = layout.layoutMode === 'split'
   const mode: LayoutMode = wantsSplit && canUseSplit ? 'split' : 'fullscreen'
-  const dockedSplit = mode === 'split'
 
   // The tab address: URL in, active tab + applet params out, plus the persisted
   // tab state it keeps in sync. See useWorkspaceNavigation for the invariants.
@@ -202,8 +169,7 @@ export function WorkspaceScreen({ widgets, views: allViews }: WorkspaceScreenPro
     isUnavailable,
     onNavigationClick
   } = useWorkspaceNavigation({
-    views: allViews,
-    split: dockedSplit
+    views: allViews
   })
 
   // Chat comes after navigation, and takes the address: every message carries
@@ -237,21 +203,16 @@ export function WorkspaceScreen({ widgets, views: allViews }: WorkspaceScreenPro
   )
 
   const openTabIds = effectiveOpenTabs(tabsState, allViews)
-  const nonAgentOpenTabs = openTabIds.filter(tab => tab !== 'agent')
   const openSet = new Set(tabsState.open)
 
-  // Entering split with the agent tab on screen needs no special-casing
-  // anymore: the URL resolution below derives a visible tab and the redirect
-  // effect makes the URL follow it (replace).
   const setMode = (m: LayoutMode) => {
     setLayout({ layoutMode: m })
   }
 
-  const visibleTabIds = dockedSplit ? nonAgentOpenTabs : openTabIds
   const canCloseTabs = openTabIds.length > 1
-  const tabItems = visibleTabIds
+  const tabItems = openTabIds
     .map(tab =>
-      tabItemFor(tab, allViews, canCloseTabs, hasRunningSession, sessionId =>
+      tabItemFor(tab, allViews, canCloseTabs, sessionId =>
         isSessionRunning(sessionActivity, workspaceId, sessionId)
       )
     )
@@ -302,10 +263,10 @@ export function WorkspaceScreen({ widgets, views: allViews }: WorkspaceScreenPro
   }, [allViews, setTabs, tabsState])
 
   useEffect(() => {
-    if (mode !== 'fullscreen' || activeTab === 'agent') {
+    if (mode !== 'fullscreen') {
       setFloatingChatOpen(false)
     }
-  }, [activeTab, mode])
+  }, [mode])
 
   useEffect(() => {
     if (!activeDraftViewId) return
@@ -313,15 +274,7 @@ export function WorkspaceScreen({ widgets, views: allViews }: WorkspaceScreenPro
     setChatFocusRequest(request => request + 1)
   }, [activeDraftViewId, mode])
 
-  // Tab switching is navigation; the saved default and the open set follow via
-  // the navigation hook. Only the chat side effects belong to the screen.
-  const openTab = (tab: WorkspaceTabId) => {
-    navigateToTab(tab)
-    if (tab === 'agent') {
-      setFloatingChatOpen(false)
-      setChatFocusRequest(request => request + 1)
-    }
-  }
+  const openTab = navigateToTab
 
   const createView = () => {
     // A pending view has no chat until its first submission.
@@ -373,10 +326,10 @@ export function WorkspaceScreen({ widgets, views: allViews }: WorkspaceScreenPro
     let open = tabsState.open.filter(t => t !== tab)
     if (open.length === 0) open = ['overview']
     // The neighbor that takes over when the tab on screen closes.
-    const visibleIndex = visibleTabIds.indexOf(tab)
+    const visibleIndex = openTabIds.indexOf(tab)
     const nextTab =
-      visibleTabIds[visibleIndex + 1] ??
-      visibleTabIds[visibleIndex - 1] ??
+      openTabIds[visibleIndex + 1] ??
+      openTabIds[visibleIndex - 1] ??
       open.find(t => tabAvailable(t, allViews)) ??
       'overview'
     const active =
@@ -401,9 +354,7 @@ export function WorkspaceScreen({ widgets, views: allViews }: WorkspaceScreenPro
     if (activeTab === tab) navigateToTab(nextTab, { replace: true })
   }
 
-  const reorderTabs = (orderedVisibleTabs: WorkspaceTabId[]) => {
-    const open = applyVisibleTabOrder(tabsState.open, visibleTabIds, orderedVisibleTabs)
-    if (open === tabsState.open) return
+  const reorderTabs = (open: WorkspaceTabId[]) => {
     setTabs({ open, active: tabsState.active })
   }
 
@@ -413,7 +364,7 @@ export function WorkspaceScreen({ widgets, views: allViews }: WorkspaceScreenPro
         .getState()
         .setComposerDraft(composerDraftKey(workspaceId, composerSessionId), intent)
     }
-    if (mode === 'fullscreen' && activeTab !== 'agent') {
+    if (mode === 'fullscreen') {
       setFloatingChatOpen(true)
       if (floatingChatOpen) {
         setChatFocusRequest(request => request + 1)
@@ -430,16 +381,6 @@ export function WorkspaceScreen({ widgets, views: allViews }: WorkspaceScreenPro
   useAppletChatAttachment(composerSessionId, openChat)
 
   const createItems: CreateWorkspaceTabItem[] = [
-    ...(!dockedSplit && !openSet.has('agent')
-      ? ([
-          {
-            key: 'agent',
-            Icon: IconMessages,
-            label: 'Agent',
-            onClick: () => openTab('agent')
-          }
-        ] satisfies CreateWorkspaceTabItem[])
-      : []),
     ...(!openSet.has('scratchpad')
       ? ([
           {
@@ -490,50 +431,34 @@ export function WorkspaceScreen({ widgets, views: allViews }: WorkspaceScreenPro
       }
     : undefined
 
-  // The docked split chat. Full-screen Agent uses the tabbed chat below.
+  const chatPanelProps = {
+    agent: theme.agent,
+    focusRequest: chatFocusRequest,
+    chatLoaded: visibleChatLoaded,
+    hasWorkspaceApplets,
+    view,
+    forkedFromSessionId,
+    previewTurn,
+    sessionId,
+    processing,
+    composerBanner: activeDraftView ? viewDraftComposerBanner : composerBanner,
+    agentAvailability,
+    send: sendChat,
+    stop,
+    onNavigateFromWelcome: navigateFromWelcome,
+    viewDraft: viewChatDraft
+  }
+
   const dockedChat = (
     <ChatPanel
-      agent={theme.agent}
+      {...chatPanelProps}
       active={mode === 'split'}
-      focusRequest={chatFocusRequest}
-      chatLoaded={visibleChatLoaded}
-      hasWorkspaceApplets={hasWorkspaceApplets}
-      view={view}
-      forkedFromSessionId={forkedFromSessionId}
-      previewTurn={previewTurn}
-      sessionId={sessionId}
-      processing={processing}
-      composerBanner={activeDraftView ? viewDraftComposerBanner : composerBanner}
-      agentAvailability={agentAvailability}
-      send={sendChat}
-      stop={stop}
-      onNavigateFromWelcome={navigateFromWelcome}
       onClose={() => setMode('fullscreen')}
       annotation={dockedAnnotation}
-      viewDraft={viewChatDraft}
       docked
     />
   )
 
-  const tabbedChat = (
-    <ChatPanel
-      agent={theme.agent}
-      active={mode === 'fullscreen' && activeTab === 'agent'}
-      focusRequest={chatFocusRequest}
-      chatLoaded={chatLoaded}
-      hasWorkspaceApplets={hasWorkspaceApplets}
-      view={view}
-      forkedFromSessionId={forkedFromSessionId}
-      previewTurn={previewTurn}
-      sessionId={sessionId}
-      processing={processing}
-      composerBanner={composerBanner}
-      agentAvailability={agentAvailability}
-      send={sendChat}
-      stop={stop}
-      onNavigateFromWelcome={navigateFromWelcome}
-    />
-  )
   const workspacePanel = (
     <div
       className={cn(
@@ -550,8 +475,6 @@ export function WorkspaceScreen({ widgets, views: allViews }: WorkspaceScreenPro
         >
           {isUnavailable ? (
             <UnavailablePage onOpenOverview={() => openTab('overview')} />
-          ) : activeTab === 'agent' ? (
-            tabbedChat
           ) : activeTab === 'overview' ? (
             <Overview
               customizing={widgetMode === 'customizing'}
@@ -599,7 +522,7 @@ export function WorkspaceScreen({ widgets, views: allViews }: WorkspaceScreenPro
                 if (mode === 'fullscreen') setFloatingChatOpen(false)
               }}
               onContinueInChat={openChat}
-              onOpenChat={openChat}
+              onOpenChat={() => openChat()}
               onDiscard={() => discardPendingView(pendingView)}
             />
           ))}
@@ -643,10 +566,10 @@ export function WorkspaceScreen({ widgets, views: allViews }: WorkspaceScreenPro
         </div>
         <WorkspaceUsersMenu
           workspaceId={workspaceId}
-          describeTab={tab => tabItemFor(tab, allViews, false, false, () => false)}
+          describeTab={tab => tabItemFor(tab, allViews, false, () => false)}
           onOpenTab={openTab}
         />
-        {hasWorkspaceContent && canUseSplit && mode === 'fullscreen' && (
+        {canUseSplit && mode === 'fullscreen' && (
           <Tooltip>
             <TooltipTrigger
               render={
@@ -674,7 +597,7 @@ export function WorkspaceScreen({ widgets, views: allViews }: WorkspaceScreenPro
       className="relative flex h-full min-h-0 flex-col font-sans text-foreground"
     >
       <div ref={rowRef} className="flex min-h-0 flex-1">
-        {hasWorkspaceContent && canUseSplit && splitLayoutConstraints ? (
+        {canUseSplit && splitLayoutConstraints ? (
           <WorkspaceSplitLayout
             {...splitLayoutConstraints}
             workspace={workspacePanel}
@@ -689,7 +612,7 @@ export function WorkspaceScreen({ widgets, views: allViews }: WorkspaceScreenPro
         )}
       </div>
 
-      {mode === 'fullscreen' && activeTab !== 'agent' && hasWorkspaceContent && (
+      {mode === 'fullscreen' && (
         <ChatPopup
           agent={theme.agent}
           loading={hasRunningSession}
@@ -703,24 +626,10 @@ export function WorkspaceScreen({ widgets, views: allViews }: WorkspaceScreenPro
         >
           {onClose => (
             <ChatPanel
-              agent={theme.agent}
+              {...chatPanelProps}
               active={floatingChatOpen}
-              focusRequest={chatFocusRequest}
-              chatLoaded={visibleChatLoaded}
-              hasWorkspaceApplets={hasWorkspaceApplets}
-              view={view}
-              forkedFromSessionId={forkedFromSessionId}
-              previewTurn={previewTurn}
-              sessionId={sessionId}
-              processing={processing}
-              composerBanner={activeDraftView ? viewDraftComposerBanner : composerBanner}
-              agentAvailability={agentAvailability}
-              send={sendChat}
-              stop={stop}
-              onNavigateFromWelcome={navigateFromWelcome}
               onClose={onClose}
               annotation={popupAnnotation}
-              viewDraft={viewChatDraft}
             />
           )}
         </ChatPopup>

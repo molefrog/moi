@@ -41,8 +41,8 @@ describe('WorkspaceTabs', () => {
     expect(html).not.toContain('mo-root')
     expect(html).toContain('data-slot="spinner"')
     const overviewButton = html.match(/<button[^>]*aria-label="Overview"[^>]*>/)?.[0]
-    const agentButton = html.match(/<button[^>]*aria-label="Test view"[^>]*>/)?.[0]
+    const viewButton = html.match(/<button[^>]*aria-label="Test view"[^>]*>/)?.[0]
     expect(overviewButton).not.toContain('aria-roledescription')
-    expect(agentButton).toContain('aria-roledescription="sortable item"')
+    expect(viewButton).toContain('aria-roledescription="sortable item"')
   })
 })

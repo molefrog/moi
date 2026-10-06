@@ -70,7 +70,6 @@ describe('envelopeTabParams', () => {
     // Widgets are not navigation targets, and the static tabs take no params —
     // so a stray record here means nothing and must not reach the envelope.
     expect(envelopeTabParams('overview', params)).toBeUndefined()
-    expect(envelopeTabParams('agent', params)).toBeUndefined()
     expect(envelopeTabParams('scratchpad', params)).toBeUndefined()
   })
 })

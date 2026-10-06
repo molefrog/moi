@@ -31,9 +31,9 @@ type NavigationOptions = { replace?: boolean }
 // Memory-only, and scoped by workspace so switching workspaces cannot leak params.
 const rememberedAddresses = new Map<string, Map<WorkspaceTabId, string>>()
 
-type UseWorkspaceNavigationOptions = { views: ViewInfo[]; split: boolean }
+type UseWorkspaceNavigationOptions = { views: ViewInfo[] }
 
-export function useWorkspaceNavigation({ views, split }: UseWorkspaceNavigationOptions) {
+export function useWorkspaceNavigation({ views }: UseWorkspaceNavigationOptions) {
   const queryClient = useQueryClient()
   const { layout, setLayout, workspaceId } = useWorkspaceLayoutCtx()
   const collabEnabled = useCollabEnabled()
@@ -59,7 +59,7 @@ export function useWorkspaceNavigation({ views, split }: UseWorkspaceNavigationO
   }, [workspaceId])
   const requestedTab = tabFromPath(path)
   const legacyTab = requestedTab ? null : legacyTabFromPath(path)
-  const activeTab = resolveActiveTab(requestedTab ?? legacyTab, tabsState, views, split)
+  const activeTab = resolveActiveTab(requestedTab ?? legacyTab, tabsState, views)
   const isUnavailable =
     Boolean(path) && !legacyTab && (!requestedTab || !tabAvailable(requestedTab, views))
   const honored = requestedTab === activeTab && !isUnavailable
@@ -130,27 +130,16 @@ export function useWorkspaceNavigation({ views, split }: UseWorkspaceNavigationO
     navigateHref(href, queryClient.getQueryData<ViewInfo[]>(queryKey) ?? views)
   })
 
-  // Bare workspace URLs, old bookmarks, and hidden singleton chat routes are
+  // Bare workspace URLs and old view bookmarks are
   // the only redirects. Missing destinations keep their URL and show recovery.
   useEffect(() => {
     if (isUnavailable) return
     if (legacyTab) {
       go(addressPath(workspaceId, { tab: legacyTab, search }), { replace: true })
-    } else if (!path || (requestedTab === 'agent' && split)) {
+    } else if (!path) {
       navigateToTab(activeTab, { replace: true })
     }
-  }, [
-    activeTab,
-    go,
-    legacyTab,
-    navigateToTab,
-    path,
-    requestedTab,
-    search,
-    split,
-    isUnavailable,
-    workspaceId
-  ])
+  }, [activeTab, go, legacyTab, navigateToTab, path, search, isUnavailable, workspaceId])
 
   useEffect(() => {
     if (!honored) return

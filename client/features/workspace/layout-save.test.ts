@@ -49,7 +49,7 @@ describe('debounced layout saves', () => {
 
   test('the latest explicit navigation replaces the previous pending tab selection', () => {
     const pending = accumulateLayoutSave({ ...initial, tabs: selected }, { tabs: selected }, null)
-    const tabs: WorkspaceTabsState = { open: ['overview', 'agent'], active: 'agent' }
+    const tabs: WorkspaceTabsState = { open: ['overview', 'scratchpad'], active: 'scratchpad' }
     const payload = accumulateLayoutSave({ ...initial, tabs }, { tabs }, pending)
 
     expect(payload.tabs).toEqual(tabs)

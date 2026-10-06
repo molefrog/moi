@@ -25,8 +25,7 @@ function readNavigation(
   const prefix = base === '/' ? '' : base
   function Probe() {
     const { activeTab, appletParams, isUnavailable } = useWorkspaceNavigation({
-      views,
-      split: false
+      views
     })
     return (
       <script type="application/json">
