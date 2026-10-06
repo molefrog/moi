@@ -135,9 +135,9 @@ function WorkspaceTab(props: WorkspaceTabProps) {
         )}
       >
         {tab.loading ? (
-          <Spinner data-icon="inline-start" />
+          <Spinner data-icon="inline-start" className="shrink-0" />
         ) : (
-          <tab.Icon data-icon="inline-start" stroke={2} />
+          <tab.Icon data-icon="inline-start" stroke={2} className="size-4 shrink-0" />
         )}
         <span
           className={cn(
@@ -166,7 +166,7 @@ function WorkspaceTab(props: WorkspaceTabProps) {
                 }
           }
         >
-          <IconX stroke={1.75} />
+          <IconX stroke={1.75} className="size-4 shrink-0" />
         </div>
       )}
     </button>

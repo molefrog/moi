@@ -13,7 +13,7 @@ import {
 
 // These cover the kind-agnostic applet HTTP machinery without invoking
 // Bun.build: serving files from a compiled bundle dir (sentinel swap + asset
-// streaming), the route-tail parser, and the `fileUrl` workspace-file route
+// streaming), the route-tail parser, and the `resolveUrl` workspace-file route
 // (whose guards are security-critical). The compile path lives in
 // build-applet.test.ts.
 
@@ -218,7 +218,7 @@ describe('apiBaseFor', () => {
   })
 })
 
-describe('serveWorkspaceFile (fileUrl streaming)', () => {
+describe('serveWorkspaceFile (resolveUrl streaming)', () => {
   function seedFile(rel: string, data: string | Uint8Array) {
     const path = join(WS, rel)
     mkdirSync(dirname(path), { recursive: true })

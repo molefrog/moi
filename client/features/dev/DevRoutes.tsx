@@ -1,4 +1,5 @@
-import { Route, Switch } from 'wouter'
+import { lazy, Suspense } from 'react'
+import { Redirect, Route, Switch } from 'wouter'
 
 import { ChatStatesPage } from './ChatStatesPage'
 import { BlobatarShapesPage } from './BlobatarShapesPage'
@@ -6,15 +7,26 @@ import { DevIndexPage } from './DevIndexPage'
 import { HarnessDebugPage } from './HarnessDebugPage'
 import { TextureLabPage } from './TextureLabPage'
 import { ToolCallsPage } from './ToolCallsPage'
-import { UiComponentsPage } from './UiComponentsPage'
+import { UiComponentsPage } from './ui-components/ui-components-page'
 
-// All /dev/* routes, colocated with their pages so the whole dev playground
-// (and its dependencies) lives in this folder and loads as one lazy chunk —
+// All /dev/* routes live with their pages here and load only in development;
 // see the dynamic import in AppRouter. /dev itself is the index; list new
 // routes there too.
+const CollabPage = lazy(() =>
+  import('./collab/collab-page').then(module => ({ default: module.CollabPage }))
+)
+
 export default function DevRoutes() {
   return (
     <Switch>
+      <Route path="/dev/collab-kit">
+        <Redirect to="/dev/collab" />
+      </Route>
+      <Route path="/dev/collab">
+        <Suspense fallback={null}>
+          <CollabPage />
+        </Suspense>
+      </Route>
       <Route path="/dev/harness" component={HarnessDebugPage} />
       <Route path="/dev/blobatar-shapes" component={BlobatarShapesPage} />
       <Route path="/dev/chat-states" component={ChatStatesPage} />

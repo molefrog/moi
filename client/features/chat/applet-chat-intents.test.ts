@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, mock, spyOn } from 'bun:test'
 import { QueryClient } from '@tanstack/react-query'
-import { appUiKeys } from '@/client/api/app-ui-keys'
+import { selectedSessionKey } from '@/client/features/chat/sessions/useSelectedSession'
 import { toast } from '@/client/components/ui/toast'
 import * as appletLog from '@/client/features/applets/applet-log'
 import type { AppletChatMessage } from '@/client/features/applets/applet-runtime'
@@ -66,7 +66,7 @@ describe('appletSendBlockedReason', () => {
 
 // Exercise the actual async handler with deferred uploads and the real selection
 // cache, including changes that happen without an intervening React render.
-describe('immediate applet sends', () => {
+describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope=%p', scope => {
   const workspaceId = 'immediate-send-test'
   const originalFetch = globalThis.fetch
   let handler: ReturnType<typeof createAppletMessageHandler>
@@ -79,7 +79,9 @@ describe('immediate applet sends', () => {
   let log: ReturnType<typeof spyOn<typeof appletLog, 'reportAppletError'>>
 
   function select(sessionId: string | null) {
-    queryClient.setQueryData(appUiKeys.selectedSession(workspaceId), { sessionId })
+    queryClient.setQueryData(selectedSessionKey(workspaceId, scope), {
+      sessionId
+    })
   }
   function deferredUpload() {
     const deferred = Promise.withResolvers<Response>()
@@ -108,14 +110,19 @@ describe('immediate applet sends', () => {
     notices = spyOn(toast, 'add').mockImplementation(() => crypto.randomUUID())
     close = spyOn(toast, 'close').mockImplementation(() => {})
     log = spyOn(appletLog, 'reportAppletError').mockImplementation(() => {})
-    handler = createAppletMessageHandler(workspaceId, queryClient, () => ({
-      sessionId:
-        queryClient.getQueryData<SelectedSessionState>(appUiKeys.selectedSession(workspaceId))
-          ?.sessionId ?? null,
-      send,
-      revealChat: reveal,
-      agentAvailability: availability
-    }))
+    handler = createAppletMessageHandler(
+      workspaceId,
+      queryClient,
+      () => ({
+        sessionId:
+          queryClient.getQueryData<SelectedSessionState>(selectedSessionKey(workspaceId, scope))
+            ?.sessionId ?? null,
+        send,
+        revealChat: reveal,
+        agentAvailability: availability
+      }),
+      scope
+    )
   })
   afterEach(() => {
     handler.dispose()
@@ -135,6 +142,21 @@ describe('immediate applet sends', () => {
       preparedAttachments: { attachments: [], parts: [] }
     })
     expect(notices).not.toHaveBeenCalled()
+  })
+
+  test('ignores selection changes in the other scope while attachments are prepared', async () => {
+    const deferred = deferredUpload()
+    const pending = handler.handle(event)
+    queryClient.setQueryData(
+      selectedSessionKey(workspaceId, scope === 'shared' ? 'browser-tab' : 'shared'),
+      {
+        sessionId: 'another-chat'
+      }
+    )
+    deferred.resolve(Response.json(upload))
+    await pending
+    expect(send).toHaveBeenCalledTimes(1)
+    expect(notices.mock.calls.some(([notice]) => notice.title === 'Message canceled')).toBe(false)
   })
 
   test('prepares all three inputs in order without deduplication or draft mutations', async () => {
@@ -291,12 +313,17 @@ describe('immediate applet sends', () => {
 
   test('a stale rendered send callback cannot target a previously selected chat', async () => {
     handler.dispose()
-    handler = createAppletMessageHandler(workspaceId, queryClient, () => ({
-      sessionId: 'old-session',
-      send,
-      revealChat: reveal,
-      agentAvailability: availability
-    }))
+    handler = createAppletMessageHandler(
+      workspaceId,
+      queryClient,
+      () => ({
+        sessionId: 'old-session',
+        send,
+        revealChat: reveal,
+        agentAvailability: availability
+      }),
+      scope
+    )
     const fetch = mock(() => Promise.reject(new Error('unexpected upload')))
     globalThis.fetch = fetch as unknown as typeof globalThis.fetch
     await handler.handle(event)

@@ -1,6 +1,8 @@
+import { CollabProvider, useCollabEnabled } from '@/client/features/collab'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
+import { useAppConfig } from '@/client/api/app-config'
 import { LedLogo } from '@/client/components/shared/LedLogo'
 import { SidebarLayout } from '@/client/app/shell/SidebarLayout'
 import { useSelectedSession } from '@/client/features/chat/sessions/useSelectedSession'
@@ -19,19 +21,24 @@ type WorkspaceRouteProps = {
   id: string
 }
 
-// The URL's tab segment is not threaded down — useWorkspaceNavigation reads it
-// off the matched route with wouter's `useParams`.
+// Navigation reads the raw browser address so encoded paths and query params
+// are decoded exactly once; the route only owns the workspace ID.
 export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
+  const { experimental } = useAppConfig()
+
   return (
     <Workspace id={id}>
       <WorkspaceLayoutProvider id={id}>
-        <WorkspaceLoader id={id} />
+        <CollabProvider workspaceId={id} enabled={experimental.collab}>
+          <WorkspaceContent id={id} />
+        </CollabProvider>
       </WorkspaceLayoutProvider>
     </Workspace>
   )
 }
 
-function WorkspaceLoader({ id }: WorkspaceRouteProps) {
+function WorkspaceContent({ id }: WorkspaceRouteProps) {
+  const collabEnabled = useCollabEnabled()
   const queryClient = useQueryClient()
   const [selectedSessionId] = useSelectedSession()
   const { isLoading: layoutLoading } = useWorkspaceLayoutCtx()
@@ -62,20 +69,21 @@ function WorkspaceLoader({ id }: WorkspaceRouteProps) {
     builders.isLoading
 
   return (
-    <>
-      <SidebarLayout>
-        {fresh ? (
-          <div className="flex h-full items-center justify-center">
-            <LedLogo sprite="moi" effect="chaos" />
-          </div>
-        ) : (
-          <WorkspaceScreen
-            widgets={widgets.data}
-            views={views.data ?? []}
-            builders={builders.data ?? []}
-          />
-        )}
-      </SidebarLayout>
-    </>
+    <SidebarLayout>
+      {fresh ? (
+        <div className="flex h-full items-center justify-center">
+          <LedLogo sprite="moi" effect="chaos" />
+        </div>
+      ) : (
+        // Browser tab state is read when the screen mounts. Reset the screen
+        // when it switches between shared workspace tabs and browser tab state.
+        <WorkspaceScreen
+          key={collabEnabled ? 'browser-tab' : 'shared'}
+          widgets={widgets.data}
+          views={views.data ?? []}
+          builders={builders.data ?? []}
+        />
+      )}
+    </SidebarLayout>
   )
 }

@@ -294,6 +294,36 @@ describe('mergeLayoutForSave', () => {
     expect(merged.name).toBe('Keep')
   })
 
+  test('a layout save omitting tabs preserves newer authored tabs', () => {
+    const existing: WorkspaceLayout = {
+      ...base,
+      tabs: { open: ['overview', 'views/board'], active: 'views/board' }
+    }
+    // This client loaded base before another client changed the workspace tabs.
+    const { tabs: _staleTabs, ...body } = base
+    const merged = mergeLayoutForSave(existing, {
+      ...body,
+      widgetGrid: [{ i: 'w', x: 2, y: 3 }]
+    })
+    expect(merged.tabs).toEqual(existing.tabs)
+    expect(merged.widgetGrid).toEqual([{ i: 'w', x: 2, y: 3 }])
+  })
+
+  test('explicit undefined tabs have the same effect as an omitted JSON field', () => {
+    const { tabs: _tabs, ...body } = base
+    expect(mergeLayoutForSave(base, { ...body, tabs: undefined }).tabs).toEqual(base.tabs)
+  })
+
+  test('an explicit tab update still changes authored defaults after an unrelated save', () => {
+    const { tabs: _tabs, ...body } = base
+    const saved = mergeLayoutForSave(base, { ...body, layoutMode: 'split' })
+    const tabs: WorkspaceLayout['tabs'] = { open: ['overview', 'agent'], active: 'agent' }
+    expect(mergeLayoutForSave(saved, { ...saved, tabs })).toEqual({
+      ...saved,
+      tabs
+    })
+  })
+
   test('drops the old Widgets tab id from stale client saves', () => {
     const body = {
       ...base,

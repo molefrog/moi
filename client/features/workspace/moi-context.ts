@@ -1,7 +1,8 @@
 // Central assembly of the moi context sent with every chat message — the one
 // place that snapshots the workspace's primary UI state (active tab, view
 // titles) and drains queued one-shot directives. The structured `MoiContext`
-// travels to the server as-is; harnesses render it (lib/moi-context.ts).
+// travels to the server, which adds server-owned fields before harnesses render
+// it (lib/moi-context.ts).
 //
 // Quick API:
 //

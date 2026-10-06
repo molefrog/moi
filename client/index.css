@@ -180,6 +180,51 @@
   corner-shape: superellipse(1.2);
 }
 
+[data-collab-color] {
+  --collab: var(--muted-foreground);
+  --collab-foreground: var(--background);
+}
+
+[data-collab-color='pink'] {
+  --collab: var(--color-pink-500);
+  --collab-foreground: white;
+}
+
+[data-collab-color='orange'] {
+  --collab: var(--color-orange-500);
+  --collab-foreground: black;
+}
+
+[data-collab-color='amber'] {
+  --collab: var(--color-amber-500);
+  --collab-foreground: black;
+}
+
+[data-collab-color='lime'] {
+  --collab: var(--color-lime-500);
+  --collab-foreground: black;
+}
+
+[data-collab-color='emerald'] {
+  --collab: var(--color-emerald-500);
+  --collab-foreground: black;
+}
+
+[data-collab-color='cyan'] {
+  --collab: var(--color-cyan-500);
+  --collab-foreground: black;
+}
+
+[data-collab-color='blue'] {
+  --collab: var(--color-blue-500);
+  --collab-foreground: white;
+}
+
+[data-collab-color='violet'] {
+  --collab: var(--color-violet-500);
+  --collab-foreground: white;
+}
+
 .hljs {
   background: transparent;
   padding: 0;

@@ -1,13 +1,8 @@
-import type { AppletBridge, AttachmentInput } from '../../../lib/types'
+import type { AttachmentInput, ChatMessageInput } from 'moi'
+import type { AppletBridge } from '../../../lib/types'
+import { resolveUrl as resolveWorkspaceUrl } from '../../../lib/navigation'
 
-import { APPLET_API_BASE_SENTINEL } from './base'
-
-type AppletChatInput = {
-  message: string
-  attachments?: AttachmentInput[]
-}
-
-const BASE = APPLET_API_BASE_SENTINEL
+import { APPLET_API_BASE_SENTINEL } from '../api-base'
 
 let bridge: Partial<AppletBridge> | null = null
 
@@ -19,17 +14,15 @@ export function __getBridge(): Partial<AppletBridge> | null {
   return bridge
 }
 
-export function fileUrl(path: string): string {
-  const clean = String(path).replace(/^\/+/, '')
-  return BASE + '/fs/' + clean.split('/').map(encodeURIComponent).join('/')
+export function resolveUrl(url: string): string {
+  // File URLs also work during module evaluation, before the host attaches.
+  if (url.startsWith('moi:/files/'))
+    return resolveWorkspaceUrl(url, { apiBase: APPLET_API_BASE_SENTINEL })
+  return bridge?.resolveUrl?.(url) ?? ''
 }
 
-export function navigate(href: string): void {
-  bridge?.navigate?.(href)
-}
-
-export function resolveHref(href: string): string {
-  return bridge?.resolveHref?.(href) ?? ''
+export function navigate(url: string): void {
+  bridge?.navigate?.(url)
 }
 
 export function addChatAttachment(input: AttachmentInput): void {
@@ -37,6 +30,6 @@ export function addChatAttachment(input: AttachmentInput): void {
 }
 
 // Keep positional calls working for previously built applets.
-export function sendChatMessage(input: AppletChatInput | string, legacyContext?: unknown): void {
+export function sendChatMessage(input: ChatMessageInput | string, legacyContext?: unknown): void {
   bridge?.sendChatMessage?.(input, legacyContext)
 }

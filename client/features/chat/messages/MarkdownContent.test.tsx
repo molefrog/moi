@@ -26,3 +26,14 @@ test('invalid moi links and executable URLs stay sanitized, including images', (
   expect(html).not.toContain('javascript:')
   expect(html).not.toContain('src="moi:')
 })
+
+test('chat resolves workspace file links and sanitizes invalid file paths', () => {
+  const html = renderToStaticMarkup(
+    <Workspace id="abc">
+      <MarkdownContent content="[Video](moi:/files/clips/a%20b.mp4#t=5) [Invalid](moi:/files/../photo.png)" />
+    </Workspace>
+  )
+  expect(html).toContain('href="/api/workspaces/abc/files/clips/a%20b.mp4#t=5"')
+  expect(html).not.toContain('href="moi:')
+  expect(html).not.toContain('/files/../')
+})

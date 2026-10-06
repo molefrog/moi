@@ -10,7 +10,7 @@
 // images/fonts). The client dynamic-imports that entry at `<name>/module` — an
 // extensionless alias, see `ENTRY_ROUTE_FILE` — and assets and chunks resolve
 // module-relative from there. `.js` files carry the
-// `%%MOI_APPLET_API_BASE%%` sentinel (for RPC + `fileUrl`), swapped to the real
+// `%%MOI_APPLET_API_BASE%%` sentinel (for RPC + file resolution), swapped to the real
 // `/api/workspaces/<id>` base when served — so the on-disk bundle is
 // workspace-agnostic.
 import { realpathSync, statSync } from 'node:fs'
@@ -20,7 +20,7 @@ import { join, resolve, sep } from 'path'
 import { analyzeDependencies, resolveSource, scanSources } from './dependencies'
 import type { AppletKind } from './build-applet'
 import { buildAppletsInChild } from './build-worker'
-import { APPLET_API_BASE_SENTINEL } from './runtime/base'
+import { APPLET_API_BASE_SENTINEL } from './api-base'
 import { pruneAppletThumbnails } from '../thumbnails'
 
 export { scanSources } from './dependencies'
@@ -137,7 +137,7 @@ const HASHED_FILE_RE = /^chunk-[0-9a-z]+\.\w+$|-[0-9a-f]{6,}\.\w+$/i
 // Serve one file from a compiled applet directory: the `index.js` entry, a code
 // chunk, or a bundled asset. `apiBase` is the workspace's `/api/workspaces/<id>`
 // prefix — substituted for the build-time sentinel in every `.js` so RPC and
-// `fileUrl` calls hit the right workspace. Assets stream untouched.
+// file addresses resolved by `resolveUrl` hit the right workspace. Assets stream untouched.
 //
 // `file` is the ON-DISK name (the route's extensionless entry alias is already
 // mapped back to `index.js` by `parseAppletTail`), so the content-type and
@@ -197,11 +197,11 @@ export async function serveApplet(
 }
 
 // ---- route helpers ----------------------------------------------------------
-// Pure helpers behind the applet/fs/rpc HTTP routes, kept here (not web.ts) so
+// Pure helpers behind the applet/files/rpc HTTP routes, kept here (not web.ts) so
 // they're unit-testable without importing web.ts — which binds ports on load.
 
-// The API base a served bundle's sentinel is rewritten to. RPC + `fileUrl`
-// hang off it, matching what the compiled `rpc()` / `fileUrl()` prepend.
+// The API base a served bundle's sentinel is rewritten to. RPC and workspace
+// file addresses resolved by `resolveUrl()` use this prefix.
 export function apiBaseFor(id: string): string {
   return `/api/workspaces/${id}`
 }
@@ -251,13 +251,13 @@ export function parseAppletTail(
   }
 }
 
-// Extensions `fileUrl()` may stream from the workspace. Media + image/doc
+// Extensions served for `moi:/files/...` addresses. Media + image/doc
 // assets only — deliberately excludes text/data (`.json`, `.env`, `.md`,
 // source) so the route can't be used to exfiltrate arbitrary workspace data.
 const FS_MEDIA_RE =
   /\.(mp4|webm|mov|m4v|mkv|mp3|wav|ogg|oga|m4a|flac|aac|opus|png|jpe?g|gif|webp|avif|svg|ico|pdf|vtt|srt)$/i
 
-// Resolve a `/fs/`-style tail to a real on-disk path inside the workspace root,
+// Resolve a `/files/`-style tail to a real on-disk path inside the workspace root,
 // or an error Response. Hard guards (defense in depth): reject empty/`.`/`..`/
 // dotfile segments and anything resolving outside the root, and require a media
 // extension. The workspace holds secrets (`.env`, `.moi/`) and the routes built

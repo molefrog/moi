@@ -10,7 +10,7 @@
 //
 // The transform prefixes each selector with `[data-applet="<scope>"]` — the
 // attribute the client puts on the applet's mount container (see
-// client/features/applets/AppletMount.tsx). Selectors that address the page
+// client/features/applets/AppletContainer.tsx). Selectors that address the page
 // root (`:root`, `:host`, `html`, `body`) are mapped onto the container
 // itself, so theme variables and preflight inheritance (line-height, font)
 // land there and inherit down. Rules inside `@keyframes` are left alone —
