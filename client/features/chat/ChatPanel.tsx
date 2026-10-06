@@ -3,7 +3,7 @@ import { Link } from 'wouter'
 
 import { IconArrowBackUp, IconChevronDown, IconChevronsRight, IconX } from '@tabler/icons-react'
 import { draftSessionId } from '@/lib/session-drafts'
-import { workspaceTabPath } from '@/lib/navigation'
+import { addressPath } from '@/lib/navigation'
 import { useCurrentTabId } from './sessions/useSelectedSession'
 
 import { canSubmitComposerAction, focusComposer } from '@/client/components/shared/Composer'
@@ -205,7 +205,7 @@ export function ChatPanel({
           <div className="mx-auto flex w-full max-w-(--chat-max-container) flex-1 flex-col gap-6">
             {forkedFromSessionId && (
               <Link
-                href={workspaceTabPath(workspaceId, 'overview')}
+                href={addressPath(workspaceId, { sessionId: forkedFromSessionId, search: '' })}
                 className="block text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 <div className="flex items-center gap-3">

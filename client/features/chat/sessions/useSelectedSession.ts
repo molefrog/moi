@@ -31,7 +31,8 @@ type SetSelectedSession = (sessionId: string | null) => void
 
 type SelectedSessionResult = readonly [
   sessionId: string | null | undefined,
-  setSessionId: SetSelectedSession
+  setSessionId: SetSelectedSession,
+  selectSessionForTab: (sessionId: string, tabId: WorkspaceTabId) => Promise<void>
 ]
 
 export type SelectedSessionSaveResult = 'applied' | 'conflict' | 'ignored'
@@ -39,6 +40,23 @@ export type SelectedSessionSaveResult = 'applied' | 'conflict' | 'ignored'
 export function selectedSessionKey(workspaceId: string, scope: SelectedSessionScope = 'shared') {
   const key = appUiKeys.sessionSelection(workspaceId)
   return scope === 'browser-tab' ? ([...key, 'browser-tab'] as const) : key
+}
+
+export function selectedSessionOptions(
+  workspaceId: string,
+  scope: SelectedSessionScope = 'shared'
+) {
+  return {
+    queryKey: selectedSessionKey(workspaceId, scope),
+    queryFn: () =>
+      scope === 'browser-tab'
+        ? Promise.resolve(readSelectedSession(workspaceId))
+        : requestJson<WorkspaceSessionSelection>(`/api/workspaces/${workspaceId}/selected-session`),
+    staleTime: Infinity,
+    gcTime: 0,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false
+  }
 }
 
 function selectedSessionMutationKey(workspaceId: string, scope: SelectedSessionScope) {
@@ -179,21 +197,11 @@ export function useSelectedSession(explicitTabId?: WorkspaceTabId): SelectedSess
   // WorkspaceContent remains an observer for the active workspace. Nested hook
   // users reuse its result without refetching; once the route unmounts, dropping
   // the cache makes the next visit load the server-owned selection again.
-  const query = useQuery<WorkspaceSessionSelection>({
-    queryKey,
-    queryFn: () =>
-      scope === 'browser-tab'
-        ? Promise.resolve(readSelectedSession(workspaceId))
-        : requestJson(`/api/workspaces/${workspaceId}/selected-session`),
-    staleTime: Infinity,
-    gcTime: 0,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false
-  })
+  const query = useQuery(selectedSessionOptions(workspaceId, scope))
   // A pin is shared with CLI creation and applies to every workspace tab.
   const sharedSelection = useWorkspaceSessionSelection().data
 
-  const { mutate: saveSelectedSession } = useMutation<
+  const { mutate: saveSelectedSession, mutateAsync: saveSelectedSessionAsync } = useMutation<
     SelectedSessionState,
     Error,
     SaveSelectedSessionInput
@@ -253,6 +261,27 @@ export function useSelectedSession(explicitTabId?: WorkspaceTabId): SelectedSess
     [queryClient, saveSelectedSession, workspaceId, tabId, scope]
   )
 
+  const selectSessionForTab = useCallback(
+    async (sessionId: string, destination: WorkspaceTabId) => {
+      const input = optimisticallySetSelectedSession(
+        queryClient,
+        workspaceId,
+        sessionId,
+        destination,
+        scope
+      )
+      if (!input) return
+      const saved = await saveSelectedSessionAsync(input)
+      if (
+        saved.sessionId !== sessionId ||
+        queryClient.getQueryData<WorkspaceSessionSelection>(queryKey)?.selected[destination] !==
+          sessionId
+      )
+        throw new Error('Couldn’t save selected chat')
+    },
+    [queryClient, queryKey, saveSelectedSessionAsync, scope, workspaceId]
+  )
+
   useWorkspaceEvent(event => {
     if (event.type !== 'selected-session:updated' || event.workspaceId !== workspaceId) return
     applySelectedSessionEvent(queryClient, workspaceId, scope === 'shared' && pendingSaves > 0)
@@ -266,19 +295,12 @@ export function useSelectedSession(explicitTabId?: WorkspaceTabId): SelectedSess
           tabId,
           scope === 'browser-tab' ? query.data : undefined
         )
-  return [selectedSessionId, setSelectedSessionId]
+  return [selectedSessionId, setSelectedSessionId, selectSessionForTab]
 }
 
 function useWorkspaceSessionSelection() {
   const workspaceId = useWorkspaceId()
-  return useQuery<WorkspaceSessionSelection>({
-    queryKey: appUiKeys.sessionSelection(workspaceId),
-    queryFn: () => requestJson(`/api/workspaces/${workspaceId}/selected-session`),
-    staleTime: Infinity,
-    gcTime: 0,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false
-  })
+  return useQuery(selectedSessionOptions(workspaceId))
 }
 
 export function usePinnedSession() {
@@ -322,6 +344,7 @@ export function usePinnedSession() {
   return {
     pinnedSessionId: data?.pinned ?? null,
     loaded: data !== undefined,
-    pin: mutation.mutate
+    pin: mutation.mutate,
+    pinAsync: mutation.mutateAsync
   }
 }

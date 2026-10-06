@@ -4,7 +4,7 @@ import { resolve } from 'path'
 import { parseAppletSelector } from '@/lib/applet-selector'
 import { resolveWorkspaceTheme } from '@/lib/themes'
 import type { WorkspaceEntry } from '@/lib/types'
-import { moiHref, parseMoiHref } from '@/lib/navigation'
+import { destinationHref, moiHref, parseMoiHref } from '@/lib/navigation'
 import { navigationRelay } from './navigation-relay'
 
 import { clearAppletLog, getAppletLog, getAppletLogCount } from './applet-log'
@@ -322,8 +322,9 @@ export const control = Bun.serve({
           if (!match) return
           try {
             const address = parseMoiHref(data.href)
-            const href = moiHref(address.tab, address.search)
-            assertNavigableTab(address.tab, await getWorkspaceViews(match.path))
+            const href = destinationHref(address)
+            if ('tab' in address)
+              assertNavigableTab(address.tab, await getWorkspaceViews(match.path))
             await navigationRelay.navigate(match.id, href)
             ws.send(JSON.stringify({ ok: true, href }))
           } catch (error) {
