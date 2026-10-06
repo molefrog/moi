@@ -2,7 +2,8 @@
 // `moi openclaw init`). Creates `.moi/widgets/`, writes the widget
 // dependency manifest, and installs dependencies — so the agent never has to
 // bootstrap the folder itself.
-import { mkdir, stat } from 'node:fs/promises'
+import { appendFile, mkdir, open, stat } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 
 import { syncAppletDeclarations } from './applets/declarations'
@@ -40,23 +41,51 @@ export const MOI_PACKAGE_JSON = {
 const INSTALL_WAIT_MS = 10_000
 const INSTALL_TIMEOUT_MS = 120_000
 
-type InstallDependencies = (moiDir: string) => Promise<number>
+type InstallDependencies = (moiDir: string, logPath: string) => Promise<number>
 
-async function runBunInstall(moiDir: string): Promise<number> {
-  const install = Bun.spawn(['bun', 'install'], {
-    cwd: moiDir,
-    stdout: 'ignore',
-    stderr: 'inherit',
-    timeout: INSTALL_TIMEOUT_MS,
-    killSignal: 'SIGKILL'
-  })
-  // Don't hold the event loop open for a backgrounded install: a short-lived
-  // CLI (`moi init`) must exit after the wait, not linger until the child
-  // does. The child survives parent exit and finishes the install on its own
-  // (verified: orphaned bun processes complete; only the 2-minute kill is no
-  // longer enforced once the parent is gone).
+export function createDependencyInstallLogPath(): string {
+  return join(tmpdir(), `moi-bun-install-${crypto.randomUUID()}.log`)
+}
+
+async function runBunInstall(moiDir: string, logPath: string): Promise<number> {
+  const log = await open(logPath, 'wx', 0o600)
+  let install: Bun.Subprocess<'ignore', number, number>
+  try {
+    await log.writeFile(
+      `bun install started at ${new Date().toISOString()}\nWorking directory: ${moiDir}\n\n`
+    )
+    install = Bun.spawn(['bun', 'install'], {
+      cwd: moiDir,
+      stdin: 'ignore',
+      // Direct file descriptors keep capturing both streams after a
+      // short-lived CLI exits; parent-owned pipes would lose that output.
+      stdout: log.fd,
+      stderr: log.fd
+    })
+  } catch (err) {
+    await log.writeFile(
+      `\nbun install error: ${err instanceof Error ? err.message : String(err)}\n`
+    )
+    return 1
+  } finally {
+    // The child owns duplicated descriptors now. Closing the parent's handle
+    // also lets a short-lived CLI exit while the install is still running.
+    await log.close()
+  }
+  // Bun.spawn's built-in timeout keeps the parent alive even after unref().
+  // Unref both the child and our timer so a short-lived CLI can exit after
+  // its brief wait. The timeout still applies while the parent is running;
+  // after parent exit the orphaned install finishes on its own.
+  const timeout = setTimeout(() => install.kill('SIGKILL'), INSTALL_TIMEOUT_MS)
+  timeout.unref()
   install.unref()
-  return install.exited
+  try {
+    const code = await install.exited
+    await appendFile(logPath, `\nbun install exited with code ${code}\n`)
+    return code
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 // Keep machine-local state out of workspaces that are git repos: build output,
@@ -105,7 +134,8 @@ async function isDirectory(path: string): Promise<boolean> {
 export async function scaffoldMoiDir(
   workspacePath: string,
   installDependencies: InstallDependencies = runBunInstall,
-  installWaitMs: number = INSTALL_WAIT_MS
+  installWaitMs: number = INSTALL_WAIT_MS,
+  installLogPath: string = createDependencyInstallLogPath()
 ): Promise<'exists' | 'installing' | number> {
   // Backstop against the nested-workspace bug: never scaffold a `.moi/` *inside*
   // another workspace's `.moi/` (which produces the junk `.moi/.moi`). Callers
@@ -133,7 +163,7 @@ export async function scaffoldMoiDir(
   await ensureMoiGitignore(workspacePath)
   await syncAppletDeclarations(workspacePath)
 
-  const exited = installDependencies(moiDir)
+  const exited = installDependencies(moiDir, installLogPath)
   let timer: ReturnType<typeof setTimeout> | undefined
   const result = await Promise.race([
     exited,
@@ -142,12 +172,14 @@ export async function scaffoldMoiDir(
   clearTimeout(timer)
 
   if (result === 'installing') {
-    console.log(`[scaffold] bun install in ${moiDir} still running — continuing in the background`)
+    console.log(
+      `[scaffold] bun install in ${moiDir} still running — continuing in the background; log: ${installLogPath}`
+    )
     exited.then(code => {
       if (code === 0) console.log(`[scaffold] background bun install in ${moiDir} finished`)
       else
         console.warn(
-          `[scaffold] background bun install in ${moiDir} failed (exit ${code}) — the agent will install deps on demand`
+          `[scaffold] background bun install in ${moiDir} failed (exit ${code}) — the agent will install deps on demand; log: ${installLogPath}`
         )
     })
   }
