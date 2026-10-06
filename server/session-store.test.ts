@@ -5,8 +5,7 @@ import { join } from 'node:path'
 import {
   DEFAULT_SESSION_STORE_PATH,
   setSessionStorePath,
-  renameSessionRecord,
-  clearSessionRecordTab
+  renameSessionRecord
 } from './session-store'
 import { getSessionConfig, saveSessionConfig } from './session-config'
 import { getSessionRecord, patchSessionRecord, withSessionRecords } from './session-store'
@@ -63,16 +62,6 @@ test('imports legacy files once and never resurrects cleared settings', async ()
   await saveSessionConfig('/ws', 's1', { fastMode: null })
   expect(await getSessionConfig('/ws', 's1')).toEqual({})
   expect(await Bun.file(join(directory, 'session-config.json')).json()).toEqual(legacyConfig)
-})
-
-test('deleted views clear attribution while preserving fork provenance', async () => {
-  const provenance = {
-    forkedFromSessionId: 'parent',
-    forkedThroughMessageId: 'boundary'
-  }
-  await patchSessionRecord('/ws', 'child', { tabId: 'views/words', ...provenance })
-  await clearSessionRecordTab('/ws', 'views/words')
-  expect(await getSessionRecord('/ws', 'child')).toEqual(provenance)
 })
 
 test('session renames move metadata and fork source ids without changing the boundary', async () => {

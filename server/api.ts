@@ -41,7 +41,6 @@ import {
 } from './thumbnails'
 import { getClientFrameLog, getWireLog } from './harness/debug'
 import { allHarnesses, harnessFor, isHarnessType } from './harness/registry'
-import { broadcast } from './state'
 import {
   discoverWorkspaces,
   getWorkspace,
@@ -54,7 +53,6 @@ import {
 import { loadScratchpadDoc, saveScratchpadDoc } from './scratchpad'
 import { MAX_ASSET_BYTES, scratchpadAssetFile, storeScratchpadAsset } from './scratchpad-assets'
 import {
-  clearSelectedSession,
   getPinnedSession,
   getSelectedSession,
   getWorkspaceSessionSelection,
@@ -65,6 +63,7 @@ import type { SelectedSessionUpdate } from './selected-session'
 import { saveSessionConfig } from './session-config'
 import type { SessionConfigPatch } from './session-config'
 import { getSessionRecord, withSessionRecords } from './session-store'
+import { archiveWorkspaceSession } from './session-archive'
 import { DIST_DIR, prebuilt } from './static'
 import { getWorkspaceSkillsStatus, updateWorkspaceSkills } from './skill-update'
 import { serveWorkspaceImagePreview } from './preview'
@@ -250,8 +249,8 @@ one.delete('/views/:viewId', async c => {
           .filter(session => session.workspaceId === ws.id)
           .map(session => session.sessionId)
       )
-      await discardPendingView(ws.id, ws.path, viewId, active)
-    } else await deleteView(publishEvent, ws.id, ws.path, viewId)
+      await discardPendingView(ws, viewId, active)
+    } else await deleteView(publishEvent, ws, viewId)
     return c.body(null, 204)
   } catch (error) {
     if (error instanceof ViewMutationError || error instanceof PendingViewError)
@@ -552,10 +551,7 @@ one.post('/sessions/:sessionId/archive', async c => {
   if (!harness.archiveSession) return c.text('Chat archiving is not supported', 501)
 
   try {
-    await harness.interrupt(ws.id, sessionId)
-    await harness.archiveSession(ws, sessionId)
-    publishSelectedSession(ws.id, await clearSelectedSession(ws.path, sessionId))
-    broadcast(ws.id, { type: 'sessions_changed', sessionId })
+    await archiveWorkspaceSession(ws, sessionId)
     return c.body(null, 204)
   } catch (error) {
     console.error(`[api] archive chat failed for ${harness.id}`, error)

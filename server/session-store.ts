@@ -5,8 +5,7 @@ import type {
   SessionRecord,
   SessionRecordPatch,
   SessionInfo,
-  SessionSummary,
-  WorkspaceTabId
+  SessionSummary
 } from '@/lib/types'
 import { DATA_DIR } from './data-dir'
 
@@ -125,16 +124,4 @@ function assertSessionRecord(record: Partial<SessionRecord>): asserts record is 
     (record.forkedThroughMessageId !== undefined || record.forkedNoticeIds !== undefined)
   )
     throw new Error('Fork history requires a source session')
-}
-
-export async function clearSessionRecordTab(workspacePath: string, tabId: WorkspaceTabId) {
-  return updateSessionRecords(workspacePath, sessions => {
-    let changed = false
-    for (const metadata of Object.values(sessions)) {
-      if (metadata.tabId !== tabId) continue
-      changed = true
-      delete metadata.tabId
-    }
-    return changed
-  })
 }

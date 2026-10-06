@@ -31,7 +31,11 @@ function isCleanupSource(moiRoot: string, path: string): boolean {
     .some(part => part.startsWith('.') || ['data', 'ui', 'node_modules'].includes(part))
 }
 
-export async function deleteViewSourceFiles(workspacePath: string, viewId: string): Promise<void> {
+export async function deleteViewSourceFiles(
+  workspacePath: string,
+  viewId: string,
+  beforeDelete?: () => Promise<void>
+): Promise<void> {
   const workspaceRoot = await realpath(workspacePath)
   const moiRoot = join(workspaceRoot, '.moi')
   const directory = join(moiRoot, 'views')
@@ -63,5 +67,7 @@ export async function deleteViewSourceFiles(workspacePath: string, viewId: strin
     }
   }
 
+  // Validate shared imports before archiving chats, and archive before removing files.
+  await beforeDelete?.()
   await Promise.all([...remove].map(path => rm(path, { force: true })))
 }

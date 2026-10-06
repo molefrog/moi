@@ -64,5 +64,8 @@ does not block the build or later sends, and later reads never move the cutoff.
 
 Startup failures preserve created chats. Errors report the child ID and, if already
 created, the view ID. Interrupted startup becomes failed on restart and is never
-replayed automatically. Deleting a view removes attribution while preserving chat
-history and fork provenance. A running pending view can be closed, but not discarded.
+replayed automatically. Deleting or discarding a view archives every chat attributed
+to its tab, preserving attribution, history, and fork provenance. Existing workspace
+chats used for pinned execution keep their attribution and remain active. Archived
+chats are removed from selections and the workspace pin. An archive failure keeps the
+view available to retry. A running pending view can be closed, but not discarded.

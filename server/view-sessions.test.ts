@@ -40,19 +40,24 @@ import { renameSessionReferences } from './session-lifecycle'
 import { getSessionConfig, saveSessionConfig } from './session-config'
 import { DATA_DIR } from './data-dir'
 import { setEventServer } from './events'
+import { getClientFrameLog } from './harness/debug'
 const harness = harnessFor('codex')
 const original = {
   forkSession: harness.forkSession,
   sendMessage: harness.sendMessage,
   listSessions: harness.listSessions,
   sessionEvents: harness.sessionEvents,
-  activeSessions: harness.activeSessions
+  activeSessions: harness.activeSessions,
+  interrupt: harness.interrupt,
+  archiveSession: harness.archiveSession
 }
 let dir: string
 let ws: WorkspaceEntry
 let sent: SendMessageInput[]
 let events: unknown[]
 let forks: number
+let archived: string[]
+let stopped: string[]
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'moi-view-sessions-'))
   ws = { id: 'test', path: dir, type: 'codex', addedAt: '' }
@@ -62,6 +67,15 @@ beforeEach(async () => {
   sent = []
   events = []
   forks = 0
+  archived = []
+  stopped = []
+  harness.interrupt = async (_, sessionId) => {
+    stopped.push(sessionId)
+  }
+  harness.archiveSession = async (_, sessionId) => {
+    expect(stopped).toContain(sessionId)
+    archived.push(sessionId)
+  }
   setEventServer({ publish: (_topic, text) => events.push(JSON.parse(text)) })
   harness.listSessions = async () => [{ sessionId: 'source', summary: 'Source', lastModified: 1 }]
   harness.activeSessions = () => [{ workspaceId: ws.id, sessionId: 'source', activity: 'running' }]
@@ -331,24 +345,78 @@ test('duplicate submissions are rejected', async () => {
   expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1)
   expect(sent).toHaveLength(1)
 })
-test('discard blocks startup and active construction, preserves chat provenance afterward', async () => {
+test('discard blocks startup and active construction, then archives attributed chats', async () => {
   const view = await createPendingView(ws.id, ws.path)
   await beginViewBuild(ws.id, ws.path, view.id, 'Cards', 'child', false)
-  await expect(discardPendingView(ws.id, ws.path, view.id, new Set())).rejects.toThrow(
-    'only be closed'
-  )
+  await expect(discardPendingView(ws, view.id, new Set())).rejects.toThrow('only be closed')
   await failInterruptedViewStarts(ws)
   await patchSessionRecord(ws.path, 'child', {
     tabId: `views/${view.id}`,
     forkedFromSessionId: 'source'
   })
-  await expect(discardPendingView(ws.id, ws.path, view.id, new Set(['child']))).rejects.toThrow(
+  await expect(discardPendingView(ws, view.id, new Set(['child']))).rejects.toThrow(
     'only be closed'
   )
-  await discardPendingView(ws.id, ws.path, view.id, new Set())
+  expect(archived).toEqual([])
+  await patchSessionRecord(ws.path, 'follow-up', { tabId: `views/${view.id}` })
+  await saveSelectedSession(ws.path, 'child', undefined, `views/${view.id}`)
+  await saveSelectedSession(ws.path, 'child')
+  await pinSession(ws.path, 'follow-up')
+  await discardPendingView(ws, view.id, new Set())
+  expect(archived).toEqual(['child', 'follow-up'])
+  expect(await getPendingView(ws.path, view.id)).toBeUndefined()
   expect(await getSessionRecord(ws.path, 'child')).toEqual({
+    tabId: `views/${view.id}`,
     forkedFromSessionId: 'source'
   })
+  expect(await getSelectedSession(ws.path, `views/${view.id}`)).toBeUndefined()
+  expect(await getSelectedSession(ws.path)).toBeUndefined()
+  expect(await getPinnedSession(ws.path)).toBeNull()
+  expect(getClientFrameLog(ws.id).map(entry => entry.frame)).toEqual(
+    expect.arrayContaining(
+      archived.map(sessionId => ({ type: 'sessions_changed', workspaceId: ws.id, sessionId }))
+    )
+  )
+})
+
+test('discard archives view attribution rather than a pinned execution chat', async () => {
+  const view = await createPendingView(ws.id, ws.path, {
+    status: 'submitted',
+    executionSessionId: 'source'
+  })
+  await patchSessionRecord(ws.path, 'source', { tabId: 'scratchpad' })
+  await patchSessionRecord(ws.path, 'sibling', { tabId: 'views/sibling' })
+  await patchSessionRecord(ws.path, 'owned', { tabId: `views/${view.id}` })
+  await pinSession(ws.path, 'source')
+  await saveSelectedSession(ws.path, 'source', undefined, `views/${view.id}`)
+  await saveSelectedSession(ws.path, 'source', undefined, 'scratchpad')
+  await discardPendingView(ws, view.id, new Set())
+  expect(archived).toEqual(['owned'])
+  expect(await getPinnedSession(ws.path)).toBe('source')
+  expect(await getSelectedSession(ws.path, 'scratchpad')).toBe('source')
+  expect(await getSelectedSession(ws.path, `views/${view.id}`)).toBeUndefined()
+  expect(await getSessionRecord(ws.path, 'source')).toEqual({ tabId: 'scratchpad' })
+})
+
+test('archive failure leaves a pending view and its selection available to retry', async () => {
+  const view = await createPendingView(ws.id, ws.path, {
+    status: 'failed',
+    executionSessionId: 'child'
+  })
+  await patchSessionRecord(ws.path, 'child', { tabId: `views/${view.id}` })
+  await saveSelectedSession(ws.path, 'child', undefined, `views/${view.id}`)
+  harness.archiveSession = async () => {
+    throw new Error('Archive failed')
+  }
+  await expect(discardPendingView(ws, view.id, new Set())).rejects.toThrow('Archive failed')
+  expect(await getPendingView(ws.path, view.id)).toEqual(view)
+  expect(await getSelectedSession(ws.path, `views/${view.id}`)).toBe('child')
+  harness.archiveSession = async (_, sessionId) => {
+    archived.push(sessionId)
+  }
+  await discardPendingView(ws, view.id, new Set())
+  expect(archived).toEqual(['child'])
+  expect(await getPendingView(ws.path, view.id)).toBeUndefined()
 })
 
 test('fresh handoff failure reports the provider ID after a native rename', async () => {

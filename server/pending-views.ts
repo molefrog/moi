@@ -2,12 +2,10 @@ import { mkdir, rename } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { isAppIconId } from '@/lib/app-icons'
 import { newViewId } from '@/lib/ids'
-import type { PendingView } from '@/lib/types'
-import { viewTabId } from '@/lib/workspace-tabs'
+import type { PendingView, WorkspaceEntry } from '@/lib/types'
 import { DATA_DIR } from './data-dir'
 import { publishEvent } from './events'
-import { clearSessionRecordTab } from './session-store'
-import { dropSessionTab } from './selected-session'
+import { archiveViewSessions } from './session-archive'
 
 type Store = Record<string, PendingView[]>
 let storePath = join(DATA_DIR, 'pending-views.json')
@@ -42,7 +40,7 @@ async function update<T>(workspaceId: string, path: string, mutate: (views: Pend
   const run = writes.then(async () => {
     const store = await read()
     const views = (store[path] ??= [])
-    const result = mutate(views)
+    const result = await mutate(views)
     if (!views.length) delete store[path]
     await mkdir(dirname(storePath), { recursive: true })
     const temp = `${storePath}.${process.pid}.tmp`
@@ -146,18 +144,12 @@ export async function renameViewExecutionSession(
     }
   })
 }
-export async function clearViewSessions(workspaceId: string, path: string, id: string) {
-  await clearSessionRecordTab(path, viewTabId(id))
-  await dropSessionTab(path, viewTabId(id))
-  publishEvent({ type: 'selected-session:updated', workspaceId, sessionId: null })
-}
 export async function discardPendingView(
-  workspaceId: string,
-  path: string,
+  ws: WorkspaceEntry,
   id: string,
   activeSessionIds: Set<string>
 ) {
-  await update(workspaceId, path, views => {
+  await update(ws.id, ws.path, async views => {
     const index = views.findIndex(view => view.id === id)
     if (index === -1) throw new PendingViewError('Pending view not found', 404)
     const view = views[index]
@@ -166,7 +158,7 @@ export async function discardPendingView(
       (view.executionSessionId && activeSessionIds.has(view.executionSessionId))
     )
       throw new PendingViewError('A starting or building view can only be closed', 409)
+    await archiveViewSessions(ws, id)
     views.splice(index, 1)
   })
-  await clearViewSessions(workspaceId, path, id)
 }

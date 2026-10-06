@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 
 import { viewTabId } from '@/lib/workspace-tabs'
-import type { CompiledView, ViewConfig, ViewInfo } from '@/lib/types'
+import type { CompiledView, ViewConfig, ViewInfo, WorkspaceEntry } from '@/lib/types'
 
 import { syncAppletLogAfterBuild } from './applet-log'
 import {
@@ -15,7 +15,8 @@ import {
 import { serializeWorkspaceBundle } from './bundle-queue'
 import { reloadModules } from './functions'
 import { loadLayout, saveLayout } from './layout'
-import { clearViewSessions, completeViewBuild, listPendingViews } from './pending-views'
+import { completeViewBuild, listPendingViews } from './pending-views'
+import { archiveViewSessions } from './session-archive'
 import { setViewSourceTitle } from './applets/config'
 import { deleteViewSourceFiles, readViewSource, ViewSourceInUseError } from './applets/view-source'
 
@@ -288,23 +289,22 @@ export async function updateViewTitle(
 
 export async function deleteView(
   publish: (msg: unknown) => void,
-  workspaceId: string,
-  workspacePath: string,
+  ws: WorkspaceEntry,
   viewId: string
 ): Promise<void> {
+  const { id: workspaceId, path: workspacePath } = ws
   await serializeWorkspaceBundle(workspacePath, async () => {
     const current = (await listCompiledViews(workspacePath)).some(view => view.id === viewId)
     if (!current) throw new ViewMutationError('View not found', 404)
 
     try {
-      await deleteViewSourceFiles(workspacePath, viewId)
+      await deleteViewSourceFiles(workspacePath, viewId, () => archiveViewSessions(ws, viewId))
     } catch (error) {
       if (error instanceof ViewSourceInUseError) throw new ViewMutationError(error.message, 409)
       throw error
     }
     reloadModules([`views/${viewId}`], workspacePath)
     await completeViewBuild(workspaceId, workspacePath, viewId)
-    await clearViewSessions(workspaceId, workspacePath, viewId)
     const layout = await loadLayout(workspacePath)
     const tab = viewTabId(viewId)
     await saveLayout(
