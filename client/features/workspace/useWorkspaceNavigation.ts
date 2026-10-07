@@ -42,7 +42,7 @@ const rememberedAddresses = new Map<string, Map<WorkspaceTabId, string>>()
 
 type UseWorkspaceNavigationOptions = {
   views: ViewInfo[]
-  onOpenChat: (tab: WorkspaceTabId) => void
+  onOpenChat: () => void
 }
 
 export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNavigationOptions) {
@@ -152,7 +152,7 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
           checkCurrent()
         }
         go(addressPath(workspaceId, { tab, search: '' }), { replace: true })
-        onOpenChatRef.current(tab)
+        onOpenChatRef.current()
       } finally {
         if (chatRequest.current === controller) chatRequest.current = null
       }
@@ -163,12 +163,10 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
 
   const navigateHref = useCallback(
     async (href: string, availableViews = views) => {
-      const target = resolveUrl(href, {
-        apiBase: `/api/workspaces/${encodeURIComponent(workspaceId)}`,
-        workspacePath: workspacePath(workspaceId)
-      })
       if (href.startsWith('moi:/files/') || !href.startsWith('moi:')) {
-        window.location.assign(target)
+        window.location.assign(
+          resolveUrl(href, { apiBase: `/api/workspaces/${encodeURIComponent(workspaceId)}` })
+        )
         return
       }
       const address = parseMoiHref(href)
@@ -178,7 +176,7 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
       }
       if (!tabAvailable(address.tab, availableViews))
         throw new Error('This destination is unavailable in this workspace')
-      go(target)
+      go(addressPath(workspaceId, address))
     },
     [go, openLinkedChat, views, workspaceId]
   )

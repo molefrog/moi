@@ -15,15 +15,25 @@ import * as workspaceEvents from '@/client/runtime/useWorkspaceEvents'
 import { WorkspaceLayoutContext } from './WorkspaceLayoutContext'
 import { useWorkspaceNavigation } from './useWorkspaceNavigation'
 
+type ReadNavigationOptions = {
+  base?: string
+  navigate?: (path: string, options?: { replace?: boolean }) => void
+  queryClient?: QueryClient
+  onOpenChat?: () => void
+  collab?: boolean
+}
+
 function readNavigation(
   path: string,
   search: string,
   views: ViewInfo[],
-  base = '',
-  navigate?: (path: string) => void,
-  queryClient = new QueryClient(),
-  onOpenChat: (tab: WorkspaceTabId) => void = () => {},
-  collab = false
+  {
+    base = '',
+    navigate,
+    queryClient = new QueryClient(),
+    onOpenChat = () => {},
+    collab = false
+  }: ReadNavigationOptions = {}
 ) {
   const queryKey = workspaceKeys.views('abc')
   if (!queryClient.getQueryDefaults(queryKey).queryFn)
@@ -97,8 +107,12 @@ test('view params decode exactly once through the real router', () => {
 
 test('encoded IDs resolve under a deployment base without decoding nested escapes', () => {
   const views: ViewInfo[] = [{ id: 'events', status: 'compiled', title: 'events' }]
-  expect(readNavigation('views/%65vents', '', views, '/prefix').activeTab).toBe('views/events')
-  expect(readNavigation('views/%2565vents', '', views, '/prefix').isUnavailable).toBe(true)
+  expect(readNavigation('views/%65vents', '', views, { base: '/prefix' }).activeTab).toBe(
+    'views/events'
+  )
+  expect(readNavigation('views/%2565vents', '', views, { base: '/prefix' }).isUnavailable).toBe(
+    true
+  )
 })
 
 test('missing views keep their destination without becoming the default tab', () => {
@@ -115,7 +129,7 @@ test('chat entry routes never render the unavailable page or become tabs', () =>
 
 test('legacy browser paths select the same view under a deployment base', () => {
   const views: ViewInfo[] = [{ id: 'events', status: 'compiled', title: 'events' }]
-  const result = readNavigation('view:%65vents', 'eventId=123', views, '/prefix')
+  const result = readNavigation('view:%65vents', 'eventId=123', views, { base: '/prefix' })
   expect(result.activeTab).toBe('views/events')
   expect(result.isUnavailable).toBe(false)
   expect(result.appletParams).toEqual({ eventId: '123' })
@@ -156,16 +170,13 @@ test.each(['', '/', '/prefix'])(
       }
     )
     try {
-      readNavigation(
-        'overview',
-        '',
-        views,
+      readNavigation('overview', '', views, {
         base,
-        path => {
+        navigate: path => {
           routedPaths.push(path)
         },
         queryClient
-      )
+      })
       await navigate('moi:/views/orders?order=o-1')
       await navigate('moi:/files/clips/a%20b.mp4?version=2#t=5')
       await navigate('https://example.com/')
@@ -217,7 +228,7 @@ function createChatNavigationFixture(collab: boolean) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   queryClient.setQueryData(workspaceKeys.sessions('abc'), sessions)
   const routed: { path: string; replace?: boolean }[] = []
-  const revealed: WorkspaceTabId[] = []
+  const revealed: boolean[] = []
   const writes: { url: string; body: { sessionId: string | null; tabId?: WorkspaceTabId } }[] = []
   const selection: WorkspaceSessionSelection = {
     selected: { overview: 'previous' },
@@ -285,16 +296,13 @@ function createChatNavigationFixture(collab: boolean) {
       navigate = callback
     }
   )
-  readNavigation(
-    'overview',
-    '',
-    views,
-    '/prefix',
-    (path, options?: { replace?: boolean }) => routed.push({ path, ...options }),
+  readNavigation('overview', '', views, {
+    base: '/prefix',
+    navigate: (path, options) => routed.push({ path, ...options }),
     queryClient,
-    tab => revealed.push(tab),
+    onOpenChat: () => revealed.push(true),
     collab
-  )
+  })
   return {
     queryClient,
     sessions,
@@ -335,7 +343,7 @@ for (const collab of [false, true]) {
       queryClient.setQueryData(selectedSessionKey('abc'), { ...selection, pinned })
       await navigate(`moi:/chats/${id}`)
       expect(routed).toEqual([{ path: `/prefix/workspace/abc/${tab}`, replace: true }])
-      expect(revealed).toEqual([tab])
+      expect(revealed).toEqual([true])
       expect(
         queryClient.getQueryData<WorkspaceSessionSelection>(selectedSessionKey('abc'))?.pinned
       ).toBe(pinned === id ? id : null)
@@ -369,7 +377,7 @@ for (const collab of [false, true]) {
         '/api/workspaces/abc/pinned-session',
         ...(collab ? [] : ['/api/workspaces/abc/selected-session'])
       ])
-      expect(revealed).toEqual(['overview'])
+      expect(revealed).toEqual([true])
     })
 
     test('opens chats with persisted Agent tab attribution on Overview', async () => {
@@ -380,7 +388,7 @@ for (const collab of [false, true]) {
       ])
       await navigate('moi:/chats/legacy')
       expect(routed).toEqual([{ path: '/prefix/workspace/abc/overview', replace: true }])
-      expect(revealed).toEqual(['overview'])
+      expect(revealed).toEqual([true])
       expect(
         queryClient.getQueryData<WorkspaceSessionSelection>(
           selectedSessionKey('abc', collab ? 'browser-tab' : 'shared')
@@ -415,7 +423,7 @@ for (const collab of [false, true]) {
         saving.resolve(Response.json({ sessionId: 'general' }))
         await opening
         expect(routed).toEqual([{ path: '/prefix/workspace/abc/overview', replace: true }])
-        expect(revealed).toEqual(['overview'])
+        expect(revealed).toEqual([true])
       })
 
       test('a refused conditional selection save does not open the chat', async () => {
@@ -469,7 +477,7 @@ for (const collab of [false, true]) {
         { sessionId: 'new', summary: 'New', lastModified: 2 }
       ])
       await navigate('moi:/chats/new')
-      expect(revealed).toEqual(['overview'])
+      expect(revealed).toEqual([true])
     })
   })
 }
