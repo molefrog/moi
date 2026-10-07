@@ -302,13 +302,14 @@ hover, in React. See [Applet intents](references/INTENTS.md#view-params-and-hist
 
 #### Creating views from chat
 
-When the user asks for a new view, run:
+When the user asks for a new view, use the current session ID and pin state from the
+hidden context. If this chat is pinned, build in this turn:
 
 ```sh
 moi views create --requirements "<complete requirements>"
 ```
 
-To start the build in a separate chat, supply the source session to fork:
+Otherwise, start the build in a separate chat by forking the current session:
 
 ```sh
 moi views create --from-session <session-id> --requirements "<complete requirements>"

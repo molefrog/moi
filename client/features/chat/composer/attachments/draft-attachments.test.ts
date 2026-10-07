@@ -258,9 +258,9 @@ describe('applet file staging', () => {
       ])
       expect(attachmentsForSend(workspaceId, 'other')).toHaveLength(1)
       expect(attachmentsForSend(workspaceId, null)).toEqual([])
-      expect(attachmentsForSend(workspaceId, 'real', { applet: { source: 'view:files' } })).toEqual(
-        []
-      )
+      expect(
+        attachmentsForSend(workspaceId, 'real', { applet: { kind: 'view', id: 'files' } })
+      ).toEqual([])
     }
   )
 

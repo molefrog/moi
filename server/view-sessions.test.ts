@@ -120,7 +120,11 @@ test('manual creation has no session until submission, then attaches once', asyn
   expect(renderMoiContext(sent[0].context!)).toContain('Build a new view from this message.')
   expect(renderMoiContext(sent[0].context!)).toContain('moi views create --requirements')
   expect(sent[0].context?.activeTab).toBeUndefined()
-  expect(sent[0].context?.chatTab).toEqual({ id: `views/${view.id}` })
+  expect(sent[0].context?.session).toEqual({
+    id: 'fresh',
+    tabId: `views/${view.id}`,
+    pinned: false
+  })
   expect(sent[0]).not.toHaveProperty('viewBuildId')
   expect((await getPendingView(ws.path, view.id))?.status).toBe('submitted')
 })
@@ -137,7 +141,7 @@ test('CLI prepares a fork and boundary before creating a view while source stays
   }
   harness.sendMessage = async input => {
     expect(await getSessionRecord(ws.path, 'child')).toMatchObject({
-      tabId: input.context?.chatTab?.id
+      tabId: input.context?.session?.tabId
     })
     expect((await getSessionRecord(ws.path, 'child')).forkedThroughMessageId).toBeUndefined()
     sent.push(input)
@@ -148,7 +152,11 @@ test('CLI prepares a fork and boundary before creating a view while source stays
   expect(sent).toHaveLength(1)
   expect(sent[0].isNew).toBe(false)
   expect(renderMoiContext(sent[0].context!)).toContain('Build a new view from this message.')
-  expect(sent[0].context?.chatTab).toEqual({ id: `views/${result.viewId}` })
+  expect(sent[0].context?.session).toEqual({
+    id: 'child',
+    tabId: `views/${result.viewId}`,
+    pinned: false
+  })
   expect(sent[0].context?.activeTab).toBeUndefined()
   expect(renderMoiContext(sent[0].context!)).toContain('moi views create --requirements')
   expect(renderMoiContext(sent[0].context!)).not.toContain('--from-session')
@@ -209,7 +217,7 @@ test.each(['manual', 'cli'])(
       })
     } else {
       expect(sent[0].isNew).toBe(false)
-      expect(sent[0].context?.chatTab).toEqual({ id: 'views/original' })
+      expect(sent[0].context?.session?.tabId).toEqual('views/original')
       expect(sent[0].context?.activeTab).toBeUndefined()
       expect(renderMoiContext(sent[0].context!)).toContain('Build a new view from this message.')
       expect(renderMoiContext(sent[0].context!)).toContain('moi views create --requirements')
@@ -283,6 +291,7 @@ test('CLI creation forks the explicit source even when a different chat is pinne
   expect(await getPinnedSession(ws.path)).toBe('source')
   expect(forks).toBe(1)
   expect(sent).toHaveLength(1)
+  expect(sent[0].context?.session?.pinned).toBe(false)
 })
 test('CLI creation rejects an unknown explicit source before creating a view', async () => {
   await expect(createViewFromSession(ws, 'missing', 'Build cards')).rejects.toThrow(
@@ -372,7 +381,7 @@ test('completion removes build state without moving selection, ownership, or pin
 })
 test('late send acceptance does not recreate a completed build', async () => {
   harness.sendMessage = async input => {
-    await completeViewBuild(ws.id, ws.path, input.context!.chatTab!.id.slice('views/'.length))
+    await completeViewBuild(ws.id, ws.path, input.context!.session!.tabId!.slice('views/'.length))
   }
   await createViewFromSession(ws, 'source', 'Build cards')
   expect(await listPendingViews(ws.path)).toEqual([])
@@ -581,15 +590,15 @@ test('follow-ups keep chat context without repeating the build request, includin
       context: { activeTab: { id: activeTab }, directives: ['Use compact spacing.'] }
     })
     const context = sent.at(-1)!.context!
-    expect(context.chatTab).toEqual({ id: `views/${view.id}` })
+    expect(context.session).toEqual({ id: 'fresh', tabId: `views/${view.id}`, pinned: false })
     expect(context.activeTab).toEqual({ id: activeTab })
     const rendered = renderMoiContext(context)
     expect(rendered).not.toContain('Build a new view from this message.')
     expect(rendered).not.toContain('moi views set')
     expect(rendered).not.toContain('Available view icons')
-    expect(rendered).toContain('# Chat tab')
+    expect(rendered).toContain('# Session')
     expect(context).not.toHaveProperty('chat')
-    expect(rendered).not.toContain('pinned')
+    expect(rendered).toContain('Pinned: no.')
     expect(rendered).not.toContain('moi views create')
     expect(rendered).toContain('# This message only\nUse compact spacing.')
   }
@@ -618,7 +627,7 @@ test('an unrelated pinned chat cannot take ownership of a running view build', a
   const message = sent.at(-1)!
   expect(message.sessionId).toBe('source')
   expect(message.context?.activeTab).toEqual({ id: `views/${view.id}` })
-  expect(message.context?.chatTab).toBeUndefined()
+  expect(message.context?.session?.tabId).toBeUndefined()
   expect(renderMoiContext(message.context!)).not.toContain('Build a new view from this message.')
   expect(await getSessionRecord(ws.path, 'builder')).toEqual({ tabId: `views/${view.id}` })
   expect(await getSelectedSession(ws.path, `views/${view.id}`)).toBe('builder')
@@ -708,7 +717,11 @@ test('the builder can resume its failed view while an unrelated failed view is v
   })
   expect((await getPendingView(ws.path, view.id))?.error).toBeUndefined()
   expect(await getPendingView(ws.path, other.id)).toEqual(otherBefore)
-  expect(sent.at(-1)?.context?.chatTab).toEqual({ id: `views/${view.id}` })
+  expect(sent.at(-1)?.context?.session).toEqual({
+    id: 'builder',
+    tabId: `views/${view.id}`,
+    pinned: true
+  })
   expect(sent.at(-1)?.context?.activeTab).toEqual({ id: `views/${other.id}` })
   expect(renderMoiContext(sent.at(-1)!.context!)).not.toContain(
     'Build a new view from this message.'
@@ -724,16 +737,56 @@ test('ordinary sends preserve the visible tab snapshot and resolve the chat tab 
     sessionId: 'source',
     isNew: false,
     content: 'Explain this item',
-    context: { activeTab, chatTab: { id: 'views/forged' } }
+    context: { activeTab, session: { id: 'forged', tabId: 'views/forged', pinned: true } }
   })
   expect(sent[0].context?.activeTab).toEqual(activeTab)
-  expect(sent[0].context?.chatTab).toEqual({ id: 'views/original' })
+  expect(sent[0].context?.session).toEqual({ id: 'source', tabId: 'views/original', pinned: false })
   expect(renderMoiContext(sent[0].context!)).toContain('The user is on the "Current view" view tab')
   expect(renderMoiContext(sent[0].context!)).toContain(
     'This chat belongs to the "original" view tab'
   )
   expect(await getPinnedSession(ws.path)).toBeNull()
   expect(await getSessionRecord(ws.path, 'source')).toEqual({ tabId: 'views/original' })
+})
+
+test('session pin state describes the sender even when a different chat is pinned', async () => {
+  await pinSession(ws.path, 'other')
+  await sendWorkspaceMessage(ws, {
+    workspaceId: ws.id,
+    workspacePath: ws.path,
+    sessionId: 'source',
+    isNew: false,
+    content: 'Create a view',
+    context: { activeTab: { id: 'overview' } }
+  })
+  expect(sent[0].context?.session).toEqual({ id: 'source', tabId: undefined, pinned: false })
+})
+
+test('follow-ups refresh the session ID and pin state after a native rename', async () => {
+  await patchSessionRecord(ws.path, 'source', { tabId: 'scratchpad' })
+  await pinSession(ws.path, 'source')
+  const message = {
+    workspaceId: ws.id,
+    workspacePath: ws.path,
+    sessionId: 'source',
+    isNew: false,
+    content: 'Create a view'
+  }
+  await sendWorkspaceMessage(ws, message)
+  expect(sent.at(-1)?.context?.session).toEqual({ id: 'source', tabId: 'scratchpad', pinned: true })
+
+  await renameSessionReferences(ws.id, ws.path, 'source', 'native')
+  await sendWorkspaceMessage(ws, message)
+  expect(sent.at(-1)?.sessionId).toBe('native')
+  expect(sent.at(-1)?.context?.session).toEqual({ id: 'native', tabId: 'scratchpad', pinned: true })
+
+  await pinSession(ws.path, null)
+  await sendWorkspaceMessage(ws, message)
+  expect(sent.at(-1)?.context?.session).toEqual({
+    id: 'native',
+    tabId: 'scratchpad',
+    pinned: false
+  })
 })
 
 test('a new browser chat groups the visible view title and params without attaching params to the chat', async () => {
@@ -747,7 +800,7 @@ test('a new browser chat groups the visible view title and params without attach
     context: { activeTab }
   })
   expect(sent[0].context?.activeTab).toEqual(activeTab)
-  expect(sent[0].context?.chatTab).toEqual({ id: 'views/garden', title: 'Garden' })
+  expect(sent[0].context?.session).toEqual({ id: 'fresh', tabId: 'views/garden', pinned: false })
   expect(await getSessionRecord(ws.path, 'fresh')).toEqual({ tabId: 'views/garden' })
 })
 
@@ -763,7 +816,7 @@ test('completion keeps the attached chat context without repeating build instruc
     content: 'What do you think?',
     context: { activeTab: { id: 'overview' } }
   })
-  expect(sent.at(-1)?.context?.chatTab).toEqual({ id: `views/${view.id}` })
+  expect(sent.at(-1)?.context?.session?.tabId).toEqual(`views/${view.id}`)
   expect(renderMoiContext(sent.at(-1)!.context!)).not.toContain(
     'Build a new view from this message.'
   )
@@ -787,8 +840,8 @@ test('a pinned chat receives one build request per view, with no repeats on foll
     const rendered = renderMoiContext(sent.at(-1)!.context!)
     expect(rendered).not.toContain('Build a new view from this message.')
     expect(rendered).not.toContain('moi views create')
-    expect(rendered).not.toContain('pinned')
-    expect(sent.at(-1)?.context?.chatTab).toBeUndefined()
+    expect(rendered).toContain('Pinned: yes.')
+    expect(sent.at(-1)?.context?.session?.tabId).toBeUndefined()
     expect(rendered).not.toContain('start it in its own chat')
   }
 })

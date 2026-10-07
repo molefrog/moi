@@ -26,6 +26,7 @@ import type {
   AttachmentInput,
   AttachmentOrigin
 } from '@/lib/types'
+import type { AppletContext } from '@/lib/moi-context'
 import { isWorkspaceAttachmentPath, MAX_UPLOAD_BYTES } from '@/lib/message-attachments'
 import { useEffect } from 'react'
 
@@ -47,12 +48,12 @@ export type AppletIdentity = { kind: AppletKind; name: string }
 
 export const appletSource = ({ kind, name }: AppletIdentity): string => `${kind}:${name}`
 
-// A chat message fired from applet UI. `source` is stamped from the identity
+// A chat message fired from applet UI. `applet` is stamped from the identity
 // the bridge was attached with, so an applet can neither omit it nor claim to
 // be another applet.
 export type AppletChatMessage = {
   message: string
-  source: string
+  applet: AppletContext
   attachments: (AttachmentInput & AttachmentOrigin)[]
 }
 
@@ -191,7 +192,11 @@ function createRuntime(workspaceId: string) {
               snapshotAttachmentInput(item, source)
             )
             if (!admitChatMessage(identity, source, message)) return
-            emitter.emit('sendChatMessage', { message, source, attachments })
+            emitter.emit('sendChatMessage', {
+              message,
+              applet: { kind: identity.kind, id: identity.name },
+              attachments
+            })
           } catch (error) {
             const message = errorMessage(error)
             toast.add({ title: 'Couldn’t send message', description: message, type: 'error' })

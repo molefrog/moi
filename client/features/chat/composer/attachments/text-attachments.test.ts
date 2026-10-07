@@ -72,7 +72,7 @@ describe('text staging and sends', () => {
     stageTextAttachment(target, { ...attachment, label: 'Another order' })
     stageTextAttachment({ workspaceId, sessionId: 'other' }, { ...attachment, label: 'Other chat' })
     const staged = attachmentsForSend(workspaceId, null)
-    const options = { applet: { source: 'view:orders' } }
+    const options = { applet: { kind: 'view', id: 'orders' } } as const
 
     expect(attachmentsForSend(workspaceId, null, options)).toEqual([])
     liveStore.getState().renameSession(workspaceId, null, 'temporary')
@@ -131,9 +131,9 @@ describe('text staging and sends', () => {
         }
       ]
     })
-    expect(attachmentsForSend(workspaceId, null, { applet: { source: 'widget:clock' } })).toEqual(
-      []
-    )
+    expect(
+      attachmentsForSend(workspaceId, null, { applet: { kind: 'widget', id: 'clock' } })
+    ).toEqual([])
     expect(liveStore.getState().attachments[attachmentKey(workspaceId, null)]).toHaveLength(2)
   })
 })

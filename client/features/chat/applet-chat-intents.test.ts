@@ -98,7 +98,7 @@ describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope
   }
   const event: AppletChatMessage = {
     message: 'Review',
-    source: 'view:orders',
+    applet: { kind: 'view', id: 'orders' },
     attachments: [{ type: 'file', path: 'report.pdf', source: 'view:orders' }]
   }
 
@@ -146,7 +146,7 @@ describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope
     await handler.handle({ ...event, attachments: [] })
     expect(reveal).toHaveBeenCalledTimes(1)
     expect(send).toHaveBeenCalledWith('Review', {
-      applet: { source: 'view:orders' },
+      applet: { kind: 'view', id: 'orders' },
       preparedAttachments: { attachments: [], parts: [] }
     })
     expect(notices).not.toHaveBeenCalled()
@@ -193,7 +193,7 @@ describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope
         {
           type: 'file',
           file: new File(['image'], 'image.png', { type: 'image/png' }),
-          source: event.source
+          source: 'view:orders'
         },
         ...event.attachments,
         text
@@ -255,7 +255,7 @@ describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope
       ...event,
       attachments: [
         ...event.attachments,
-        { type: 'file', path: 'missing.pdf', source: event.source }
+        { type: 'file', path: 'missing.pdf', source: 'view:orders' }
       ]
     })
     expect(send).not.toHaveBeenCalled()

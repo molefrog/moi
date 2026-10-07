@@ -8,8 +8,8 @@
 // Flow: a structured `MoiContext` is assembled at send time — by the client
 // for chat sends (client/features/workspace/moi-context.ts, sent as the chat
 // frame's `context`), by the server for pending-view requests. The server adds
-// the optional collab reference path before the harness renders the context
-// with the transform matching its conventions:
+// the session snapshot and optional collab reference before the harness renders
+// the context with the transform matching its conventions:
 //   - Claude Code  — `moiContextSystemReminder` as its own leading text block
 //     (mirrors how Claude Code itself injects ambient context; a string
 //     prefix would defeat the SDK's first-prompt extraction, which skips
@@ -20,7 +20,7 @@
 //   - OpenClaw — `appendMoiContext` after the user's text
 // Display paths strip with `stripMoiContext` so the envelope never surfaces
 // in a bubble, live or replayed from a transcript.
-import type { WorkspaceTabId } from './types'
+import type { AppletKind, WorkspaceTabId } from './types'
 import { isParamsRecord } from './workspace-tabs'
 
 const MOI_CONTEXT_OPEN = '<moi-context>'
@@ -34,11 +34,16 @@ const SYSTEM_REMINDER_OPEN = '<system-reminder>'
 const SYSTEM_REMINDER_CLOSE = '</system-reminder>'
 
 // A chat message fired from applet UI (`sendChatMessage`) rather than typed.
-// `source` is the applet's `<kind>:<name>`, stamped host-side by the applet
-// runtime from the identity the bridge was attached with — an applet cannot
-// claim to be another one.
-export type AppletMessage = {
-  source: string
+// Identity is stamped host-side from the bridge the applet was attached with.
+export type AppletContext = {
+  kind: AppletKind
+  id: string
+}
+
+export type SessionContext = {
+  id: string
+  tabId?: WorkspaceTabId
+  pinned: boolean
 }
 
 export type TabContext = {
@@ -58,9 +63,9 @@ export type MoiContext = {
   // Omitted for programmatic sends when the visible tab is unknown.
   activeTab?: TabContext
   // Set when this message came from applet UI instead of the composer.
-  applet?: AppletMessage
-  // The tab this chat belongs to, resolved by the server.
-  chatTab?: Pick<TabContext, 'id' | 'title'>
+  applet?: AppletContext
+  // Added by the server before sending to the harness.
+  session?: SessionContext
   // One-shot imperative lines for this message only (e.g. pending-view build
   // instructions from lib/view-build-directives.ts).
   directives?: string[]
@@ -97,19 +102,10 @@ function renderTabParams(value: Record<string, unknown>): string | null {
   return escapeTags(capped)
 }
 
-// `<kind>:<name>` → a sentence fragment that names the applet the way the user
-// sees it AND the file the agent edits, the same pairing `describeTab` makes
-// for view tabs.
-function describeAppletSource(source: string): string {
-  if (source.startsWith('widget:')) {
-    const name = escapeTags(source.slice('widget:'.length))
-    return `"${name}" widget (.moi/widgets/${name}.tsx)`
-  }
-  if (source.startsWith('view:')) {
-    const name = escapeTags(source.slice('view:'.length))
-    return `"${name}" view (.moi/views/${name}.tsx)`
-  }
-  return `"${escapeTags(source)}" applet`
+function describeApplet(applet: AppletContext): string {
+  const id = escapeTags(applet.id)
+  const directory = applet.kind === 'view' ? 'views' : 'widgets'
+  return `The "${id}" ${applet.kind} (.moi/${directory}/${id}.tsx)`
 }
 
 // Describe a tab using the labels the user sees in the tab bar. A view
@@ -142,8 +138,11 @@ export function renderMoiContextBody(ctx: MoiContext): string {
     'Read the **`moi-workspace` skill** before responding — even to a simple question — unless you already read it in this chat.'
   ].join('\n')
   const sections: string[] = []
+  const appletIsActiveView =
+    ctx.applet?.kind === 'view' && ctx.activeTab?.id === `views/${ctx.applet.id}`
   if (ctx.activeTab) {
     const tabLines = [`The user is on ${describeTab(ctx.activeTab)}.`]
+    if (appletIsActiveView) tabLines.push('This view sent the message above from its UI.')
     const tabParams = ctx.activeTab.params ? renderTabParams(ctx.activeTab.params) : null
     if (tabParams) tabLines.push(`Params it is rendering with right now: ${tabParams}`)
     sections.push(`# Active tab\n${tabLines.join('\n')}`)
@@ -152,12 +151,23 @@ export function renderMoiContextBody(ctx: MoiContext): string {
     sections.push(
       `# Collab\nThe collab runtime is available. Before writing collaborative applets, read ${escapeTags(ctx.collabReference)}.`
     )
-  if (ctx.applet) {
+  if (ctx.applet && !appletIsActiveView) {
     sections.push(
-      `# Applet message\nThe message above was not typed by the user — the ${describeAppletSource(ctx.applet.source)} sent it when the user acted in its UI.`
+      `# Applet message\n${describeApplet(ctx.applet)} sent the message above from its UI.`
     )
   }
-  if (ctx.chatTab) sections.push(`# Chat tab\nThis chat belongs to ${describeTab(ctx.chatTab)}.`)
+  if (ctx.session) {
+    const sessionLines = [`Session id: \`${escapeTags(ctx.session.id)}\``]
+    if (ctx.session.tabId) {
+      sessionLines.push(
+        ctx.session.tabId === ctx.activeTab?.id
+          ? 'This chat belongs to the active tab.'
+          : `This chat belongs to ${describeTab({ id: ctx.session.tabId })}.`
+      )
+    }
+    sessionLines.push(`Pinned: ${ctx.session.pinned ? 'yes' : 'no'}.`)
+    sections.push(`# Session\n${sessionLines.join('\n')}`)
+  }
   if (ctx.directives?.length) {
     sections.push(`# This message only\n${ctx.directives.join('\n')}`)
   }
@@ -180,14 +190,14 @@ export function isMoiContext(value: unknown): value is MoiContext {
     collabReference?: unknown
     activeTab?: unknown
     applet?: unknown
-    chatTab?: unknown
+    session?: unknown
     directives?: unknown
   }
   return (
     (v.activeTab === undefined || isTabContext(v.activeTab)) &&
     (v.collabReference === undefined || typeof v.collabReference === 'string') &&
-    (v.applet === undefined || isAppletMessage(v.applet)) &&
-    (v.chatTab === undefined || (isTabContext(v.chatTab) && v.chatTab.params === undefined)) &&
+    (v.applet === undefined || isAppletContext(v.applet)) &&
+    (v.session === undefined || isSessionContext(v.session)) &&
     (v.directives === undefined ||
       (Array.isArray(v.directives) && v.directives.every(d => typeof d === 'string')))
   )
@@ -202,9 +212,23 @@ function isTabContext(value: unknown): value is TabContext {
   )
 }
 
-function isAppletMessage(value: unknown): value is AppletMessage {
+function isAppletContext(value: unknown): value is AppletContext {
   if (!isParamsRecord(value)) return false
-  return typeof value.source === 'string' && value.source.length > 0
+  return (
+    (value.kind === 'view' || value.kind === 'widget') &&
+    typeof value.id === 'string' &&
+    value.id.length > 0
+  )
+}
+
+function isSessionContext(value: unknown): value is SessionContext {
+  if (!isParamsRecord(value)) return false
+  return (
+    typeof value.id === 'string' &&
+    value.id.length > 0 &&
+    (value.tabId === undefined || typeof value.tabId === 'string') &&
+    typeof value.pinned === 'boolean'
+  )
 }
 
 // Claude Code: the envelope rides as its OWN text block wrapped in

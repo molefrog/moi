@@ -84,7 +84,7 @@ export function createAppletMessageHandler(
       toast.add({ title: 'Couldn’t send message', description: message, type: 'error' })
       reportAppletError(workspaceId, {
         source: 'runtime',
-        message: `sendChatMessage() from ${event.source}: ${message}`
+        message: `sendChatMessage() from ${event.applet.kind}:${event.applet.id}: ${message}`
       })
     }
     const blocked = appletSendBlockedReason(getOptions().agentAvailability)
@@ -148,7 +148,7 @@ export function createAppletMessageHandler(
     // Stop watching before sending: a new chat gets its first session ID here.
     finish()
     try {
-      getOptions().send(event.message, { applet: { source: event.source }, preparedAttachments })
+      getOptions().send(event.message, { applet: event.applet, preparedAttachments })
     } catch (error) {
       reportFailure(
         error instanceof Error ? error.message : 'Something went wrong while sending this message'

@@ -44,10 +44,11 @@ They supply the view ID, source path, metadata command, icons, and final link.
 A fresh chat receives the saved requirements and can resume only when the previous
 builder is idle. Forked requests include a reminder to treat inherited history as background.
 
-Browser messages include `activeTab` with its ID, title, and URL parameters. The server
-adds `chatTab`, the tab the chat belongs to. Programmatic sends omit an unknown
-`activeTab`. Follow-ups retain tab context; session IDs, pin state, and fork provenance
-remain internal.
+Browser messages include `activeTab` with its ID, title, and URL parameters, plus
+`applet: { kind, id }` for applet sends. The server supplies `session: { id, tabId, pinned }`
+on every send. Matching applet and active-view details are rendered once. Programmatic
+sends omit an unknown `activeTab`; fork provenance remains internal. Agents build in
+place when pinned and use `--from-session` with the current session ID otherwise.
 
 ## State and completion
 

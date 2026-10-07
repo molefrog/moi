@@ -26,7 +26,7 @@ import { useCallback } from 'react'
 
 import { useViews } from '@/client/features/views/api'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
-import type { AppletMessage, MoiContext } from '@/lib/moi-context'
+import type { AppletContext, MoiContext } from '@/lib/moi-context'
 import type { ViewInfo, WorkspaceTabId } from '@/lib/types'
 
 // One-shot directives queued per workspace, drained into the NEXT chat
@@ -97,7 +97,7 @@ export function activeTabTitle(
 export type MoiUserMessageOptions = {
   directives?: readonly string[]
   // Present when applet UI sent this message instead of the user typing it.
-  applet?: AppletMessage
+  applet?: AppletContext
 }
 
 // Returns a builder that snapshots the workspace state at call time — invoke

@@ -74,19 +74,17 @@ export async function sendWorkspaceMessage(
       executionSessionId: sessionId
     })
   const collabReference = await getCollabReferencePath(ws.path, ws.type)
+  const pinnedSessionId = await getPinnedSession(ws.path)
   await harnessFor(ws).sendMessage({
     ...message,
     sessionId,
     context: {
       ...input.context,
-      chatTab: record.tabId
-        ? {
-            id: record.tabId,
-            ...(record.tabId === input.context?.activeTab?.id && input.context.activeTab.title
-              ? { title: input.context.activeTab.title }
-              : {})
-          }
-        : undefined,
+      session: {
+        id: sessionId,
+        tabId: record.tabId,
+        pinned: pinnedSessionId === sessionId
+      },
       ...(collabReference ? { collabReference } : {}),
       directives: [
         ...(input.context?.directives ?? []),
