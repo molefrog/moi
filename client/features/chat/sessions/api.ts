@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { QueryClient } from '@tanstack/react-query'
 
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { sessionViewOptions } from '@/client/features/chat/sessions/session-view'
-import { useCollabEnabled } from '@/client/features/collab'
 import { readSelectedSession, writeSelectedSession } from './browser-tab-state'
 import { selectedSessionKey } from './useSelectedSession'
 import type {
@@ -29,8 +29,42 @@ export function removeArchivedSession(
   return sessions?.filter(session => session.sessionId !== sessionId)
 }
 
+export function applyArchivedSession(
+  queryClient: QueryClient,
+  workspaceId: string,
+  sessionId: string
+) {
+  const sessionsKey = workspaceKeys.sessions(workspaceId)
+  void queryClient.cancelQueries({ queryKey: sessionsKey })
+  queryClient.setQueryData<SessionInfo[]>(sessionsKey, current =>
+    removeArchivedSession(current, sessionId)
+  )
+  queryClient.removeQueries({ queryKey: workspaceKeys.events(workspaceId, sessionId) })
+  queryClient.removeQueries({ queryKey: workspaceKeys.session(workspaceId, sessionId) })
+  for (const scope of ['shared', 'browser-tab'] as const) {
+    const key = selectedSessionKey(workspaceId, scope)
+    const current =
+      queryClient.getQueryData<WorkspaceSessionSelection>(key) ??
+      (scope === 'browser-tab' ? readSelectedSession(workspaceId) : undefined)
+    if (!current) continue
+    let changed = current.pinned === sessionId
+    const selected = Object.fromEntries(Object.entries(current.selected))
+    for (const [tabId, id] of Object.entries(selected)) {
+      if (id !== sessionId) continue
+      changed = true
+      // An explicit empty local choice prevents falling back to the server's chat.
+      if (scope === 'browser-tab') selected[tabId] = null
+      else delete selected[tabId]
+    }
+    if (!changed) continue
+    const next = { selected, pinned: current.pinned === sessionId ? null : current.pinned }
+    queryClient.setQueryData(key, next)
+    if (scope === 'browser-tab') writeSelectedSession(workspaceId, next)
+  }
+  void queryClient.invalidateQueries({ queryKey: selectedSessionKey(workspaceId), exact: true })
+}
+
 export function useArchiveWorkspaceSession(workspaceId: string) {
-  const collabEnabled = useCollabEnabled()
   const queryClient = useQueryClient()
   return useMutation<void, Error, string>({
     mutationFn: sessionId =>
@@ -40,25 +74,8 @@ export function useArchiveWorkspaceSession(workspaceId: string) {
         'Couldn’t archive chat'
       ),
     onSuccess: (_, sessionId) => {
-      queryClient.setQueryData<SessionInfo[]>(workspaceKeys.sessions(workspaceId), current =>
-        removeArchivedSession(current, sessionId)
-      )
-      queryClient.removeQueries({ queryKey: workspaceKeys.events(workspaceId, sessionId) })
-      queryClient.removeQueries({ queryKey: workspaceKeys.session(workspaceId, sessionId) })
+      applyArchivedSession(queryClient, workspaceId, sessionId)
       queryClient.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })
-      if (collabEnabled) {
-        const localKey = selectedSessionKey(workspaceId, 'browser-tab')
-        const local =
-          queryClient.getQueryData<WorkspaceSessionSelection>(localKey) ??
-          readSelectedSession(workspaceId)
-        const selected = Object.fromEntries(
-          Object.entries(local.selected).filter(([, id]) => id !== sessionId)
-        )
-        const next = { selected, pinned: null }
-        queryClient.setQueryData(localKey, next)
-        writeSelectedSession(workspaceId, next)
-      }
-      void queryClient.invalidateQueries({ queryKey: selectedSessionKey(workspaceId), exact: true })
     }
   })
 }

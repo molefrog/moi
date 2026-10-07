@@ -374,7 +374,11 @@ test('discard blocks startup and active construction, then archives attributed c
   expect(await getPinnedSession(ws.path)).toBeNull()
   expect(getClientFrameLog(ws.id).map(entry => entry.frame)).toEqual(
     expect.arrayContaining(
-      archived.map(sessionId => ({ type: 'sessions_changed', workspaceId: ws.id, sessionId }))
+      archived.map(sessionId => ({
+        type: 'session_archived',
+        workspaceId: ws.id,
+        sessionId
+      }))
     )
   )
 })

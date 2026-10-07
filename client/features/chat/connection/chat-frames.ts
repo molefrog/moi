@@ -5,6 +5,7 @@ import { getScratchExecutor } from '@/client/features/scratchpad/scratch-executo
 import { liveStore } from '@/client/features/chat/chat-store'
 import { bufferSessionEvent } from '@/client/features/chat/sessions/session-view'
 import { renameSelectedSessionInCache } from '@/client/features/chat/sessions/useSelectedSession'
+import { applyArchivedSession } from '@/client/features/chat/sessions/api'
 import { applyEvent } from '@/lib/format'
 import type {
   ClientMessage,
@@ -101,8 +102,10 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
     queryClient?.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })
     return
   }
-  if (data.type === 'sessions_changed') {
+  if (data.type === 'sessions_changed' || data.type === 'session_archived') {
     const workspaceId = data.workspaceId as string
+    if (queryClient && data.type === 'session_archived' && typeof data.sessionId === 'string')
+      applyArchivedSession(queryClient, workspaceId, data.sessionId)
     const sessionsKey = workspaceKeys.sessions(workspaceId)
     queryClient?.invalidateQueries({ queryKey: sessionsKey })
     queryClient?.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })

@@ -69,3 +69,6 @@ to its tab, preserving attribution, history, and fork provenance. Existing works
 chats used for pinned execution keep their attribution and remain active. Archived
 chats are removed from selections and the workspace pin. An archive failure keeps the
 view available to retry. A running pending view can be closed, but not discarded.
+`session_archived` notifications clear the chat from every connected browser's cache and local
+selections. Local selections become explicitly empty so they do not fall back to
+another server-selected chat. Unrelated selections and pins remain unchanged.

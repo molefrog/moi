@@ -18,7 +18,7 @@ export async function archiveWorkspaceSession(ws: WorkspaceEntry, sessionId: str
       workspaceId: ws.id,
       sessionId: update.sessionId
     })
-  broadcast(ws.id, { type: 'sessions_changed', sessionId })
+  broadcast(ws.id, { type: 'session_archived', sessionId })
 }
 
 export async function archiveViewSessions(ws: WorkspaceEntry, viewId: string) {

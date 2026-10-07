@@ -249,7 +249,11 @@ test('deletes a view and its owned state while preserving shared files and data'
   expect(await getWorkspaceSessionSelection(workspaceDir)).toEqual({ selected: {}, pinned: null })
   expect(getClientFrameLog(workspaceId).map(entry => entry.frame)).toEqual(
     expect.arrayContaining(
-      archived.map(sessionId => ({ type: 'sessions_changed', workspaceId, sessionId }))
+      archived.map(sessionId => ({
+        type: 'session_archived',
+        workspaceId,
+        sessionId
+      }))
     )
   )
   expect(await Bun.file(sourcePath).exists()).toBe(false)

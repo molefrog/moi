@@ -403,6 +403,7 @@ export type ServerMessage =
   | StatusMessage
   | SessionRenamedMessage
   | SessionsChangedMessage
+  | SessionArchivedMessage
   | WorkspaceSwitchMessage
   | ErrorFrame
   | StoppedFrame
@@ -447,6 +448,7 @@ export type BroadcastFrame =
   | Omit<StatusMessage, 'workspaceId'>
   | Omit<SessionRenamedMessage, 'workspaceId'>
   | Omit<SessionsChangedMessage, 'workspaceId'>
+  | Omit<SessionArchivedMessage, 'workspaceId'>
   | Omit<ErrorFrame, 'workspaceId'>
   | Omit<StoppedFrame, 'workspaceId'>
 
@@ -554,6 +556,12 @@ export type SessionRenamedMessage = {
 
 export type SessionsChangedMessage = {
   type: 'sessions_changed'
+  workspaceId: string
+  sessionId: string
+}
+
+export type SessionArchivedMessage = {
+  type: 'session_archived'
   workspaceId: string
   sessionId: string
 }
