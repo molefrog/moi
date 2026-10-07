@@ -16,7 +16,7 @@ type WorkspaceComposerStateOptions = {
 
 type WorkspaceComposerState = {
   composerBanner?: ComposerBanner
-  builderComposerBanner?: ComposerBanner
+  viewDraftComposerBanner?: ComposerBanner
   agentAvailability: AgentAvailability
 }
 
@@ -68,10 +68,10 @@ export function useWorkspaceComposerState(
     chatError: chatErrorBanner,
     skillUpdate
   })
-  const builderComposerBanner = resolveComposerBanner({
+  const viewDraftComposerBanner = resolveComposerBanner({
     agentUnavailable: agentUnavailableBanner,
     skillUpdate
   })
 
-  return { agentAvailability, composerBanner, builderComposerBanner }
+  return { agentAvailability, composerBanner, viewDraftComposerBanner }
 }

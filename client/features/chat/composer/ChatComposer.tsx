@@ -1,7 +1,10 @@
+import { toast } from '@/client/components/ui/toast'
 import { TextAttachmentChip } from './attachments/TextAttachmentChip'
 import { DrawingAttachmentChip } from './attachments/DrawingAttachmentChip'
 import { FileAttachmentChip } from './attachments/FileAttachmentChip'
-import { type RefObject, useRef, useState } from 'react'
+import { type RefObject, useEffect, useRef, useState } from 'react'
+import { draftSessionId, composerDraftKey } from '@/lib/session-drafts'
+import { useCurrentTabId } from '../sessions/useSelectedSession'
 
 import { IconPaperclip, IconPlayerStopFilled, IconScribble } from '@tabler/icons-react'
 
@@ -32,15 +35,6 @@ export type ComposerAnnotationControls = {
   onRemove: (localId: string) => void
 }
 
-type ChatComposerDraft = {
-  // The UI-store key the composer subscribes to for live text; `initialValue`
-  // is the builder's server-saved requirements, used until a local draft
-  // exists.
-  id: string
-  initialValue: string
-  onChange: (value: string) => void
-}
-
 type ChatComposerProps = {
   composerRef: RefObject<HTMLTextAreaElement | null>
   onSend: (text: string) => void | Promise<void>
@@ -49,16 +43,14 @@ type ChatComposerProps = {
   sessionId: string | null
   modelSessionId: string | null
   availability: AgentAvailability
+  chatReady: boolean
   annotation?: ComposerAnnotationControls
   onRemoveDrawing?: (localId: string) => void
   allowFiles?: boolean
   placeholder?: string
-  draft?: ChatComposerDraft
 }
 
-// Draft text is persisted per workspace (or per view builder, when the
-// composer is fronting one), while attachments remain ephemeral and follow the
-// selected chat. Both stores are subscribed here so a keystroke or upload
+// Draft text is persisted per chat or fresh tab, while attachments remain ephemeral. Both stores are subscribed here so a keystroke or upload
 // re-renders only the composer.
 export function ChatComposer({
   composerRef,
@@ -68,17 +60,20 @@ export function ChatComposer({
   sessionId,
   modelSessionId,
   availability,
+  chatReady,
   annotation,
   onRemoveDrawing,
   allowFiles = true,
-  placeholder,
-  draft
+  placeholder
 }: ChatComposerProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const workspaceId = useWorkspaceId()
-  const workspaceDraft = useUiStore(s => s.composerDrafts[workspaceId] ?? '')
-  const builderDraft = useUiStore(s => (draft ? (s.viewBuilderDrafts ?? {})[draft.id] : undefined))
-  const value = draft ? (builderDraft ?? draft.initialValue) : workspaceDraft
+  const tabId = useCurrentTabId()
+  const draftKey = composerDraftKey(workspaceId, sessionId ?? draftSessionId(tabId))
+  const value = useUiStore(s => s.composerDrafts[draftKey] ?? '')
+  useEffect(() => {
+    if (tabId === 'overview') useUiStore.getState().moveComposerDraft(workspaceId, draftKey)
+  }, [tabId, workspaceId, draftKey])
   const valueRef = useLatestRef(value)
   const attachments = useLive(s => s.attachments[attachmentKey(workspaceId, sessionId)] ?? EMPTY)
   const [dragOver, setDragOver] = useState(false)
@@ -90,12 +85,11 @@ export function ChatComposer({
     a => a.kind === 'text' || a.status === 'ready' || a.status === 'draft'
   )
   const hasContent = value.trim().length > 0 || hasSendable
-  const canSend = canSubmitComposerAction(hasContent, uploading, availability)
+  const canSend = chatReady && canSubmitComposerAction(hasContent, uploading, availability)
 
   const onChange = (next: string) => {
     valueRef.current = next
-    if (draft) draft.onChange(next)
-    else useUiStore.getState().setComposerDraft(workspaceId, next)
+    useUiStore.getState().setComposerDraft(draftKey, next)
   }
 
   const addFiles = (files: File[]) => {
@@ -121,10 +115,13 @@ export function ChatComposer({
     try {
       await annotation?.finish()
       await onSend(valueRef.current)
-      if (!draft) {
-        valueRef.current = ''
-        useUiStore.getState().setComposerDraft(workspaceId, '')
-      }
+      valueRef.current = ''
+      useUiStore.getState().setComposerDraft(draftKey, null)
+    } catch (error) {
+      toast.add({
+        title: error instanceof Error ? error.message : 'Couldn’t send message',
+        type: 'error'
+      })
     } finally {
       sendingRef.current = false
     }
@@ -275,7 +272,7 @@ export function ChatComposer({
           <ComposerSubmitButton
             label="Send message"
             hasContent={hasContent}
-            busy={uploading}
+            busy={uploading || !chatReady}
             availability={availability}
           />
         )}

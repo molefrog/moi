@@ -277,7 +277,7 @@ describe('composer attachments', () => {
 
   test('an applet send carries none, however much is staged', () => {
     stage()
-    const applet = { applet: { source: 'widget:late-orders' } }
+    const applet = { applet: { kind: 'widget', id: 'late-orders' } } as const
     expect(attachmentsForSend(workspaceId, sessionId, applet)).toEqual([])
   })
 
@@ -340,7 +340,7 @@ describe('composer attachments', () => {
       localId: 'sketch-1',
       label: 'Sketch.png',
       mediaType: 'image/png',
-      source: 'view-builders/draft-1',
+      source: 'views/draft-1',
       status: 'ready',
       upload: { id: 'up-sketch', kind: 'image' } as UploadInfo
     }
@@ -349,7 +349,7 @@ describe('composer attachments', () => {
       {
         type: 'upload',
         uploadId: 'up-sketch',
-        source: 'view-builders/draft-1',
+        source: 'views/draft-1',
         purpose: 'sketch'
       }
     ])
@@ -358,6 +358,6 @@ describe('composer attachments', () => {
   test('only a composer send may clear the staged list', () => {
     expect(ownsComposerAttachments(undefined)).toBe(true)
     expect(ownsComposerAttachments({ directives: ['x'] })).toBe(true)
-    expect(ownsComposerAttachments({ applet: { source: 'widget:late-orders' } })).toBe(false)
+    expect(ownsComposerAttachments({ applet: { kind: 'widget', id: 'late-orders' } })).toBe(false)
   })
 })

@@ -1,5 +1,5 @@
 // Session list, model catalog and home-card preview over ACP. Provider-agnostic.
-import type { Model, SessionInfo } from '@/lib/types'
+import type { Model, SessionSummary } from '@/lib/types'
 
 import { type AcpProviderConfig, type AcpSpawnContext } from './session'
 import { acpSessionToSessionInfo } from './adapter'
@@ -17,13 +17,13 @@ const PAGE_LIMIT = 5
 export async function listAcpSessions(
   config: AcpProviderConfig,
   ctx: AcpSpawnContext
-): Promise<SessionInfo[]> {
+): Promise<SessionSummary[]> {
   try {
     const client = await getAcpClient(await config.spawn(ctx))
     // Archiving is moi-side (see ./archived.ts) — the backend still lists the
     // chat, so it is filtered here rather than by the agent.
     const archived = await archivedAcpSessions(ctx.workspacePath)
-    const out: SessionInfo[] = []
+    const out: SessionSummary[] = []
     let cursor: string | undefined
     for (let page = 0; page < PAGE_LIMIT; page++) {
       const res: ListSessionsResponse = await client.rpc('session/list', {

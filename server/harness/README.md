@@ -47,6 +47,8 @@ Socket-protocol notes the layers rely on (all defined in `lib/types.ts`):
   uuid, then rekeyed to the backend's real session/thread id.
 - **`sessions_changed`** — a provider changed session-list metadata such as a
   generated session title; clients refresh that workspace's session list.
+- **`session_archived`** — a chat was archived; clients remove it from caches and
+  clear its selections and pin, including browser-local Collab selections.
 - **Optimistic-id rendezvous** — the client sends `optimisticId` with each
   chat; the user's bubble must upsert under that id. Backends differ: Codex
   echoes it natively (`clientUserMessageId` → `clientId`), Claude Code never
@@ -244,6 +246,12 @@ doubles as the evaluation rubric for new harnesses.
 
 ### Per-request configuration
 
+- **Fork settings** — shared orchestration snapshots the source `SessionConfig`,
+  passes it to native `forkSession`, saves it on the child, and uses it for the
+  first send. Model, effort, and fast mode are inherited together. Adapters only
+  translate settings their native fork needs at creation; they do not read or
+  copy stored settings themselves. The fresh-chat fallback follows the same
+  rule when native forking is unavailable. Hermes currently has no effort control.
 - **List supported models**, including per-model metadata such as supported
   effort levels (drives the picker).
 - **Set model** — ideally live mid-session.

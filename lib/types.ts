@@ -3,7 +3,7 @@ import type { AppIconId } from './app-icons'
 import type { ExperimentalFeatures } from './experimental'
 import type { MoiContext } from './moi-context'
 import type { WorkspaceTheme } from './themes'
-import type { AttachmentInput, ViewConfig, WidgetConfig } from 'moi'
+import type { AttachmentInput, WidgetConfig } from 'moi'
 
 export type { AttachmentInput, ViewConfig, WidgetConfig } from 'moi'
 
@@ -33,32 +33,27 @@ export type WidgetInfo = AppletInfo & {
 // A view is a full-screen, agent-authored "app" (`.moi/views/<name>.tsx`),
 // shown one-at-a-time in the workspace nav. Same build/RPC machinery as a
 // widget, minus the grid: no sizing, the view owns its own layout and scroll.
-export type ViewInfo = AppletInfo & {
-  config: ViewConfig
-}
-
-export type ViewBuilderStatus = 'draft' | 'building' | 'waiting' | 'ready'
-
-export type ViewBuilderInput = {
-  requirements: string
-}
-
-export type ViewBuilder = {
+export type PendingView = {
   id: string
-  kind?: AppletKind
-  status: ViewBuilderStatus
-  input: ViewBuilderInput
-  sessionId: string
-  viewId?: string
+  status: 'draft' | 'starting' | 'submitted' | 'failed'
   title?: string
   icon?: string
+  requirements: string
+  // Execution reference only. Ownership lives in SessionRecord.tabId.
+  executionSessionId?: string
   error?: string
-  // Wall-clock ms when this builder last entered `building`. Used by reconcile
-  // to demote a build that has been running too long (a hung/abandoned turn).
-  buildingSince?: number
-  createdAt: number
-  updatedAt: number
 }
+
+export type CompiledView = {
+  id: string
+  status: 'compiled'
+  title: string
+  icon?: string
+  requiredEnv?: string[]
+  revision?: string
+}
+
+export type ViewInfo = PendingView | CompiledView
 
 // ---- Applet error journal (see docs/self-correction.md) ------------------
 
@@ -281,8 +276,8 @@ export type ClientMessage =
   // op's correlation id so the server settles the right pending CLI request.
   | { type: 'scratchpad:op-result'; opId: string; result?: ScratchOpResult; error?: string }
 
-// Session info returned by list endpoint
-export type SessionInfo = {
+// Session details supplied by the agent backend.
+export type SessionSummary = {
   sessionId: string
   summary: string
   lastModified: number
@@ -306,8 +301,43 @@ export type SessionConfig = {
   fastMode?: boolean
 }
 
+type SessionForkFields =
+  | {
+      forkedFromSessionId?: undefined
+      forkedThroughMessageId?: never
+      forkedNoticeIds?: never
+    }
+  | {
+      forkedFromSessionId: string
+      // Last copied turn in the child. Without a cutoff, show its full history.
+      forkedThroughMessageId?: string
+      forkedNoticeIds?: string[]
+    }
+
+// Local session fields shared by the saved record and session-list rows.
+type SessionMetadata = {
+  tabId?: WorkspaceTabId
+} & SessionForkFields
+
+export type SessionRecord = SessionMetadata & {
+  config?: SessionConfig
+}
+
+export type SessionRecordPatch = Partial<Pick<SessionRecord, 'tabId' | 'config'>> &
+  SessionForkFields
+
+// List row returned to the client after local metadata is added.
+export type SessionInfo = SessionSummary & SessionMetadata
+
 export type SelectedSessionState = {
   sessionId: string | null
+}
+
+export type WorkspaceSessionSelection = {
+  // A browser tab can explicitly choose an empty chat (null). An absent key
+  // inherits the server selection, including CLI-created view handoffs.
+  selected: Partial<Record<WorkspaceTabId, string | null>>
+  pinned: string | null
 }
 
 // App-wide settings, persisted server-side as `settings.json` in moi's data
@@ -373,6 +403,7 @@ export type ServerMessage =
   | StatusMessage
   | SessionRenamedMessage
   | SessionsChangedMessage
+  | SessionArchivedMessage
   | WorkspaceSwitchMessage
   | ErrorFrame
   | StoppedFrame
@@ -417,6 +448,7 @@ export type BroadcastFrame =
   | Omit<StatusMessage, 'workspaceId'>
   | Omit<SessionRenamedMessage, 'workspaceId'>
   | Omit<SessionsChangedMessage, 'workspaceId'>
+  | Omit<SessionArchivedMessage, 'workspaceId'>
   | Omit<ErrorFrame, 'workspaceId'>
   | Omit<StoppedFrame, 'workspaceId'>
 
@@ -528,6 +560,12 @@ export type SessionsChangedMessage = {
   sessionId: string
 }
 
+export type SessionArchivedMessage = {
+  type: 'session_archived'
+  workspaceId: string
+  sessionId: string
+}
+
 export type ErrorFrame = {
   kind: 'error'
   workspaceId: string
@@ -568,12 +606,7 @@ export type LayoutGridItem = { i: string; x: number; y: number }
 //   split      — Agent chat as a left column, workspace content on the right
 export type LayoutMode = 'fullscreen' | 'split'
 
-export type WorkspaceTabId =
-  | 'agent'
-  | 'overview'
-  | 'scratchpad'
-  | `views/${string}`
-  | `view-builders/${string}`
+export type WorkspaceTabId = 'agent' | 'overview' | 'scratchpad' | `views/${string}`
 
 // Open tabs plus the workspace's saved DEFAULT tab. `active` is not live focus
 // state — the live active tab is each browser tab's URL (`/workspace/:id/<tab>`).

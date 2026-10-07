@@ -124,7 +124,7 @@ test('archiving the selected session switches the workspace to New chat', async 
   })
 
   expect(response.status).toBe(204)
-  expect(await getSelectedSession(workspace.path)).toBeNull()
+  expect(await getSelectedSession(workspace.path)).toBeUndefined()
 })
 
 test('every provider supports archiving, openclaw via gateway patch', async () => {

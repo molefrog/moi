@@ -7,11 +7,9 @@ export const workspaceKeys = {
   widgets: (id: string) => ['workspaces', 'widgets', id] as const,
   appletThumbnails: (id: string) => ['workspaces', 'applet-thumbnails', id] as const,
   views: (id: string) => ['workspaces', 'views', id] as const,
-  viewBuilders: (id: string) => ['workspaces', 'view-builders', id] as const,
   sessions: (id: string) => ['workspaces', 'sessions', id] as const,
   events: (id: string, sessionId: string) => ['workspaces', 'events', id, sessionId] as const,
-  sessionConfig: (id: string, sessionId: string) =>
-    ['workspaces', 'sessionConfig', id, sessionId] as const,
+  session: (id: string, sessionId: string) => ['workspaces', 'session', id, sessionId] as const,
   mcp: (id: string) => ['workspaces', 'mcp', id] as const,
   agent: (id: string) => ['workspaces', 'agent', id] as const,
   skills: (id: string) => ['workspaces', 'skills', id] as const,

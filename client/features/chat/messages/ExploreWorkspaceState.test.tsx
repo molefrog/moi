@@ -53,7 +53,7 @@ describe('ExploreWorkspaceState', () => {
     expect(html).not.toContain('Wait for me to choose')
 
     const context = renderMoiContext({
-      activeTab: 'agent',
+      activeTab: { id: 'overview' },
       directives: [...WORKSPACE_ANALYSIS_PROMPT.context]
     })
     expect(context).toContain('Explore the existing workspace files')

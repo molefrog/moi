@@ -1,18 +1,41 @@
-const keyFor = (workspaceId: string) => `moi:collab:${workspaceId}:session`
+import type { WorkspaceSessionSelection } from '@/lib/types'
 
-export function readSelectedSession(workspaceId: string): string | null {
+const keyFor = (workspaceId: string) => `moi:collab:${workspaceId}:session`
+const emptySelection = (): WorkspaceSessionSelection => ({ selected: {}, pinned: null })
+
+// Collab keeps each browser tab's unpinned chat choice, including a separate
+// selection for every workspace tab. The workspace pin remains server-owned.
+export function readSelectedSession(workspaceId: string): WorkspaceSessionSelection {
   try {
-    return sessionStorage.getItem(keyFor(workspaceId))
+    const saved = sessionStorage.getItem(keyFor(workspaceId))
+    if (!saved) return emptySelection()
+    // The first Collab build stored only the overview chat ID.
+    if (!saved.startsWith('{')) return { selected: { overview: saved }, pinned: null }
+    const value: unknown = JSON.parse(saved)
+    if (!value || typeof value !== 'object' || !('selected' in value)) return emptySelection()
+    const selected = (value as { selected: unknown }).selected
+    if (!selected || typeof selected !== 'object' || Array.isArray(selected))
+      return emptySelection()
+    return {
+      selected: Object.fromEntries(
+        Object.entries(selected).filter(
+          ([, sessionId]) => typeof sessionId === 'string' || sessionId === null
+        )
+      ),
+      pinned: null
+    }
   } catch {
-    return null
+    return emptySelection()
   }
 }
 
-export function writeSelectedSession(workspaceId: string, sessionId: string | null): void {
+export function writeSelectedSession(
+  workspaceId: string,
+  selection: WorkspaceSessionSelection
+): void {
   try {
-    if (sessionId === null) sessionStorage.removeItem(keyFor(workspaceId))
-    else sessionStorage.setItem(keyFor(workspaceId), sessionId)
+    sessionStorage.setItem(keyFor(workspaceId), JSON.stringify({ selected: selection.selected }))
   } catch {
-    /* A private browser can still keep the active query in memory. */
+    // The in-memory query still works when browser storage is denied.
   }
 }

@@ -35,8 +35,5 @@ export function validateWorkspaceId(id: string): string | null {
   return null
 }
 
-// Builder handles are copied onto the command line (`moi builder set …
-// --builder <id>`), and only need to be unique among a workspace's handful of
-// builders — so 6 chars (~31 bits) keeps the command short while staying
-// collision-free at that scale.
-export const newBuilderId = customAlphabet(ALPHABET, 6)
+// A view keeps this ID from its pending tab through its compiled file.
+export const newViewId = customAlphabet(ALPHABET, 6)

@@ -19,7 +19,7 @@ import {
   liveStore
 } from '@/client/features/chat/chat-store'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import type { SelectedSessionState, SessionActivity, SessionInfo } from '@/lib/types'
+import type { WorkspaceSessionSelection, SessionActivity, SessionInfo } from '@/lib/types'
 
 const WS = 'ws1'
 const SID = 'sess-1'
@@ -220,15 +220,30 @@ describe('session rename', () => {
   test('the current chat session follows the provider id', () => {
     const queryClient = new QueryClient()
     __setQueryClientForTests(queryClient)
-    queryClient.setQueryData(appUiKeys.selectedSession(WS), {
-      sessionId: 'temp-1'
+    queryClient.setQueryData(appUiKeys.sessionSelection(WS), {
+      selected: { overview: 'temp-1', scratchpad: 'temp-1' },
+      pinned: 'temp-1'
     })
+    const record = {
+      config: { model: 'sonnet' },
+      tabId: 'scratchpad',
+      forkedFromSessionId: 'parent',
+      forkedThroughMessageId: 'boundary'
+    }
+    queryClient.setQueryData(workspaceKeys.session(WS, 'temp-1'), record)
 
     handleFrame({ type: 'session_renamed', workspaceId: WS, from: 'temp-1', to: 'real-1' })
 
-    expect(queryClient.getQueryData<SelectedSessionState>(appUiKeys.selectedSession(WS))).toEqual({
-      sessionId: 'real-1'
+    expect(
+      queryClient.getQueryData<WorkspaceSessionSelection>(appUiKeys.sessionSelection(WS))
+    ).toEqual({
+      selected: { overview: 'real-1', scratchpad: 'real-1' },
+      pinned: 'real-1'
     })
+    expect(queryClient.getQueryData<typeof record>(workspaceKeys.session(WS, 'real-1'))).toEqual(
+      record
+    )
+    expect(queryClient.getQueryData(workspaceKeys.session(WS, 'temp-1'))).toBeUndefined()
   })
 })
 

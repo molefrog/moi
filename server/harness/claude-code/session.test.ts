@@ -4,9 +4,9 @@ import * as sdk from '@anthropic-ai/claude-agent-sdk'
 import type { Options, Query, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 
 import * as state from '../../state'
-import * as viewBuilders from '../../view-builders'
 import * as workspaceEnv from '../../workspace-env'
 import * as sessionConfig from '../../session-config'
+import * as sessionStore from '../../session-store'
 import * as selectedSession from '../../selected-session'
 import * as executable from '../executable'
 import type { SendMessageInput } from '../types'
@@ -118,11 +118,8 @@ beforeEach(() => {
     spyOn(state, 'broadcast').mockImplementation((_id, frame) => {
       frames.push(frame)
     }),
-    spyOn(viewBuilders, 'markViewBuilderBuildingBySession').mockResolvedValue(null),
-    spyOn(viewBuilders, 'markViewBuilderWaitingBySession').mockResolvedValue(null),
-    spyOn(viewBuilders, 'renameViewBuilderSession').mockResolvedValue(null),
     spyOn(sessionConfig, 'hasSessionConfig').mockResolvedValue(true),
-    spyOn(sessionConfig, 'renameSessionConfig').mockResolvedValue(undefined),
+    spyOn(sessionStore, 'renameSessionRecord').mockResolvedValue(undefined),
     spyOn(selectedSession, 'renameSelectedSession').mockResolvedValue({
       changed: false,
       sessionId: null
@@ -612,29 +609,6 @@ describe('Claude session message queue', () => {
     })
     await send({ content: 'try again' })
     expect(drivers).toHaveLength(2)
-  })
-
-  test('an idle bookkeeping callback cannot settle a newly dispatched message', async () => {
-    await send()
-    const d = drivers[0]!
-    d.emit(result)
-    await until(() => getCCActiveSessions().length === 0)
-    const gate = Promise.withResolvers<null>()
-    const spy = spyOn(viewBuilders, 'markViewBuilderWaitingBySession').mockReturnValue(gate.promise)
-    // A repeated idle event starts async bookkeeping while the queue is empty.
-    d.emit({ type: 'system', subtype: 'session_state_changed', state: 'idle' })
-    await settle()
-    await send({ content: 'second' })
-    gate.resolve(null)
-    await settle()
-    const third = send({ content: 'third' })
-    await settle()
-    expect(d.inputs).toHaveLength(2)
-    spy.mockRestore()
-    d.emit(result)
-    d.emit({ type: 'system', subtype: 'session_state_changed', state: 'idle' })
-    await third
-    expect(d.inputs).toHaveLength(3)
   })
 
   test('state events wait for turn completion and cannot release a startup send', async () => {

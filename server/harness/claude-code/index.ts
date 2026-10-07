@@ -1,6 +1,7 @@
 // Claude Code as a Harness. Thin wiring over this folder's modules — see
 // ../types.ts for the contract and ../README.md for the architecture.
 import { join } from 'node:path'
+import { forkSession } from '@anthropic-ai/claude-agent-sdk'
 
 import type { McpServer } from '@/lib/types'
 
@@ -92,6 +93,10 @@ export const claudeCodeHarness: Harness = {
   sendMessage: input => sendCCMessage(input),
   interrupt: (workspaceId, sessionId) => interruptCCSession(workspaceId, sessionId),
   archiveSession: (ws, sessionId) => archiveClaudeSession(sessionId, ws.path),
+  forkSession: async (ws, sourceId) => {
+    const { sessionId } = await forkSession(sourceId, { dir: ws.path })
+    return sessionId
+  },
   activeSessions: () => getCCActiveSessions(),
 
   listSessions: ws => getSessions(ws.path),

@@ -9,14 +9,15 @@ type UiStore = {
   hasSentMessageFromMoi: boolean
   workspaceIdsPendingAnalysis: string[]
   composerDrafts: Record<string, string>
-  viewBuilderDrafts: Record<string, string>
   dockedChatWidth: number
+  popupChatWidth: number
   setDiscoveredWorkspacesOpen: (open: boolean) => void
   markWorkspacePendingAnalysis: (workspaceId: string) => void
   markMessageSentFromMoi: (workspaceId: string) => void
-  setComposerDraft: (workspaceId: string, value: string) => void
-  setViewBuilderDraft: (builderId: string, value: string | null) => void
+  setComposerDraft: (key: string, value: string | null) => void
+  moveComposerDraft: (from: string, to: string) => void
   setDockedChatWidth: (width: number) => void
+  setPopupChatWidth: (width: number) => void
 }
 
 export const createUiStore = (storage?: StateStorage) =>
@@ -27,8 +28,8 @@ export const createUiStore = (storage?: StateStorage) =>
         hasSentMessageFromMoi: false,
         workspaceIdsPendingAnalysis: [],
         composerDrafts: {},
-        viewBuilderDrafts: {},
         dockedChatWidth: 360,
+        popupChatWidth: 440,
         setDiscoveredWorkspacesOpen: open => set({ discoveredWorkspacesOpen: open }),
         markWorkspacePendingAnalysis: workspaceId =>
           set(state => {
@@ -46,37 +47,32 @@ export const createUiStore = (storage?: StateStorage) =>
               id => id !== workspaceId
             )
           })),
-        setComposerDraft: (workspaceId, value) =>
+        setComposerDraft: (key, value) =>
           set(state => {
-            const composerDrafts = { ...(state.composerDrafts ?? {}) }
-            if (value) composerDrafts[workspaceId] = value
-            else delete composerDrafts[workspaceId]
+            if (
+              value === null ? !(key in state.composerDrafts) : state.composerDrafts[key] === value
+            )
+              return state
+            const composerDrafts = { ...state.composerDrafts }
+            if (value === null) delete composerDrafts[key]
+            else composerDrafts[key] = value
             return { composerDrafts }
           }),
-        // Unlike composer drafts, an empty string stays stored: the composer
-        // falls back to the builder's server-saved requirements when no draft
-        // exists, and deleting all text must not resurrect them. Pass null to
-        // drop the draft (submit, discard).
-        setViewBuilderDraft: (builderId, value) =>
+        moveComposerDraft: (from, to) =>
           set(state => {
-            const current = state.viewBuilderDrafts ?? {}
-            if (value === null) {
-              if (!(builderId in current)) return state
-              const viewBuilderDrafts = { ...current }
-              delete viewBuilderDrafts[builderId]
-              return { viewBuilderDrafts }
-            }
-            if (current[builderId] === value) return state
-            return { viewBuilderDrafts: { ...current, [builderId]: value } }
+            if (from === to || !(from in state.composerDrafts)) return state
+            const composerDrafts = { ...state.composerDrafts }
+            composerDrafts[to] ??= composerDrafts[from]
+            delete composerDrafts[from]
+            return { composerDrafts }
           }),
-        setDockedChatWidth: width => set({ dockedChatWidth: width })
+        setDockedChatWidth: width => set({ dockedChatWidth: width }),
+        setPopupChatWidth: width => set({ popupChatWidth: width })
       }),
-      storage
-        ? {
-            name: 'moi:ui',
-            storage: createJSONStorage<UiStore>(() => storage)
-          }
-        : { name: 'moi:ui' }
+      {
+        name: 'moi:ui',
+        ...(storage ? { storage: createJSONStorage<UiStore>(() => storage) } : {})
+      }
     )
   )
 

@@ -1,117 +1,78 @@
+import type { MessageAttachment, PendingView, SelectedSessionScope, ViewInfo } from '@/lib/types'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { APP_ICON_IDS } from '@/client/lib/app-icon-registry'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
-import type { MessageAttachment, SelectedSessionScope, ViewBuilder, ViewInfo } from '@/lib/types'
 
 export function useViews(workspaceId: string) {
-  return useQuery<ViewInfo[]>({
-    queryKey: workspaceKeys.views(workspaceId),
-    queryFn: async () => {
-      const data = await requestJson<{ views: ViewInfo[] }>(`/api/workspaces/${workspaceId}/views`)
-      return data.views
-    },
-    ...WORKSPACE_RESOURCE_OPTIONS
-  })
-}
-
-export function useRenameView(workspaceId: string) {
-  return useMutation<ViewInfo, Error, { viewId: string; title: string }>({
-    mutationFn: ({ viewId, title }) =>
-      requestJson(
-        `/api/workspaces/${workspaceId}/views/${encodeURIComponent(viewId)}`,
-        jsonRequest('PATCH', { title }),
-        'Failed to rename view'
-      )
-  })
-}
-
-export function useDeleteView(workspaceId: string) {
-  return useMutation<void, Error, string>({
-    mutationFn: viewId =>
-      requestVoid(
-        `/api/workspaces/${workspaceId}/views/${encodeURIComponent(viewId)}`,
-        { method: 'DELETE' },
-        'Failed to delete view'
-      )
-  })
-}
-
-function upsertBuilder(builders: ViewBuilder[] | undefined, builder: ViewBuilder): ViewBuilder[] {
-  const current = builders ?? []
-  const index = current.findIndex(candidate => candidate.id === builder.id)
-  if (index === -1) return [...current, builder]
-  return current.map(candidate =>
-    candidate.id === builder.id && candidate.updatedAt <= builder.updatedAt ? builder : candidate
-  )
-}
-
-export function useViewBuilders(workspaceId: string) {
   const queryClient = useQueryClient()
   useWorkspaceEvent(event => {
-    if (event.type === 'view-builder:updated' && event.workspaceId === workspaceId) {
-      queryClient.setQueryData<ViewBuilder[]>(workspaceKeys.viewBuilders(workspaceId), current =>
-        upsertBuilder(current, event.builder)
-      )
-    } else if (event.type === 'view-builder:deleted' && event.workspaceId === workspaceId) {
-      queryClient.setQueryData<ViewBuilder[]>(workspaceKeys.viewBuilders(workspaceId), current =>
-        (current ?? []).filter(builder => builder.id !== event.builderId)
-      )
+    if (
+      (event.type === 'views:changed' || event.type === 'view:deleted') &&
+      event.workspaceId === workspaceId
+    ) {
+      void queryClient.invalidateQueries({ queryKey: workspaceKeys.views(workspaceId) })
+      if (event.type === 'view:deleted')
+        void queryClient.invalidateQueries({ queryKey: workspaceKeys.sessions(workspaceId) })
     }
   })
-
-  return useQuery<ViewBuilder[]>({
-    queryKey: workspaceKeys.viewBuilders(workspaceId),
-    queryFn: async () => {
-      const data = await requestJson<{ builders: ViewBuilder[] }>(
-        `/api/workspaces/${workspaceId}/view-builders`
-      )
-      return data.builders
-    },
+  return useQuery<ViewInfo[]>({
+    queryKey: workspaceKeys.views(workspaceId),
+    queryFn: async () =>
+      (await requestJson<{ views: ViewInfo[] }>(`/api/workspaces/${workspaceId}/views`)).views,
     ...WORKSPACE_RESOURCE_OPTIONS
   })
 }
-
-export function useCreateViewBuilder(workspaceId: string) {
+function useViewMutation<T, Input>(workspaceId: string, mutationFn: (input: Input) => Promise<T>) {
   const queryClient = useQueryClient()
-  return useMutation<ViewBuilder, Error>({
-    mutationFn: () =>
-      requestJson(
-        `/api/workspaces/${workspaceId}/view-builders`,
-        jsonRequest('POST'),
-        'Failed to create view builder'
-      ),
-    onSuccess: builder => {
-      queryClient.setQueryData<ViewBuilder[]>(workspaceKeys.viewBuilders(workspaceId), current =>
-        upsertBuilder(current, builder)
-      )
-    }
+  return useMutation({
+    mutationFn,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: workspaceKeys.views(workspaceId) })
   })
 }
-
-export function useSaveViewBuilder(workspaceId: string) {
-  const queryClient = useQueryClient()
-  return useMutation<ViewBuilder, Error, { builderId: string; requirements: string }>({
-    mutationFn: ({ builderId, requirements }) =>
-      requestJson(
-        `/api/workspaces/${workspaceId}/view-builders/${builderId}`,
-        jsonRequest('PATCH', { input: { requirements } }),
-        'Failed to save view requirements'
-      ),
-    onSuccess: builder => {
-      queryClient.setQueryData<ViewBuilder[]>(workspaceKeys.viewBuilders(workspaceId), current =>
-        upsertBuilder(current, builder)
-      )
-    }
-  })
+export function useRenameView(workspaceId: string) {
+  return useViewMutation(workspaceId, ({ viewId, title }: { viewId: string; title: string }) =>
+    requestJson<ViewInfo>(
+      `/api/workspaces/${workspaceId}/views/${encodeURIComponent(viewId)}`,
+      jsonRequest('PATCH', { title }),
+      'Couldn’t rename view'
+    )
+  )
 }
-
-export type SubmitViewBuilderInput = {
-  builderId: string
+export function useDeleteView(workspaceId: string) {
+  return useViewMutation(workspaceId, (viewId: string) =>
+    requestVoid(
+      `/api/workspaces/${workspaceId}/views/${encodeURIComponent(viewId)}`,
+      { method: 'DELETE' },
+      'Couldn’t delete view'
+    )
+  )
+}
+export function useCreateView(workspaceId: string) {
+  return useViewMutation(workspaceId, () =>
+    requestJson<PendingView>(
+      `/api/workspaces/${workspaceId}/views`,
+      jsonRequest('POST'),
+      'Couldn’t create view'
+    )
+  )
+}
+export function useSaveViewDraft(workspaceId: string) {
+  return useViewMutation(
+    workspaceId,
+    ({ viewId, requirements }: { viewId: string; requirements: string }) =>
+      requestJson<PendingView>(
+        `/api/workspaces/${workspaceId}/views/${viewId}`,
+        jsonRequest('PATCH', { requirements }),
+        'Couldn’t save view requirements'
+      )
+  )
+}
+export type SubmitViewInput = {
+  viewId: string
   requirements: string
+  sessionId: string
   optimisticId: string
   selectedSessionScope?: SelectedSessionScope
   attachments?: MessageAttachment[]
@@ -120,41 +81,13 @@ export type SubmitViewBuilderInput = {
   fastMode?: boolean
   stream?: boolean
 }
-
-export function useSubmitViewBuilder(workspaceId: string) {
-  const queryClient = useQueryClient()
-  return useMutation<ViewBuilder, Error, SubmitViewBuilderInput>({
-    mutationFn: ({ builderId, requirements, ...options }) =>
-      requestJson(
-        `/api/workspaces/${workspaceId}/view-builders/${builderId}/submit`,
-        jsonRequest('POST', {
-          input: { requirements },
-          availableIcons: APP_ICON_IDS,
-          ...options
-        }),
-        'Failed to start view builder'
-      ),
-    onSuccess: builder => {
-      queryClient.setQueryData<ViewBuilder[]>(workspaceKeys.viewBuilders(workspaceId), current =>
-        upsertBuilder(current, builder)
-      )
-    }
-  })
+export function useSubmitView(workspaceId: string) {
+  return useViewMutation(workspaceId, ({ viewId, ...input }: SubmitViewInput) =>
+    requestJson<{ viewId: string; sessionId: string }>(
+      `/api/workspaces/${workspaceId}/views/${viewId}/submit`,
+      jsonRequest('POST', input),
+      'Couldn’t start view chat'
+    )
+  )
 }
-
-export function useDiscardViewBuilder(workspaceId: string) {
-  const queryClient = useQueryClient()
-  return useMutation<void, Error, string>({
-    mutationFn: builderId =>
-      requestVoid(
-        `/api/workspaces/${workspaceId}/view-builders/${builderId}`,
-        { method: 'DELETE' },
-        'Failed to discard view builder'
-      ),
-    onSuccess: (_result, builderId) => {
-      queryClient.setQueryData<ViewBuilder[]>(workspaceKeys.viewBuilders(workspaceId), current =>
-        (current ?? []).filter(builder => builder.id !== builderId)
-      )
-    }
-  })
-}
+export const useDiscardView = useDeleteView

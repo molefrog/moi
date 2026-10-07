@@ -29,7 +29,45 @@ afterEach(async () => {
 })
 
 describe('selected session API', () => {
-  test('initializes an unset workspace to its most recently modified session', async () => {
+  test('fresh view and Scratchpad selections stay empty; a workspace pin overrides without replacing them', async () => {
+    const workspace = await registerWorkspace(join(tempDir, 'workspace'), { type: 'claude-code' })
+    claudeCodeHarness.listSessions = async () => [
+      { sessionId: 'existing', summary: 'Existing', lastModified: 1 }
+    ]
+    const path = `/api/workspaces/${workspace.id}`
+    for (const tabId of ['views/words', 'scratchpad']) {
+      expect(await (await api.request(`${path}/selected-session?tabId=${tabId}`)).json()).toEqual({
+        selected: {},
+        pinned: null
+      })
+    }
+    const pin = await api.request(`${path}/pinned-session`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: 'existing' })
+    })
+    expect(pin.status).toBe(200)
+    expect(await (await api.request(`${path}/selected-session?tabId=scratchpad`)).json()).toEqual({
+      selected: {},
+      pinned: 'existing'
+    })
+    const change = await api.request(`${path}/selected-session`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: null, tabId: 'scratchpad' })
+    })
+    expect(change.status).toBe(409)
+    await api.request(`${path}/pinned-session`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: null })
+    })
+    expect(await (await api.request(`${path}/selected-session?tabId=scratchpad`)).json()).toEqual({
+      selected: {},
+      pinned: null
+    })
+  })
+  test('starts with a fresh composer when there is no remembered selection', async () => {
     const workspace = await registerWorkspace(join(tempDir, 'workspace'), {
       type: 'claude-code'
     })
@@ -41,8 +79,8 @@ describe('selected session API', () => {
     const response = await api.request(`/api/workspaces/${workspace.id}/selected-session`)
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ sessionId: 'newer' })
-    expect(await getSelectedSession(workspace.path)).toBe('newer')
+    expect(await response.json()).toEqual({ selected: {}, pinned: null })
+    expect(await getSelectedSession(workspace.path)).toBeUndefined()
   })
 
   test('preserves an explicit New chat selection on later reads', async () => {
@@ -61,7 +99,7 @@ describe('selected session API', () => {
     const loaded = await api.request(`/api/workspaces/${workspace.id}/selected-session`)
 
     expect(saved.status).toBe(200)
-    expect(await loaded.json()).toEqual({ sessionId: null })
+    expect(await loaded.json()).toEqual({ selected: {}, pinned: null })
   })
 
   test('rejects a stale conditional write and returns the stored session', async () => {

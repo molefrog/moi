@@ -14,7 +14,7 @@ import {
   isAttachmentOnlyPlaceholder,
   splitAttachmentNote
 } from '@/lib/attachment-note'
-import type { SessionInfo, StreamEvent } from '@/lib/types'
+import type { SessionSummary, StreamEvent } from '@/lib/types'
 
 import { ClaudeAdapter } from './adapter'
 
@@ -52,7 +52,7 @@ export function visibleClaudeSessions<T extends Pick<SDKSessionInfo, 'tag'>>(ses
   return sessions.filter(session => session.tag !== MOI_ARCHIVED_SESSION_TAG)
 }
 
-export async function getSessions(workspacePath: string): Promise<SessionInfo[]> {
+export async function getSessions(workspacePath: string): Promise<SessionSummary[]> {
   const sessions = visibleClaudeSessions(await listSessions({ dir: workspacePath }))
   return sessions.map(s => ({
     sessionId: s.sessionId,
@@ -142,16 +142,12 @@ export async function getSessionEvents(
 ): Promise<StreamEvent[]> {
   const adapter = new ClaudeAdapter()
   const events: StreamEvent[] = []
-  try {
-    const raw = await getSessionMessages(sessionId, { dir: workspacePath })
-    for (const msg of raw) {
-      // Disk replay carries no `stream_event` messages, so the adapter never
-      // produces previews here — filter defensively to keep this the pure,
-      // persisted StreamEvent path that reconnect-healing trusts.
-      for (const ev of adapter.ingest(msg)) if (ev.kind !== 'preview') events.push(ev)
-    }
-  } catch {
-    // session file missing or unreadable — return whatever we have (often [])
+  const raw = await getSessionMessages(sessionId, { dir: workspacePath })
+  for (const msg of raw) {
+    // Disk replay carries no `stream_event` messages, so the adapter never
+    // produces previews here — filter defensively to keep this the pure,
+    // persisted StreamEvent path that reconnect-healing trusts.
+    for (const ev of adapter.ingest(msg)) if (ev.kind !== 'preview') events.push(ev)
   }
   return events
 }

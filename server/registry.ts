@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { rename, rm } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'path'
@@ -186,10 +186,20 @@ export function findWorkspaceForPath<T extends { path: string }>(
   workspaces: T[],
   reqPath: string
 ): T | null {
-  const normal = resolve(reqPath)
-  const matches = workspaces.filter(w => normal === w.path || normal.startsWith(w.path + sep))
+  // Shells can resolve aliases such as macOS /tmp → /private/tmp differently.
+  function canonicalPath(path: string) {
+    try {
+      return realpathSync(path)
+    } catch {
+      return resolve(path)
+    }
+  }
+  const normal = canonicalPath(reqPath)
+  const matches = workspaces
+    .map(workspace => ({ workspace, path: canonicalPath(workspace.path) }))
+    .filter(w => normal === w.path || normal.startsWith(w.path + sep))
   if (matches.length === 0) return null
-  return matches.reduce((best, w) => (w.path.length > best.path.length ? w : best))
+  return matches.reduce((best, w) => (w.path.length > best.path.length ? w : best)).workspace
 }
 
 // If `p` lies inside a workspace's `.moi/` directory, return the workspace root

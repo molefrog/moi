@@ -18,7 +18,7 @@ import {
   type Usage,
   toolContentToText
 } from './wire'
-import type { SessionInfo } from '@/lib/types'
+import type { SessionSummary } from '@/lib/types'
 
 export type AcpProviderId = NonNullable<ToolCall['provider']>
 
@@ -115,7 +115,7 @@ export function replayedUserParts(raw: string, images: readonly Part[] = []): Pa
   return replayAttachmentParts([...images, { type: 'text', text: raw }])
 }
 
-export function acpSessionToSessionInfo(entry: AcpSessionListEntry): SessionInfo {
+export function acpSessionToSessionInfo(entry: AcpSessionListEntry): SessionSummary {
   const updated = entry.updatedAt ? Date.parse(entry.updatedAt) : NaN
   return {
     sessionId: entry.sessionId,

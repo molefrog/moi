@@ -21,7 +21,7 @@ describe('workspace addresses', () => {
 
   test('old browser bookmarks resolve without accepting legacy tab IDs in new addresses', () => {
     expect(legacyTabFromPath('view:orders')).toBe('views/orders')
-    expect(legacyTabFromPath('view-builder:abc')).toBe('view-builders/abc')
+    expect(legacyTabFromPath('view-builder:abc')).toBeNull()
     expect(legacyTabFromPath('view:%65vents')).toBe('views/events')
     expect(legacyTabFromPath('view:%2565vents')).toBeNull()
     expect(legacyTabFromPath('view:a/b')).toBeNull()
@@ -83,13 +83,7 @@ describe('workspace addresses', () => {
     }
   })
   test('host-only tabs still round trip without becoming portable destinations', () => {
-    for (const tab of [
-      'agent',
-      'overview',
-      'scratchpad',
-      'views/events',
-      'view-builders/abc'
-    ] as const) {
+    for (const tab of ['agent', 'overview', 'scratchpad', 'views/events'] as const) {
       expect(tabFromPath(tab)).toBe(tab)
     }
   })

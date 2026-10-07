@@ -1,7 +1,7 @@
 import type { UserProfile } from '@/lib/collab/types'
 import { isMessageAttachments } from '@/lib/message-attachments'
 import type { ClientMessage, StatusSnapshotMessage } from '@/lib/types'
-import { isMoiContext, type MoiContext } from '@/lib/moi-context'
+import { isMoiContext } from '@/lib/moi-context'
 
 import index from '../client/index.html'
 import { api } from './api'
@@ -9,8 +9,7 @@ import { AttachmentUploadError } from './attachment-message'
 import { PORT } from './constants'
 import { control } from './control'
 import { proxyUserState } from './collab/cloudflare-access'
-import { getCollabReferencePath, isCollabEnabled } from './collab/config'
-import { selectChatSession } from './chat-selection'
+import { isCollabEnabled } from './collab/config'
 import { collabManager } from './collab/manager'
 import { EVENTS_TOPIC, setEventServer } from './events'
 import { killBuildWorkers } from './applets/build-worker'
@@ -19,7 +18,9 @@ import { startScratchpadSweeper } from './scratchpad'
 import { navigationRelay } from './navigation-relay'
 import { resolveScratchOp } from './scratchpad-relay'
 import { allHarnesses, harnessFor } from './harness/registry'
-import { getWorkspace } from './registry'
+import { getWorkspace, listWorkspaces } from './registry'
+import { failInterruptedViewStarts, sendWorkspaceMessage } from './view-sessions'
+import { PendingViewError } from './pending-views'
 import {
   addClient,
   broadcast,
@@ -104,6 +105,8 @@ function upgrade(server: Upgradable, req: Request, data: WsData) {
 // Bun owns the fullstack surface: the HTML shell + dev bundler/HMR, and the two
 // WebSocket channels (which need Bun's native `server.upgrade` + pub/sub). Every
 // HTTP API route is delegated to the Hono app (`./api`) via `fetch`.
+await Promise.all((await listWorkspaces()).map(failInterruptedViewStarts))
+
 export const app = Bun.serve<WsData>({
   port: PORT,
   hostname: process.env.HOST ?? '127.0.0.1',
@@ -203,45 +206,30 @@ export const app = Bun.serve<WsData>({
         if (data.type === 'chat' && (data.content?.trim() || data.attachments?.length)) {
           const workspace = await getWorkspace(data.workspaceId)
           if (!workspace) return
-          const collabReference = await getCollabReferencePath(workspace.path, workspace.type)
-          const context: MoiContext | undefined =
-            data.context || collabReference
-              ? {
-                  ...(data.context ?? { activeTab: 'agent' }),
-                  collabReference
-                }
-              : undefined
-          if (data.isNew) {
-            await selectChatSession(workspace, data.sessionId, data.selectedSessionScope, null)
-          }
-          // Harnesses ignore fields they don't support (see SendMessageInput).
-          // Their failures surface internally; attachment resolution happens
-          // before a harness owns the send, so surface that one here.
-          void harnessFor(workspace)
-            .sendMessage({
-              workspaceId: data.workspaceId,
-              workspacePath: workspace.path,
-              sessionId: data.sessionId,
-              isNew: data.isNew,
-              content: data.content.trim(),
-              attachments: data.attachments,
-              optimisticId: data.optimisticId,
-              model: data.model,
-              effort: data.effort,
-              fastMode: data.fastMode,
-              stream: data.stream,
-              context,
-              agentId: workspace.agentId
-            })
-            .catch(error => {
-              if (error instanceof AttachmentUploadError) {
-                broadcast(data.workspaceId, {
-                  kind: 'error',
-                  sessionId: data.sessionId,
-                  content: error.message
-                })
-              }
-            })
+          void sendWorkspaceMessage(workspace, {
+            workspaceId: data.workspaceId,
+            workspacePath: workspace.path,
+            sessionId: data.sessionId,
+            isNew: data.isNew,
+            selectedSessionScope: data.selectedSessionScope,
+            content: data.content.trim(),
+            attachments: data.attachments,
+            optimisticId: data.optimisticId,
+            model: data.model,
+            effort: data.effort,
+            fastMode: data.fastMode,
+            stream: data.stream,
+            context: data.context,
+            agentId: workspace.agentId
+          }).catch(error => {
+            if (error instanceof AttachmentUploadError || error instanceof PendingViewError) {
+              broadcast(workspace.id, {
+                kind: 'error',
+                sessionId: data.sessionId,
+                content: error.message
+              })
+            }
+          })
         }
         if (data.type === 'stop') {
           const workspace = await getWorkspace(data.workspaceId)

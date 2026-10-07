@@ -5,13 +5,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 import { WorkspaceLayoutContext } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
-import type { ViewInfo } from '@/lib/types'
+import type { CompiledView } from '@/lib/types'
 
 import { ViewsWidget } from './ViewsWidget'
 
 const noop = () => {}
 
-function render(views: ViewInfo[], showOnboarding = true): string {
+function render(views: CompiledView[], showOnboarding = true): string {
   const queryClient = new QueryClient()
   return renderToStaticMarkup(
     createElement(
@@ -32,7 +32,6 @@ function render(views: ViewInfo[], showOnboarding = true): string {
         },
         createElement(ViewsWidget, {
           views,
-          builders: [],
           onOpenView: noop,
           onCreateView: noop,
           showOnboarding
@@ -45,8 +44,8 @@ function render(views: ViewInfo[], showOnboarding = true): string {
 describe('ViewsWidget', () => {
   test('renders view launchers in the supplied order', () => {
     const html = render([
-      { id: 'roadmap', config: { title: 'Roadmap', icon: 'calendar' } },
-      { id: 'reports', config: { title: 'Reports', icon: 'chart' } }
+      { id: 'roadmap', status: 'compiled', title: 'Roadmap', icon: 'calendar' },
+      { id: 'reports', status: 'compiled', title: 'Reports', icon: 'chart' }
     ])
 
     expect(html.indexOf('Roadmap')).toBeLessThan(html.indexOf('Reports'))

@@ -2,8 +2,12 @@ import { mkdir, rename } from 'node:fs/promises'
 import { join } from 'path'
 
 import { DATA_DIR } from './data-dir'
+import type { WorkspaceSessionSelection, WorkspaceTabId } from '@/lib/types'
+import { isWorkspaceTabId } from '@/lib/workspace-tabs'
 
-type Store = Record<string, string | null>
+type Selection = WorkspaceSessionSelection
+type Store = Record<string, Selection>
+const emptySelection = (): Selection => ({ selected: {}, pinned: null })
 
 export type SelectedSessionUpdate = {
   changed: boolean
@@ -26,8 +30,14 @@ function rememberSessionRename(workspacePath: string, from: string, to: string):
   renamedSessions.set(workspacePath, renames)
 }
 
-function resolveRenamedSession(workspacePath: string, sessionId: string): string {
-  return renamedSessions.get(workspacePath)?.get(sessionId) ?? sessionId
+export function resolveRenamedSession(workspacePath: string, sessionId: string): string {
+  const renames = renamedSessions.get(workspacePath)
+  const seen = new Set<string>()
+  while (renames?.has(sessionId) && !seen.has(sessionId)) {
+    seen.add(sessionId)
+    sessionId = renames.get(sessionId)!
+  }
+  return sessionId
 }
 
 async function readStore(): Promise<Store> {
@@ -36,9 +46,17 @@ async function readStore(): Promise<Store> {
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
 
     const store: Store = {}
-    for (const [workspacePath, sessionId] of Object.entries(parsed)) {
-      if (sessionId === null || typeof sessionId === 'string') {
-        store[workspacePath] = sessionId
+    for (const [workspacePath, value] of Object.entries(parsed)) {
+      if (value === null || typeof value === 'string') {
+        store[workspacePath] = { selected: value === null ? {} : { overview: value }, pinned: null }
+      } else if (value && typeof value === 'object' && 'selected' in value) {
+        const entry = value as Selection
+        store[workspacePath] = {
+          selected: Object.fromEntries(
+            Object.entries(entry.selected ?? {}).filter(([, id]) => typeof id === 'string')
+          ),
+          pinned: typeof entry.pinned === 'string' ? entry.pinned : null
+        }
       }
     }
     return store
@@ -63,39 +81,53 @@ function locked<T>(operation: () => Promise<T>): Promise<T> {
 }
 
 export async function getSelectedSession(
-  workspacePath: string
-): Promise<string | null | undefined> {
+  workspacePath: string,
+  tabId: WorkspaceTabId = 'overview'
+): Promise<string | undefined> {
   const store = await readStore()
-  return Object.prototype.hasOwnProperty.call(store, workspacePath)
-    ? store[workspacePath]
-    : undefined
+  return store[workspacePath]?.selected[tabId] ?? undefined
 }
 
-export async function initializeSelectedSession(
-  workspacePath: string,
-  fallbackSessionId: string | null
-): Promise<string | null> {
-  return locked(async () => {
+export async function getWorkspaceSessionSelection(
+  workspacePath: string
+): Promise<WorkspaceSessionSelection> {
+  await writeChain
+  return (await readStore())[workspacePath] ?? emptySelection()
+}
+
+export async function getPinnedSession(workspacePath: string): Promise<string | null> {
+  return (await readStore())[workspacePath]?.pinned ?? null
+}
+
+export async function pinSession(workspacePath: string, sessionId: string | null): Promise<void> {
+  await locked(async () => {
     const store = await readStore()
-    if (Object.prototype.hasOwnProperty.call(store, workspacePath)) {
-      return store[workspacePath]
-    }
-    store[workspacePath] = fallbackSessionId
+    const selection = (store[workspacePath] ??= emptySelection())
+    selection.pinned = sessionId === null ? null : resolveRenamedSession(workspacePath, sessionId)
     await writeStore(store)
-    return fallbackSessionId
+  })
+}
+
+export async function dropSessionTab(workspacePath: string, tabId: WorkspaceTabId): Promise<void> {
+  await locked(async () => {
+    const store = await readStore()
+    const selection = store[workspacePath]
+    if (!selection || !(tabId in selection.selected)) return
+    delete selection.selected[tabId]
+    await writeStore(store)
   })
 }
 
 export async function saveSelectedSession(
   workspacePath: string,
   sessionId: string | null,
-  previousSessionId?: string | null
+  previousSessionId?: string | null,
+  tabId: WorkspaceTabId = 'overview'
 ): Promise<SelectedSessionUpdate> {
   return locked(async () => {
     const store = await readStore()
-    const current = Object.prototype.hasOwnProperty.call(store, workspacePath)
-      ? store[workspacePath]
-      : undefined
+    const selection = (store[workspacePath] ??= emptySelection())
+    const current = selection.selected[tabId]
     const resolvedSessionId =
       sessionId === null ? null : resolveRenamedSession(workspacePath, sessionId)
     const resolvedPreviousSessionId =
@@ -103,12 +135,17 @@ export async function saveSelectedSession(
         ? previousSessionId
         : resolveRenamedSession(workspacePath, previousSessionId)
 
-    if (resolvedPreviousSessionId !== undefined && current !== resolvedPreviousSessionId) {
+    if (
+      resolvedPreviousSessionId !== undefined &&
+      (current ?? null) !== resolvedPreviousSessionId
+    ) {
       return { changed: false, sessionId: current ?? null }
     }
-    if (current === resolvedSessionId) return { changed: false, sessionId: resolvedSessionId }
+    if ((current ?? null) === resolvedSessionId)
+      return { changed: false, sessionId: resolvedSessionId }
 
-    store[workspacePath] = resolvedSessionId
+    if (resolvedSessionId === null) delete selection.selected[tabId]
+    else selection.selected[tabId] = resolvedSessionId
     await writeStore(store)
     return { changed: true, sessionId: resolvedSessionId }
   })
@@ -123,14 +160,19 @@ export async function renameSelectedSession(
   return locked(async () => {
     rememberSessionRename(workspacePath, from, to)
     const store = await readStore()
-    const current = Object.prototype.hasOwnProperty.call(store, workspacePath)
-      ? store[workspacePath]
-      : undefined
-    if (current !== from) return { changed: false, sessionId: current ?? null }
-
-    store[workspacePath] = to
-    await writeStore(store)
-    return { changed: true, sessionId: to }
+    const selection = (store[workspacePath] ??= emptySelection())
+    let changed = false
+    for (const tabId of Object.keys(selection.selected).filter(isWorkspaceTabId)) {
+      if (selection.selected[tabId] !== from) continue
+      selection.selected[tabId] = to
+      changed = true
+    }
+    if (selection.pinned === from) {
+      selection.pinned = to
+      changed = true
+    }
+    if (changed) await writeStore(store)
+    return { changed, sessionId: selection.selected.overview ?? null }
   })
 }
 
@@ -140,13 +182,18 @@ export async function clearSelectedSession(
 ): Promise<SelectedSessionUpdate> {
   return locked(async () => {
     const store = await readStore()
-    const current = Object.prototype.hasOwnProperty.call(store, workspacePath)
-      ? store[workspacePath]
-      : undefined
-    if (current !== sessionId) return { changed: false, sessionId: current ?? null }
-
-    store[workspacePath] = null
-    await writeStore(store)
-    return { changed: true, sessionId: null }
+    const selection = (store[workspacePath] ??= emptySelection())
+    let changed = false
+    for (const tabId of Object.keys(selection.selected).filter(isWorkspaceTabId)) {
+      if (selection.selected[tabId] !== sessionId) continue
+      delete selection.selected[tabId]
+      changed = true
+    }
+    if (selection.pinned === sessionId) {
+      selection.pinned = null
+      changed = true
+    }
+    if (changed) await writeStore(store)
+    return { changed, sessionId: selection.selected.overview ?? null }
   })
 }

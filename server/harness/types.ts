@@ -10,7 +10,8 @@ import type {
   McpServer,
   Model,
   SessionActivity,
-  SessionInfo,
+  SessionConfig,
+  SessionSummary,
   StreamEvent,
   WorkspaceEntry,
   WorkspaceType
@@ -83,13 +84,17 @@ export type Harness = {
   interrupt(workspaceId: string, sessionId: string): Promise<void>
   // Optional because some providers do not expose an archive operation.
   archiveSession?(ws: WorkspaceEntry, sessionId: string): Promise<void>
+  // Silent native fork, returning its durable child id. Apply sourceConfig at
+  // creation if the backend needs it there. The caller copies the full config
+  // to the child and passes it on the first send, before any work starts.
+  forkSession?(ws: WorkspaceEntry, sessionId: string, sourceConfig: SessionConfig): Promise<string>
   // Every session whose activity is not `idle`, across all workspaces (drives
-  // the status snapshot and view-builder reconciliation). Activity is mirrored
+  // the status snapshot and pending-view progress). Activity is mirrored
   // from the backend's native lifecycle signal, never derived by counting.
   activeSessions(): { workspaceId: string; sessionId: string; activity: SessionActivity }[]
 
   // -- discovery / metadata ---------------------------------------------------
-  listSessions(ws: WorkspaceEntry): Promise<SessionInfo[]>
+  listSessions(ws: WorkspaceEntry): Promise<SessionSummary[]>
   // Home-page card preview. Called for every card on the home screen, so
   // implementations must stay cheap: no process spawns, no per-session
   // transcript reads unless cached. Failures resolve to {} — the card

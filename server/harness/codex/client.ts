@@ -1,7 +1,7 @@
 // One app-server per workspace: environment is fixed at process spawn, while
 // threads share the connection. Framing lives in transport.ts; see NOTES.md
 // for lifecycle, configuration, and wire-type maintenance.
-import type { McpServer, Model, SessionInfo, StreamEvent } from '@/lib/types'
+import type { McpServer, Model, SessionSummary, StreamEvent } from '@/lib/types'
 
 import {
   type CodexModel,
@@ -261,7 +261,7 @@ export function killAllCodexClients(): void {
 // ---- discovery (sessions list / models / cold history) -----------------------
 
 // Threads whose recorded cwd is exactly the workspace path, newest first.
-export async function getCodexSessions(workspacePath: string): Promise<SessionInfo[]> {
+export async function getCodexSessions(workspacePath: string): Promise<SessionSummary[]> {
   try {
     const client = await getCodexClient(workspacePath)
     const threads = await readCodexPages<CodexThread>(client, 'thread/list', {

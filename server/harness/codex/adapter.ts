@@ -13,7 +13,7 @@ import type {
   Turn
 } from '@/lib/format'
 import { stripMoiContextLoose } from '@/lib/moi-context'
-import type { McpServer, Model, SessionInfo } from '@/lib/types'
+import type { McpServer, Model, SessionSummary } from '@/lib/types'
 
 import type { WorkspaceActivityPreview } from '../types'
 
@@ -143,11 +143,11 @@ function cleanPreview(preview: string | undefined): string {
   return preview ? formatChatTitle(stripMoiContextLoose(preview)) : ''
 }
 
-export function codexThreadToSessionInfo(t: CodexThread): SessionInfo {
+export function codexThreadToSessionInfo(t: CodexThread): SessionSummary {
   return {
     sessionId: t.id,
     summary: t.name?.trim() || cleanPreview(t.preview),
-    // Codex timestamps are unix seconds; SessionInfo wants millis.
+    // Codex timestamps are unix seconds; moi uses milliseconds.
     lastModified: (t.updatedAt ?? t.createdAt ?? 0) * 1000,
     cwd: t.cwd
   }

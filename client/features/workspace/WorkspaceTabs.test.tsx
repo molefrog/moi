@@ -12,9 +12,9 @@ describe('WorkspaceTabs', () => {
       createElement(WorkspaceTabs, {
         tabs: [
           {
-            key: 'agent',
+            key: 'views/test',
             Icon: IconMessages,
-            label: 'Agent'
+            label: 'Test view'
           },
           {
             key: 'overview',
@@ -29,7 +29,7 @@ describe('WorkspaceTabs', () => {
             label: 'Scratchpad'
           }
         ],
-        active: 'agent',
+        active: 'views/test',
         createItems: [],
         onSelect: () => undefined,
         onClose: () => undefined,
@@ -41,7 +41,7 @@ describe('WorkspaceTabs', () => {
     expect(html).not.toContain('mo-root')
     expect(html).toContain('data-slot="spinner"')
     const overviewButton = html.match(/<button[^>]*aria-label="Overview"[^>]*>/)?.[0]
-    const agentButton = html.match(/<button[^>]*aria-label="Agent"[^>]*>/)?.[0]
+    const agentButton = html.match(/<button[^>]*aria-label="Test view"[^>]*>/)?.[0]
     expect(overviewButton).not.toContain('aria-roledescription')
     expect(agentButton).toContain('aria-roledescription="sortable item"')
   })

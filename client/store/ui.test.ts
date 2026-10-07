@@ -17,8 +17,8 @@ beforeEach(() => {
     hasSentMessageFromMoi: false,
     workspaceIdsPendingAnalysis: [],
     composerDrafts: {},
-    viewBuilderDrafts: {},
-    dockedChatWidth: 360
+    dockedChatWidth: 360,
+    popupChatWidth: 440
   })
 })
 
@@ -60,6 +60,7 @@ describe('composer drafts', () => {
 
     expect(restoredStore.getState().composerDrafts).toEqual({})
     expect(restoredStore.getState().dockedChatWidth).toBe(360)
+    expect(restoredStore.getState().popupChatWidth).toBe(440)
   })
 
   test('persists drafts per workspace and restores them in a new store', () => {
@@ -77,7 +78,7 @@ describe('composer drafts', () => {
   test('removes a workspace draft when it is cleared', () => {
     useUiStore.getState().setComposerDraft('ws-1', 'Keep me')
     useUiStore.getState().setComposerDraft('ws-2', 'Send me')
-    useUiStore.getState().setComposerDraft('ws-2', '')
+    useUiStore.getState().setComposerDraft('ws-2', null)
 
     expect(useUiStore.getState().composerDrafts).toEqual({ 'ws-1': 'Keep me' })
     expect(JSON.parse(storedValues.get('moi:ui') ?? '{}')).toMatchObject({
@@ -86,35 +87,35 @@ describe('composer drafts', () => {
   })
 })
 
-describe('view builder drafts', () => {
+describe('pending view drafts', () => {
   test('keeps an empty draft distinct from no draft', () => {
-    useUiStore.getState().setViewBuilderDraft('builder-1', 'Chart of expenses')
-    useUiStore.getState().setViewBuilderDraft('builder-1', '')
+    useUiStore.getState().setComposerDraft('draft-1', 'Chart of expenses')
+    useUiStore.getState().setComposerDraft('draft-1', '')
 
     // Deleted text must stay deleted — a missing entry falls back to the
-    // builder's server-saved requirements in the composer.
-    expect(useUiStore.getState().viewBuilderDrafts).toEqual({ 'builder-1': '' })
+    // view's server-saved requirements in the composer.
+    expect(useUiStore.getState().composerDrafts).toEqual({ 'draft-1': '' })
 
-    useUiStore.getState().setViewBuilderDraft('builder-1', null)
+    useUiStore.getState().setComposerDraft('draft-1', null)
 
-    expect(useUiStore.getState().viewBuilderDrafts).toEqual({})
+    expect(useUiStore.getState().composerDrafts).toEqual({})
   })
 
   test('clearing a missing draft leaves state untouched', () => {
     const before = useUiStore.getState()
 
-    useUiStore.getState().setViewBuilderDraft('builder-x', null)
+    useUiStore.getState().setComposerDraft('draft-x', null)
 
     expect(useUiStore.getState()).toBe(before)
   })
 
   test('restores drafts in a new store', () => {
-    useUiStore.getState().setViewBuilderDraft('builder-1', 'Weekly report view')
+    useUiStore.getState().setComposerDraft('draft-1', 'Weekly report view')
 
     const restoredStore = createUiStore(localStorage)
 
-    expect(restoredStore.getState().viewBuilderDrafts).toEqual({
-      'builder-1': 'Weekly report view'
+    expect(restoredStore.getState().composerDrafts).toEqual({
+      'draft-1': 'Weekly report view'
     })
   })
 })
@@ -134,4 +135,30 @@ describe('docked chat width', () => {
       state: { dockedChatWidth: 412 }
     })
   })
+})
+
+test('popup width survives reloads independently of the sidebar width', () => {
+  useUiStore.getState().setPopupChatWidth(1000)
+  useUiStore.getState().setDockedChatWidth(412)
+
+  const restoredStore = createUiStore(localStorage)
+  expect(restoredStore.getState().popupChatWidth).toBe(1000)
+  expect(restoredStore.getState().dockedChatWidth).toBe(412)
+})
+
+test('a pending view draft follows chat creation and native renames, including empty text', () => {
+  const draft = JSON.stringify(['ws-1', 'draft:views/cards'])
+  const temporary = JSON.stringify(['ws-1', 'temporary'])
+  const native = JSON.stringify(['ws-1', 'native'])
+  const otherWorkspace = JSON.stringify(['ws-2', 'draft:views/cards'])
+  useUiStore.getState().setComposerDraft(draft, '')
+  useUiStore.getState().setComposerDraft(otherWorkspace, 'Other workspace')
+  useUiStore.getState().moveComposerDraft(draft, temporary)
+  useUiStore.getState().moveComposerDraft(temporary, native)
+  expect(useUiStore.getState().composerDrafts).toEqual({
+    [native]: '',
+    [otherWorkspace]: 'Other workspace'
+  })
+  useUiStore.getState().moveComposerDraft(native, draft)
+  expect(useUiStore.getState().composerDrafts[draft]).toBe('')
 })

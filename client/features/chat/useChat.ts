@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import {
-  useSessionConfig,
+  useSession,
   useSessionView,
   useWorkspaceSessions
 } from '@/client/features/chat/sessions/api'
@@ -20,13 +20,16 @@ import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayo
 import { sendMessage } from '@/client/features/chat/connection/chat-connection'
 import {
   type ChatSendOptions,
+  finishComposerSend,
+  moveChatDraft,
   prepareDraftAttachments,
+  prepareOptimisticSend,
   attachmentsForSend,
   ownsComposerAttachments,
   resolveChatRunOptions,
-  startOptimisticSession,
-  startOptimisticTurn
+  startOptimisticSession
 } from '@/client/features/chat/chat-send'
+import { visibleForkHistory } from '@/client/features/chat/messages/fork-history'
 import { buildPreviewTurn } from '@/client/features/chat/messages/preview-turn'
 import {
   isRunningActivity,
@@ -34,11 +37,11 @@ import {
   selectPreviews,
   useLive
 } from '@/client/features/chat/chat-store'
-import { useUiStore } from '@/client/store/ui'
 import { toast } from '@/client/components/ui/toast'
 import { emptyViewState } from '@/lib/format'
 import { messageAttachmentLimitError } from '@/lib/message-attachments'
-import type { Part, ViewState } from '@/lib/types'
+import { draftSessionId } from '@/lib/session-drafts'
+import type { ViewState } from '@/lib/types'
 
 const EMPTY: ViewState = emptyViewState()
 
@@ -53,19 +56,14 @@ export function useChat(address: WorkspaceTabAddress) {
   const workspaceId = useWorkspaceId()
   const qc = useQueryClient()
   const { layout } = useWorkspaceLayoutCtx()
-  const [selectedSession, selectSession] = useSelectedSession()
+  const [selectedSession, selectSession] = useSelectedSession(address.activeTab)
   const collabEnabled = useCollabEnabled()
   const modelsData = useWorkspaceAgent(workspaceId).data
   const sessions = useWorkspaceSessions(workspaceId).data
-  const selectedSessionMissing =
-    Boolean(selectedSession) &&
-    sessions !== undefined &&
-    !sessions.some(session => session.sessionId === selectedSession)
-  const selectedSessionId = selectedSessionMissing ? null : (selectedSession ?? null)
-
-  useEffect(() => {
-    if (selectedSessionMissing) selectSession(null)
-  }, [selectSession, selectedSessionMissing])
+  // A newly forked/native session can precede the provider's session listing.
+  // Archive explicitly clears selection; a stale catalog must not do so.
+  const selectedSessionId = selectedSession ?? null
+  const composerSessionId = selectedSessionId ?? draftSessionId(address.activeTab)
   // Snapshot of the workspace's ambient UI state + queued one-shot
   // directives, taken when the message actually goes out.
   const buildMoiContext = useMoiUserMessageContext(address)
@@ -81,10 +79,21 @@ export function useChat(address: WorkspaceTabAddress) {
 
   const viewQuery = useSessionView(workspaceId, selectedSessionId)
   const { refetch } = viewQuery
-  const retryLoad = useCallback(() => void refetch(), [refetch])
-  const view = viewQuery.data ?? EMPTY
+  const session = useSession(workspaceId, selectedSessionId)
+  const { refetch: refetchSession } = session
+  const retryLoad = useCallback(async () => {
+    await refetch()
+    await refetchSession()
+  }, [refetch, refetchSession])
+  const forkedFromSessionId = session.data?.forkedFromSessionId
+  const sessionReady = !selectedSessionId || session.data !== undefined
+  let view = sessionReady ? (viewQuery.data ?? EMPTY) : EMPTY
+  if (viewQuery.data && forkedFromSessionId) view = visibleForkHistory(viewQuery.data, session.data)
   const chatLoaded =
-    sessions !== undefined && (selectedSessionId === null || viewQuery.data !== undefined)
+    selectedSession !== undefined &&
+    sessionReady &&
+    sessions !== undefined &&
+    (selectedSessionId === null || viewQuery.data !== undefined)
 
   // The live streaming preview as a synthetic assistant turn, so the ChatPanel
   // can merge it into the trailing assistant run — a
@@ -99,7 +108,7 @@ export function useChat(address: WorkspaceTabAddress) {
 
   // The selected session's persisted model/effort. For a brand-new chat (no
   // session yet) this is empty and `send` falls back to workspace defaults.
-  const sessionConfig = useSessionConfig(workspaceId, selectedSessionId).data
+  const sessionConfig = session.data?.config
 
   // The composer owns the workspace draft in the persisted UI store and hands
   // the text in, so a keystroke re-renders only the composer.
@@ -110,7 +119,7 @@ export function useChat(address: WorkspaceTabAddress) {
       // sent; the composer disables send while any are still uploading, so in
       // practice they're all ready here. Applet sends supply their own prepared
       // attachments and leave the user's staged files alone.
-      const ready = attachmentsForSend(workspaceId, selectedSessionId, options)
+      const ready = attachmentsForSend(workspaceId, composerSessionId, options)
       // No `processing` guard: sending while a turn is in flight QUEUES the
       // message into the same live server session (streaming-input mode).
       if (!text && ready.length === 0 && !options?.preparedAttachments?.attachments.length) return
@@ -129,10 +138,11 @@ export function useChat(address: WorkspaceTabAddress) {
         isNew = true
         // An immediate applet send leaves the user's attachments staged in this chat.
         if (!ownsComposerAttachments(options)) {
-          liveStore.getState().renameSession(workspaceId, selectedSessionId, sid)
+          moveChatDraft(workspaceId, composerSessionId, sid)
         }
         selectSession(sid)
         startOptimisticSession({
+          tabId: address.activeTab,
           queryClient: qc,
           workspaceId,
           sessionId: sid,
@@ -141,19 +151,11 @@ export function useChat(address: WorkspaceTabAddress) {
         })
       }
 
-      // Optimistic user turn — primed into the RQ transcript cache so it renders
-      // immediately. The server re-ids the SDK's user echo to optimisticId so it
-      // upserts in place rather than duplicating. Image attachments render from
-      // their local object URL until the server's broadcast (with a data URL)
-      // upserts in place.
-      const parts: Part[] = [...prepared.parts]
-      if (text) parts.push({ type: 'text', text })
-      const optimisticId = startOptimisticTurn({
-        queryClient: qc,
-        workspaceId,
-        sessionId: sid,
-        parts
-      })
+      const { attachments, optimisticId } = prepareOptimisticSend(
+        { queryClient: qc, workspaceId, sessionId: sid, text },
+        ready,
+        prepared
+      )
 
       // Resolve the session/workspace choice against the catalog. Codex sends
       // the picker's concrete model even for an implicit or stale selection;
@@ -168,7 +170,6 @@ export function useChat(address: WorkspaceTabAddress) {
         pickedEffort,
         pickedFastMode
       )
-      const { attachments } = prepared
       sendMessage({
         type: 'chat',
         workspaceId,
@@ -184,19 +185,14 @@ export function useChat(address: WorkspaceTabAddress) {
         context: buildMoiContext(options),
         ...(attachments.length > 0 ? { attachments } : {})
       })
-      useUiStore.getState().markMessageSentFromMoi(workspaceId)
+      finishComposerSend(workspaceId, ready)
       if (isNew) {
         qc.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })
       }
-      // Drop the session's attachments now that they've been sent (revokes the
-      // preview object URLs). Keyed by the pre-mint id, matching where they were
-      // stored by the composer. Skipped for an applet send:
-      // clearing here would discard the user's staged (and in-flight) files.
-      if (ownsComposerAttachments(options)) {
-        liveStore.getState().clearAttachments(workspaceId, selectedSessionId)
-      }
     },
     [
+      address.activeTab,
+      composerSessionId,
       selectedSessionId,
       workspaceId,
       qc,
@@ -225,12 +221,14 @@ export function useChat(address: WorkspaceTabAddress) {
 
   return {
     view,
+    forkedFromSessionId,
     chatLoaded,
     previewTurn,
     sessionId: selectedSessionId,
+    composerSessionId,
     processing,
     error,
-    loadError: viewQuery.error?.message ?? null,
+    loadError: session.error?.message ?? viewQuery.error?.message ?? null,
     retryLoad,
     send,
     stop,

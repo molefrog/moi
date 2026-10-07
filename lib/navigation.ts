@@ -4,8 +4,7 @@ import { isWorkspaceTabId } from './workspace-tabs'
 export type ViewParams = Record<string, string>
 export type WorkspaceAddress = { tab: WorkspaceTabId; search: string }
 
-// Public destinations deliberately exclude the current singleton chat and
-// transient builders.
+// Public destinations deliberately exclude the current singleton chat.
 export function parseMoiHref(href: unknown): WorkspaceAddress {
   if (typeof href !== 'string' || !href.startsWith('moi:/') || href.startsWith('moi://')) {
     throw new Error('Expected a workspace address such as moi:/views/events?eventId=123')
@@ -13,7 +12,7 @@ export function parseMoiHref(href: unknown): WorkspaceAddress {
   const path = href.slice(5).split(/[?#]/, 1)[0]
   if (href.includes('#') || /[\s\\]/.test(path)) throw new Error('Invalid workspace address')
   const tab = tabFromPath(path)
-  if (!tab || tab === 'agent' || tab.startsWith('view-builders/')) {
+  if (!tab || tab === 'agent') {
     throw new Error(`Unsupported workspace destination: ${path}`)
   }
   const query = href.indexOf('?')
@@ -45,8 +44,8 @@ export function tabFromPath(path: string): WorkspaceTabId | null {
 
 // Compatibility for old browser bookmarks only; saved tab state uses paths.
 export function legacyTabFromPath(path: string): WorkspaceTabId | null {
-  const match = /^(view|view-builder):(.+)$/.exec(path)
-  return match ? tabFromPath(`${match[1]}s/${match[2]}`) : null
+  const match = /^view:(.+)$/.exec(path)
+  return match ? tabFromPath(`views/${match[1]}`) : null
 }
 
 export function moiHref(tab: WorkspaceTabId, search = ''): string {

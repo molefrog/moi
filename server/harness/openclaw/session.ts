@@ -31,7 +31,6 @@ import {
   type OpenClawSessionDetail,
   getOpenClawSessionMessages
 } from './discovery'
-import { renameSelectedSession } from '../../selected-session'
 import {
   type ToolResultInfo,
   findToolCallOwners,
@@ -47,11 +46,7 @@ import {
 } from './gateway'
 import { recordOpenClawThinkingProfile, recordOpenClawThinkingRejection } from './thinking'
 import { broadcast } from '../../state'
-import {
-  markViewBuilderBuildingBySession,
-  markViewBuilderWaitingBySession,
-  renameViewBuilderSession
-} from '../../view-builders'
+import { renameSessionReferences } from '../../session-lifecycle'
 
 type OpenClawSessionKey = string // the gateway-side composite key, e.g. `agent:main:main`
 
@@ -228,11 +223,6 @@ function setProcessing(rec: SessionRecord, processing: boolean, runId: string | 
     sessionId: rec.sessionId,
     activity: processing ? 'running' : 'idle'
   })
-  if (processing) {
-    void markViewBuilderBuildingBySession(rec.workspaceId, rec.workspacePath, rec.sessionId)
-  } else {
-    void markViewBuilderWaitingBySession(rec.workspaceId, rec.workspacePath, rec.sessionId)
-  }
 }
 
 function clearIdleTimer(rec: SessionRecord): void {
@@ -1344,18 +1334,12 @@ async function sendOpenClawMessageImpl(input: {
       })
       if (created?.sessionId && created.sessionId !== input.sessionId) {
         realSessionId = created.sessionId
-        await renameSelectedSession(input.workspacePath, input.sessionId, realSessionId)
-        await renameViewBuilderSession(
+        await renameSessionReferences(
           input.workspaceId,
           input.workspacePath,
           input.sessionId,
           realSessionId
         )
-        broadcast(input.workspaceId, {
-          type: 'session_renamed',
-          from: input.sessionId,
-          to: realSessionId
-        })
       }
     }
     rec = await getOrCreateOpenClawSession({
@@ -1378,12 +1362,6 @@ async function sendOpenClawMessageImpl(input: {
       sessionId: realSessionId,
       content: message
     })
-    await markViewBuilderWaitingBySession(
-      input.workspaceId,
-      input.workspacePath,
-      realSessionId,
-      message
-    )
     throw err
   }
 
@@ -1429,12 +1407,6 @@ async function sendOpenClawMessageImpl(input: {
       sessionId: rec.sessionId,
       content: message
     })
-    await markViewBuilderWaitingBySession(
-      rec.workspaceId,
-      rec.workspacePath,
-      rec.sessionId,
-      message
-    )
     throw err
   }
 }

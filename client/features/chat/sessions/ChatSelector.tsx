@@ -1,18 +1,17 @@
 import { useRef, useState } from 'react'
-import { IconArchive, IconChevronDown, IconEdit } from '@tabler/icons-react'
+import { IconArchive, IconEdit, IconHistory, IconPin, IconPinFilled } from '@tabler/icons-react'
 
 import { useArchiveWorkspaceSession, useWorkspaceSessions } from './api'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
-import { useSelectedSession } from '@/client/features/chat/sessions/useSelectedSession'
-import { cn } from '@/client/lib/cn'
 import {
-  hasRunningBackgroundSession,
-  isSessionRunning,
-  liveStore,
-  useLive
-} from '@/client/features/chat/chat-store'
-import type { SessionInfo } from '@/lib/types'
+  useSelectedSession,
+  useCurrentTabId,
+  usePinnedSession
+} from '@/client/features/chat/sessions/useSelectedSession'
+import { cn } from '@/client/lib/cn'
+import { isSessionRunning, liveStore, useLive } from '@/client/features/chat/chat-store'
+import type { SessionInfo, WorkspaceTabId } from '@/lib/types'
 
 import { Button } from '@/client/components/ui/button'
 import { toast } from '@/client/components/ui/toast'
@@ -23,27 +22,22 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/client/components/ui/dropdown-menu'
 import { Spinner } from '@/client/components/ui/spinner'
 
 type ChatSelectorProps = {
-  isViewBuilder?: boolean
+  className?: string
 }
 
-type ChatHeaderLabelProps = {
-  label: string
+type SessionSelectorProps = ChatSelectorProps & {
+  sessions: SessionInfo[]
 }
 
 type ChatSessionGroup = {
   key: string
   label: string
   sessions: SessionInfo[]
-}
-
-function ChatHeaderLabel({ label }: ChatHeaderLabelProps) {
-  return <div className="flex h-7 items-center px-2.5 text-sm font-medium">{label}</div>
 }
 
 // One tiny text badge per row at most: a cron/subagent flavor wins; otherwise
@@ -239,33 +233,94 @@ export function groupSessionsByDate(sessions: SessionInfo[], now = new Date()): 
   return [...groups.values()]
 }
 
-export function ChatSelector({ isViewBuilder = false }: ChatSelectorProps) {
-  if (isViewBuilder) {
-    return <ChatHeaderLabel label="Build a new view" />
-  }
-
-  return <SessionSelector />
+export function groupSessionsForTab(
+  sessions: SessionInfo[],
+  tabId: WorkspaceTabId,
+  now = new Date()
+): ChatSessionGroup[] {
+  return groupSessionsByDate(
+    sessions.filter(session =>
+      tabId === 'overview' ? !session.tabId?.startsWith('views/') : session.tabId === tabId
+    ),
+    now
+  )
 }
 
-function SessionSelector() {
+export function ChatSelector({ className }: ChatSelectorProps) {
   const workspaceId = useWorkspaceId()
-  const [selectedSession, selectSession] = useSelectedSession()
-  const selectedSessionId = selectedSession ?? null
-  const [confirmingSessionId, setConfirmingSessionId] = useState<string | null>(null)
+  const { pinnedSessionId, loaded, pin } = usePinnedSession()
+  const [selectedSessionId] = useSelectedSession()
   const { data: sessions = [] } = useWorkspaceSessions(workspaceId)
-  const canArchive = useWorkspaceAgent(workspaceId).data?.supportsArchiving === true
-  const archiveSession = useArchiveWorkspaceSession(workspaceId)
-  const hasRunningBackgroundChat = useLive(state =>
-    hasRunningBackgroundSession(state.activity, workspaceId, selectedSessionId)
-  )
+  if (!loaded) return null
 
-  if (sessions.length === 0) {
-    return <ChatHeaderLabel label="New chat" />
+  if (pinnedSessionId) {
+    const title = sessions.find(session => session.sessionId === pinnedSessionId)?.summary
+    if (!title) return null
+    return (
+      <div
+        className={cn(
+          '-my-0.5 -ml-0.5 box-content h-7 max-w-64 rounded-lg py-0.5 pr-0.5 pl-3',
+          'flex min-w-0 items-center gap-1 bg-accent text-sm font-medium'
+        )}
+      >
+        <span className="min-w-0 flex-1 truncate">{title}</span>
+        <Tooltip key="unpin">
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className={className}
+                onClick={() => pin(null)}
+                aria-label="Unpin chat"
+                aria-pressed={true}
+              >
+                <IconPinFilled stroke={1.75} />
+              </Button>
+            }
+          />
+          <TooltipContent>Unpin chat</TooltipContent>
+        </Tooltip>
+      </div>
+    )
   }
 
-  const active = sessions.find(s => s.sessionId === selectedSessionId)
-  const label = active?.summary ?? 'New chat'
-  const sessionGroups = groupSessionsByDate(sessions)
+  return (
+    <div className="flex w-full min-w-0 items-center justify-between gap-1">
+      <SessionSelector className={className} sessions={sessions} />
+      {selectedSessionId && (
+        <Tooltip key="pin">
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className={className}
+                onClick={() => pin(selectedSessionId)}
+                aria-label="Pin chat to workspace"
+                aria-pressed={false}
+              >
+                <IconPin stroke={1.75} />
+              </Button>
+            }
+          />
+          <TooltipContent>Pin chat to workspace</TooltipContent>
+        </Tooltip>
+      )}
+    </div>
+  )
+}
+
+function SessionSelector({ className, sessions }: SessionSelectorProps) {
+  const workspaceId = useWorkspaceId()
+  const tabId = useCurrentTabId()
+  const [selectedSessionId, selectSession] = useSelectedSession()
+  const [confirmingSessionId, setConfirmingSessionId] = useState<string | null>(null)
+  const canArchive = useWorkspaceAgent(workspaceId).data?.supportsArchiving === true
+  const archiveSession = useArchiveWorkspaceSession(workspaceId)
+  const sessionGroups = groupSessionsForTab(sessions, tabId)
+
+  if (sessionGroups.length === 0 && !selectedSessionId) return null
 
   function handleMenuOpenChange(open: boolean) {
     if (!open) setConfirmingSessionId(null)
@@ -282,59 +337,63 @@ function SessionSelector() {
     }
   }
 
-  return (
-    <DropdownMenu onOpenChange={handleMenuOpenChange}>
-      <DropdownMenuTrigger
+  return selectedSessionId ? (
+    <Tooltip>
+      <TooltipTrigger
         render={
-          <Button className="group max-w-full min-w-0 shrink" variant="ghost" size="sm">
-            <span className="max-w-64 min-w-0 truncate">{label}</span>
-            {hasRunningBackgroundChat ? (
-              <Spinner className="size-4!" stroke={2} />
-            ) : (
-              <IconChevronDown
-                className="text-muted-foreground group-hover:text-foreground"
-                stroke={1.75}
-              />
-            )}
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="New chat"
+            onClick={() => selectSession(null)}
+            className={className}
+          >
+            <IconEdit stroke={1.75} />
           </Button>
         }
       />
+      <TooltipContent>New chat</TooltipContent>
+    </Tooltip>
+  ) : (
+    <DropdownMenu onOpenChange={handleMenuOpenChange}>
+      <Tooltip>
+        <DropdownMenuTrigger
+          render={
+            <TooltipTrigger
+              render={
+                <Button variant="ghost" size="icon-sm" aria-label="History" className={className}>
+                  <IconHistory stroke={1.75} />
+                </Button>
+              }
+            />
+          }
+        />
+        <TooltipContent>History</TooltipContent>
+      </Tooltip>
       <DropdownMenuContent
         align="start"
         className="flex max-h-100 w-max max-w-72 min-w-40 flex-col overflow-hidden"
       >
-        <DropdownMenuItem
-          className="shrink-0 gap-1 font-medium text-muted-foreground! **:text-muted-foreground!"
-          onClick={() => selectSession(null)}
-        >
-          <IconEdit size={16} stroke={1.75} />
-          New chat
-        </DropdownMenuItem>
-        {sessionGroups.length > 0 && (
-          <>
-            <DropdownMenuSeparator className="shrink-0" />
-            <div className="no-scrollbar flex min-h-0 flex-1 scroll-fade flex-col gap-1 overflow-y-auto overscroll-contain [--scroll-fade-reveal:8px]">
-              {sessionGroups.map(group => (
-                <DropdownMenuGroup key={group.key}>
-                  <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
-                  {group.sessions.map(session => (
-                    <ChatSessionItem
-                      key={session.sessionId}
-                      session={session}
-                      active={selectedSessionId === session.sessionId}
-                      canArchive={canArchive}
-                      confirmingArchive={confirmingSessionId === session.sessionId}
-                      onSelect={selectSession}
-                      onArchive={handleArchive}
-                      onRequestArchive={setConfirmingSessionId}
-                      workspaceId={workspaceId}
-                    />
-                  ))}
-                </DropdownMenuGroup>
+        <div className="no-scrollbar flex min-h-0 flex-1 scroll-fade flex-col gap-1 overflow-y-auto overscroll-contain [--scroll-fade-reveal:8px]">
+          {sessionGroups.map(group => (
+            <DropdownMenuGroup key={group.key}>
+              <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+              {group.sessions.map(session => (
+                <ChatSessionItem
+                  key={session.sessionId}
+                  session={session}
+                  active={selectedSessionId === session.sessionId}
+                  canArchive={canArchive}
+                  confirmingArchive={confirmingSessionId === session.sessionId}
+                  onSelect={selectSession}
+                  onArchive={handleArchive}
+                  onRequestArchive={setConfirmingSessionId}
+                  workspaceId={workspaceId}
+                />
               ))}
-            </div>
-          </>
-        )}
+            </DropdownMenuGroup>
+          ))}
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   )

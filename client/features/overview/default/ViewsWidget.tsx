@@ -33,7 +33,7 @@ import { useDeleteView, useRenameView } from '@/client/features/views/api'
 import { getViewIcon, getViewLabel } from '@/client/features/views/view-presentation'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { cn } from '@/client/lib/cn'
-import type { ViewBuilder, ViewInfo } from '@/lib/types'
+import type { CompiledView } from '@/lib/types'
 
 type NewViewButtonProps = {
   outlined: boolean
@@ -74,7 +74,7 @@ function NewViewButton({ outlined, onClick }: NewViewButtonProps) {
 }
 
 type ViewItemProps = {
-  view: ViewInfo
+  view: CompiledView
   Icon: TablerIcon
   onOpen: () => void
 }
@@ -206,20 +206,13 @@ function ViewItem({ view, Icon, onOpen }: ViewItemProps) {
 }
 
 type ViewsWidgetProps = {
-  views: ViewInfo[]
-  builders: ViewBuilder[]
+  views: CompiledView[]
   onOpenView: (viewId: string) => void
   onCreateView: () => void
   showOnboarding: boolean
 }
 
-export function ViewsWidget({
-  views,
-  builders,
-  onOpenView,
-  onCreateView,
-  showOnboarding
-}: ViewsWidgetProps) {
+export function ViewsWidget({ views, onOpenView, onCreateView, showOnboarding }: ViewsWidgetProps) {
   const empty = views.length === 0
 
   return (
@@ -236,7 +229,7 @@ export function ViewsWidget({
           <ViewItem
             key={view.id}
             view={view}
-            Icon={getViewIcon(view, builders)}
+            Icon={getViewIcon(view)}
             onOpen={() => onOpenView(view.id)}
           />
         ))}

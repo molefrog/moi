@@ -24,9 +24,10 @@ describe('isAgentCaller', () => {
 
 async function runHelp(
   envPatch: Record<string, string | undefined>,
-  command?: string
+  command?: string | string[]
 ): Promise<string> {
-  const proc = Bun.spawn(['bun', CLI, ...(command ? [command] : []), '--help'], {
+  const commands = typeof command === 'string' ? [command] : (command ?? [])
+  const proc = Bun.spawn(['bun', CLI, ...commands, '--help'], {
     stdin: 'ignore',
     stdout: 'pipe',
     stderr: 'pipe',
@@ -50,6 +51,27 @@ async function runHelp(
 }
 
 describe('moi --help (e2e)', () => {
+  test('views set only exposes pending metadata', async () => {
+    const help = await runHelp({}, ['views', 'set'])
+    expect(help).not.toContain('--kind')
+    expect(help).not.toContain('widget')
+    expect(help).not.toContain('--builder')
+    expect(help).not.toContain('--status')
+    for (const flag of ['--title', '--icon']) {
+      expect(help).toContain(flag)
+    }
+  }, 30_000)
+
+  test('views owns create and set without the old builder group', async () => {
+    const rootHelp = await runHelp({})
+    const viewsHelp = await runHelp({}, 'views')
+
+    expect(rootHelp).toMatch(/^\s+views\s/m)
+    expect(rootHelp).not.toMatch(/^\s+builder\s/m)
+    expect(viewsHelp).toContain('USAGE moi views create|set')
+    expect(viewsHelp).not.toMatch(/^\s+start\s/m)
+  }, 30_000)
+
   test('human view: both sections', async () => {
     const out = await runHelp({})
     expect(out).toContain('Workspace commands:')

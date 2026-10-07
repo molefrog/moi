@@ -21,9 +21,7 @@ const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
 
 test('presence pages follow nested navigation paths and deployment bases, decoding once', () => {
   expect(pageFromPath('/workspace/test/views/board', 'test')).toBe('views/board')
-  expect(pageFromPath('/prefix/workspace/test/view-builders/draft', 'test', '/prefix')).toBe(
-    'view-builders/draft'
-  )
+  expect(pageFromPath('/prefix/workspace/test/views/draft', 'test', '/prefix')).toBe('views/draft')
   expect(pageFromPath('/prefix/workspace/test/views/%62oard', 'test', '/prefix')).toBe(
     'views/board'
   )

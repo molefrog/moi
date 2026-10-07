@@ -1,5 +1,6 @@
-> Historical RFC. For the current API, see [Workspace navigation](navigation.md) and
-> [Applet intents](../workspace/.claude/skills/moi-workspace/references/INTENTS.md).
+> Historical RFC. Its `focusTab`, `moi tabs focus`, and navigation-state examples describe a
+> superseded API. For the current routes and commands, see [Workspace navigation](navigation.md)
+> and [Applet intents](../workspace/.claude/skills/moi-workspace/references/INTENTS.md).
 
 # RFC: workspace tab navigation and applet messaging (intents v2)
 
@@ -18,8 +19,8 @@ from applet UI**. The "intent" vocabulary disappears from the API surface — th
 ## 1. Routes: the URL is the tab address
 
 - Route becomes `/workspace/:id/*?` — the wildcard suffix is a tab id:
-  `/workspace/ws1/view:roadmap`, `/workspace/ws1/overview`, `/workspace/ws1/scratchpad`,
-  `/workspace/ws1/view-builder:abc`. Tab ids are URL-safe as-is (`:` is a legal path character).
+  `/workspace/ws1/views/roadmap`, `/workspace/ws1/overview`, `/workspace/ws1/scratchpad`,
+  `/workspace/ws1/views/abc`. Tab ids are workspace-relative paths.
 - **Missing tab** (`/workspace/:id`) → redirect to the workspace's default tab (the layout's
   saved `active`, same behavior as today), using a **history replace** so Back never bounces
   through the redirect.
@@ -64,8 +65,8 @@ moi tabs — workspace tabs, the default one marked
   ●  overview     Overview
      agent        Agent
      scratchpad   Scratchpad
-     view:orders  Orders
-     view:shop    Shop
+     views/orders  Orders
+     views/shop    Shop
 
   Focus one: moi tabs focus <tab-id> [--params '{"k":"v"}']
 ```
@@ -96,7 +97,7 @@ import { listOrders } from './orders.server'
 
 export const config = { title: 'Orders', icon: 'package' } as const
 
-// The view's addressable state — what `focusTab('view:orders', …)` can set.
+// The view's addressable state — what `focusTab('views/orders', …)` can set.
 // Other agents read this file to learn how to talk to this view. Local on
 // purpose (not exported): applets never import from each other, so exporting
 // would only invite that mistake — the type is read, never imported.
@@ -125,7 +126,7 @@ where it read it:
 import { focusTab, sendChatMessage } from 'moi'
 
 // Params contract read from ../views/orders.tsx: { order?: string; status?: string }
-const openOrder = (order: string) => focusTab('view:orders', { order })
+const openOrder = (order: string) => focusTab('views/orders', { order })
 
 const chaseOrder = (order: string, carrier: string) =>
   sendChatMessage(`Chase order ${order}`, { order, carrier })
@@ -134,7 +135,7 @@ const chaseOrder = (order: string, carrier: string) =>
 - **Widgets: `params` is always `{}`** — widgets are not navigation targets and have no
   addressable state.
 - **Views: `{}` or the values from navigation state.** Delivery rides wouter's navigate state —
-  `navigate(`/workspace/${id}/view:shop`, { state: { appletParams: { product: 'scarf' } } })` —
+  `navigate(`/workspace/${id}/views/shop`, { state: { appletParams: { product: 'scarf' } } })` —
   and the host reads history state and passes the `params` prop. Params must be
   JSON-plain (history state is structured-cloned; keep it serializable).
 - Persistence semantics: history-entry state survives reload, but is **not** in the URL — links
@@ -173,7 +174,7 @@ sendChatMessage(message: string, context?: Record<string, unknown>): void
   `# Applet message` section. Envelope symmetry: while a view is active, user messages carry its
   current `params` values, read from navigation state.
 - **Reveal before send.** The chat is a closed popover on a view tab in full-screen mode, so an
-  applet message opens it first (the same `openChat` path the widget grid and view builder use).
+  applet message opens it first (the same `openChat` path the widget grid and pending view use).
   A run the user cannot see is worse than a panel that opens itself.
 - **Rate limiting is the host's job.** Each call starts an agent run, and the bridge is per
   bundle, so a `sendChatMessage` in render — or one applet mounted twice — would bill the user
@@ -196,8 +197,8 @@ The word "intent" stays out of the API: the focus event is `tab:focus`, the enve
 
 ## Decisions
 
-1. **Chat targeting** — `sendChatMessage` always targets the **active chat**. No artifact-linked
-   routing.
+1. **Chat targeting** — `sendChatMessage` targets the **active chat**. Its selection is defined
+   in [View chats](view-chats.md).
 2. **Attribution** — an applet-sent message renders like a regular user message for now; a
    visible source chip with inspectable context is future UI work. (The trust/injection concern
    stands — the envelope still names the source applet, so the agent knows, even though the user

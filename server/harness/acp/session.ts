@@ -52,9 +52,8 @@ import {
 import { agentStore } from '../../agent'
 import { debug } from '../../debug'
 import { broadcast } from '../../state'
-import { renameSelectedSession } from '../../selected-session'
-import { hasSessionConfig, renameSessionConfig, saveSessionConfig } from '../../session-config'
-import { renameViewBuilderSession } from '../../view-builders'
+import { hasSessionConfig, saveSessionConfig } from '../../session-config'
+import { renameSessionReferences } from '../../session-lifecycle'
 
 export type AcpSpawnContext = {
   workspaceId: string
@@ -541,11 +540,12 @@ async function runPrompt(
       content: err instanceof Error ? err.message : 'send failed'
     })
     refreshAvailability(rec, config.id)
+    throw err
   } finally {
     void appendRunDuration(rec.workspacePath, rec.sessionId, Date.now() - startedAt)
     const next = rec.queue.shift()
     if (next) {
-      void runPrompt(config, rec, next.blocks)
+      void runPrompt(config, rec, next.blocks).catch(() => {})
     } else {
       setProcessing(rec, false)
     }
@@ -608,15 +608,12 @@ export async function sendAcpMessage(
       const model = input.model ?? created.models?.currentModelId
       if (realId !== input.sessionId) {
         aliases.set(recKey(input.workspaceId, input.sessionId), realId)
-        await renameSessionConfig(input.workspacePath, input.sessionId, realId)
-        await renameSelectedSession(input.workspacePath, input.sessionId, realId)
-        await renameViewBuilderSession(
+        await renameSessionReferences(
           input.workspaceId,
           input.workspacePath,
           input.sessionId,
           realId
         )
-        broadcast(input.workspaceId, { type: 'session_renamed', from: input.sessionId, to: realId })
       }
       rec = createRecord({
         workspaceId: input.workspaceId,
@@ -650,7 +647,7 @@ export async function sendAcpMessage(
       { workspaceId: input.workspaceId, workspacePath: input.workspacePath },
       config.id
     )
-    return
+    throw err
   }
 
   rec.stream = input.stream === true

@@ -54,7 +54,10 @@ reach the harness's 30-second RPC timeout before Bun closes the connection.
 ## Session lifecycle
 
 - A new chat starts under a temporary moi id. `thread/start` supplies the real
-  id; `session_renamed` rekeys the chat, saved settings, and builder references.
+  id; `session_renamed` rekeys the chat, saved settings, and pending-build references.
+- View handoffs pass the source chat's saved model to `thread/fork`. Codex 0.160.0
+  otherwise starts the fork with the configured default; switching an active-source
+  fork to `gpt-6.1-sol` on its first turn can fail with a `rustponsesapi` model error.
 - Concurrent resumes share one promise. Subscribe before `thread/resume`,
   buffer notifications while loading history, then apply them after the
   snapshot. Otherwise a live update can be overwritten by replay.

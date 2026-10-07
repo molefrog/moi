@@ -13,7 +13,7 @@ import {
   useWorkspaceLayoutCtx
 } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { WorkspaceScreen } from '@/client/features/workspace/WorkspaceScreen'
-import { useViewBuilders, useViews } from '@/client/features/views/api'
+import { useViews } from '@/client/features/views/api'
 import { useWidgets } from '@/client/features/overview/api'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 
@@ -44,7 +44,6 @@ function WorkspaceContent({ id }: WorkspaceRouteProps) {
   const { isLoading: layoutLoading } = useWorkspaceLayoutCtx()
   const widgets = useWidgets(id)
   const views = useViews(id)
-  const builders = useViewBuilders(id)
   useAppletCacheInvalidation()
 
   useWorkspaceEvent(event => {
@@ -62,11 +61,7 @@ function WorkspaceContent({ id }: WorkspaceRouteProps) {
   })
 
   const fresh =
-    layoutLoading ||
-    selectedSessionId === undefined ||
-    widgets.isLoading ||
-    views.isLoading ||
-    builders.isLoading
+    layoutLoading || selectedSessionId === undefined || widgets.isLoading || views.isLoading
 
   return (
     <SidebarLayout>
@@ -81,7 +76,6 @@ function WorkspaceContent({ id }: WorkspaceRouteProps) {
           key={collabEnabled ? 'browser-tab' : 'shared'}
           widgets={widgets.data}
           views={views.data ?? []}
-          builders={builders.data ?? []}
         />
       )}
     </SidebarLayout>

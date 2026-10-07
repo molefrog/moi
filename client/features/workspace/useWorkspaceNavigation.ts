@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo } from 'react'
 import type { MouseEvent } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useLocation, useRouter } from 'wouter'
 import { usePathname, useSearch } from 'wouter/use-browser-location'
 
 import { toast } from '@/client/components/ui/toast'
+import { workspaceKeys } from '@/client/api/workspace-keys'
 import { reportAppletError } from '@/client/features/applets/applet-log'
 import { useAppletEvent } from '@/client/features/applets/applet-runtime'
 import { useCollabEnabled } from '@/client/features/collab'
@@ -12,7 +14,7 @@ import { normalizeTabsState, resolveActiveTab, tabAvailable } from './tab-resolu
 import { useWorkspaceLayoutCtx } from './WorkspaceLayoutContext'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import { useNavigationClient } from '@/client/runtime/useWorkspaceEvents'
-import type { ViewBuilder, ViewInfo, WorkspaceTabId, WorkspaceTabsState } from '@/lib/types'
+import type { ViewInfo, WorkspaceTabId, WorkspaceTabsState } from '@/lib/types'
 import {
   addressPath,
   canonicalSearch,
@@ -29,9 +31,10 @@ type NavigationOptions = { replace?: boolean }
 // Memory-only, and scoped by workspace so switching workspaces cannot leak params.
 const rememberedAddresses = new Map<string, Map<WorkspaceTabId, string>>()
 
-type UseWorkspaceNavigationOptions = { views: ViewInfo[]; builders: ViewBuilder[]; split: boolean }
+type UseWorkspaceNavigationOptions = { views: ViewInfo[]; split: boolean }
 
-export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceNavigationOptions) {
+export function useWorkspaceNavigation({ views, split }: UseWorkspaceNavigationOptions) {
+  const queryClient = useQueryClient()
   const { layout, setLayout, workspaceId } = useWorkspaceLayoutCtx()
   const collabEnabled = useCollabEnabled()
   const [, navigate] = useLocation()
@@ -56,9 +59,9 @@ export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceN
   }, [workspaceId])
   const requestedTab = tabFromPath(path)
   const legacyTab = requestedTab ? null : legacyTabFromPath(path)
-  const activeTab = resolveActiveTab(requestedTab ?? legacyTab, tabsState, views, builders, split)
+  const activeTab = resolveActiveTab(requestedTab ?? legacyTab, tabsState, views, split)
   const isUnavailable =
-    Boolean(path) && !legacyTab && (!requestedTab || !tabAvailable(requestedTab, views, builders))
+    Boolean(path) && !legacyTab && (!requestedTab || !tabAvailable(requestedTab, views))
   const honored = requestedTab === activeTab && !isUnavailable
 
   const setTabs = useCallback(
@@ -87,7 +90,7 @@ export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceN
   )
 
   const navigateHref = useCallback(
-    (href: string) => {
+    (href: string, availableViews = views) => {
       const target = resolveUrl(href, {
         apiBase: `/api/workspaces/${encodeURIComponent(workspaceId)}`,
         workspacePath: workspacePath(workspaceId)
@@ -97,11 +100,11 @@ export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceN
         return
       }
       const address = parseMoiHref(href)
-      if (!tabAvailable(address.tab, views, builders))
+      if (!tabAvailable(address.tab, availableViews))
         throw new Error('This destination is unavailable in this workspace')
       go(target)
     },
-    [builders, go, views, workspaceId]
+    [go, views, workspaceId]
   )
 
   const reportError = useCallback(
@@ -120,7 +123,12 @@ export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceN
       reportError(error)
     }
   })
-  useNavigationClient(workspaceId, navigateHref)
+  useNavigationClient(workspaceId, async href => {
+    const queryKey = workspaceKeys.views(workspaceId)
+    if (href.startsWith('moi:/views/') && !tabAvailable(parseMoiHref(href).tab, views))
+      await queryClient.refetchQueries({ queryKey, exact: true }, { throwOnError: true })
+    navigateHref(href, queryClient.getQueryData<ViewInfo[]>(queryKey) ?? views)
+  })
 
   // Bare workspace URLs, old bookmarks, and hidden singleton chat routes are
   // the only redirects. Missing destinations keep their URL and show recovery.
@@ -181,14 +189,14 @@ export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceN
       if (!tab) return
       event.preventDefault()
       try {
-        if (!tabAvailable(tab, views, builders))
+        if (!tabAvailable(tab, views))
           throw new Error('This destination is unavailable in this workspace')
         go(addressPath(workspaceId, { tab, search: canonicalSearch(url.search) }))
       } catch (error) {
         reportError(error)
       }
     },
-    [base, builders, go, reportError, views, workspaceId]
+    [base, go, reportError, views, workspaceId]
   )
 
   return {

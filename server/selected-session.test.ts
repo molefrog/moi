@@ -7,7 +7,8 @@ import {
   DEFAULT_SELECTED_SESSION_PATH,
   clearSelectedSession,
   getSelectedSession,
-  initializeSelectedSession,
+  getPinnedSession,
+  pinSession,
   renameSelectedSession,
   saveSelectedSession,
   setSelectedSessionPath
@@ -26,11 +27,42 @@ afterEach(async () => {
 })
 
 describe('selected session persistence', () => {
-  test('distinguishes an unset workspace from an explicit new session', async () => {
+  test('tabId selection and workspace pin are independent', async () => {
+    await saveSelectedSession('/workspace', 'general')
+    await saveSelectedSession('/workspace', 'words', undefined, 'views/words')
+    await saveSelectedSession('/workspace', 'sketch', undefined, 'scratchpad')
+    expect(await getSelectedSession('/workspace', 'views/genders')).toBeUndefined()
+    await pinSession('/workspace', 'words')
+    expect(await getPinnedSession('/workspace')).toBe('words')
+    expect(await getSelectedSession('/workspace', 'scratchpad')).toBe('sketch')
+    await pinSession('/workspace', null)
+    expect(await getSelectedSession('/workspace', 'views/words')).toBe('words')
+    expect(await getSelectedSession('/workspace')).toBe('general')
+  })
+
+  test('archiving clears both tab selection and the workspace pin', async () => {
+    await saveSelectedSession('/workspace', 'build', undefined, 'views/words')
+    await pinSession('/workspace', 'build')
+    expect(await getSelectedSession('/workspace', 'views/words')).toBe('build')
+    await clearSelectedSession('/workspace', 'build')
+    expect(await getSelectedSession('/workspace', 'views/words')).toBeUndefined()
+    expect(await getPinnedSession('/workspace')).toBeNull()
+  })
+
+  test('legacy workspace selection loads as overview without pinning', async () => {
+    await Bun.write(
+      join(scratchDir, 'selected-sessions.json'),
+      JSON.stringify({ '/workspace': 'legacy' })
+    )
+    expect(await getSelectedSession('/workspace')).toBe('legacy')
+    expect(await getSelectedSession('/workspace', 'scratchpad')).toBeUndefined()
+    expect(await getPinnedSession('/workspace')).toBeNull()
+  })
+  test('New chat removes the remembered selection', async () => {
     expect(await getSelectedSession('/workspace')).toBeUndefined()
-    expect(await initializeSelectedSession('/workspace', null)).toBeNull()
-    expect(await initializeSelectedSession('/workspace', 'recent')).toBeNull()
-    expect(await getSelectedSession('/workspace')).toBeNull()
+    await saveSelectedSession('/workspace', 'session-1')
+    await saveSelectedSession('/workspace', null)
+    expect(await getSelectedSession('/workspace')).toBeUndefined()
   })
 
   test('serializes writes for different workspaces without dropping either value', async () => {
@@ -55,7 +87,7 @@ describe('selected session persistence', () => {
   })
 
   test('renames a selected temporary session and rejects a late stale save', async () => {
-    await initializeSelectedSession('/workspace', null)
+    await saveSelectedSession('/workspace', null)
     await saveSelectedSession('/workspace', 'temporary', null)
     expect(await renameSelectedSession('/workspace', 'temporary', 'real')).toEqual({
       changed: true,
@@ -70,7 +102,7 @@ describe('selected session persistence', () => {
   })
 
   test('resolves a temporary selection saved after its session was renamed', async () => {
-    await initializeSelectedSession('/workspace', null)
+    await saveSelectedSession('/workspace', null)
 
     expect(await renameSelectedSession('/workspace', 'temporary', 'real')).toEqual({
       changed: false,

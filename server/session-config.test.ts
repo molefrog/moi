@@ -3,13 +3,12 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import { getSessionConfig, saveSessionConfig } from './session-config'
 import {
-  DEFAULT_SESSION_CONFIG_PATH,
-  getSessionConfig,
-  renameSessionConfig,
-  saveSessionConfig,
-  setSessionConfigPath
-} from './session-config'
+  DEFAULT_SESSION_STORE_PATH,
+  setSessionStorePath,
+  renameSessionRecord
+} from './session-store'
 
 let scratchDir = ''
 const workspacePath = '/workspace'
@@ -17,12 +16,12 @@ let storePath = ''
 
 beforeEach(async () => {
   scratchDir = await mkdtemp(join(tmpdir(), 'moi-session-config-'))
-  storePath = join(scratchDir, 'session-config.json')
-  setSessionConfigPath(storePath)
+  storePath = join(scratchDir, 'sessions.json')
+  setSessionStorePath(storePath)
 })
 
 afterEach(async () => {
-  setSessionConfigPath(DEFAULT_SESSION_CONFIG_PATH)
+  setSessionStorePath(DEFAULT_SESSION_STORE_PATH)
   await rm(scratchDir, { recursive: true, force: true })
 })
 
@@ -43,7 +42,7 @@ describe('session Fast mode config', () => {
 
   test('keeps false when a temporary session config is renamed', async () => {
     await saveSessionConfig(workspacePath, 'temporary', { fastMode: false })
-    await renameSessionConfig(workspacePath, 'temporary', 'real')
+    await renameSessionRecord(workspacePath, 'temporary', 'real')
 
     expect(await getSessionConfig(workspacePath, 'temporary')).toEqual({})
     expect(await getSessionConfig(workspacePath, 'real')).toEqual({ fastMode: false })

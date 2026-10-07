@@ -115,20 +115,21 @@ describe('bridge validation', () => {
 })
 
 describe('sendChatMessage validation', () => {
-  test('trims the message and stamps the applet source the host attached', () => {
+  test('trims the message and stamps the applet identity and attachment source', () => {
     const ws = `ws-${crypto.randomUUID()}`
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(WIDGET)
 
     bridge.sendChatMessage({
       message: '  Chase order A-1042  ',
+      applet: { kind: 'view', id: 'forged' },
       attachments: [{ type: 'text', label: 'Order', text: 'A-1042', source: 'forged' }]
     })
 
     expect(calls).toEqual([
       {
         message: 'Chase order A-1042',
-        source: 'widget:clock',
+        applet: { kind: 'widget', id: 'clock' },
         attachments: [{ type: 'text', label: 'Order', text: 'A-1042', source: 'widget:clock' }]
       }
     ])
@@ -149,18 +150,18 @@ describe('sendChatMessage validation', () => {
     expect(calls).toEqual([
       {
         message: 'Legacy',
-        source: 'widget:clock',
+        applet: { kind: 'widget', id: 'clock' },
         attachments: [
           { type: 'text', label: 'Context', text: '{"order":"1042"}', source: 'widget:clock' }
         ]
       },
-      { message: 'Message only', source: 'widget:clock', attachments: [] },
+      { message: 'Message only', applet: { kind: 'widget', id: 'clock' }, attachments: [] },
       {
         message: 'Array context',
-        source: 'widget:clock',
+        applet: { kind: 'widget', id: 'clock' },
         attachments: [{ type: 'text', label: 'Context', text: '[]', source: 'widget:clock' }]
       },
-      { message: 'Object', source: 'widget:clock', attachments: [] }
+      { message: 'Object', applet: { kind: 'widget', id: 'clock' }, attachments: [] }
     ])
   })
 
@@ -310,10 +311,10 @@ describe('sendChatMessage rate limiting', () => {
     view.bridge.sendChatMessage({ message: 'Sync now' })
     widget.bridge.sendChatMessage({ message: 'Something else' })
 
-    expect(calls.map(c => [c.source, c.message])).toEqual([
-      ['widget:clock', 'Sync now'],
-      ['view:board', 'Sync now'],
-      ['widget:clock', 'Something else']
+    expect(calls.map(c => [c.applet, c.message])).toEqual([
+      [{ kind: 'widget', id: 'clock' }, 'Sync now'],
+      [{ kind: 'view', id: 'board' }, 'Sync now'],
+      [{ kind: 'widget', id: 'clock' }, 'Something else']
     ])
   })
 

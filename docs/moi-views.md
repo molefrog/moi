@@ -1,7 +1,7 @@
 # Custom Views
 
 **Key idea:** a workspace can define full-screen, full-stack "apps" — _views_ — that
-live in the workspace nav alongside Agent / Overview / Scratchpad. Think dashboard
+live in the workspace nav alongside Overview / Scratchpad. Think dashboard
 pages: a users table, a kanban board, a CRM. At most one view is visible at a time;
 the user switches via the nav tabs.
 
@@ -28,8 +28,9 @@ export default function CRMView() {
 }
 ```
 
-- **Authored by the agent only**, via the CLI (`moi bundle`). There is no UI affordance
-  to create a view; the "Create New" tab entry is a no-op for now.
+- Create a view from the New view tab or an existing chat; see
+  [pending view builds](../workspace/.claude/skills/moi-workspace/SKILL.md#pending-view-builds).
+  Host-side chat selection and handoff state are covered in [View chats](view-chats.md).
 - Unlike widgets, a view is a **real app**: it provides its own chrome, layout, and
   internal scrolling. No fixed grid cell, no `rowSpan`/`colSpan`.
 - **One view = one screen.** No internal client-side routing; navigation between
@@ -75,13 +76,13 @@ Output:
 
 Mirrors widgets:
 
-- `GET /api/workspaces/:id/views` → `{ views: ViewInfo[] }` (`ViewInfo = { id, config }`,
-  in manifest `order`).
+- `GET /api/workspaces/:id/views` → `{ views: ViewInfo[] }`. Compiled entries carry
+  `status: "compiled"`; unfinished entries carry their startup status and requirements directly.
 - `GET /api/workspaces/:id/views/:name.js` → serves the built bundle.
 - Client refetches the list on the relevant MEI rebuild event.
 
-The view list is **never persisted in layout** — it's derived from the filesystem /
-manifest. Only the _active_ view is client state.
+The view list is **never persisted in layout**. Compiled views come from the filesystem and
+manifest, pending views from host state, and open tab order from the workspace layout.
 
 ## Client rendering
 

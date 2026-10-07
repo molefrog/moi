@@ -9,6 +9,23 @@ import type { StreamEvent, Turn } from '@/lib/format'
 
 import { ClaudeAdapter } from './adapter'
 
+test('persisted notices keep their identity and timestamp across replays', () => {
+  const message = {
+    type: 'system',
+    subtype: 'compact_boundary',
+    uuid: 'compact-1',
+    timestamp: '2026-09-17T12:00:00Z',
+    compact_metadata: { trigger: 'auto' }
+  }
+  const first = new ClaudeAdapter().ingest(message)
+  const second = new ClaudeAdapter().ingest(message)
+  expect(second).toEqual(first)
+  expect(first[0]).toMatchObject({
+    kind: 'notice',
+    notice: { id: message.uuid, at: message.timestamp }
+  })
+})
+
 let seq = 0
 function userMsg(content: unknown, extra: Record<string, unknown> = {}) {
   return {

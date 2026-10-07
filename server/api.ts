@@ -13,25 +13,20 @@ import type {
   AppletThumbnailBatch,
   AppSettings,
   HarnessAvailability,
-  SessionInfo,
   SelectedSessionScope,
   UploadInfo,
-  ViewBuilderInput,
   WorkspaceAgent,
   WorkspaceEntry,
   WorkspaceType
 } from '@/lib/types'
-import type { MoiContext } from '@/lib/moi-context'
-import { viewBuilderDirectives } from '@/lib/view-builder-directives'
+import { isWorkspaceTabId } from '@/lib/workspace-tabs'
 
 import { proxyUserState } from './collab/cloudflare-access'
-import { getCollabReferencePath } from './collab/config'
 import { collabManager } from './collab/manager'
 import { agentStore } from './agent'
 import { clientAppConfig, getAppConfig } from './app-config'
 import { getAppSettings, pickAppSettingsPatch, saveAppSettings } from './app-settings'
 import { appletForModule, recordAppletError } from './applet-log'
-import { selectChatSession } from './chat-selection'
 import { apiBaseFor, parseAppletTail, serveWorkspaceFile } from './applets'
 import { applyEnvChanged } from './env-apply'
 import { publishEvent } from './events'
@@ -46,7 +41,6 @@ import {
 } from './thumbnails'
 import { getClientFrameLog, getWireLog } from './harness/debug'
 import { allHarnesses, harnessFor, isHarnessType } from './harness/registry'
-import { broadcast } from './state'
 import {
   discoverWorkspaces,
   getWorkspace,
@@ -59,14 +53,17 @@ import {
 import { loadScratchpadDoc, saveScratchpadDoc } from './scratchpad'
 import { MAX_ASSET_BYTES, scratchpadAssetFile, storeScratchpadAsset } from './scratchpad-assets'
 import {
-  clearSelectedSession,
+  getPinnedSession,
   getSelectedSession,
-  initializeSelectedSession,
+  getWorkspaceSessionSelection,
+  pinSession,
   saveSelectedSession
 } from './selected-session'
 import type { SelectedSessionUpdate } from './selected-session'
-import { getSessionConfig, saveSessionConfig } from './session-config'
+import { saveSessionConfig } from './session-config'
 import type { SessionConfigPatch } from './session-config'
+import { getSessionRecord, withSessionRecords } from './session-store'
+import { archiveWorkspaceSession } from './session-archive'
 import { DIST_DIR, prebuilt } from './static'
 import { getWorkspaceSkillsStatus, updateWorkspaceSkills } from './skill-update'
 import { serveWorkspaceImagePreview } from './preview'
@@ -74,21 +71,20 @@ import { MAX_UPLOAD_BYTES, addUpload, addWorkspaceFileUpload, getUpload } from '
 import { requiredEnvFor } from './required-env'
 import {
   deleteView,
-  getViewList,
+  listCompiledViews,
   listViews,
   serveView,
   updateViewTitle,
   ViewMutationError
 } from './views'
 import {
-  ViewBuilderError,
-  beginViewBuilder,
-  createViewBuilder,
-  deleteViewBuilder,
-  markViewBuilderWaiting,
-  reconcileViewBuilders,
-  updateViewBuilderInput
-} from './view-builders'
+  createPendingView,
+  discardPendingView,
+  getPendingView,
+  updatePendingView,
+  PendingViewError
+} from './pending-views'
+import { submitView, ViewStartupError } from './view-sessions'
 import { listWidgets, serveWidget } from './widgets'
 import { getWorkspaceConfig, setWorkspaceConfig } from './workspace-config'
 import {
@@ -178,7 +174,7 @@ one.use('*', withWorkspace)
 
 one.get('/preview', async c => {
   const ws = c.get('ws')
-  const views = await getViewList(ws.path)
+  const views = await listCompiledViews(ws.path)
   return c.json(
     await getWorkspacePreview(ws.path, {
       getProviderPreview: includeFirstUserMessage =>
@@ -210,13 +206,34 @@ one.get('/views', c => listViews(c.get('ws').path))
 one.patch('/views/:viewId', async c => {
   const ws = c.get('ws')
   const body = await c.req.json().catch(() => null)
+  if (await getPendingView(ws.path, c.req.param('viewId'))) {
+    try {
+      if (
+        typeof body?.requirements !== 'string' &&
+        typeof body?.title !== 'string' &&
+        typeof body?.icon !== 'string'
+      )
+        return c.text('Expected requirements, title, or icon', 400)
+      return c.json(
+        await updatePendingView(ws.id, ws.path, c.req.param('viewId'), {
+          requirements: typeof body.requirements === 'string' ? body.requirements : undefined,
+          title: typeof body.title === 'string' ? body.title.trim() : undefined,
+          icon: typeof body.icon === 'string' ? body.icon : undefined
+        })
+      )
+    } catch (error) {
+      if (error instanceof PendingViewError) return c.text(error.message, error.status)
+      throw error
+    }
+  }
   const title = typeof body?.title === 'string' ? body.title.trim() : ''
   if (!title) return c.text('Expected { title: string }', 400)
 
   try {
     return c.json(await updateViewTitle(publishEvent, ws.id, ws.path, c.req.param('viewId'), title))
   } catch (error) {
-    if (error instanceof ViewMutationError) return c.text(error.message, error.status)
+    if (error instanceof ViewMutationError || error instanceof PendingViewError)
+      return c.text(error.message, error.status)
     throw error
   }
 })
@@ -224,10 +241,20 @@ one.patch('/views/:viewId', async c => {
 one.delete('/views/:viewId', async c => {
   const ws = c.get('ws')
   try {
-    await deleteView(publishEvent, ws.id, ws.path, c.req.param('viewId'))
+    const viewId = c.req.param('viewId')
+    if (await getPendingView(ws.path, viewId)) {
+      const active = new Set(
+        harnessFor(ws)
+          .activeSessions()
+          .filter(session => session.workspaceId === ws.id)
+          .map(session => session.sessionId)
+      )
+      await discardPendingView(ws, viewId, active)
+    } else await deleteView(publishEvent, ws, viewId)
     return c.body(null, 204)
   } catch (error) {
-    if (error instanceof ViewMutationError) return c.text(error.message, error.status)
+    if (error instanceof ViewMutationError || error instanceof PendingViewError)
+      return c.text(error.message, error.status)
     throw error
   }
 })
@@ -239,80 +266,26 @@ one.get('/views/*', c => {
   return serveView(name, file, ws.path, apiBaseFor(ws.id), c.req.header('if-none-match'))
 })
 
-function viewBuilderError(err: unknown): { message: string; status: 400 | 404 | 409 } | null {
-  return err instanceof ViewBuilderError ? { message: err.message, status: err.status } : null
-}
-
-function parseAvailableViewIcons(value: unknown): string[] | null {
-  if (!Array.isArray(value)) return null
-  const icons = value.filter(
-    (icon): icon is string =>
-      typeof icon === 'string' && /^[a-z0-9][a-z0-9-]*$/.test(icon) && icon.length <= 64
-  )
-  return icons.length > 0 ? [...new Set(icons)] : null
-}
-
-one.get('/view-builders', async c => {
+one.post('/views', async c => {
   const ws = c.get('ws')
-  const activeSessionIds = new Set(
-    allHarnesses()
-      .flatMap(h => h.activeSessions())
-      .filter(session => session.workspaceId === ws.id)
-      .map(session => session.sessionId)
-  )
-  const builders = await reconcileViewBuilders(
-    ws.id,
-    ws.path,
-    await getViewList(ws.path),
-    activeSessionIds
-  )
-  // Widget builders are record-only for now — reconciled server-side but kept
-  // out of the host's view-builder tab list until their UI lands.
-  return c.json({ builders: builders.filter(builder => builder.kind !== 'widget') })
+  return c.json(await createPendingView(ws.id, ws.path), 201)
 })
 
-one.post('/view-builders', async c => {
-  const ws = c.get('ws')
-  return c.json(await createViewBuilder(ws.id, ws.path), 201)
-})
-
-one.patch('/view-builders/:builderId', async c => {
-  const ws = c.get('ws')
-  const body = await c.req.json<{ input?: Partial<ViewBuilderInput> }>()
-  if (typeof body?.input?.requirements !== 'string') {
-    return c.text('Expected { input: { requirements: string } }', 400)
-  }
-  try {
-    return c.json(
-      await updateViewBuilderInput(
-        ws.id,
-        ws.path,
-        c.req.param('builderId'),
-        body.input.requirements
-      )
-    )
-  } catch (err) {
-    const known = viewBuilderError(err)
-    if (known) return c.text(known.message, known.status)
-    throw err
-  }
-})
-
-one.post('/view-builders/:builderId/submit', async c => {
+one.post('/views/:viewId/submit', async c => {
   const ws = c.get('ws')
   const body = await c.req.json<{
-    input?: Partial<ViewBuilderInput>
+    requirements?: string
+    sessionId?: string
     optimisticId?: string
     selectedSessionScope?: SelectedSessionScope
     model?: string
     effort?: string
     fastMode?: boolean
     stream?: boolean
-    availableIcons?: unknown
     attachments?: unknown
   }>()
-  if (typeof body?.input?.requirements !== 'string') {
-    return c.text('Expected { input: { requirements: string } }', 400)
+  if (typeof body?.requirements !== 'string') {
+    return c.text('Expected { requirements: string }', 400)
   }
   if (body.optimisticId !== undefined && typeof body.optimisticId !== 'string') {
     return c.text('Invalid optimisticId', 400)
@@ -324,8 +297,6 @@ one.post('/view-builders/:builderId/submit', async c => {
   ) {
     return c.text('Invalid selectedSessionScope', 400)
   }
-  const availableIcons = parseAvailableViewIcons(body.availableIcons)
-  if (!availableIcons) return c.text('Available view icons are required', 400)
   const attachments = body.attachments ?? []
   if (!isMessageAttachments(attachments)) return c.text('Invalid attachments', 400)
   for (const attachment of attachments) {
@@ -337,65 +308,22 @@ one.post('/view-builders/:builderId/submit', async c => {
   const availability = await workspaceTypeAvailability(ws.type ?? 'claude-code')
   if (availability.status !== 'available') return c.text(availability.reason, 400)
   try {
-    const builder = await beginViewBuilder(
-      ws.id,
-      ws.path,
-      c.req.param('builderId'),
-      body.input.requirements,
-      attachments.length > 0
-    )
-    // The bootstrap instructions ride the moi-context envelope, injected by
-    // the harness like any other ambient context; the user text stays bare.
-    // The user submits from the builder's own tab, so that's the active tab.
-    const collabReference = await getCollabReferencePath(ws.path, ws.type)
-    const context: MoiContext = {
-      ...(collabReference ? { collabReference } : {}),
-      activeTab: `view-builders/${builder.id}`,
-      directives: [
-        ...viewBuilderDirectives(builder.id, availableIcons),
-        ...(attachments.length > 0
-          ? ['Use the attachments as reference material for the intended view.']
-          : [])
-      ]
-    }
-    try {
-      await selectChatSession(ws, builder.sessionId, body.selectedSessionScope)
-      await harnessFor(ws).sendMessage({
-        workspaceId: ws.id,
-        workspacePath: ws.path,
-        sessionId: builder.sessionId,
-        isNew: true,
-        content: builder.input.requirements,
-        attachments,
-        context,
-        optimisticId: body.optimisticId,
-        model: typeof body.model === 'string' ? body.model : undefined,
-        effort: typeof body.effort === 'string' ? body.effort : undefined,
-        fastMode: typeof body.fastMode === 'boolean' ? body.fastMode : undefined,
-        stream: body.stream === true ? true : undefined,
-        agentId: ws.agentId
-      })
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Could not start view builder'
-      await markViewBuilderWaiting(ws.id, ws.path, builder.id, message)
-      return c.text(message, 500)
-    }
-    return c.json(builder)
+    const result = await submitView(ws, c.req.param('viewId'), {
+      requirements: body.requirements,
+      sessionId: typeof body.sessionId === 'string' ? body.sessionId : undefined,
+      selectedSessionScope: body.selectedSessionScope,
+      attachments,
+      optimisticId: body.optimisticId,
+      model: typeof body.model === 'string' ? body.model : undefined,
+      effort: typeof body.effort === 'string' ? body.effort : undefined,
+      fastMode: typeof body.fastMode === 'boolean' ? body.fastMode : undefined,
+      stream: body.stream === true ? true : undefined
+    })
+    return c.json(result)
   } catch (err) {
-    const known = viewBuilderError(err)
-    if (known) return c.text(known.message, known.status)
-    throw err
-  }
-})
-
-one.delete('/view-builders/:builderId', async c => {
-  const ws = c.get('ws')
-  try {
-    await deleteViewBuilder(ws.id, ws.path, c.req.param('builderId'))
-    return c.body(null, 204)
-  } catch (err) {
-    const known = viewBuilderError(err)
-    if (known) return c.text(known.message, known.status)
+    if (err instanceof PendingViewError) return c.text(err.message, err.status)
+    if (err instanceof ViewStartupError)
+      return c.json({ error: err.message, viewId: err.viewId, sessionId: err.sessionId }, 500)
     throw err
   }
 })
@@ -558,27 +486,35 @@ one.get('/uploads/:uploadId', c => {
 
 one.get('/sessions', async c => {
   const ws = c.get('ws')
-  return c.json(await harnessFor(ws).listSessions(ws))
+  return c.json(await withSessionRecords(ws.path, await harnessFor(ws).listSessions(ws)))
 })
 
 one.get('/selected-session', async c => {
+  return c.json(await getWorkspaceSessionSelection(c.get('ws').path))
+})
+
+one.put('/pinned-session', async c => {
   const ws = c.get('ws')
-  let sessionId = await getSelectedSession(ws.path)
-  if (sessionId === undefined) {
-    const sessions = await harnessFor(ws).listSessions(ws)
-    const latest = sessions.reduce<SessionInfo | undefined>(
-      (current, session) =>
-        !current ||
-        session.lastModified > current.lastModified ||
-        (session.lastModified === current.lastModified &&
-          session.sessionId.localeCompare(current.sessionId) < 0)
-          ? session
-          : current,
-      undefined
+  const body = await c.req.json<{ sessionId: string | null }>()
+  if (body.sessionId !== null && typeof body.sessionId !== 'string')
+    return c.text('Invalid chat', 400)
+  if (body.sessionId) {
+    const harness = harnessFor(ws)
+    const found = (await harness.listSessions(ws)).some(
+      session => session.sessionId === body.sessionId
     )
-    sessionId = await initializeSelectedSession(ws.path, latest?.sessionId ?? null)
+    const active = harness
+      .activeSessions()
+      .some(session => session.workspaceId === ws.id && session.sessionId === body.sessionId)
+    if (!found && !active) return c.text('Chat not found', 404)
   }
-  return c.json({ sessionId })
+  await pinSession(ws.path, body.sessionId)
+  publishEvent({
+    type: 'selected-session:updated',
+    workspaceId: ws.id,
+    sessionId: (await getSelectedSession(ws.path)) ?? null
+  })
+  return c.json({ pinnedSessionId: body.sessionId })
 })
 
 one.put('/selected-session', async c => {
@@ -586,7 +522,10 @@ one.put('/selected-session', async c => {
   const body: unknown = await c.req.json().catch(() => null)
   if (!body || typeof body !== 'object') return c.text('Bad request', 400)
 
-  const input = body as { sessionId?: unknown; previousSessionId?: unknown }
+  const input = body as { sessionId?: unknown; previousSessionId?: unknown; tabId?: unknown }
+  const tabId = input.tabId ?? 'overview'
+  if (!isWorkspaceTabId(tabId)) return c.text('Invalid chat tab', 400)
+  if (await getPinnedSession(ws.path)) return c.text('Unpin chat before switching', 409)
   const validSessionId = input.sessionId === null || typeof input.sessionId === 'string'
   const hasPreviousSessionId = Object.prototype.hasOwnProperty.call(input, 'previousSessionId')
   const validPreviousSessionId =
@@ -598,7 +537,8 @@ one.put('/selected-session', async c => {
   const update = await saveSelectedSession(
     ws.path,
     input.sessionId as string | null,
-    hasPreviousSessionId ? (input.previousSessionId as string | null) : undefined
+    hasPreviousSessionId ? (input.previousSessionId as string | null) : undefined,
+    tabId
   )
   publishSelectedSession(ws.id, update)
   return c.json({ sessionId: update.sessionId })
@@ -611,10 +551,7 @@ one.post('/sessions/:sessionId/archive', async c => {
   if (!harness.archiveSession) return c.text('Chat archiving is not supported', 501)
 
   try {
-    await harness.interrupt(ws.id, sessionId)
-    await harness.archiveSession(ws, sessionId)
-    publishSelectedSession(ws.id, await clearSelectedSession(ws.path, sessionId))
-    broadcast(ws.id, { type: 'sessions_changed', sessionId })
+    await archiveWorkspaceSession(ws, sessionId)
     return c.body(null, 204)
   } catch (error) {
     console.error(`[api] archive chat failed for ${harness.id}`, error)
@@ -628,17 +565,15 @@ one.post('/sessions/:sessionId/archive', async c => {
 
 one.get('/sessions/:sessionId/events', async c => {
   const ws = c.get('ws')
-  return c.json(await harnessFor(ws).sessionEvents(ws, c.req.param('sessionId')))
+  const sessionId = c.req.param('sessionId')
+  return c.json(await harnessFor(ws).sessionEvents(ws, sessionId))
 })
 
-// Per-session agent settings (model, reasoning effort, and Fast mode). GET
-// returns the stored config ({} for sessions that never overrode the workspace
-// defaults); PUT patches it (a field as `null` clears it, omitted leaves it).
-// The change takes effect on the session's next message.
-one.get('/sessions/:sessionId/config', async c => {
-  return c.json(await getSessionConfig(c.get('ws').path, c.req.param('sessionId')))
+one.get('/sessions/:sessionId', async c => {
+  return c.json(await getSessionRecord(c.get('ws').path, c.req.param('sessionId')))
 })
 
+// Patch run settings and return the complete session record. null clears a setting.
 one.put('/sessions/:sessionId/config', async c => {
   const body = await c.req.json().catch(() => null)
   if (typeof body !== 'object' || body === null) {
@@ -661,7 +596,10 @@ one.put('/sessions/:sessionId/config', async c => {
     }
     patch.fastMode = value
   }
-  return c.json(await saveSessionConfig(c.get('ws').path, c.req.param('sessionId'), patch))
+  const workspacePath = c.get('ws').path
+  const sessionId = c.req.param('sessionId')
+  await saveSessionConfig(workspacePath, sessionId, patch)
+  return c.json(await getSessionRecord(workspacePath, sessionId))
 })
 
 one.get('/mcp', async c => {

@@ -7,7 +7,7 @@ import type { AppletChatMessage } from '@/client/features/applets/applet-runtime
 import { type ChatSendOptions, ownsComposerAttachments, attachmentsForSend } from './chat-send'
 import { liveStore } from './chat-store'
 import { stageTextAttachment } from './composer/attachments/draft-attachments'
-import type { SelectedSessionState, UploadInfo } from '@/lib/types'
+import type { WorkspaceSessionSelection, UploadInfo } from '@/lib/types'
 import { drainChatDirectives, pushChatDirective } from '@/client/features/workspace/moi-context'
 
 import { canSubmitComposerAction } from '@/client/components/shared/Composer'
@@ -80,7 +80,8 @@ describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope
 
   function select(sessionId: string | null) {
     queryClient.setQueryData(selectedSessionKey(workspaceId, scope), {
-      sessionId
+      selected: sessionId ? { overview: sessionId } : {},
+      pinned: null
     })
   }
   function deferredUpload() {
@@ -97,12 +98,17 @@ describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope
   }
   const event: AppletChatMessage = {
     message: 'Review',
-    source: 'view:orders',
+    applet: { kind: 'view', id: 'orders' },
     attachments: [{ type: 'file', path: 'report.pdf', source: 'view:orders' }]
   }
 
   beforeEach(() => {
     queryClient = new QueryClient()
+    if (scope === 'browser-tab')
+      queryClient.setQueryData(selectedSessionKey(workspaceId), {
+        selected: {},
+        pinned: null
+      })
     select('session-1')
     availability = { status: 'available' }
     send = mock(() => {})
@@ -114,9 +120,11 @@ describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope
       workspaceId,
       queryClient,
       () => ({
+        tabId: 'overview',
         sessionId:
-          queryClient.getQueryData<SelectedSessionState>(selectedSessionKey(workspaceId, scope))
-            ?.sessionId ?? null,
+          queryClient.getQueryData<WorkspaceSessionSelection>(
+            selectedSessionKey(workspaceId, scope)
+          )?.selected.overview ?? null,
         send,
         revealChat: reveal,
         agentAvailability: availability
@@ -138,7 +146,7 @@ describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope
     await handler.handle({ ...event, attachments: [] })
     expect(reveal).toHaveBeenCalledTimes(1)
     expect(send).toHaveBeenCalledWith('Review', {
-      applet: { source: 'view:orders' },
+      applet: { kind: 'view', id: 'orders' },
       preparedAttachments: { attachments: [], parts: [] }
     })
     expect(notices).not.toHaveBeenCalled()
@@ -150,7 +158,8 @@ describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope
     queryClient.setQueryData(
       selectedSessionKey(workspaceId, scope === 'shared' ? 'browser-tab' : 'shared'),
       {
-        sessionId: 'another-chat'
+        selected: { overview: 'another-chat' },
+        pinned: null
       }
     )
     deferred.resolve(Response.json(upload))
@@ -184,7 +193,7 @@ describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope
         {
           type: 'file',
           file: new File(['image'], 'image.png', { type: 'image/png' }),
-          source: event.source
+          source: 'view:orders'
         },
         ...event.attachments,
         text
@@ -246,7 +255,7 @@ describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope
       ...event,
       attachments: [
         ...event.attachments,
-        { type: 'file', path: 'missing.pdf', source: event.source }
+        { type: 'file', path: 'missing.pdf', source: 'view:orders' }
       ]
     })
     expect(send).not.toHaveBeenCalled()
@@ -317,6 +326,7 @@ describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope
       workspaceId,
       queryClient,
       () => ({
+        tabId: 'overview',
         sessionId: 'old-session',
         send,
         revealChat: reveal,

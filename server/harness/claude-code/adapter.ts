@@ -267,7 +267,7 @@ export class ClaudeAdapter {
       events.push({
         kind: 'notice',
         notice: {
-          id: noticeId('rate-limit'),
+          id: msg.uuid ?? noticeId('rate-limit'),
           kind: 'rate-limit',
           at: new Date().toISOString(),
           info: msg.rate_limit_info
@@ -774,20 +774,25 @@ export class ClaudeAdapter {
   // -----------------------------------------------------------------------
 
   private buildSystemNotice(msg: SdkMessage): SystemNotice | undefined {
-    const at = new Date().toISOString()
+    const at = msg.timestamp ?? new Date().toISOString()
     switch (msg.subtype) {
       case 'session_state_changed':
         return {
-          id: noticeId('session-state'),
+          id: msg.uuid ?? noticeId('session-state'),
           kind: 'session-state',
           at,
           state: (msg.state as 'idle' | 'running' | 'requires-action') ?? 'idle'
         }
       case 'compact_boundary':
-        return { id: noticeId('compact'), kind: 'compact', at, metadata: msg.compact_metadata }
+        return {
+          id: msg.uuid ?? noticeId('compact'),
+          kind: 'compact',
+          at,
+          metadata: msg.compact_metadata
+        }
       case 'api_retry':
         return {
-          id: noticeId('api-retry'),
+          id: msg.uuid ?? noticeId('api-retry'),
           kind: 'api-retry',
           at,
           attempt: msg.attempt ?? 0,
@@ -799,7 +804,7 @@ export class ClaudeAdapter {
       case 'hook_progress':
       case 'hook_response':
         return {
-          id: noticeId('hook'),
+          id: msg.uuid ?? noticeId('hook'),
           kind: 'hook',
           at,
           hookId: msg.hook_id ?? '',
@@ -817,7 +822,7 @@ export class ClaudeAdapter {
         }
       case 'files_persisted':
         return {
-          id: noticeId('files-persisted'),
+          id: msg.uuid ?? noticeId('files-persisted'),
           kind: 'files-persisted',
           at,
           files: (msg.files ?? []).map(f => f.filename),
@@ -825,7 +830,7 @@ export class ClaudeAdapter {
         }
       case 'elicitation_complete':
         return {
-          id: noticeId('elicitation'),
+          id: msg.uuid ?? noticeId('elicitation'),
           kind: 'elicitation',
           at,
           server: msg.mcp_server_name ?? '',

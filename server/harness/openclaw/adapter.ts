@@ -10,7 +10,7 @@
 // per-frame path the live session uses.
 import { replayAttachmentParts, stripAttachmentsLoose } from '@/lib/moi-attachments'
 import type { Part, StreamEvent, ToolCall, ToolState, Turn, TurnMeta } from '@/lib/format'
-import type { SessionInfo } from '@/lib/types'
+import type { SessionSummary } from '@/lib/types'
 
 import type {
   OpenClawContentBlock,
@@ -34,7 +34,7 @@ function cleanTitle(text: string | undefined): string {
   ).trim()
 }
 
-export function toSessionInfo(row: OpenClawSessionRow, cwd: string): SessionInfo {
+export function toSessionInfo(row: OpenClawSessionRow, cwd: string): SessionSummary {
   const summary =
     cleanTitle(row.label) ||
     cleanTitle(row.displayName) ||
@@ -51,7 +51,7 @@ export function toSessionInfo(row: OpenClawSessionRow, cwd: string): SessionInfo
     provider && provider !== 'webchat' ? { provider, ...(label ? { label } : {}) } : undefined
   // Flavor from the gateway key layout: cron buckets are `…:cron:<jobId>`,
   // spawned subagents carry `spawnedBy` (and live under `…:subagent:<uuid>`).
-  const flavor: SessionInfo['flavor'] = row.key.includes(':cron:')
+  const flavor: SessionSummary['flavor'] = row.key.includes(':cron:')
     ? 'cron'
     : row.spawnedBy || row.key.includes(':subagent:')
       ? 'subagent'

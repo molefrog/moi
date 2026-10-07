@@ -40,7 +40,7 @@ async function mixedAttachments(workspaceId: string): Promise<MessageAttachment[
     { type: 'upload', uploadId: images[0].id, source: 'view:orders', purpose: 'annotation' },
     { type: 'text', source: 'widget:orders', label: 'Order', text: 'Order #1042' },
     { type: 'upload', uploadId: file.id, source: 'widget:orders' },
-    { type: 'upload', uploadId: images[1].id, source: 'view-builder:orders', purpose: 'sketch' }
+    { type: 'upload', uploadId: images[1].id, source: 'views/orders', purpose: 'sketch' }
   ]
 }
 

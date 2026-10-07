@@ -1,6 +1,9 @@
 // Codex as a Harness. Thin wiring over this folder's modules — see
 // ../types.ts for the contract and ../README.md for the architecture.
 import type { Harness } from '../types'
+import { ForkUnsupportedError } from '../fork'
+import { CodexRpcError } from './transport'
+import { getCodexClient } from './client'
 import { findHarnessExecutable, pathHarnessAvailability } from '../executable'
 import { getCodexAuthReadiness, startCodexLogin } from './auth'
 import {
@@ -39,6 +42,21 @@ export const codexHarness: Harness = {
   sendMessage: input => sendCodexMessage(input),
   interrupt: (workspaceId, sessionId) => interruptCodexRun({ workspaceId, sessionId }),
   archiveSession: (ws, sessionId) => archiveCodexSession(ws.path, sessionId),
+  forkSession: async (ws, sourceId, { model }) => {
+    const client = await getCodexClient(ws.path)
+    const { thread } = await client
+      .rpc<{ thread: { id: string } }>('thread/fork', {
+        threadId: sourceId,
+        // A live fork must start with its selected model, before its first turn.
+        ...(model ? { model } : {})
+      })
+      .catch(error => {
+        if (error instanceof CodexRpcError && error.code === -32601)
+          throw new ForkUnsupportedError('This Codex runtime does not support chat forks')
+        throw error
+      })
+    return thread.id
+  },
   activeSessions: () => getCodexActiveSessions(),
 
   listSessions: ws => getCodexSessions(ws.path),
