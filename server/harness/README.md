@@ -216,6 +216,33 @@ a URL-less provider flow, and a server-side watch loop re-probes until the login
 lands or times out, pushing `agent:updated` events to every tab. The composer
 renders that state; it never polls.
 
+## Workspace discovery
+
+`server/registry.ts` owns one discovery scan shared by concurrent requests,
+with raw candidates cached for 30 seconds after completion. Each provider's
+failure is isolated. Registration filtering happens after the scan on every
+request, so imports disappear immediately and removed workspaces can reappear
+from the same cached candidates.
+
+Each harness must also bound its own work. `discovery.ts` supplies a streaming
+directory iterator, a 64 KiB metadata-head size and a two-second cooperative
+filesystem budget. Pending filesystem operations finish normally.
+
+- Claude Code samples three transcript heads per project, with 2,048 root and
+  128 per-project entries; it excludes linked worktrees.
+- Codex samples up to 400 rollout heads, with 2,048 entries per directory and
+  traversal limited to its year/month/day layout. Newer names are preferred
+  within the bounded directory sample.
+- Hermes loads profiles sequentially, with 128 named-profile entries and
+  capped config/description reads. Explicit profile-id lookup bypasses the
+  discovery sample, including for already imported agents.
+- OpenClaw requests `agents.list` only, returning at most 128 workspace paths
+  under the gateway client's existing two-second connect/RPC timeouts.
+
+Discovery is best-effort. Workspaces beyond these limits may require explicit
+import, and newly created candidates can take up to 30 seconds to appear.
+These rules do not change session listing or history replay.
+
 ## What a harness adapter must support
 
 The checklist below is distilled from what the Claude Code integration

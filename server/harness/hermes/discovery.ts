@@ -8,13 +8,16 @@
 //
 // Discovery reads the filesystem rather than parsing `hermes profile list` —
 // that command prints an ASCII table with no --json mode.
-import { readdir, readFile, stat } from 'node:fs/promises'
+import { stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
+
+import { DISCOVERY_HEAD_BYTES, DISCOVERY_SCAN_MS, discoveryEntries } from '../discovery'
 
 export const DEFAULT_PROFILE = 'default'
 
 const WORKSPACE_DIR = 'workspace'
+const PROFILE_ENTRIES = 128
 
 export type HermesProfile = {
   // Profile id, as passed to `hermes -p <id>`. 'default' is the unnamed one.
@@ -61,7 +64,7 @@ async function isDir(path: string): Promise<boolean> {
 // leaves the column blank.
 async function readProfileModel(home: string): Promise<string | undefined> {
   try {
-    const text = await readFile(join(home, 'config.yaml'), 'utf8')
+    const text = await Bun.file(join(home, 'config.yaml')).slice(0, DISCOVERY_HEAD_BYTES).text()
     const section = /^model:\s*$([\s\S]*?)(?=^\S)/m.exec(text)?.[1] ?? text
     const match = /^\s{2,}(?:default|model):\s*["']?([^"'\n#]+)/m.exec(section)
     return match?.[1].trim() || undefined
@@ -72,20 +75,25 @@ async function readProfileModel(home: string): Promise<string | undefined> {
 
 async function readProfileDescription(home: string): Promise<string | undefined> {
   try {
-    const text = await readFile(join(home, 'profile.yaml'), 'utf8')
+    const text = await Bun.file(join(home, 'profile.yaml')).slice(0, DISCOVERY_HEAD_BYTES).text()
     return /^description:\s*["']?([^"'\n#]+)/m.exec(text)?.[1].trim() || undefined
   } catch {
     return undefined
   }
 }
 
-async function loadProfile(agentId: string, home: string): Promise<HermesProfile | null> {
+async function loadProfile(
+  agentId: string,
+  home: string,
+  deadline = Infinity
+): Promise<HermesProfile | null> {
   // A profile without config.yaml is not provisioned (or not a profile at all).
   try {
     await stat(join(home, 'config.yaml'))
   } catch {
     return null
   }
+  if (performance.now() >= deadline) return null
   const [model, name] = await Promise.all([readProfileModel(home), readProfileDescription(home)])
   return {
     agentId,
@@ -98,28 +106,20 @@ async function loadProfile(agentId: string, home: string): Promise<HermesProfile
 }
 
 export async function discoverHermesProfiles(): Promise<HermesProfile[]> {
+  const deadline = performance.now() + DISCOVERY_SCAN_MS
   const home = hermesHome()
-  if (!(await isDir(home))) return []
+  if (!(await isDir(home)) || performance.now() >= deadline) return []
 
   const out: HermesProfile[] = []
-  const base = await loadProfile(DEFAULT_PROFILE, home)
+  const base = await loadProfile(DEFAULT_PROFILE, home, deadline)
   if (base) out.push(base)
 
   const profilesDir = join(home, 'profiles')
-  if (await isDir(profilesDir)) {
-    let entries: string[] = []
-    try {
-      entries = await readdir(profilesDir)
-    } catch {
-      entries = []
-    }
-    const loaded = await Promise.all(
-      entries.map(async name => {
-        const dir = join(profilesDir, name)
-        return (await isDir(dir)) ? loadProfile(name, dir) : null
-      })
-    )
-    for (const p of loaded) if (p) out.push(p)
+  for await (const entry of discoveryEntries(profilesDir, PROFILE_ENTRIES, deadline)) {
+    if (!entry.isDirectory() && !entry.isSymbolicLink()) continue
+    const dir = join(profilesDir, entry.name)
+    const profile = (await isDir(dir)) ? await loadProfile(entry.name, dir, deadline) : null
+    if (profile) out.push(profile)
   }
   return out
 }
@@ -137,7 +137,16 @@ export function matchHermesProfile(
 }
 
 export async function findHermesProfile(query: string): Promise<HermesProfile | null> {
+  // Explicit ids keep working even when their profile is outside discovery's cap.
+  const byId = await loadProfileById(query)
+  if (byId) return byId
   return matchHermesProfile(await discoverHermesProfiles(), query)
+}
+
+async function loadProfileById(id: string): Promise<HermesProfile | null> {
+  if (!id || id === '.' || id === '..' || basename(id) !== id) return null
+  const home = hermesHome()
+  return loadProfile(id, id === DEFAULT_PROFILE ? home : join(home, 'profiles', id))
 }
 
 // Which profile owns a registered workspace. Falls back to matching the
@@ -146,12 +155,17 @@ export async function resolveHermesProfile(
   workspacePath: string,
   agentId?: string
 ): Promise<HermesProfile | null> {
-  const profiles = await discoverHermesProfiles()
   if (agentId) {
-    const byId = profiles.find(p => p.agentId === agentId)
+    const byId = await loadProfileById(agentId)
     if (byId) return byId
   }
-  return profiles.find(p => p.path === workspacePath) ?? null
+  // Legacy registrations may have no agentId. Resolve their known directory
+  // directly too, so discovery's sample never determines an imported agent's availability.
+  const home = profileHomeFromWorkspace(resolve(workspacePath))
+  const root = resolve(hermesHome())
+  if (home === root) return loadProfileById(DEFAULT_PROFILE)
+  if (home && dirname(home) === join(root, 'profiles')) return loadProfileById(basename(home))
+  return null
 }
 
 // Version stamp for the profile inputs that decide its default model:

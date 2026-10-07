@@ -6,7 +6,7 @@ import { toSessionInfo, toStreamEvents } from './adapter'
 import { cronRunsToStreamEvents, openClawCronJobIdFromKey } from './cron-view'
 import {
   archiveOpenClawSession,
-  discoverOpenClawAgents,
+  discoverOpenClawWorkspacePaths,
   getOpenClawCronRuns,
   getOpenClawModels,
   getOpenClawSessionMessages,
@@ -88,12 +88,12 @@ export const openclawHarness: Harness = {
   listModels: () => getOpenClawModels(),
 
   discoverWorkspaces: async registeredPaths => {
-    const agents = await discoverOpenClawAgents()
-    return agents
-      .filter(a => !registeredPaths.has(a.path))
+    const paths = await discoverOpenClawWorkspacePaths()
+    return paths
+      .filter(path => !registeredPaths.has(path))
       .map(
-        (a): DiscoveredWorkspaceCandidate => ({
-          path: a.path,
+        (path): DiscoveredWorkspaceCandidate => ({
+          path,
           type: 'openclaw'
         })
       )

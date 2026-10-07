@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, setSystemTime, spyOn, test } from 'bun:test'
 import { existsSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -6,6 +6,7 @@ import { join } from 'path'
 
 import {
   assertWorkspaceIdAvailable,
+  discoverWorkspaces,
   findWorkspaceForPath,
   getWorkspace,
   groupDiscoveredWorkspaces,
@@ -16,6 +17,7 @@ import {
   reorderWorkspaces,
   setRegistryPath
 } from './registry'
+import { allHarnesses } from './harness/registry'
 
 let tmpDir: string
 
@@ -168,6 +170,88 @@ describe('registerWorkspace with a chosen id', () => {
     await expect(assertWorkspaceIdAvailable('.', existing.id)).rejects.toThrow(
       `Workspace id ${existing.id} is already taken`
     )
+  })
+})
+
+describe('shared workspace discovery', () => {
+  let restore: (() => void)[] = []
+
+  afterEach(() => {
+    for (const fn of restore) fn()
+    restore = []
+    setSystemTime()
+  })
+
+  function mockDiscovery() {
+    return allHarnesses().map(h => {
+      const scan = spyOn(h, 'discoverWorkspaces').mockImplementation(async () => [
+        { path: join(tmpDir, 'project'), type: h.id }
+      ])
+      restore.push(() => scan.mockRestore())
+      return scan
+    })
+  }
+
+  test('shares concurrent scans and cached results across every harness', async () => {
+    const scans = mockDiscovery()
+    const results = await Promise.all(Array.from({ length: 20 }, () => discoverWorkspaces()))
+    expect(results[0]?.[0]?.types).toEqual(['claude-code', 'codex', 'openclaw', 'hermes'])
+    expect(results.every(result => JSON.stringify(result) === JSON.stringify(results[0]))).toBe(
+      true
+    )
+    await discoverWorkspaces()
+    for (const scan of scans) expect(scan).toHaveBeenCalledTimes(1)
+  })
+
+  test('filters registrations per call and reveals removed workspaces from the cache', async () => {
+    const scans = mockDiscovery()
+    expect(await discoverWorkspaces()).toHaveLength(1)
+    const registered = await registerWorkspace(join(tmpDir, 'project'))
+    expect(await discoverWorkspaces()).toEqual([])
+    await removeWorkspace(registered.id)
+    expect(await discoverWorkspaces()).toHaveLength(1)
+    for (const scan of scans) expect(scan).toHaveBeenCalledTimes(1)
+  })
+
+  test('reflects an import made during a scan and starts the TTL after completion', async () => {
+    const scans = mockDiscovery()
+    let finish!: () => void
+    const pending = new Promise<void>(resolve => {
+      finish = resolve
+    })
+    scans[0]!.mockImplementation(async () => {
+      await pending
+      return [{ path: join(tmpDir, 'project'), type: 'claude-code' }]
+    })
+    const first = discoverWorkspaces()
+    setSystemTime(Date.now() + 60_000)
+    const second = discoverWorkspaces()
+    await registerWorkspace(join(tmpDir, 'project'))
+    finish()
+    expect(await first).toEqual([])
+    expect(await second).toEqual([])
+    await discoverWorkspaces()
+    for (const scan of scans) expect(scan).toHaveBeenCalledTimes(1)
+  })
+
+  test('refreshes every harness after the cache expires', async () => {
+    const scans = mockDiscovery()
+    await discoverWorkspaces()
+    setSystemTime(Date.now() + 31_000)
+    await discoverWorkspaces()
+    for (const scan of scans) expect(scan).toHaveBeenCalledTimes(2)
+  })
+
+  test('isolates synchronous and asynchronous provider failures', async () => {
+    const scans = mockDiscovery()
+    scans[0]!.mockImplementation(() => {
+      throw new Error('unreadable history')
+    })
+    scans[1]!.mockRejectedValue(new Error('gateway offline'))
+    const found = await discoverWorkspaces()
+    expect(found[0]?.types).toEqual(['codex', 'hermes'])
+    await discoverWorkspaces()
+    for (const scan of scans) expect(scan).toHaveBeenCalledTimes(1)
   })
 })
 

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 import { mkdir, mkdtemp, rm, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -94,6 +94,48 @@ describe('discoverHermesProfiles', () => {
     await writeProfile(home)
     expect((await discoverHermesProfiles())[0].model).toBeUndefined()
   })
+
+  test('caps profile discovery and still resolves explicit ids outside the sample', async () => {
+    const ids = Array.from({ length: 140 }, (_, i) => `profile-${i}`)
+    for (const id of ids) await writeProfile(join(home, 'profiles', id))
+    const discovered = await discoverHermesProfiles()
+    expect(discovered.length).toBeLessThanOrEqual(128)
+    const omitted = ids.find(id => !discovered.some(profile => profile.agentId === id))!
+    expect((await findHermesProfile(omitted))?.agentId).toBe(omitted)
+    expect((await resolveHermesProfile('/other-path', omitted))?.agentId).toBe(omitted)
+    expect(
+      (await resolveHermesProfile(join(home, 'profiles', omitted, 'workspace')))?.agentId
+    ).toBe(omitted)
+  })
+
+  test('reads only the head of profile metadata', async () => {
+    await writeProfile(home)
+    await Bun.write(
+      join(home, 'config.yaml'),
+      '#'.repeat(64 * 1024) + '\nmodel:\n  default: late-model\n'
+    )
+    await Bun.write(
+      join(home, 'profile.yaml'),
+      '#'.repeat(64 * 1024) + '\ndescription: late-name\n'
+    )
+    const [profile] = await discoverHermesProfiles()
+    expect(profile?.agentId).toBe('default')
+    expect(profile?.model).toBeUndefined()
+    expect(profile?.name).toBeUndefined()
+  })
+
+  test('stops loading profiles after the scan deadline', async () => {
+    await writeProfile(home)
+    const now = spyOn(performance, 'now').mockReturnValueOnce(0).mockReturnValue(2001)
+    const reads = spyOn(Bun, 'file')
+    try {
+      expect(await discoverHermesProfiles()).toEqual([])
+      expect(reads).not.toHaveBeenCalled()
+    } finally {
+      reads.mockRestore()
+      now.mockRestore()
+    }
+  })
 })
 
 describe('findHermesProfile', () => {
@@ -112,6 +154,12 @@ describe('findHermesProfile', () => {
 
   test('returns null for an unknown profile', async () => {
     expect(await findHermesProfile('nope')).toBeNull()
+  })
+
+  test('does not resolve path traversal as a profile id', async () => {
+    // Traversing out of profiles would otherwise find the default config.
+    expect(await findHermesProfile('..')).toBeNull()
+    expect(await findHermesProfile('../research')).toBeNull()
   })
 })
 
@@ -134,6 +182,12 @@ describe('resolveHermesProfile', () => {
 
   test('returns null when nothing matches', async () => {
     expect(await resolveHermesProfile('/unknown', 'ghost')).toBeNull()
+  })
+
+  test('does not claim profile-shaped directories outside Hermes home', async () => {
+    const foreign = join(home, 'other', 'foreign')
+    await writeProfile(foreign)
+    expect(await resolveHermesProfile(join(foreign, 'workspace'))).toBeNull()
   })
 })
 

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, setSystemTime, spyOn, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 import { mkdir, mkdtemp, open, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -18,7 +18,6 @@ describe('Claude workspace discovery', () => {
   })
 
   afterEach(async () => {
-    setSystemTime()
     await rm(scratch, { recursive: true, force: true })
   })
 
@@ -58,7 +57,7 @@ describe('Claude workspace discovery', () => {
     expect(await discover()).toEqual([])
   })
 
-  test('deduplicates directories and filters registrations on every cached request', async () => {
+  test('deduplicates directories and filters normalized registrations', async () => {
     await transcript('first', record(workspace))
     await transcript('second', record(workspace))
     expect(await discover()).toEqual([candidate(workspace)])
@@ -91,8 +90,6 @@ describe('Claude workspace discovery', () => {
 
   test('tolerates absent history and unreadable project entries', async () => {
     expect(await discover()).toEqual([])
-    // Switch roots so the negative cache does not hide this second fixture.
-    projects = join(scratch, 'other-projects')
     await transcript('good', record(workspace))
     await Bun.write(join(projects, 'not-a-directory'), 'x')
     expect(await discover()).toEqual([candidate(workspace)])
@@ -138,32 +135,7 @@ describe('Claude workspace discovery', () => {
     }
   })
 
-  test('shares in-flight scans and caches completed results', async () => {
-    await transcript('project', record(workspace))
-    const reads = spyOn(Bun, 'file')
-    try {
-      const results = await Promise.all(Array.from({ length: 20 }, () => discover()))
-      expect(results.every(result => result[0]?.path === workspace)).toBe(true)
-      const count = reads.mock.calls.length
-      await discover()
-      expect(reads.mock.calls.length).toBe(count)
-      // One transcript head and one .git check across all callers.
-      expect(count).toBe(2)
-    } finally {
-      reads.mockRestore()
-    }
-  })
-
-  test('refreshes after the cache expires', async () => {
-    const file = await transcript('project', record(workspace))
-    expect(await discover()).toEqual([candidate(workspace)])
-    await rm(file)
-    expect(await discover()).toEqual([candidate(workspace)])
-    setSystemTime(Date.now() + 31_000)
-    expect(await discover()).toEqual([])
-  })
-
-  test('honors CLAUDE_CONFIG_DIR and does not reuse another root cache', async () => {
+  test('honors CLAUDE_CONFIG_DIR', async () => {
     const original = process.env.CLAUDE_CONFIG_DIR
     try {
       await transcript('project', record(workspace))

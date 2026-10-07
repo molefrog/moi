@@ -32,6 +32,7 @@ export const DEFAULT_REGISTRY_PATH = join(DATA_DIR, 'workspaces.json')
 let _registryPath = DEFAULT_REGISTRY_PATH
 export function setRegistryPath(p: string) {
   _registryPath = p
+  discoveryCache = undefined
 }
 
 async function readRegistry(): Promise<WorkspaceEntry[]> {
@@ -206,13 +207,16 @@ export function liftToWorkspaceRoot(p: string): string {
   return segments.slice(0, i).join(sep) || sep
 }
 
-async function collectDiscoveredWorkspaces(
-  registeredPaths: Set<string>
-): Promise<DiscoveredWorkspaceCandidate[]> {
+async function collectDiscoveredWorkspaces(): Promise<DiscoveredWorkspaceCandidate[]> {
   const perHarness = await Promise.all(
-    allHarnesses().map(
-      h => h.discoverWorkspaces?.(registeredPaths).catch(() => []) ?? Promise.resolve([])
-    )
+    allHarnesses().map(async h => {
+      try {
+        // Cache all candidates so removing a registration can reveal it again.
+        return (await h.discoverWorkspaces?.(new Set())) ?? []
+      } catch {
+        return []
+      }
+    })
   )
   return perHarness.flat()
 }
@@ -240,8 +244,22 @@ export function groupDiscoveredWorkspaces(
 
 // Ask every harness for workspaces it knows about that aren't registered yet,
 // then combine providers that claim the same normalized folder.
+const DISCOVERY_CACHE_MS = 30_000
+let discoveryCache:
+  | { expiresAt: number; result: Promise<DiscoveredWorkspaceCandidate[]> }
+  | undefined
+
 export async function discoverWorkspaces(): Promise<DiscoveredWorkspace[]> {
+  if (!discoveryCache || Date.now() >= discoveryCache.expiresAt) {
+    // Share pending scans; start the TTL when every provider has finished.
+    const next = { expiresAt: Infinity, result: collectDiscoveredWorkspaces() }
+    discoveryCache = next
+    void next.result.finally(() => {
+      next.expiresAt = Date.now() + DISCOVERY_CACHE_MS
+    })
+  }
+  const found = await discoveryCache.result
+  // Read after discovery so an import during the scan is reflected immediately.
   const registeredPaths = new Set((await readRegistry()).map(e => e.path))
-  const found = await collectDiscoveredWorkspaces(registeredPaths)
   return groupDiscoveredWorkspaces(found, registeredPaths).map(withDisplayPath)
 }
