@@ -134,7 +134,7 @@ afterAll(() => {
 
 describe('ACP session replay', () => {
   test('a replayed history keeps its tool calls and strips the moi-context envelope', async () => {
-    const envelope = renderMoiContext({ activeTab: 'overview' })
+    const envelope = renderMoiContext({ activeTab: { id: 'overview' } })
     const events = await replayThroughMockAgent([
       {
         sessionUpdate: 'user_message_chunk',
@@ -271,7 +271,7 @@ describe('ACP session replay', () => {
   })
 
   test('an envelope-only user block replays as no turn at all', async () => {
-    const envelope = renderMoiContext({ activeTab: 'overview' })
+    const envelope = renderMoiContext({ activeTab: { id: 'overview' } })
     const events = await replayThroughMockAgent([
       { sessionUpdate: 'user_message_chunk', content: { type: 'text', text: envelope } },
       { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'hi' } }
@@ -286,7 +286,7 @@ describe('ACP session replay', () => {
     // block (sendAcpMessage unshifts the envelope when no text block exists).
     // Stripping the envelope must not drop the turn — the image survives as a
     // data-URL file part, the same cold-reload fallback other adapters use.
-    const envelope = renderMoiContext({ activeTab: 'overview' })
+    const envelope = renderMoiContext({ activeTab: { id: 'overview' } })
     const events = await replayThroughMockAgent([
       { sessionUpdate: 'user_message_chunk', content: { type: 'text', text: envelope } },
       {

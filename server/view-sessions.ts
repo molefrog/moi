@@ -37,18 +37,19 @@ export type SubmitViewInput = BuildSendOptions & { requirements: string; session
 // Both ordinary chat and initial build requests use this boundary.
 export async function sendWorkspaceMessage(
   ws: WorkspaceEntry,
-  input: SendMessageInput & { selectedSessionScope?: SelectedSessionScope }
+  input: SendMessageInput & { selectedSessionScope?: SelectedSessionScope; viewBuildId?: string }
 ) {
-  const { selectedSessionScope, ...message } = input
+  const { selectedSessionScope, viewBuildId, ...message } = input
   const sessionId = resolveRenamedSession(ws.path, input.sessionId)
   const record = await getSessionRecord(ws.path, sessionId)
-  const tabId = input.context?.activeTab ?? 'overview'
+  const tabId = input.context?.activeTab?.id ?? record.tabId ?? 'overview'
   if (input.isNew && record.tabId !== tabId) {
     record.tabId = tabId === 'overview' ? undefined : tabId
     await attachSession(ws, tabId, sessionId, null, selectedSessionScope)
   }
-  const viewId = viewIdFromTab(tabId)
+  const viewId = viewBuildId ?? viewIdFromTab(tabId)
   const pending = viewId ? await getPendingView(ws.path, viewId) : undefined
+  const isBuildRequest = pending && (viewBuildId === pending.id || input.isNew)
   if (pending)
     await patchPendingView(ws.id, ws.path, pending.id, {
       executionSessionId: sessionId
@@ -59,25 +60,28 @@ export async function sendWorkspaceMessage(
     sessionId,
     context: {
       ...input.context,
-      activeTab: tabId,
+      chatTab: record.tabId
+        ? {
+            id: record.tabId,
+            ...(record.tabId === input.context?.activeTab?.id && input.context.activeTab.title
+              ? { title: input.context.activeTab.title }
+              : {})
+          }
+        : undefined,
       ...(collabReference ? { collabReference } : {}),
       directives: [
         ...(input.context?.directives ?? []),
-        ...(pending ? viewBuildDirectives(pending.id, APP_ICON_IDS) : []),
+        ...(isBuildRequest ? viewBuildDirectives(pending.id, APP_ICON_IDS) : []),
+        ...(isBuildRequest && record.forkedFromSessionId
+          ? [
+              'Inherited conversation is background. Work on the current request; do not resume unrelated earlier tasks.'
+            ]
+          : []),
         ...(pending && input.isNew && pending.requirements !== input.content
           ? [`Original view requirements:\n${pending.requirements}`]
           : []),
         ...(pending && input.attachments?.length
           ? ['Use the attachments as reference material for the intended view.']
-          : []),
-        `Current session id: ${sessionId}. Use this as --source-session for moi views create.`,
-        ...(record.tabId
-          ? [`This chat belongs to ${record.tabId}; the active tab may be different.`]
-          : []),
-        ...(record.forkedFromSessionId
-          ? [
-              'Inherited conversation is background. Work on the current request; do not resume unrelated earlier tasks.'
-            ]
           : [])
       ]
     }
@@ -113,8 +117,8 @@ async function sendBuild(
     agentId: ws.agentId,
     sessionId,
     isNew,
-    content: view.requirements,
-    context: { activeTab: viewTabId(view.id) }
+    viewBuildId: view.id,
+    content: view.requirements
   })
   await patchPendingView(ws.id, ws.path, view.id, { status: 'submitted' }, 'starting')
 }
@@ -164,50 +168,50 @@ export async function submitView(ws: WorkspaceEntry, viewId: string, input: Subm
 }
 export async function createViewFromSession(
   ws: WorkspaceEntry,
-  sourceSessionId: string,
+  fromSessionId: string | undefined,
   requirements: string
 ) {
-  if (!requirements.trim() || !sourceSessionId)
-    throw new Error('Requirements and source session are required')
-  sourceSessionId = resolveRenamedSession(ws.path, sourceSessionId)
-  const harness = harnessFor(ws)
-  if (
-    !(await harness.listSessions(ws)).some(session => session.sessionId === sourceSessionId) &&
-    !harness
-      .activeSessions()
-      .some(session => session.workspaceId === ws.id && session.sessionId === sourceSessionId)
-  )
-    throw new Error('Source chat not found')
-  const pinned = await getPinnedSession(ws.path)
-  if (pinned && pinned !== sourceSessionId)
-    throw new Error('Unpin the workspace chat before creating a view from another chat')
-  if (pinned) {
+  if (!requirements.trim()) throw new Error('View requirements are required')
+  if (fromSessionId === undefined) {
     const view = await createPendingView(ws.id, ws.path, {
       requirements: requirements.trim(),
-      status: 'submitted',
-      executionSessionId: pinned
+      status: 'submitted'
     })
-    return { viewId: view.id, mode: 'in-place' as const }
+    return {
+      viewId: view.id,
+      mode: 'in-place' as const,
+      buildInstructions: viewBuildDirectives(view.id, APP_ICON_IDS)
+    }
   }
+  if (!fromSessionId) throw new Error('Session id cannot be empty')
+  fromSessionId = resolveRenamedSession(ws.path, fromSessionId)
+  const harness = harnessFor(ws)
+  if (
+    !(await harness.listSessions(ws)).some(session => session.sessionId === fromSessionId) &&
+    !harness
+      .activeSessions()
+      .some(session => session.workspaceId === ws.id && session.sessionId === fromSessionId)
+  )
+    throw new Error('Source chat not found')
   let sessionId: string | undefined
   let view: PendingView | undefined
   try {
-    const sourceConfig = await getSessionConfig(ws.path, sourceSessionId)
+    const sourceConfig = await getSessionConfig(ws.path, fromSessionId)
     try {
-      sessionId = await harness.forkSession?.(ws, sourceSessionId, sourceConfig)
+      sessionId = await harness.forkSession?.(ws, fromSessionId, sourceConfig)
     } catch (error) {
       if (!(error instanceof ForkUnsupportedError)) throw error
     }
     const isNew = !sessionId
     sessionId ??= crypto.randomUUID()
     if (!isNew) {
-      await patchSessionRecord(ws.path, sessionId, { forkedFromSessionId: sourceSessionId })
+      await patchSessionRecord(ws.path, sessionId, { forkedFromSessionId: fromSessionId })
       // The fork API returns only a child ID. A failed history read leaves the
       // child usable and its full transcript visible.
       const history = await harness.sessionEvents(ws, sessionId).catch(() => undefined)
       if (history)
         await patchSessionRecord(ws.path, sessionId, {
-          forkedFromSessionId: sourceSessionId,
+          forkedFromSessionId: fromSessionId,
           ...inheritedHistoryBoundary(history)
         })
     }

@@ -302,26 +302,29 @@ hover, in React. See [Applet intents](references/INTENTS.md#view-params-and-hist
 
 #### Creating views from chat
 
-When the user asks for a new view from an existing chat, run:
+When the user asks for a new view, run:
 
 ```sh
-moi views create --source-session <current-session-id> --requirements "<complete requirements>"
+moi views create --requirements "<complete requirements>"
 ```
 
-Use the current session id from the hidden context. The command returns a permanent `viewId` and
-opens its view tab before returning.
+To start the build in a separate chat, supply the source session to fork:
+
+```sh
+moi views create --from-session <session-id> --requirements "<complete requirements>"
+```
+
+The command returns a permanent `viewId` and opens its view tab before returning.
 
 - `mode: "handoff"`: another chat continues the build. Finish this turn with a link such as
   `[Open the view](moi:/views/<viewId>)`.
-- `mode: "in-place"`: the pinned chat stays visible. Continue the build in this turn using the
-  returned id.
+- `mode: "in-place"`: no chat was created or attached. Continue the build in this turn using the
+  returned id and build instructions.
 - Navigation fails: include the same `[Open the view](moi:/views/<viewId>)` link in your reply.
 
 #### Pending view builds
 
-When the hidden `<moi-context>` envelope is marked `View build request`, this chat is working on the
-pending view whose id is supplied in that request. This guidance also applies when
-`moi views create` returns `mode: "in-place"`. Read the applet design guidance before editing.
+Read the applet design guidance before editing.
 When the direction is clear, choose a sentence-case title and relevant icon. Preserve proper names
 and acronyms. Set this provisional metadata before the first bundle:
 

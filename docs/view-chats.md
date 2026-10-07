@@ -15,7 +15,12 @@ A null selection means a fresh composer. Its first send creates an attached chat
 Manual creation makes a pending view without a chat. First submission creates a
 fresh chat, attaches and selects it, and sends the prompt and optional sketch.
 
-`moi views create --source-session <id> --requirements "…"` first prepares a child
+`moi views create --requirements "…"` creates a pending view without creating or
+attaching a chat. It returns `viewId`, `mode: "in-place"`, and `buildInstructions`
+so the caller can continue building in its current turn. No execution session is
+assigned. The CLI opens the pending view through the navigation channel.
+
+`moi views create --from-session <id> --requirements "…"` first prepares a child
 chat. Forks snapshot available source history immediately; they do not wait for
 the source turn to finish. The child ID is saved before reading its history. When
 that read succeeds, moi saves the last inherited turn as a display cutoff before
@@ -28,11 +33,29 @@ the acknowledged navigation channel, then returns `viewId`, `mode: "handoff"`, a
 creation result. The source agent ends its turn with a view link. The child continues
 building without navigating again on completion.
 
-With a pinned chat, manual submission sends there without changing its attribution
-or the new view's empty selection. CLI creation returns `mode: "in-place"` and the
-view ID so the calling agent continues in its current turn. It opens the new view
-with the pinned chat still visible. No fork or extra send occurs. Unpinning reveals
-the view's own selection, which may be an empty composer.
+CLI creation depends only on whether `--from-session` is supplied. Pin state
+does not change its behavior. A pinned chat can remain visible while a forked chat
+builds the view; unpinning reveals the selected child chat.
+Manual submission sends to the pinned chat when present, without changing its
+attribution or the new view's empty selection. Unpinning reveals an empty composer.
+
+## Agent context
+
+The initial build request includes the assigned view ID, source path, provisional
+metadata command, available icons, and final view link. It is sent once when a chat
+starts working on a pending view, including a fork or an existing pinned chat.
+A fresh chat continuing a pending view receives the instructions and saved requirements.
+The build instructions also supply the `moi views create --requirements …`
+command for additional views. Forked build requests include a reminder to treat
+inherited conversation as background.
+
+Browser messages include `activeTab` with its ID, title, and current URL parameters.
+The server adds `chatTab`, the tab this chat belongs to, which can differ from the
+visible tab. Programmatic build requests omit `activeTab` when the visible tab is
+unknown; the build instructions supply the target view ID separately.
+Follow-ups retain tab context without pin state, session IDs, creation commands,
+fork origin, or the initial build request. Pin state and fork provenance remain
+internal. CLI creation reports its mode to the agent; manual submissions use the current pin.
 
 ## State and completion
 

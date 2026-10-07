@@ -236,13 +236,11 @@ export const control = Bun.serve({
           const match = await resolveWorkspace(ws, data.path)
           if (!match) return
           try {
-            if (typeof data.sourceSessionId !== 'string' || typeof data.requirements !== 'string')
-              throw new Error('Source session and requirements are required')
-            const result = await createViewFromSession(
-              match,
-              data.sourceSessionId,
-              data.requirements
-            )
+            if (typeof data.requirements !== 'string')
+              throw new Error('View requirements are required')
+            if (data.fromSessionId !== undefined && typeof data.fromSessionId !== 'string')
+              throw new Error('Invalid session id')
+            const result = await createViewFromSession(match, data.fromSessionId, data.requirements)
             let warning: string | undefined
             try {
               await navigationRelay.navigate(match.id, moiHref(`views/${result.viewId}`))

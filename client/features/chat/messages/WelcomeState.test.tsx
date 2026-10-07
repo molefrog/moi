@@ -115,7 +115,7 @@ describe('WelcomeState', () => {
     expect(html).not.toContain('workspace-local SQLite database')
 
     const context = renderMoiContext({
-      activeTab: 'overview',
+      activeTab: { id: 'overview' },
       directives: [...CHAT_WELCOME_PROMPTS[0].context]
     })
     expect(context).toContain('# This message only')

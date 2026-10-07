@@ -8,7 +8,11 @@ const HANDOFF = { viewId: 'garden', mode: 'handoff', sessionId: 'child' }
 
 // Run the real control handler and CLI in isolation, with agent startup and
 // browser navigation stubbed so the test cannot create a real view or move a tab.
-async function runCreate(result: Record<string, unknown>, navigationError?: string) {
+async function runCreate(
+  result: Record<string, unknown>,
+  navigationError?: string,
+  includeFromSession = true
+) {
   const script = `
     import { mock, spyOn } from 'bun:test'
     const constants = await import(${JSON.stringify(join(SERVER, 'constants.ts'))})
@@ -18,8 +22,8 @@ async function runCreate(result: Record<string, unknown>, navigationError?: stri
     const { navigationRelay } = await import(${JSON.stringify(join(SERVER, 'navigation-relay.ts'))})
     const calls = []
     spyOn(registry, 'listWorkspaces').mockResolvedValue([{ id: 'workspace', path: ${JSON.stringify(WORKSPACE)} }])
-    spyOn(sessions, 'createViewFromSession').mockImplementation(async (workspace, source, requirements) => {
-      calls.push({ type: 'create', workspaceId: workspace.id, source, requirements })
+    spyOn(sessions, 'createViewFromSession').mockImplementation(async (workspace, fromSessionId, requirements) => {
+      calls.push({ type: 'create', workspaceId: workspace.id, fromSessionId, requirements })
       return ${JSON.stringify(result)}
     })
     spyOn(navigationRelay, 'navigate').mockImplementation(async (workspaceId, href) => {
@@ -29,7 +33,8 @@ async function runCreate(result: Record<string, unknown>, navigationError?: stri
     })
     const { control } = await import(${JSON.stringify(join(SERVER, 'control.ts'))})
     const cli = Bun.spawn(['bun', ${JSON.stringify(CLI)}, 'views', 'create', ${JSON.stringify(WORKSPACE)},
-      '--source-session', 'source', '--requirements', 'Build a garden view'], {
+      ...${JSON.stringify(includeFromSession ? ['--from-session', 'source'] : [])},
+      '--requirements', 'Build a garden view'], {
       env: { ...process.env, MOI_CONTROL_PORT: String(control.port) },
       stdin: 'ignore', stdout: 'pipe', stderr: 'pipe'
     })
@@ -58,15 +63,21 @@ async function runCreate(result: Record<string, unknown>, navigationError?: stri
 const CREATE_CALL = {
   type: 'create',
   workspaceId: 'workspace',
-  source: 'source',
+  fromSessionId: 'source',
   requirements: 'Build a garden view'
 }
 const NAVIGATE_CALL = { type: 'navigate', workspaceId: 'workspace', href: 'moi:/views/garden' }
 
 test.each(['handoff', 'in-place'])('%s creation opens the new view', async mode => {
-  const creation = mode === 'handoff' ? HANDOFF : { viewId: 'garden', mode }
-  const { calls, result, error, code } = await runCreate(creation)
-  expect(calls).toEqual([CREATE_CALL, NAVIGATE_CALL])
+  const creation =
+    mode === 'handoff' ? HANDOFF : { viewId: 'garden', mode, buildInstructions: ['Build the view'] }
+  const { calls, result, error, code } = await runCreate(creation, undefined, mode === 'handoff')
+  const withoutSource = {
+    type: 'create',
+    workspaceId: 'workspace',
+    requirements: 'Build a garden view'
+  }
+  expect(calls).toEqual([mode === 'handoff' ? CREATE_CALL : withoutSource, NAVIGATE_CALL])
   expect(result).toEqual({ ok: true, ...creation })
   expect(error).toBe('')
   expect(code).toBe(0)

@@ -3,6 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { WorkspaceEntry } from '@/lib/types'
+import { renderMoiContext } from '@/lib/moi-context'
 import { allHarnesses, harnessFor } from './harness/registry'
 import type { SendMessageInput } from './harness/types'
 import { ForkUnsupportedError } from './harness/fork'
@@ -115,6 +116,11 @@ test('manual creation has no session until submission, then attaches once', asyn
   expect(result).toEqual({ viewId: view.id, sessionId: 'fresh' })
   expect(await getSessionRecord(ws.path, 'fresh')).toEqual({ tabId: `views/${view.id}` })
   expect(sent[0]).toMatchObject({ sessionId: 'fresh', isNew: true, content: 'Build cards' })
+  expect(renderMoiContext(sent[0].context!)).toContain('Build a new view from this message.')
+  expect(renderMoiContext(sent[0].context!)).toContain('moi views create --requirements')
+  expect(sent[0].context?.activeTab).toBeUndefined()
+  expect(sent[0].context?.chatTab).toEqual({ id: `views/${view.id}` })
+  expect(sent[0]).not.toHaveProperty('viewBuildId')
   expect((await getPendingView(ws.path, view.id))?.status).toBe('submitted')
 })
 test('CLI prepares a fork and boundary before creating a view while source stays running', async () => {
@@ -130,7 +136,7 @@ test('CLI prepares a fork and boundary before creating a view while source stays
   }
   harness.sendMessage = async input => {
     expect(await getSessionRecord(ws.path, 'child')).toMatchObject({
-      tabId: input.context?.activeTab
+      tabId: input.context?.chatTab?.id
     })
     expect((await getSessionRecord(ws.path, 'child')).forkedThroughMessageId).toBeUndefined()
     sent.push(input)
@@ -140,6 +146,22 @@ test('CLI prepares a fork and boundary before creating a view while source stays
   expect(result).not.toHaveProperty('url')
   expect(sent).toHaveLength(1)
   expect(sent[0].isNew).toBe(false)
+  expect(renderMoiContext(sent[0].context!)).toContain('Build a new view from this message.')
+  expect(sent[0].context?.chatTab).toEqual({ id: `views/${result.viewId}` })
+  expect(sent[0].context?.activeTab).toBeUndefined()
+  expect(renderMoiContext(sent[0].context!)).toContain('moi views create --requirements')
+  expect(renderMoiContext(sent[0].context!)).not.toContain('--from-session')
+  expect(renderMoiContext(sent[0].context!)).toContain('Inherited conversation is background.')
+  await sendWorkspaceMessage(ws, {
+    workspaceId: ws.id,
+    workspacePath: ws.path,
+    sessionId: 'child',
+    isNew: false,
+    content: 'Make the cards smaller',
+    context: { activeTab: { id: `views/${result.viewId}` } }
+  })
+  expect(renderMoiContext(sent[1].context!)).not.toContain('Inherited conversation is background.')
+  expect(renderMoiContext(sent[1].context!)).not.toContain('moi views create')
   expect(forks).toBe(1)
   expect(events).not.toContainEqual(expect.objectContaining({ type: 'tab:focus' }))
 })
@@ -168,7 +190,7 @@ test.each(['manual', 'cli'])(
     await pinSession(ws.path, 'source')
     const result =
       entry === 'cli'
-        ? await createViewFromSession(ws, 'source', 'Build cards')
+        ? await createViewFromSession(ws, undefined, 'Build cards')
         : await submitView(ws, (await createPendingView(ws.id, ws.path)).id, {
             requirements: 'Build cards'
           })
@@ -176,6 +198,21 @@ test.each(['manual', 'cli'])(
     expect(sent).toHaveLength(entry === 'cli' ? 0 : 1)
     expect(await getSessionRecord(ws.path, 'source')).toEqual({ tabId: 'views/original' })
     expect(await getSelectedSession(ws.path, `views/${result.viewId}`)).toBeUndefined()
+    if (entry === 'cli') {
+      expect(result).toMatchObject({
+        mode: 'in-place',
+        buildInstructions: expect.arrayContaining([
+          expect.stringContaining(`.moi/views/${result.viewId}.tsx`),
+          expect.stringContaining('moi views create --requirements')
+        ])
+      })
+    } else {
+      expect(sent[0].isNew).toBe(false)
+      expect(sent[0].context?.chatTab).toEqual({ id: 'views/original' })
+      expect(sent[0].context?.activeTab).toBeUndefined()
+      expect(renderMoiContext(sent[0].context!)).toContain('Build a new view from this message.')
+      expect(renderMoiContext(sent[0].context!)).toContain('moi views create --requirements')
+    }
     await pinSession(ws.path, null)
     await sendWorkspaceMessage(ws, {
       workspaceId: ws.id,
@@ -183,14 +220,83 @@ test.each(['manual', 'cli'])(
       sessionId: 'new-chat',
       isNew: true,
       content: 'Continue',
-      context: { activeTab: `views/${result.viewId}` }
+      context: { activeTab: { id: `views/${result.viewId}` } }
     })
     expect(await getSessionRecord(ws.path, 'new-chat')).toEqual({ tabId: `views/${result.viewId}` })
-    expect(sent.at(-1)?.context?.directives).toContain(
-      `View id: ${result.viewId} (already assigned)`
+    expect(renderMoiContext(sent.at(-1)!.context!)).toContain(
+      `The view id is \`${result.viewId}\`.`
     )
   }
 )
+test.each([false, true])(
+  'CLI creation without a source creates only a view (pinned: %s)',
+  async pinned => {
+    await patchSessionRecord(ws.path, 'source', { tabId: 'scratchpad' })
+    if (pinned) await pinSession(ws.path, 'source')
+    harness.listSessions = async () => {
+      throw new Error('Should not look up chats')
+    }
+    harness.activeSessions = () => {
+      throw new Error('Should not look up chats')
+    }
+    const result = await createViewFromSession(ws, undefined, '  Build cards  ')
+    expect(result.mode).toBe('in-place')
+    const instructions = result.buildInstructions?.join('\n')
+    expect(instructions).toContain('moi views create --requirements')
+    expect(instructions).not.toContain('--from-session')
+    const view = await getPendingView(ws.path, result.viewId)
+    expect(view).toMatchObject({ requirements: 'Build cards', status: 'submitted' })
+    expect(view?.executionSessionId).toBeUndefined()
+    expect(await getSessionRecord(ws.path, 'source')).toEqual({ tabId: 'scratchpad' })
+    expect(await getSessionRecord(ws.path, 'child')).toEqual({})
+    expect(await getPinnedSession(ws.path)).toBe(pinned ? 'source' : null)
+    expect(await getSelectedSession(ws.path, `views/${result.viewId}`)).toBeUndefined()
+    expect(forks).toBe(0)
+    expect(sent).toEqual([])
+  }
+)
+test('CLI creation rejects an empty explicit source', async () => {
+  await expect(createViewFromSession(ws, '', 'Build cards')).rejects.toThrow(
+    'Session id cannot be empty'
+  )
+  expect(await listPendingViews(ws.path)).toEqual([])
+  expect(forks).toBe(0)
+  expect(sent).toEqual([])
+})
+test('CLI creation forks the explicit source even when a different chat is pinned', async () => {
+  await pinSession(ws.path, 'source')
+  harness.listSessions = async () => [{ sessionId: 'other', summary: 'Other', lastModified: 1 }]
+  harness.forkSession = async (_ws, sourceId) => {
+    expect(sourceId).toBe('other')
+    forks++
+    return 'child'
+  }
+  const result = await createViewFromSession(ws, 'other', 'Build cards')
+  expect(result).toEqual({ viewId: expect.any(String), mode: 'handoff', sessionId: 'child' })
+  expect(await getSessionRecord(ws.path, 'child')).toMatchObject({
+    tabId: `views/${result.viewId}`,
+    forkedFromSessionId: 'other'
+  })
+  expect(await getSelectedSession(ws.path, `views/${result.viewId}`)).toBe('child')
+  expect(await getPinnedSession(ws.path)).toBe('source')
+  expect(forks).toBe(1)
+  expect(sent).toHaveLength(1)
+})
+test('CLI creation rejects an unknown explicit source before creating a view', async () => {
+  await expect(createViewFromSession(ws, 'missing', 'Build cards')).rejects.toThrow(
+    'Source chat not found'
+  )
+  expect(await listPendingViews(ws.path)).toEqual([])
+  expect(forks).toBe(0)
+  expect(sent).toEqual([])
+})
+test('CLI creation still requires nonempty requirements in a pinned chat', async () => {
+  await pinSession(ws.path, 'source')
+  await expect(createViewFromSession(ws, undefined, '  ')).rejects.toThrow(
+    'View requirements are required'
+  )
+  expect(await listPendingViews(ws.path)).toEqual([])
+})
 test.each(['missing', 'unsupported'])('fresh fallback for %s fork support', async kind => {
   harness.forkSession =
     kind === 'missing'
@@ -264,7 +370,7 @@ test('completion removes build state without moving selection, ownership, or pin
 })
 test('late send acceptance does not recreate a completed build', async () => {
   harness.sendMessage = async input => {
-    await completeViewBuild(ws.id, ws.path, input.context!.activeTab.slice('views/'.length))
+    await completeViewBuild(ws.id, ws.path, input.context!.chatTab!.id.slice('views/'.length))
   }
   await createViewFromSession(ws, 'source', 'Build cards')
   expect(await listPendingViews(ws.path)).toEqual([])
@@ -451,12 +557,117 @@ test('a fresh chat after unpinning receives the saved view requirements', async 
     sessionId: 'fresh',
     isNew: true,
     content: 'Continue',
-    context: { activeTab: `views/${view.id}` }
+    context: { activeTab: { id: `views/${view.id}` } }
   })
   expect(sent[0].context?.directives).toContain(
     'Original view requirements:\nBuild a gardening board with watering reminders'
   )
   expect(await getSessionRecord(ws.path, 'fresh')).toEqual({ tabId: `views/${view.id}` })
+})
+
+test('follow-ups keep chat context without repeating the build request, including off the view tab', async () => {
+  const view = await createPendingView(ws.id, ws.path)
+  await submitView(ws, view.id, { requirements: 'Build cards', sessionId: 'fresh' })
+  for (const activeTab of [`views/${view.id}`, 'overview'] as const) {
+    await sendWorkspaceMessage(ws, {
+      workspaceId: ws.id,
+      workspacePath: ws.path,
+      sessionId: 'fresh',
+      isNew: false,
+      content: 'Make the cards smaller',
+      context: { activeTab: { id: activeTab }, directives: ['Use compact spacing.'] }
+    })
+    const context = sent.at(-1)!.context!
+    expect(context.chatTab).toEqual({ id: `views/${view.id}` })
+    expect(context.activeTab).toEqual({ id: activeTab })
+    const rendered = renderMoiContext(context)
+    expect(rendered).not.toContain('Build a new view from this message.')
+    expect(rendered).not.toContain('moi views set')
+    expect(rendered).not.toContain('Available view icons')
+    expect(rendered).toContain('# Chat tab')
+    expect(context).not.toHaveProperty('chat')
+    expect(rendered).not.toContain('pinned')
+    expect(rendered).not.toContain('moi views create')
+    expect(rendered).toContain('# This message only\nUse compact spacing.')
+  }
+})
+
+test('ordinary sends preserve the visible tab snapshot and resolve the chat tab separately', async () => {
+  await patchSessionRecord(ws.path, 'source', { tabId: 'views/original' })
+  const activeTab = { id: 'views/current', title: 'Current view', params: { item: '42' } } as const
+  await sendWorkspaceMessage(ws, {
+    workspaceId: ws.id,
+    workspacePath: ws.path,
+    sessionId: 'source',
+    isNew: false,
+    content: 'Explain this item',
+    context: { activeTab, chatTab: { id: 'views/forged' } }
+  })
+  expect(sent[0].context?.activeTab).toEqual(activeTab)
+  expect(sent[0].context?.chatTab).toEqual({ id: 'views/original' })
+  expect(renderMoiContext(sent[0].context!)).toContain('The user is on the "Current view" view tab')
+  expect(renderMoiContext(sent[0].context!)).toContain(
+    'This chat belongs to the "original" view tab'
+  )
+  expect(await getPinnedSession(ws.path)).toBeNull()
+  expect(await getSessionRecord(ws.path, 'source')).toEqual({ tabId: 'views/original' })
+})
+
+test('a new browser chat groups the visible view title and params without attaching params to the chat', async () => {
+  const activeTab = { id: 'views/garden', title: 'Garden', params: { plant: 'rose' } } as const
+  await sendWorkspaceMessage(ws, {
+    workspaceId: ws.id,
+    workspacePath: ws.path,
+    sessionId: 'fresh',
+    isNew: true,
+    content: 'Explain this plant',
+    context: { activeTab }
+  })
+  expect(sent[0].context?.activeTab).toEqual(activeTab)
+  expect(sent[0].context?.chatTab).toEqual({ id: 'views/garden', title: 'Garden' })
+  expect(await getSessionRecord(ws.path, 'fresh')).toEqual({ tabId: 'views/garden' })
+})
+
+test('completion keeps the attached chat context without repeating build instructions', async () => {
+  const view = await createPendingView(ws.id, ws.path)
+  await submitView(ws, view.id, { requirements: 'Build cards', sessionId: 'fresh' })
+  await completeViewBuild(ws.id, ws.path, view.id)
+  await sendWorkspaceMessage(ws, {
+    workspaceId: ws.id,
+    workspacePath: ws.path,
+    sessionId: 'fresh',
+    isNew: false,
+    content: 'What do you think?',
+    context: { activeTab: { id: 'overview' } }
+  })
+  expect(sent.at(-1)?.context?.chatTab).toEqual({ id: `views/${view.id}` })
+  expect(renderMoiContext(sent.at(-1)!.context!)).not.toContain(
+    'Build a new view from this message.'
+  )
+})
+
+test('a pinned chat receives one build request per view, with no repeats on follow-ups', async () => {
+  await pinSession(ws.path, 'source')
+  for (const requirements of ['Build cards', 'Build a calendar']) {
+    const view = await createPendingView(ws.id, ws.path)
+    await submitView(ws, view.id, { requirements })
+    expect(renderMoiContext(sent.at(-1)!.context!)).toContain(`The view id is \`${view.id}\`.`)
+    expect(renderMoiContext(sent.at(-1)!.context!)).toContain('moi views create --requirements')
+    await sendWorkspaceMessage(ws, {
+      workspaceId: ws.id,
+      workspacePath: ws.path,
+      sessionId: 'source',
+      isNew: false,
+      content: 'Continue',
+      context: { activeTab: { id: `views/${view.id}` } }
+    })
+    const rendered = renderMoiContext(sent.at(-1)!.context!)
+    expect(rendered).not.toContain('Build a new view from this message.')
+    expect(rendered).not.toContain('moi views create')
+    expect(rendered).not.toContain('pinned')
+    expect(sent.at(-1)?.context?.chatTab).toBeUndefined()
+    expect(rendered).not.toContain('start it in its own chat')
+  }
 })
 
 test('rejected ordinary sends do not mark a pending view submitted', async () => {
@@ -471,7 +682,7 @@ test('rejected ordinary sends do not mark a pending view submitted', async () =>
       sessionId: 'fresh',
       isNew: true,
       content: 'Continue',
-      context: { activeTab: `views/${view.id}` }
+      context: { activeTab: { id: `views/${view.id}` } }
     })
   ).rejects.toThrow('Unavailable')
   expect((await getPendingView(ws.path, view.id))?.status).toBe('draft')

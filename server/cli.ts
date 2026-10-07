@@ -832,14 +832,13 @@ const viewsSet = defineCommand({
 const viewsCreate = defineCommand({
   meta: {
     name: 'create',
-    description: 'Create a view in its own chat, or build in the pinned chat'
+    description: 'Create a view, optionally forking a source chat to build it'
   },
   args: {
     dir: { type: 'positional', default: '.', description: 'Workspace directory' },
-    'source-session': {
+    'from-session': {
       type: 'string',
-      required: true,
-      description: 'Current session id from moi context'
+      description: 'Session id to fork into a new view chat'
     },
     requirements: { type: 'string', required: true, description: 'Complete view requirements' }
   },
@@ -850,7 +849,7 @@ const viewsCreate = defineCommand({
         JSON.stringify({
           type: 'view:create',
           path: resolve(args.dir),
-          sourceSessionId: args['source-session'],
+          fromSessionId: args['from-session'],
           requirements: args.requirements
         })
       )
