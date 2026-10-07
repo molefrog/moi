@@ -75,6 +75,30 @@ while moi keeps running, changing which models are available.
 
 ---
 
+## Workspace discovery
+
+`discovery.ts` reads cwd metadata directly from `$CLAUDE_CONFIG_DIR/projects`
+(default `~/.claude/projects`). Do not use SDK `listSessions({})` here: it
+builds session summaries across the whole history, although discovery only
+needs workspace paths.
+
+The scan streams at most 2,048 project-root entries and 128 entries per project,
+reads at most three 64 KiB transcript heads per project, and stops at the first
+absolute top-level `cwd`. Reads are sequential; nested subagent directories and
+symlinks are skipped. Existing directories are deduplicated and linked git
+worktrees excluded. `.git` checks read only the first 4 KiB.
+
+A two-second cooperative deadline stops scheduling more work; an already pending
+filesystem operation is allowed to finish. Concurrent callers share one scan,
+with results cached for 30 seconds after completion. Registration filtering runs
+per request so importing a workspace hides it immediately.
+
+Discovery is best-effort: folders beyond these limits, or with cwd only in
+truncated/late records, may be omitted and can still be imported manually.
+Session listing and history replay continue to use the SDK.
+
+---
+
 ## 1. Three layers
 
 ```
