@@ -89,9 +89,9 @@ symlinks are skipped. Existing directories are deduplicated and linked git
 worktrees excluded. `.git` checks read only the first 4 KiB.
 
 A two-second cooperative deadline stops scheduling more work; an already pending
-filesystem operation is allowed to finish. Concurrent callers share one scan,
-with results cached for 30 seconds after completion. Registration filtering runs
-per request so importing a workspace hides it immediately.
+filesystem operation is allowed to finish. The shared registry owns request
+deduplication, caching and registration filtering for every harness; see
+[workspace discovery](../README.md#workspace-discovery).
 
 Discovery is best-effort: folders beyond these limits, or with cwd only in
 truncated/late records, may be omitted and can still be imported manually.

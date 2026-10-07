@@ -1,10 +1,11 @@
 // Discover workspace paths from rollout metadata under $CODEX_HOME/sessions
 // (default ~/.codex/sessions), even when the CLI is no longer installed.
-import { readdir, stat } from 'node:fs/promises'
+import { stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
 
 import type { DiscoveredWorkspaceCandidate } from '../types'
+import { DISCOVERY_HEAD_BYTES, DISCOVERY_SCAN_MS, discoveryEntries } from '../discovery'
 
 export const CODEX_SESSIONS_ROOT = join(
   process.env.CODEX_HOME || join(homedir(), '.codex'),
@@ -13,9 +14,7 @@ export const CODEX_SESSIONS_ROOT = join(
 
 // Bound discovery cost; workspaces present only in older rollouts may be missed.
 const SCAN_LIMIT = 400
-// The session_meta line is small (id/cwd/timestamps), but read a generous head
-// in case a Codex version inlines instructions into it.
-const HEAD_BYTES = 64 * 1024
+const DIRECTORY_ENTRIES = 2048
 
 type SessionMeta = { cwd: string; timestamp?: string }
 
@@ -25,7 +24,7 @@ type SessionMeta = { cwd: string; timestamp?: string }
 async function readSessionMeta(file: string): Promise<SessionMeta | null> {
   let head: string
   try {
-    head = await Bun.file(file).slice(0, HEAD_BYTES).text()
+    head = await Bun.file(file).slice(0, DISCOVERY_HEAD_BYTES).text()
   } catch {
     return null
   }
@@ -57,22 +56,21 @@ async function readSessionMeta(file: string): Promise<SessionMeta | null> {
   return null
 }
 
-// Date-partitioned names sort chronologically, so descending traversal can
-// stop at the cap without enumerating the entire history.
-async function listRolloutFiles(root: string, limit: number): Promise<string[]> {
+// Prefer newer date partitions within the bounded sample. Histories exceeding
+// the entry/file/time limits may omit workspaces; explicit import still works.
+async function listRolloutFiles(root: string, limit: number, deadline: number): Promise<string[]> {
   const out: string[] = []
-  async function walk(dir: string) {
-    let entries
-    try {
-      entries = await readdir(dir, { withFileTypes: true })
-    } catch {
-      return
+  async function walk(dir: string, depth = 0) {
+    if (depth > 3 || out.length >= limit || performance.now() >= deadline) return
+    const entries = []
+    for await (const entry of discoveryEntries(dir, DIRECTORY_ENTRIES, deadline)) {
+      entries.push(entry)
     }
     entries.sort((a, b) => (a.name < b.name ? 1 : -1))
     for (const e of entries) {
-      if (out.length >= limit) return
+      if (out.length >= limit || performance.now() >= deadline) return
       const p = join(dir, e.name)
-      if (e.isDirectory()) await walk(p)
+      if (e.isDirectory()) await walk(p, depth + 1)
       else if (e.isFile() && e.name.endsWith('.jsonl')) out.push(p)
     }
   }
@@ -84,16 +82,19 @@ export async function discoverCodexWorkspaces(
   registeredPaths: Set<string>,
   sessionsRoot: string = CODEX_SESSIONS_ROOT
 ): Promise<DiscoveredWorkspaceCandidate[]> {
-  const files = await listRolloutFiles(sessionsRoot, SCAN_LIMIT)
+  const deadline = performance.now() + DISCOVERY_SCAN_MS
+  const files = await listRolloutFiles(sessionsRoot, SCAN_LIMIT, deadline)
   // Newest-first scan: only the first rollout seen per cwd is needed.
   const byCwd = new Map<string, string | undefined>()
   for (const file of files) {
+    if (performance.now() >= deadline) break
     const meta = await readSessionMeta(file)
     if (!meta || byCwd.has(meta.cwd)) continue
     byCwd.set(meta.cwd, meta.timestamp)
   }
   const out: DiscoveredWorkspaceCandidate[] = []
   for (const cwd of byCwd.keys()) {
+    if (performance.now() >= deadline) break
     if (registeredPaths.has(cwd)) continue
     try {
       if (!(await stat(cwd)).isDirectory()) continue
