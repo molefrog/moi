@@ -12,18 +12,12 @@ const views: ViewInfo[] = [
 describe('assembleTabRows', () => {
   test('lists static tabs then views, marking the saved default', () => {
     const rows = assembleTabRows(views, 'views/roadmap')
-    expect(rows.map(r => r.id)).toEqual([
-      'overview',
-      'agent',
-      'scratchpad',
-      'views/roadmap',
-      'views/orders'
-    ])
+    expect(rows.map(r => r.id)).toEqual(['overview', 'scratchpad', 'views/roadmap', 'views/orders'])
     expect(rows.find(r => r.isDefault)?.id).toBe('views/roadmap')
   })
 
   test('falls back to the view id when the title is empty', () => {
-    const rows = assembleTabRows(views, 'agent')
+    const rows = assembleTabRows(views, 'overview')
     expect(rows.find(r => r.id === 'views/orders')?.title).toBe('orders')
     expect(rows.find(r => r.id === 'views/roadmap')?.title).toBe('Roadmap')
   })
@@ -44,10 +38,15 @@ describe('assembleTabRows', () => {
   })
 })
 
-test('discovery includes portable links but no singleton chat contract', () => {
+test('every discovered tab has a portable address', () => {
   const rows = assembleTabRows(views, 'overview')
   expect(rows.find(row => row.id === 'views/orders')?.href).toBe('moi:/views/orders')
-  expect(rows.find(row => row.id === 'agent')?.href).toBeUndefined()
+  expect(rows.map(row => row.href)).toEqual([
+    'moi:/overview',
+    'moi:/scratchpad',
+    'moi:/views/roadmap',
+    'moi:/views/orders'
+  ])
 })
 
 describe('assertNavigableTab', () => {

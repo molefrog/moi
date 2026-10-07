@@ -54,8 +54,6 @@ type ChatPanelProps = {
   // into the trailing assistant run so a thinking-only
   // preview folds into the current tool group. See client/lib/preview-turn.ts.
   previewTurn?: Turn | null
-  // Selected session id — used only as the scroll reset key (jump to bottom on
-  // session switch).
   sessionId?: string | null
   processing: boolean
   composerBanner?: ComposerBanner
@@ -64,8 +62,7 @@ type ChatPanelProps = {
   send: (text: string, options?: ChatSendOptions) => Promise<void>
   stop: () => void
   onNavigateFromWelcome: (destination: WelcomeDestination) => void
-  // Chat on a separate tab doesn't have a close button
-  onClose?: () => void
+  onClose: () => void
   viewDraft?: ViewChatDraft
 }
 
@@ -181,7 +178,7 @@ export function ChatPanel({
         <div className="flex h-7 min-w-0 flex-1">
           <ChatSelector className={cn('text-foreground', docked && 'text-muted-foreground')} />
         </div>
-        {onClose && docked && (
+        {docked && (
           <Tooltip>
             <TooltipTrigger
               render={
@@ -193,7 +190,7 @@ export function ChatPanel({
             <TooltipContent>Undock chat</TooltipContent>
           </Tooltip>
         )}
-        {!viewDraft && onClose && !docked && (
+        {!viewDraft && !docked && (
           <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close chat">
             <IconX stroke={2} />
           </Button>

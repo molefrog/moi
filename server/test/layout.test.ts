@@ -18,7 +18,7 @@ const base: WorkspaceLayout = {
   version: 1,
   widgetGrid: [],
   layoutMode: 'fullscreen',
-  tabs: { open: ['overview', 'agent'], active: 'overview' }
+  tabs: { open: ['overview', 'scratchpad'], active: 'overview' }
 }
 
 async function withWorkspaceFile<T>(
@@ -181,13 +181,13 @@ describe('loadLayout', () => {
         version: 1,
         widgetGrid: [],
         tabs: {
-          open: ['agent', 'views/dashboard', 'overview', 'scratchpad'],
+          open: ['views/dashboard', 'overview', 'scratchpad'],
           active: 'views/dashboard'
         }
       },
       async dir => {
         expect((await loadLayout(dir)).tabs).toEqual({
-          open: ['overview', 'agent', 'views/dashboard', 'scratchpad'],
+          open: ['overview', 'views/dashboard', 'scratchpad'],
           active: 'views/dashboard'
         })
       }
@@ -265,7 +265,7 @@ describe('mergeLayoutForSave', () => {
       version: 1,
       widgetGrid: [],
       layoutMode: 'fullscreen',
-      tabs: { open: ['overview', 'agent'], active: 'overview' }
+      tabs: { open: ['overview', 'scratchpad'], active: 'overview' }
     })
   })
 
@@ -275,14 +275,14 @@ describe('mergeLayoutForSave', () => {
       version: 1,
       widgetGrid: [{ i: 'w', x: 1, y: 2 }],
       layoutMode: 'split',
-      tabs: { open: ['agent', 'overview'], active: 'agent' },
+      tabs: { open: ['scratchpad', 'overview'], active: 'scratchpad' },
       selectedModel: 'sonnet',
       selectedFastMode: false,
       theme: { font: 'sans', color: 'rose', radius: 'square', agent: 'dorito' }
     }
     const merged = mergeLayoutForSave(existing, body)
     expect(merged.layoutMode).toBe('split')
-    expect(merged.tabs).toEqual({ open: ['overview', 'agent'], active: 'agent' })
+    expect(merged.tabs).toEqual({ open: ['overview', 'scratchpad'], active: 'scratchpad' })
     expect(merged.selectedModel).toBe('sonnet')
     expect(merged.selectedFastMode).toBe(false)
     expect(merged.theme).toEqual({
@@ -317,7 +317,7 @@ describe('mergeLayoutForSave', () => {
   test('an explicit tab update still changes authored defaults after an unrelated save', () => {
     const { tabs: _tabs, ...body } = base
     const saved = mergeLayoutForSave(base, { ...body, layoutMode: 'split' })
-    const tabs: WorkspaceLayout['tabs'] = { open: ['overview', 'agent'], active: 'agent' }
+    const tabs: WorkspaceLayout['tabs'] = { open: ['overview', 'scratchpad'], active: 'scratchpad' }
     expect(mergeLayoutForSave(saved, { ...saved, tabs })).toEqual({
       ...saved,
       tabs
@@ -327,11 +327,11 @@ describe('mergeLayoutForSave', () => {
   test('drops the old Widgets tab id from stale client saves', () => {
     const body = {
       ...base,
-      tabs: { open: ['agent', 'widgets', 'scratchpad'], active: 'widgets' }
+      tabs: { open: ['widgets', 'scratchpad'], active: 'widgets' }
     } as unknown as WorkspaceLayout
 
     expect(mergeLayoutForSave(base, body).tabs).toEqual({
-      open: ['overview', 'agent', 'scratchpad'],
+      open: ['overview', 'scratchpad'],
       active: 'overview'
     })
   })

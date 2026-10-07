@@ -95,12 +95,6 @@ describe('groupSessionsForTab', () => {
       [
         ...sessions,
         {
-          sessionId: 'agent',
-          summary: 'Agent',
-          lastModified: now.getTime() - 4,
-          tabId: 'agent'
-        },
-        {
           sessionId: 'older',
           summary: 'Older',
           lastModified: new Date(2026, 6, 29, 12).getTime(),
@@ -119,7 +113,7 @@ describe('groupSessionsForTab', () => {
     expect(
       groups.map(group => [group.label, group.sessions.map(session => session.sessionId)])
     ).toEqual([
-      ['Today', ['scratchpad', 'overview', 'generic', 'agent']],
+      ['Today', ['scratchpad', 'overview', 'generic']],
       ['Yesterday', ['older']]
     ])
     expect(sessions.map(session => session.sessionId)).toEqual([

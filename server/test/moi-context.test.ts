@@ -26,8 +26,8 @@ describe('moi context envelope', () => {
     expect(renderMoiContext({ activeTab: { id: 'views/crm' } })).toContain(
       'The user is on the "crm" view tab (.moi/views/crm.tsx).'
     )
-    expect(renderMoiContext({ activeTab: { id: 'agent' } })).toContain(
-      'The user is on the "Agent" tab (full page chat).'
+    expect(renderMoiContext({ activeTab: { id: 'overview' } })).toContain(
+      'The user is on the "Overview" tab.'
     )
   })
 
@@ -149,14 +149,16 @@ describe('moi context envelope', () => {
     expect(isMoiContext({ activeTab: 'overview' })).toBe(false)
     expect(isMoiContext({ activeTab: null })).toBe(false)
     expect(isMoiContext({ activeTab: { id: 'overview', title: 1 } })).toBe(false)
-    expect(isMoiContext({ activeTab: { id: 'agent' }, directives: [1] })).toBe(false)
-    expect(isMoiContext({ activeTab: { id: 'agent', params: ['a'] } })).toBe(false)
+    expect(isMoiContext({ activeTab: { id: 'overview' }, directives: [1] })).toBe(false)
+    expect(isMoiContext({ activeTab: { id: 'overview', params: ['a'] } })).toBe(false)
     expect(isMoiContext({ applet: { kind: 'view', id: '' } })).toBe(false)
     expect(isMoiContext({ applet: { kind: 'tab', id: 'orders' } })).toBe(false)
     expect(isMoiContext({ applet: { kind: 'view', id: 1 } })).toBe(false)
     expect(isMoiContext({ applet: { source: 'view:orders' } })).toBe(false)
     expect(isMoiContext({ applet: [] })).toBe(false)
-    expect(isMoiContext({ activeTab: { id: 'agent' }, applet: { context: { a: 1 } } })).toBe(false)
+    expect(isMoiContext({ activeTab: { id: 'overview' }, applet: { context: { a: 1 } } })).toBe(
+      false
+    )
     expect(
       isMoiContext({
         activeTab: { id: 'overview' },

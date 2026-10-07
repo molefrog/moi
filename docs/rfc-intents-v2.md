@@ -63,7 +63,6 @@ moi tabs — workspace tabs, the default one marked
 
      tab          title
   ●  overview     Overview
-     agent        Agent
      scratchpad   Scratchpad
      views/orders  Orders
      views/shop    Shop

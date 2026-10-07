@@ -42,7 +42,7 @@ type ViewManagerProps = {
   views: CompiledView[]
   // The view the active tab names, or null when another tab is on screen. The
   // manager stays mounted either way — that is what makes coming back from the
-  // agent or Overview tab instant too.
+  // Overview or Scratchpad tab instant too.
   activeViewId: string | null
   // The active view's URL query params. Parked views retain their last values.
   params: Record<string, string>

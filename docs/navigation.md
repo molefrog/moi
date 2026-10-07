@@ -9,8 +9,7 @@ Portable addresses identify destinations inside the current workspace:
 
 The host resolves these to `/workspace/<id>/views/events?eventId=123`. Domain and deployment
 prefix belong to the host adapter in `lib/navigation.ts`. Tab IDs use those same workspace-relative
-paths (`views/events`), without query strings, including in saved layouts. The singleton agent tab
-remains a host-internal route.
+paths (`views/events`), without query strings, including in saved layouts.
 `resolveUrl` maps workspace files to `/api/workspaces/<id>/files/...` on the current origin.
 
 ## One controller

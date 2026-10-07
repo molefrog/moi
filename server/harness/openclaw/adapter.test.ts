@@ -221,7 +221,7 @@ describe('toStreamEvents model-change notices', () => {
 
 describe('toSessionInfo — moi-context stripping (issue: envelope in title)', () => {
   const envelope =
-    'Sup fool\n\n<moi-context>\nYou are running in a `moi` workspace — a shared UI.\n# Active tab\nThe user is on the "Agent" tab.\n</moi-context>'
+    'Sup fool\n\n<moi-context>\nYou are running in a `moi` workspace — a shared UI.\n# Active tab\nThe user is on the "Overview" tab.\n</moi-context>'
 
   test('strips the moi-context envelope from a derived title', () => {
     // The gateway derives titles from the sent message, which carries the

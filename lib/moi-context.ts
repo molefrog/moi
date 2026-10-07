@@ -116,7 +116,6 @@ function describeTab(tab: Pick<TabContext, 'id' | 'title'>): string {
   // Titles come from applet config, so they carry the same forgery risk as any
   // other applet-authored string in here.
   const title = tab.title === undefined ? undefined : escapeTags(tab.title)
-  if (tab.id === 'agent') return 'the "Agent" tab (full page chat)'
   if (tab.id === 'overview') return 'the "Overview" tab'
   if (tab.id === 'scratchpad') return 'the "Scratchpad" tab'
   if (tab.id.startsWith('views/')) {

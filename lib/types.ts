@@ -602,11 +602,11 @@ export type StatusMessage = {
 export type LayoutGridItem = { i: string; x: number; y: number }
 
 // Persisted layout of the workspace panel:
-//   fullscreen — tabbed full-panel workspace; Agent chat is the first tab
-//   split      — Agent chat as a left column, workspace content on the right
+//   fullscreen — full-width workspace with chat in a floating popup
+//   split      — workspace content with a docked chat sidebar on the right
 export type LayoutMode = 'fullscreen' | 'split'
 
-export type WorkspaceTabId = 'agent' | 'overview' | 'scratchpad' | `views/${string}`
+export type WorkspaceTabId = 'overview' | 'scratchpad' | `views/${string}`
 
 // Open tabs plus the workspace's saved DEFAULT tab. `active` is not live focus
 // state — the live active tab is each browser tab's URL (`/workspace/:id/<tab>`).

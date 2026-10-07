@@ -2451,7 +2451,7 @@ const debug = defineCommand({
 function runTabsList(dir: string) {
   const path = resolve(dir)
   sendControl(path, { type: 'tabs', path }, res => {
-    type Row = { title: string; isDefault: boolean; href?: string }
+    type Row = { title: string; isDefault: boolean; href: string }
     const rows: Row[] = Array.isArray(res.tabs) ? (res.tabs as Row[]) : []
     console.log(
       '\n' + pc.bold('moi tabs') + pc.dim(' — workspace tabs, the default one marked') + '\n'
@@ -2462,7 +2462,7 @@ function runTabsList(dir: string) {
         rows.map(row => [
           row.isDefault ? pc.green('●') : ' ',
           row.isDefault ? pc.bold(row.title) : row.title,
-          row.href ?? '—'
+          row.href
         ])
       )
     )

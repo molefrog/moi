@@ -3,7 +3,6 @@ import type { WorkspaceTabId } from './types'
 
 export function isWorkspaceTabId(value: unknown): value is WorkspaceTabId {
   return (
-    value === 'agent' ||
     value === 'overview' ||
     value === 'scratchpad' ||
     // Match the applet IDs accepted by the server's module routes.
