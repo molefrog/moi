@@ -21,7 +21,8 @@ import {
   updatePendingView,
   completeViewBuild,
   discardPendingView,
-  beginViewBuild
+  beginViewBuild,
+  patchPendingView
 } from './pending-views'
 import {
   getSessionRecord,
@@ -213,6 +214,7 @@ test.each(['manual', 'cli'])(
       expect(renderMoiContext(sent[0].context!)).toContain('Build a new view from this message.')
       expect(renderMoiContext(sent[0].context!)).toContain('moi views create --requirements')
     }
+    harness.activeSessions = () => []
     await pinSession(ws.path, null)
     await sendWorkspaceMessage(ws, {
       workspaceId: ws.id,
@@ -546,6 +548,7 @@ test('fresh handoff failure reports the provider ID after a native rename', asyn
 })
 
 test('a fresh chat after unpinning receives the saved view requirements', async () => {
+  harness.activeSessions = () => []
   const view = await createPendingView(ws.id, ws.path, {
     requirements: 'Build a gardening board with watering reminders',
     status: 'submitted',
@@ -590,6 +593,126 @@ test('follow-ups keep chat context without repeating the build request, includin
     expect(rendered).not.toContain('moi views create')
     expect(rendered).toContain('# This message only\nUse compact spacing.')
   }
+})
+
+test('an unrelated pinned chat cannot take ownership of a running view build', async () => {
+  const view = await createPendingView(ws.id, ws.path)
+  await submitView(ws, view.id, {
+    requirements: 'Build a weather dashboard',
+    sessionId: 'builder'
+  })
+  await saveSelectedSession(ws.path, 'source', undefined, 'overview')
+  await pinSession(ws.path, 'source')
+  harness.activeSessions = () => [{ workspaceId: ws.id, sessionId: 'builder', activity: 'running' }]
+  const before = await getPendingView(ws.path, view.id)
+
+  await sendWorkspaceMessage(ws, {
+    workspaceId: ws.id,
+    workspacePath: ws.path,
+    sessionId: 'source',
+    isNew: false,
+    content: 'What are you working on?',
+    context: { activeTab: { id: `views/${view.id}` } }
+  })
+
+  const message = sent.at(-1)!
+  expect(message.sessionId).toBe('source')
+  expect(message.context?.activeTab).toEqual({ id: `views/${view.id}` })
+  expect(message.context?.chatTab).toBeUndefined()
+  expect(renderMoiContext(message.context!)).not.toContain('Build a new view from this message.')
+  expect(await getSessionRecord(ws.path, 'builder')).toEqual({ tabId: `views/${view.id}` })
+  expect(await getSelectedSession(ws.path, `views/${view.id}`)).toBe('builder')
+  expect(await getPinnedSession(ws.path)).toBe('source')
+  expect(await getPendingView(ws.path, view.id)).toEqual(before)
+})
+
+test('an unrelated pinned chat cannot clear a failed view build or its error', async () => {
+  const view = await createPendingView(ws.id, ws.path)
+  await submitView(ws, view.id, {
+    requirements: 'Build a weather dashboard',
+    sessionId: 'builder'
+  })
+  await patchPendingView(ws.id, ws.path, view.id, {
+    status: 'failed',
+    error: 'Weather data could not be loaded'
+  })
+  await saveSelectedSession(ws.path, 'source', undefined, 'overview')
+  await pinSession(ws.path, 'source')
+  harness.activeSessions = () => []
+  const before = await getPendingView(ws.path, view.id)
+
+  await sendWorkspaceMessage(ws, {
+    workspaceId: ws.id,
+    workspacePath: ws.path,
+    sessionId: 'source',
+    isNew: false,
+    content: 'What are you working on?',
+    context: { activeTab: { id: `views/${view.id}` } }
+  })
+
+  expect(sent.at(-1)?.sessionId).toBe('source')
+  expect(renderMoiContext(sent.at(-1)!.context!)).not.toContain(
+    'Build a new view from this message.'
+  )
+  expect(await getPendingView(ws.path, view.id)).toEqual(before)
+})
+
+test('a fresh chat cannot take over a view while its builder is running', async () => {
+  const view = await createPendingView(ws.id, ws.path)
+  await submitView(ws, view.id, { requirements: 'Build a weather dashboard', sessionId: 'builder' })
+  harness.activeSessions = () => [{ workspaceId: ws.id, sessionId: 'builder', activity: 'running' }]
+  const before = await getPendingView(ws.path, view.id)
+
+  await expect(
+    sendWorkspaceMessage(ws, {
+      workspaceId: ws.id,
+      workspacePath: ws.path,
+      sessionId: 'fresh',
+      isNew: true,
+      content: 'Continue',
+      context: { activeTab: { id: `views/${view.id}` } }
+    })
+  ).rejects.toThrow('already being built in another chat')
+
+  expect(sent).toHaveLength(1)
+  expect(await getPendingView(ws.path, view.id)).toEqual(before)
+  expect(await getSelectedSession(ws.path, `views/${view.id}`)).toBe('builder')
+  expect(await getSessionRecord(ws.path, 'fresh')).toEqual({})
+})
+
+test('the builder can resume its failed view while an unrelated failed view is visible', async () => {
+  const view = await createPendingView(ws.id, ws.path)
+  await submitView(ws, view.id, { requirements: 'Build weather cards', sessionId: 'builder' })
+  await patchPendingView(ws.id, ws.path, view.id, { status: 'failed', error: 'Build failed' })
+  const other = await createPendingView(ws.id, ws.path, {
+    status: 'failed',
+    requirements: 'Build a calendar',
+    executionSessionId: 'other-builder',
+    error: 'Other build failed'
+  })
+  const otherBefore = await getPendingView(ws.path, other.id)
+  await pinSession(ws.path, 'builder')
+
+  await sendWorkspaceMessage(ws, {
+    workspaceId: ws.id,
+    workspacePath: ws.path,
+    sessionId: 'builder',
+    isNew: false,
+    content: 'Fix the weather cards',
+    context: { activeTab: { id: `views/${other.id}` } }
+  })
+
+  expect(await getPendingView(ws.path, view.id)).toMatchObject({
+    status: 'submitted',
+    executionSessionId: 'builder'
+  })
+  expect((await getPendingView(ws.path, view.id))?.error).toBeUndefined()
+  expect(await getPendingView(ws.path, other.id)).toEqual(otherBefore)
+  expect(sent.at(-1)?.context?.chatTab).toEqual({ id: `views/${view.id}` })
+  expect(sent.at(-1)?.context?.activeTab).toEqual({ id: `views/${other.id}` })
+  expect(renderMoiContext(sent.at(-1)!.context!)).not.toContain(
+    'Build a new view from this message.'
+  )
 })
 
 test('ordinary sends preserve the visible tab snapshot and resolve the chat tab separately', async () => {

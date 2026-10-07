@@ -33,36 +33,29 @@ the acknowledged navigation channel, then returns `viewId`, `mode: "handoff"`, a
 creation result. The source agent ends its turn with a view link. The child continues
 building without navigating again on completion.
 
-CLI creation depends only on whether `--from-session` is supplied. Pin state
-does not change its behavior. A pinned chat can remain visible while a forked chat
-builds the view; unpinning reveals the selected child chat.
 Manual submission sends to the pinned chat when present, without changing its
-attribution or the new view's empty selection. Unpinning reveals an empty composer.
+attribution or the new view's empty selection. Pin state does not affect CLI creation.
+Unpinning reveals the view's selected chat or an empty composer.
 
 ## Agent context
 
-The initial build request includes the assigned view ID, source path, provisional
-metadata command, available icons, and final view link. It is sent once when a chat
-starts working on a pending view, including a fork or an existing pinned chat.
-A fresh chat continuing a pending view receives the instructions and saved requirements.
-The build instructions also supply the `moi views create --requirements …`
-command for additional views. Forked build requests include a reminder to treat
-inherited conversation as background.
+Build instructions are sent once when a chat starts working on a pending view.
+They supply the view ID, source path, metadata command, icons, and final link.
+A fresh chat receives the saved requirements and can resume only when the previous
+builder is idle. Forked requests include a reminder to treat inherited history as background.
 
-Browser messages include `activeTab` with its ID, title, and current URL parameters.
-The server adds `chatTab`, the tab this chat belongs to, which can differ from the
-visible tab. Programmatic build requests omit `activeTab` when the visible tab is
-unknown; the build instructions supply the target view ID separately.
-Follow-ups retain tab context without pin state, session IDs, creation commands,
-fork origin, or the initial build request. Pin state and fork provenance remain
-internal. CLI creation reports its mode to the agent; manual submissions use the current pin.
+Browser messages include `activeTab` with its ID, title, and URL parameters. The server
+adds `chatTab`, the tab the chat belongs to. Programmatic sends omit an unknown
+`activeTab`. Follow-ups retain tab context; session IDs, pin state, and fork provenance
+remain internal.
 
 ## State and completion
 
 `DATA_DIR/pending-views.json` holds pending views. Their startup statuses are `draft`,
 `starting`, `submitted`, and `failed`. Building/waiting presentation derives from
-normal session activity. `executionSessionId` tracks execution, including pinned
-execution; it is never chat ownership.
+normal session activity. `executionSessionId` identifies the builder, including pinned
+execution, independently of chat attribution. Ordinary messages update build state
+only when the sending chat matches this ID.
 
 `moi views set <id> --title "…" --icon <id>` updates pending metadata only. A successful
 bundle reveals the compiled view, whose manifest config supplies its title/icon, and

@@ -16,7 +16,8 @@ import {
   createPendingView,
   getPendingView,
   listPendingViews,
-  patchPendingView
+  patchPendingView,
+  PendingViewError
 } from './pending-views'
 
 export class ViewStartupError extends Error {
@@ -43,14 +44,32 @@ export async function sendWorkspaceMessage(
   const sessionId = resolveRenamedSession(ws.path, input.sessionId)
   const record = await getSessionRecord(ws.path, sessionId)
   const tabId = input.context?.activeTab?.id ?? record.tabId ?? 'overview'
+  const targetViewId = viewBuildId ?? (input.isNew ? viewIdFromTab(tabId) : undefined)
+  const ownedViews = targetViewId
+    ? []
+    : (await listPendingViews(ws.path)).filter(view => view.executionSessionId === sessionId)
+  const pending = targetViewId
+    ? await getPendingView(ws.path, targetViewId)
+    : (ownedViews.find(view => view.id === viewIdFromTab(tabId)) ?? ownedViews[0])
+  const isBuildRequest = pending && (viewBuildId === pending.id || input.isNew)
+  if (
+    isBuildRequest &&
+    pending.executionSessionId &&
+    pending.executionSessionId !== sessionId &&
+    (pending.status === 'starting' ||
+      harnessFor(ws)
+        .activeSessions()
+        .some(
+          session =>
+            session.workspaceId === ws.id && session.sessionId === pending.executionSessionId
+        ))
+  )
+    throw new PendingViewError('This view is already being built in another chat', 409)
   if (input.isNew && record.tabId !== tabId) {
     record.tabId = tabId === 'overview' ? undefined : tabId
     await attachSession(ws, tabId, sessionId, null, selectedSessionScope)
   }
-  const viewId = viewBuildId ?? viewIdFromTab(tabId)
-  const pending = viewId ? await getPendingView(ws.path, viewId) : undefined
-  const isBuildRequest = pending && (viewBuildId === pending.id || input.isNew)
-  if (pending)
+  if (isBuildRequest)
     await patchPendingView(ws.id, ws.path, pending.id, {
       executionSessionId: sessionId
     })

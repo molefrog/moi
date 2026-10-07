@@ -20,6 +20,7 @@ import { resolveScratchOp } from './scratchpad-relay'
 import { allHarnesses, harnessFor } from './harness/registry'
 import { getWorkspace, listWorkspaces } from './registry'
 import { failInterruptedViewStarts, sendWorkspaceMessage } from './view-sessions'
+import { PendingViewError } from './pending-views'
 import {
   addClient,
   broadcast,
@@ -221,7 +222,7 @@ export const app = Bun.serve<WsData>({
             context: data.context,
             agentId: workspace.agentId
           }).catch(error => {
-            if (error instanceof AttachmentUploadError) {
+            if (error instanceof AttachmentUploadError || error instanceof PendingViewError) {
               broadcast(workspace.id, {
                 kind: 'error',
                 sessionId: data.sessionId,
