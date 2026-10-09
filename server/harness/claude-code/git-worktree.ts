@@ -3,8 +3,11 @@
 // Claude Code accumulates session history in every directory an agent ever ran
 // in, including the throwaway checkouts created for worktree-isolated runs.
 // Those derived directories shouldn't surface as importable workspaces in the
-// discovery list, so we filter them out. moi doesn't support running inside a
-// worktree yet — see docs/git-worktrees.md.
+// discovery list, so we filter them out. This is a filter on discovery only:
+// moi doesn't support running inside a linked worktree as a workspace, and a
+// worktree that was already imported stays registered until removed by hand.
+// Detection fails open — a read error means "not a worktree" — so a transient
+// filesystem hiccup can let a worktree through but never hides a real repo.
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
