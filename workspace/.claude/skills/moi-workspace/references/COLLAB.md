@@ -39,10 +39,6 @@ Use `usePeers()` to find other connected users on the current page. It excludes 
 user and combines multiple browser tabs into one user. Set `scope: 'workspace'` to include
 other pages; its status filter accepts `'active'` or `'away'`.
 
-A host-supplied directory is authoritative, including an empty list, and is the same in
-every workspace. Without one, user lookups fall back to your profile and connected users;
-they cannot discover offline members.
-
 ### Components
 
 #### `User` and `UserAvatar`
