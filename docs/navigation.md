@@ -41,7 +41,8 @@ home tab, selects the chat, and reveals the sidebar or popup. Its browser addres
 `/workspace/<workspace-id>/chats/<session-id>`. Chats without tab
 attribution, including old Agent chats, open on Overview. Both pending and compiled
 views are valid destinations. The entry route is replaced with the tab's plain URL;
-it creates no separate chat tab and forwards no view parameters.
+it creates no separate chat tab and forwards no view parameters. Applet and CLI
+requests push the home tab like view links, so Back returns to the previous page.
 
 Opening a different chat unpins the workspace's current chat before selecting the
 requested one. Linking to the already pinned chat preserves its pin. Selection uses

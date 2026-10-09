@@ -26,6 +26,7 @@ function mountNavigation(path: string, collab: boolean) {
   const location = new URL(`http://localhost/prefix/workspace/abc/${path}`)
   Object.defineProperty(window, 'location', { configurable: true, value: location })
   const storage = new Map<string, string>()
+  const entries: { kind: 'push' | 'replace'; href: string }[] = []
   const globals = {
     window,
     document,
@@ -36,8 +37,14 @@ function mountNavigation(path: string, collab: boolean) {
     addEventListener: window.addEventListener.bind(window),
     removeEventListener: window.removeEventListener.bind(window),
     history: {
-      pushState: (_state: unknown, _title: string, href: string) => move(href),
-      replaceState: (_state: unknown, _title: string, href: string) => move(href)
+      pushState: (_state: unknown, _title: string, href: string) => {
+        entries.push({ kind: 'push', href })
+        move(href)
+      },
+      replaceState: (_state: unknown, _title: string, href: string) => {
+        entries.push({ kind: 'replace', href })
+        move(href)
+      }
     },
     sessionStorage: {
       getItem: (key: string) => storage.get(key) ?? null,
@@ -181,7 +188,7 @@ function mountNavigation(path: string, collab: boolean) {
       )?.selected.scratchpad
     ).toBe('source')
   }
-  return { render, document, window, waitForNavigation }
+  return { render, document, window, waitForNavigation, history: entries }
 }
 
 for (const collab of [false, true]) {
@@ -190,6 +197,10 @@ for (const collab of [false, true]) {
       const fixture = mountNavigation('chats/source', collab)
       await fixture.render()
       await fixture.waitForNavigation()
+      // A direct load has no origin page, so the entry route is replaced in place.
+      expect(fixture.history).toEqual([
+        { kind: 'replace', href: '/prefix/workspace/abc/scratchpad' }
+      ])
     })
 
     test.each(['source', 'native'])(
@@ -204,6 +215,12 @@ for (const collab of [false, true]) {
         })
         expect(click.defaultPrevented).toBe(true)
         await fixture.waitForNavigation()
+        // One net history entry: the pushed chat route is replaced by its home
+        // tab, so Back returns to the page the link was clicked on.
+        expect(fixture.history).toEqual([
+          { kind: 'push', href: '/prefix/workspace/abc/chats/source' },
+          { kind: 'replace', href: '/prefix/workspace/abc/scratchpad' }
+        ])
       }
     )
   })

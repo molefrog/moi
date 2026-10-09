@@ -342,7 +342,7 @@ for (const collab of [false, true]) {
       const { queryClient, selection, navigate, routed, revealed, writes, storage } = fixture
       queryClient.setQueryData(selectedSessionKey('abc'), { ...selection, pinned })
       await navigate(`moi:/chats/${id}`)
-      expect(routed).toEqual([{ path: `/prefix/workspace/abc/${tab}`, replace: true }])
+      expect(routed).toEqual([{ path: `/prefix/workspace/abc/${tab}`, replace: false }])
       expect(revealed).toEqual([true])
       expect(
         queryClient.getQueryData<WorkspaceSessionSelection>(selectedSessionKey('abc'))?.pinned
@@ -387,7 +387,7 @@ for (const collab of [false, true]) {
         { sessionId: 'legacy', summary: 'Legacy', lastModified: 1, tabId: 'agent' }
       ])
       await navigate('moi:/chats/legacy')
-      expect(routed).toEqual([{ path: '/prefix/workspace/abc/overview', replace: true }])
+      expect(routed).toEqual([{ path: '/prefix/workspace/abc/overview', replace: false }])
       expect(revealed).toEqual([true])
       expect(
         queryClient.getQueryData<WorkspaceSessionSelection>(
@@ -422,7 +422,7 @@ for (const collab of [false, true]) {
         expect(revealed).toEqual([])
         saving.resolve(Response.json({ sessionId: 'general' }))
         await opening
-        expect(routed).toEqual([{ path: '/prefix/workspace/abc/overview', replace: true }])
+        expect(routed).toEqual([{ path: '/prefix/workspace/abc/overview', replace: false }])
         expect(revealed).toEqual([true])
       })
 
@@ -442,7 +442,7 @@ for (const collab of [false, true]) {
         const original = { ...selection, pinned: 'pin' }
         queryClient.setQueryData(selectedSessionKey('abc'), original)
         await navigate(`moi:/chats/${id}`)
-        expect(routed).toEqual([{ path: '/prefix/workspace/abc/overview', replace: true }])
+        expect(routed).toEqual([{ path: '/prefix/workspace/abc/overview', replace: false }])
         expect(
           queryClient.getQueryData<WorkspaceSessionSelection>(selectedSessionKey('abc'))
         ).toEqual(original)

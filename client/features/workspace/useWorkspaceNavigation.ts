@@ -36,6 +36,13 @@ import {
 } from '@/lib/navigation'
 type NavigationOptions = { replace?: boolean }
 
+type OpenLinkedChatOptions = {
+  controller?: AbortController
+  // The chat route is an intermediate entry and gets replaced. Imperative
+  // requests push like view links, so Back returns to the origin page.
+  replace?: boolean
+}
+
 // A convenience for returning to tabs, never a second source of active state.
 // Memory-only, and scoped by workspace so switching workspaces cannot leak params.
 const rememberedAddresses = new Map<string, Map<WorkspaceTabId, string>>()
@@ -45,14 +52,56 @@ type UseWorkspaceNavigationOptions = {
   onOpenChat: () => void
 }
 
+type UseOpenChatLinkOptions = {
+  workspaceId: string
+  views: ViewInfo[]
+}
+
+// A chat link needs state prepared before its URL is valid: the chat becomes
+// the selection on its home tab, and a different pinned chat is unpinned
+// first. Resolves to that tab, or null when the chat or its tab is missing.
+// Navigation stays with the caller.
+export function useOpenChatLink({ workspaceId, views }: UseOpenChatLinkOptions) {
+  const queryClient = useQueryClient()
+  const collabEnabled = useCollabEnabled()
+  const [, , selectSessionForTab] = useSelectedSession()
+  const { pinAsync } = usePinnedSession()
+  const open = useLatestRef(
+    async (sessionId: string, signal: AbortSignal): Promise<WorkspaceTabId | null> => {
+      const tab = await resolveChatLink(queryClient, workspaceId, sessionId, views, signal)
+      if (!tab) return null
+      // Direct loads can resolve the chat before selection and pin state load.
+      await queryClient.ensureQueryData(selectedSessionOptions(workspaceId))
+      if (collabEnabled)
+        await queryClient.ensureQueryData(selectedSessionOptions(workspaceId, 'browser-tab'))
+      signal.throwIfAborted()
+      const pinned = queryClient.getQueryData<WorkspaceSessionSelection>(
+        selectedSessionKey(workspaceId)
+      )?.pinned
+      if (pinned && pinned !== sessionId) {
+        await pinAsync(null)
+        signal.throwIfAborted()
+      }
+      if (pinned !== sessionId) {
+        await selectSessionForTab(sessionId, tab)
+        signal.throwIfAborted()
+      }
+      return tab
+    }
+  )
+  // Stable so a route effect does not restart a link when views or selection change.
+  return useCallback(
+    (sessionId: string, signal: AbortSignal) => open.current(sessionId, signal),
+    [open]
+  )
+}
+
 export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNavigationOptions) {
   const queryClient = useQueryClient()
   const { layout, setLayout, workspaceId } = useWorkspaceLayoutCtx()
   const collabEnabled = useCollabEnabled()
-  const [, , selectSessionForTab] = useSelectedSession()
-  const { pinAsync } = usePinnedSession()
+  const openChat = useOpenChatLink({ workspaceId, views })
   const chatRequest = useRef<AbortController | null>(null)
-  const workspaceIdRef = useLatestRef(workspaceId)
   const onOpenChatRef = useLatestRef(onOpenChat)
   const [, navigate] = useLocation()
   const router = useRouter()
@@ -112,51 +161,28 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
     [go, remembered, workspaceId]
   )
 
-  const openLinkedChat = useLatestRef(
-    async (sessionId: string, controller = new AbortController()) => {
+  // Navigation owns the link's lifetime: one request at a time, cancelled by
+  // any navigation or route change. The chat hook prepares state; this turns
+  // its answer into the home tab's URL and reveals the chat.
+  const openLinkedChat = useCallback(
+    async (
+      sessionId: string,
+      { controller = new AbortController(), replace = false }: OpenLinkedChatOptions = {}
+    ) => {
       chatRequest.current?.abort()
       chatRequest.current = controller
-      const originalUrl = window.location.href
-      const checkCurrent = () => {
-        if (window.location.href !== originalUrl || workspaceIdRef.current !== workspaceId)
-          controller.abort()
-        controller.signal.throwIfAborted()
-      }
       try {
-        const tab = await resolveChatLink(
-          queryClient,
-          workspaceId,
-          sessionId,
-          views,
-          controller.signal
-        )
-        checkCurrent()
-        if (!tab) {
-          go(addressPath(workspaceId, { tab: 'overview', search: '' }), { replace: true })
-          return
-        }
-        // Direct loads can resolve the chat before selection and pin state load.
-        await queryClient.ensureQueryData(selectedSessionOptions(workspaceId))
-        if (collabEnabled)
-          await queryClient.ensureQueryData(selectedSessionOptions(workspaceId, 'browser-tab'))
-        checkCurrent()
-        const pinned = queryClient.getQueryData<WorkspaceSessionSelection>(
-          selectedSessionKey(workspaceId)
-        )?.pinned
-        if (pinned && pinned !== sessionId) {
-          await pinAsync(null)
-          checkCurrent()
-        }
-        if (pinned !== sessionId) {
-          await selectSessionForTab(sessionId, tab)
-          checkCurrent()
-        }
-        go(addressPath(workspaceId, { tab, search: '' }), { replace: true })
-        onOpenChatRef.current()
+        const tab = await openChat(sessionId, controller.signal)
+        controller.signal.throwIfAborted()
+        // Finished before the redirect, which cancels whatever is still in flight.
+        chatRequest.current = null
+        go(addressPath(workspaceId, { tab: tab ?? 'overview', search: '' }), { replace })
+        if (tab) onOpenChatRef.current()
       } finally {
         if (chatRequest.current === controller) chatRequest.current = null
       }
-    }
+    },
+    [go, onOpenChatRef, openChat, workspaceId]
   )
 
   useEffect(() => () => chatRequest.current?.abort(), [path, search, workspaceId])
@@ -171,7 +197,7 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
       }
       const address = parseMoiHref(href)
       if ('sessionId' in address) {
-        await openLinkedChat.current(address.sessionId)
+        await openLinkedChat(address.sessionId)
         return
       }
       if (!tabAvailable(address.tab, availableViews))
@@ -211,7 +237,7 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
       return
     }
     const controller = new AbortController()
-    void openLinkedChat.current(linkedSessionId, controller).catch(error => {
+    void openLinkedChat(linkedSessionId, { controller, replace: true }).catch(error => {
       if (!controller.signal.aborted) reportError(error)
     })
     return () => controller.abort()
