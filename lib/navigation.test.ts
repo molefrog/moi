@@ -2,8 +2,9 @@ import { describe, expect, test } from 'bun:test'
 import {
   addressPath,
   canonicalSearch,
+  chatSessionIdFromPath,
+  destinationHref,
   legacyTabFromPath,
-  moiHref,
   parseMoiHref,
   readViewParams,
   resolveUrl,
@@ -15,7 +16,10 @@ const context = { apiBase: '/api/workspaces/abc', workspacePath: '/workspace/abc
 
 describe('workspace addresses', () => {
   test('tab IDs are the workspace-relative paths', () => {
-    expect(parseMoiHref('moi:/views/events?eventId=123').tab).toBe('views/events')
+    expect(parseMoiHref('moi:/views/events?eventId=123')).toEqual({
+      tab: 'views/events',
+      search: '?eventId=123'
+    })
     expect(workspaceTabPath('ws1', 'views/events')).toBe('/workspace/ws1/views/events')
   })
 
@@ -32,7 +36,7 @@ describe('workspace addresses', () => {
   test('round trips a destination independently of workspace, origin, and deployment prefix', () => {
     const href = 'moi:/views/events?eventId=123'
     const address = parseMoiHref(href)
-    expect(moiHref(address.tab, address.search)).toBe(href)
+    expect(destinationHref(address)).toBe(href)
     expect(addressPath('abc', address)).toBe('/workspace/abc/views/events?eventId=123')
     expect(addressPath('other', address, '/prefix/')).toBe(
       '/prefix/workspace/other/views/events?eventId=123'
@@ -43,7 +47,10 @@ describe('workspace addresses', () => {
     )
   })
   test('accepts encoded IDs supported by the applet server', () => {
-    expect(parseMoiHref('moi:/views/%65vents_2026-09').tab).toBe('views/events_2026-09')
+    expect(parseMoiHref('moi:/views/%65vents_2026-09')).toEqual({
+      tab: 'views/events_2026-09',
+      search: ''
+    })
   })
 
   test('query values remain strings and follow URLSearchParams.get semantics', () => {
@@ -75,11 +82,26 @@ describe('workspace addresses', () => {
       'moi:/views/../overview',
       'moi:/views/a#part',
       'moi:/view-builders/a',
-      'moi:/chats/a',
+      'moi:/agent',
+      'moi:/chats/',
+      'moi:/chats/a/b',
+      'moi:/chats/%2f',
+      'moi:/chats/%',
       'moi:/files/a.md'
     ]) {
       expect(() => parseMoiHref(href)).toThrow()
     }
+  })
+  test('chat entry routes round trip without becoming workspace tabs', () => {
+    const address = parseMoiHref('moi:/chats/%61bc')
+    expect(address).toEqual({ sessionId: 'abc', search: '' })
+    expect(destinationHref(address)).toBe('moi:/chats/abc')
+    expect(addressPath('ws1', address, '/prefix')).toBe('/prefix/workspace/ws1/chats/abc')
+    expect(resolveUrl('moi:/chats/abc', context)).toBe('/workspace/abc/chats/abc')
+    expect(tabFromPath('chats/abc')).toBeNull()
+    expect(chatSessionIdFromPath('chats/provider%3Aid')).toBe('provider:id')
+    expect(chatSessionIdFromPath('chats/%252f')).toBe('%2f')
+    expect(chatSessionIdFromPath('chats/..')).toBeNull()
   })
   test('current tabs round trip through browser paths', () => {
     for (const tab of ['overview', 'scratchpad', 'views/events'] as const) {

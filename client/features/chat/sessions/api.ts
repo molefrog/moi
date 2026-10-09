@@ -14,12 +14,16 @@ import type {
   WorkspaceSessionSelection
 } from '@/lib/types'
 
-export function useWorkspaceSessions(workspaceId: string) {
-  return useQuery<SessionInfo[]>({
+export function workspaceSessionsOptions(workspaceId: string) {
+  return {
     queryKey: workspaceKeys.sessions(workspaceId),
-    queryFn: () => requestJson(`/api/workspaces/${workspaceId}/sessions`),
+    queryFn: () => requestJson<SessionInfo[]>(`/api/workspaces/${workspaceId}/sessions`),
     ...WORKSPACE_RESOURCE_OPTIONS
-  })
+  }
+}
+
+export function useWorkspaceSessions(workspaceId: string) {
+  return useQuery(workspaceSessionsOptions(workspaceId))
 }
 
 export function removeArchivedSession(

@@ -3,20 +3,38 @@ import { isWorkspaceTabId } from './workspace-tabs'
 
 export type ViewParams = Record<string, string>
 export type WorkspaceAddress = { tab: WorkspaceTabId; search: string }
+export type WorkspaceDestination = WorkspaceAddress | { sessionId: string; search: string }
 
-export function parseMoiHref(href: unknown): WorkspaceAddress {
+export function parseMoiHref(href: unknown): WorkspaceDestination {
   if (typeof href !== 'string' || !href.startsWith('moi:/') || href.startsWith('moi://')) {
     throw new Error('Expected a workspace address such as moi:/views/events?eventId=123')
   }
   const path = href.slice(5).split(/[?#]/, 1)[0]
   if (href.includes('#') || /[\s\\]/.test(path)) throw new Error('Invalid workspace address')
   const tab = tabFromPath(path)
-  if (!tab) {
+  const sessionId = chatSessionIdFromPath(path)
+  if (!tab && !sessionId) {
     throw new Error(`Unsupported workspace destination: ${path}`)
   }
   const query = href.indexOf('?')
   const search = query < 0 ? '' : canonicalSearch(href.slice(query + 1))
-  return { tab, search }
+  return sessionId ? { sessionId, search } : { tab: tab!, search }
+}
+
+export function chatSessionIdFromPath(path: string): string | null {
+  if (!path.startsWith('chats/')) return null
+  try {
+    const id = decodeURIComponent(path.slice('chats/'.length))
+    return id && id !== '.' && id !== '..' && !/[/\\\s\0]/.test(id) ? id : null
+  } catch {
+    return null
+  }
+}
+
+export function destinationHref(address: WorkspaceDestination): string {
+  return 'sessionId' in address
+    ? `moi:/chats/${encodeURIComponent(address.sessionId)}${address.search}`
+    : moiHref(address.tab, address.search)
 }
 
 export function canonicalSearch(search: string): string {
@@ -57,8 +75,8 @@ export function workspacePath(workspaceId: string, base = ''): string {
   return `${base.replace(/\/$/, '')}/workspace/${encodeURIComponent(workspaceId)}`
 }
 
-export function addressPath(workspaceId: string, address: WorkspaceAddress, base = ''): string {
-  return `${workspacePath(workspaceId, base)}/${address.tab}${address.search}`
+export function addressPath(workspaceId: string, address: WorkspaceDestination, base = ''): string {
+  return `${workspacePath(workspaceId, base)}/${destinationHref(address).slice(5)}`
 }
 
 export function workspaceTabPath(workspaceId: string, tab: WorkspaceTabId): string {
@@ -83,8 +101,10 @@ export function resolveUrl(url: string, context: ResolveUrlContext): string {
     return `${context.apiBase}/files/${segments.join('/')}${suffix}`
   }
   if (url.startsWith('moi:')) {
-    const { tab, search } = parseMoiHref(url)
-    return context.workspacePath ? `${context.workspacePath}/${tab}${search}` : ''
+    const address = parseMoiHref(url)
+    return context.workspacePath
+      ? `${context.workspacePath}/${destinationHref(address).slice(5)}`
+      : ''
   }
   // Only explicit ordinary web addresses may leave the workspace through the
   // imperative API. Native anchors keep their existing protocol policy.

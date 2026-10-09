@@ -8,12 +8,13 @@ test('chat renders portable links as native workspace hrefs with the deployment 
   const html = renderToStaticMarkup(
     <Router base="/prefix">
       <Workspace id="abc">
-        <MarkdownContent content="[Event](moi:/views/events?eventId=123) [Web](https://example.com/)" />
+        <MarkdownContent content="[Event](moi:/views/events?eventId=123) [Chat](moi:/chats/chat-1) [Web](https://example.com/)" />
       </Workspace>
     </Router>
   )
   expect(html).toContain('href="/prefix/workspace/abc/views/events?eventId=123"')
   expect(html).toContain('href="https://example.com/"')
+  expect(html).toContain('href="/prefix/workspace/abc/chats/chat-1"')
 })
 
 test('invalid moi links and executable URLs stay sanitized, including images', () => {
