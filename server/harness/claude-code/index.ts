@@ -5,10 +5,10 @@ import { forkSession } from '@anthropic-ai/claude-agent-sdk'
 
 import type { McpServer } from '@/lib/types'
 
-import type { DiscoveredWorkspaceCandidate, Harness } from '../types'
+import type { Harness } from '../types'
 import { findHarnessExecutable, pathHarnessAvailability } from '../executable'
 import { getClaudeAuthReadiness, startClaudeLogin } from './auth'
-import { isLinkedGitWorktree } from './git-worktree'
+import { discoverClaudeWorkspaces } from './discovery'
 import { getMcpStatus } from './mcp'
 import { getClaudeModels, lastProbedClaudeCli, onClaudeCliChanged } from './models'
 import {
@@ -48,34 +48,6 @@ function fmtAgo(ts: number, now: number): string {
   return `${Math.floor(m / 60)}h ${m % 60}m ago`
 }
 
-// Discover directories with CC session history that aren't registered yet.
-async function discoverWorkspaces(
-  registeredPaths: Set<string>
-): Promise<DiscoveredWorkspaceCandidate[]> {
-  try {
-    const { listSessions } = await import('@anthropic-ai/claude-agent-sdk')
-    const sessions = await listSessions({})
-    const { stat } = await import('node:fs/promises')
-    const paths = new Set<string>()
-    for (const s of sessions) {
-      if (!s.cwd || registeredPaths.has(s.cwd)) continue
-      try {
-        const info = await stat(s.cwd)
-        if (info.isDirectory()) paths.add(s.cwd)
-      } catch {}
-    }
-    // Drop linked git worktrees — throwaway checkouts (e.g. worktree-isolated
-    // runs) that shouldn't surface as importable workspaces.
-    const candidates = [...paths]
-    const worktree = await Promise.all(candidates.map(isLinkedGitWorktree))
-    return candidates
-      .filter((_, i) => !worktree[i])
-      .map(path => ({ path, type: 'claude-code' as const }))
-  } catch {
-    return []
-  }
-}
-
 // Keep future sends on the CLI version that supplied the model catalog.
 // Active turns and background work finish before the dispatcher replaces it.
 onClaudeCliChanged(() => retireCCSessionsOnCliChange())
@@ -107,7 +79,7 @@ export const claudeCodeHarness: Harness = {
   // The SDK's McpServerStatus is a superset of the UI's McpServer (extra
   // fields are ignored by the client) — pass it through unchanged.
   mcpStatus: async ws => (await getMcpStatus(ws.path)) as unknown as McpServer[],
-  discoverWorkspaces,
+  discoverWorkspaces: registeredPaths => discoverClaudeWorkspaces(registeredPaths),
   availability: async ws => {
     const runtime = await pathHarnessAvailability('claude-code')
     return runtime.status === 'available' && ws ? getClaudeAuthReadiness(ws.path) : runtime

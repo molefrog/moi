@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -88,5 +88,49 @@ describe('discoverCodexWorkspaces', () => {
 
   test('returns nothing when the sessions dir does not exist', async () => {
     expect(await discoverCodexWorkspaces(new Set(), join(root, 'missing'))).toEqual([])
+  })
+
+  test('caps transcript reads in a large day partition', async () => {
+    for (let i = 0; i < 410; i++) {
+      await writeRollout(`2026/07/10/rollout-${i}.jsonl`, sessionMeta(workDirs))
+    }
+    const reads = spyOn(Bun, 'file')
+    try {
+      expect(await discoverCodexWorkspaces(new Set(), root)).toEqual([
+        { path: workDirs, type: 'codex' }
+      ])
+      expect(reads.mock.calls.length).toBeLessThanOrEqual(400)
+    } finally {
+      reads.mockRestore()
+    }
+  })
+
+  test('keeps newest-first traversal within normal date partitions', async () => {
+    const older = join(workDirs, 'older')
+    const newer = join(workDirs, 'newer')
+    await mkdir(older)
+    await mkdir(newer)
+    await writeRollout('2026/06/01/rollout-old.jsonl', sessionMeta(older))
+    await writeRollout('2026/07/01/rollout-new.jsonl', sessionMeta(newer))
+    const found = await discoverCodexWorkspaces(new Set(), root)
+    expect(found.map(candidate => candidate.path)).toEqual([newer, older])
+  })
+
+  test('ignores nested histories beyond year/month/day partitions', async () => {
+    await writeRollout('2026/07/10/subagents/rollout.jsonl', sessionMeta(workDirs))
+    expect(await discoverCodexWorkspaces(new Set(), root)).toEqual([])
+  })
+
+  test('stops filesystem discovery after the scan deadline', async () => {
+    await writeRollout('2026/07/10/rollout.jsonl', sessionMeta(workDirs))
+    const now = spyOn(performance, 'now').mockReturnValueOnce(0).mockReturnValue(2001)
+    const reads = spyOn(Bun, 'file')
+    try {
+      expect(await discoverCodexWorkspaces(new Set(), root)).toEqual([])
+      expect(reads).not.toHaveBeenCalled()
+    } finally {
+      reads.mockRestore()
+      now.mockRestore()
+    }
   })
 })
