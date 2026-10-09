@@ -1,70 +1,68 @@
 # Workspace navigation
 
-Portable addresses identify destinations inside the current workspace:
+The idea is to give the whole workspace one way to say “open this, showing this state.”
 
-- `moi:/overview`
-- `moi:/scratchpad`
-- `moi:/views/events?eventId=123`
-- `moi:/chats/<session-id>`
-- `moi:/files/clips/video.mp4`
+moi links point to places in the current workspace:
+`moi:/views/events?eventId=123` becomes `/workspace/<id>/views/events?eventId=123`.
+moi fills in the workspace ID and server address. Use `moi:/` with one slash.
 
-The host resolves these to browser addresses such as `/workspace/<id>/views/events?eventId=123`.
-Domain and deployment prefix belong to the host. Tab IDs use the same workspace-relative paths
-(`views/events`), without query strings, including in saved layouts. File addresses point at the
-file itself on the current origin.
+The browser URL sets the open tab and passes values to views. All ways of opening a workspace
+link follow the same rules.
 
-## One controller
+Where links are used:
 
-Applet navigation, tab selection, link clicks, and CLI requests all go through one controller.
-Pages navigate within the app; files and HTTP(S) URLs open in the current browser tab. CLI
-navigation accepts workspace pages.
+- Widgets and views: `resolveUrl()` for links, `navigate()` for button actions.
+- Chat messages: Markdown links, such as `[Open event](moi:/views/events?eventId=123)`.
+- Tab bar: return to the last page opened in a tab.
+- CLI: `moi tabs` lists links; `moi navigate '<address>'` opens one.
+- Browser address bar: copy, bookmark, or open a page URL.
 
-Applet links and chat Markdown links resolve the same way. Modified clicks, downloads, targets,
-and web links keep browser behavior. Markdown accepts valid moi links, including files; moi image
-URLs stay sanitized. The server enforces file access restrictions.
+## Link types
 
-The browser URL owns the active destination and its params. Query values are strings (the first
-value wins for a repeated key), and views parse their own types. Canonical addresses sort query
-keys and preserve repeated values. A view's detail UI must render from params and navigate when
-selection changes; params live nowhere but the URL.
+- **Built-in tabs:** `moi:/overview` and `moi:/scratchpad` open their respective tabs.
+  Query values are not passed to widgets or built-in UI.
+- **Views:** `moi:/views/events?eventId=123` opens the `events` view. Query values become
+  its component's `params` prop: `{ eventId: '123' }`.
+- **Chats:** `moi:/chats/<session-id>` selects an existing chat, opens its home tab, and
+  reveals the chat panel. The URL becomes the home tab's plain URL; query values are not
+  forwarded to the view.
+- **Files:** `moi:/files/clips/video.mp4` opens a file relative to the workspace root through
+  `/api/workspaces/<id>/files/clips/video.mp4`. Query strings and fragments stay on the file URL.
+- **Web addresses:** `https://example.com` (or HTTP) opens an ordinary web address.
+  Its query values go to that destination.
 
-Navigation pushes history. Each workspace remembers its tabs' last addresses in browser memory. A
-tab click restores its address; an explicit link names the exact state to open. Only the active URL
-survives reload. Parked views retain their own params. Layout persistence still stores tab order
-and the default tab, without query strings.
+Chats without tab attribution use Overview. Missing chats or missing home tabs fall back to
+Overview without changing selection. Opening a different chat unpins the current chat.
+Share the `moi:/chats/<session-id>` link to identify an exact chat; the resulting address bar URL identifies only its tab.
 
-## Exact chat links
+## View parameters
 
-`moi:/chats/<session-id>` resolves inside the current workspace and opens the chat's home tab,
-selects the chat, and reveals the sidebar or popup. Its browser address is
-`/workspace/<workspace-id>/chats/<session-id>`. Chats without tab attribution, including old Agent
-chats, open on Overview. Both pending and compiled views are valid destinations. The entry address
-is replaced with the tab's plain URL; it creates no separate chat tab and forwards no view
-parameters. Applet and CLI requests push the home tab like view links, so Back returns to the
-previous page.
+The host decodes the query and renders `<View params={...} />`. Values are strings; the first
+value wins for repeated keys. Views parse numbers and booleans themselves. Read selection from
+`params` and change it by navigating, so links, reload, and Back restore the same state.
 
-Opening a different chat unpins the workspace's current chat before selecting the requested one.
-Linking to the already pinned chat preserves its pin. Selection uses the existing persistence:
-browser-tab-local with Collab enabled, shared otherwise. Missing chats or missing home tabs quietly
-redirect to Overview without changing selection or the workspace pin. Navigating away cancels a
-pending link.
+```tsx
+import { navigate, resolveUrl } from 'moi'
 
-Copying the resulting address bar URL links to the tab. Exact chat links keep the
-`moi:/chats/<session-id>` form; browser history does not track per-tab chat selections.
+type Props = { params?: Record<string, string> }
 
-Invalid action requests do not navigate. An unavailable direct browser address stays in the URL
-and shows recovery to Overview.
+export default function Events({ params = {} }: Props) {
+  return (
+    <>
+      <p>Selected event: {params.eventId ?? 'none'}</p>
+      <a href={resolveUrl('moi:/views/events?eventId=123')}>Open event 123</a>
+      <button onClick={() => navigate('moi:/views/events')}>Clear selection</button>
+    </>
+  )
+}
+```
 
-## CLI navigation
+Widgets receive no `params`. Chat messages carry the active view's non-empty params to the
+agent as `activeTab.params` in the moi context.
 
-`moi tabs` lists addresses. `moi navigate <address>` validates the address format, then asks one
-connected browser to navigate. Each browser reports the workspace it shows and when it was last
-focused; the most recently focused browser showing that workspace is chosen, even after focus moves
-to a terminal. A sole client needs no focus record; multiple clients without a focus record require
-the user to focus one first.
+Workspace pages add browser history; files and web addresses open in the current browser tab.
+Modified clicks, downloads, and explicit link targets retain browser behavior.
 
-The browser checks that the destination exists and acknowledges after applying the URL, without
-waiting for view data. Chat links also wait for resolution, unpinning when needed, and selection
-persistence before acknowledging, without waiting for the transcript. Disconnects and workspace
-switches fail pending requests. The five-second timeout does not retry: navigation may already have
-happened.
+A tab click restores its last address from browser memory; an explicit link opens exactly the
+state it names. Parked views keep their own params. Reload preserves only the active URL.
+Saved layouts store tab paths such as `views/events`, tab order, and the default tab, without query strings.
