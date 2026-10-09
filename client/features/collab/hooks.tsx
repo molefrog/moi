@@ -20,14 +20,6 @@ export function useConnectionState() {
   const engine = useCollabEngine()
   return useSyncExternalStore(engine.subscribe, engine.getUsersSnapshot, engine.getUsersSnapshot)
 }
-export function useWorkspaceDirectory() {
-  const engine = useCollabEngine()
-  return useSyncExternalStore(
-    engine.subscribeWorkspaceUsers,
-    engine.getWorkspaceDirectory,
-    engine.getWorkspaceDirectory
-  )
-}
 function useUsersSource() {
   const engine = useCollabEngine()
   const state = useConnectionState()
@@ -36,10 +28,13 @@ function useUsersSource() {
     engine.getCurrentUser,
     engine.getCurrentUser
   )
-  const directory = useWorkspaceDirectory()
+  const directory = useSyncExternalStore(
+    engine.subscribeDirectory,
+    engine.getDirectory,
+    engine.getDirectory
+  )
   const users = useMemo(
-    () =>
-      workspaceProfiles(state.users, self, directory?.status === 'loading' ? [] : directory?.users),
+    () => workspaceProfiles(state.users, self, directory),
     [state.users, self, directory]
   )
   return { state, self, users, engine }

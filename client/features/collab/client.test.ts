@@ -6,13 +6,22 @@ import type { CollabClientMessage } from '@/lib/collab/types'
 import { CollabService } from '@/server/collab/service'
 
 import { CollabClient, NO_ENGINE } from './client'
-import { getCurrentUser, setHostState } from './host-state'
+import { getCurrentUser, publishUsers } from './host-state'
+import type { UserProfileInput } from './host-state'
 
 const originalLocation = Object.getOwnPropertyDescriptor(globalThis, 'location')
 const originalWebSocket = Object.getOwnPropertyDescriptor(globalThis, 'WebSocket')
 let service: CollabService
 let sockets: TestSocket[]
 let stop: (() => void) | undefined
+
+// Publish as an outer host would: one viewer, listed in the directory.
+function signIn(user: UserProfileInput, others: readonly UserProfileInput[] = []) {
+  publishUsers({ me: user.id, users: [user, ...others] })
+}
+function signOut() {
+  publishUsers({ users: [] })
+}
 
 class TestSocket {
   static OPEN = 1
@@ -56,7 +65,7 @@ class TestSocket {
 }
 
 beforeEach(() => {
-  setHostState({ currentUser: undefined, workspaces: {} })
+  signOut()
   sockets = []
   service = new CollabService((connectionId, message) => {
     sockets
@@ -74,7 +83,7 @@ afterEach(() => {
   stop?.()
   stop = undefined
   service.close()
-  setHostState({ currentUser: undefined, workspaces: {} })
+  signOut()
   if (originalLocation) Object.defineProperty(globalThis, 'location', originalLocation)
   else Reflect.deleteProperty(globalThis, 'location')
   if (originalWebSocket) Object.defineProperty(globalThis, 'WebSocket', originalWebSocket)
@@ -100,22 +109,22 @@ test('an explicit user enables workspace presence without an applet and clearing
   const engine = new CollabClient('workspace')
   stop = engine.start()
   const profile = { id: 'alice', name: 'Alice', color: 'emerald' } as const
-  setHostState({ currentUser: profile, workspaces: {} })
+  signIn(profile)
   expect(sockets).toHaveLength(1)
   const socket = sockets[0]!
   socket.open()
   expect(socket.sent[0]).toMatchObject({ type: 'join', profile })
   expect(engine.getSnapshot().connections[0]?.userId).toEqual(profile.id)
-  setHostState({ currentUser: { ...profile, name: 'Alicia' }, workspaces: {} })
+  signIn({ ...profile, name: 'Alicia' })
   expect(socket.sent.at(-1)).toMatchObject({ type: 'profile', profile: { name: 'Alicia' } })
   expect(sockets).toHaveLength(1)
-  setHostState({ currentUser: undefined, workspaces: {} })
+  signOut()
   expect(socket.readyState).toBe(3)
   expect(engine.getSnapshot().status).toBe('disconnected')
 })
 
 test('two tabs send the same resolved color for a host user without one', () => {
-  setHostState({ currentUser: { id: 'alice' }, workspaces: {} })
+  signIn({ id: 'alice' })
   const first = new CollabClient('workspace')
   const second = new CollabClient('workspace')
   stop = first.start()
@@ -135,7 +144,7 @@ test('two tabs send the same resolved color for a host user without one', () => 
 })
 
 test('reconnecting restores current presence and removed registrations stay gone', async () => {
-  setHostState({ currentUser: { id: 'alice', name: 'Alice', color: 'emerald' }, workspaces: {} })
+  signIn({ id: 'alice', name: 'Alice', color: 'emerald' })
   const engine = new CollabClient('workspace')
   stop = engine.start()
   sockets[0]!.open()
@@ -176,7 +185,7 @@ test('a rejected join retries after capacity frees and cleanup cancels pending w
       profile: { id: `occupied-${index}`, color: 'blue' }
     })
   }
-  setHostState({ currentUser: { id: 'alice', color: 'emerald' }, workspaces: {} })
+  signIn({ id: 'alice', color: 'emerald' })
   const heartbeat = spyOn(globalThis, 'setInterval')
   const clearHeartbeat = spyOn(globalThis, 'clearInterval')
   const timer = spyOn(globalThis, 'setTimeout')
@@ -231,7 +240,7 @@ test('a rejected join retries after capacity frees and cleanup cancels pending w
 })
 
 test('errors after joining keep the connection available for further presence', () => {
-  setHostState({ currentUser: { id: 'alice', color: 'emerald' }, workspaces: {} })
+  signIn({ id: 'alice', color: 'emerald' })
   const client = new CollabClient('workspace')
   stop = client.start()
   const socket = sockets[0]!
@@ -250,24 +259,38 @@ test('errors after joining keep the connection available for further presence', 
 
 test('profile edits publish immediately without changing the user id or reconnecting', () => {
   const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
-  setHostState({ currentUser: alice, workspaces: {} })
+  signIn(alice)
   const engine = new CollabClient('workspace')
   stop = engine.start()
   sockets[0]!.open()
   const edited = { ...alice, name: 'Ada Lovelace', color: 'cyan' } as const
-  setHostState({ currentUser: edited, workspaces: {} })
+  signIn(edited)
   expect(sockets).toHaveLength(1)
   expect(sockets[0]!.readyState).toBe(TestSocket.OPEN)
   expect(sockets[0]!.sent.at(-1)).toEqual({ type: 'profile', profile: edited })
   expect(engine.getSnapshot().users).toEqual([edited])
 })
 
-test('changing user reconnects and never sends the host directory over the socket', async () => {
-  setHostState({ currentUser: { id: 'alice', name: 'Alice', color: 'emerald' }, workspaces: {} })
+test('a directory change that leaves the viewer alone sends nothing to the room', () => {
+  const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
+  const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
+  signIn(alice, [bob])
   const engine = new CollabClient('workspace')
   stop = engine.start()
   sockets[0]!.open()
-  setHostState({ currentUser: { id: 'bob', name: 'Bob', color: 'blue' }, workspaces: {} })
+  const sent = sockets[0]!.sent.length
+  signIn(alice, [{ ...bob, name: 'Robert' }])
+  expect(engine.getDirectory()).toEqual([alice, { ...bob, name: 'Robert' }])
+  expect(sockets[0]!.sent).toHaveLength(sent)
+  expect(sockets).toHaveLength(1)
+})
+
+test('changing user reconnects and never sends the host directory over the socket', async () => {
+  signIn({ id: 'alice', name: 'Alice', color: 'emerald' })
+  const engine = new CollabClient('workspace')
+  stop = engine.start()
+  sockets[0]!.open()
+  signIn({ id: 'bob', name: 'Bob', color: 'blue' })
   expect(sockets[0]!.readyState).toBe(3)
   await Bun.sleep(550)
   sockets[1]!.open()
@@ -275,25 +298,20 @@ test('changing user reconnects and never sends the host directory over the socke
   expect(sockets[1]!.sent.every(message => !('users' in message))).toBe(true)
 })
 
-test('disabled engine exposes host profiles and readiness without starting a transport', () => {
+test('disabled engine exposes host profiles without starting a transport', () => {
   const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
-  setHostState({
-    currentUser: alice,
-    workspaces: { workspace: { status: 'loading' } }
-  })
+  const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
+  signIn(alice)
   const engine = new CollabClient('workspace', false)
   stop = engine.start()
   expect(engine.enabled).toBe(false)
   expect(engine.workspaceId).toBe('workspace')
   expect(engine.getCurrentUser()).toEqual(alice)
-  expect(engine.getWorkspaceDirectory()).toEqual({ status: 'loading' })
+  expect(engine.getDirectory()).toEqual([alice])
   let updates = 0
-  const unsubscribe = engine.subscribeWorkspaceUsers(() => updates++)
-  setHostState({
-    currentUser: alice,
-    workspaces: { workspace: { status: 'ready', users: [alice] } }
-  })
-  expect(engine.getWorkspaceDirectory()).toEqual({ status: 'ready', users: [alice] })
+  const unsubscribe = engine.subscribeDirectory(() => updates++)
+  signIn(alice, [bob])
+  expect(engine.getDirectory()).toEqual([alice, bob])
   expect(updates).toBe(1)
   engine.setLocation({ page: 'overview', status: 'active' })
   engine.setPresence({
@@ -312,15 +330,15 @@ test('disabled engine exposes host profiles and readiness without starting a tra
 
 test('engine cleanup survives remounting and does not leave user listeners or retry sockets', async () => {
   const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
-  setHostState({ currentUser: alice, workspaces: {} })
+  signIn(alice)
   const engine = new CollabClient('workspace')
   stop = engine.start()
   engine.start()()
   sockets[0]!.open()
-  setHostState({ currentUser: { ...alice, name: 'Alicia' }, workspaces: {} })
+  signIn({ ...alice, name: 'Alicia' })
   expect(sockets[0]!.sent.filter(message => message.type === 'profile')).toHaveLength(1)
   stop()
-  setHostState({ currentUser: { ...alice, name: 'Alice again' }, workspaces: {} })
+  signIn({ ...alice, name: 'Alice again' })
   await Bun.sleep(550)
   expect(sockets).toHaveLength(1)
   stop = engine.start()
@@ -329,11 +347,18 @@ test('engine cleanup survives remounting and does not leave user listeners or re
   expect(engine.getSnapshot().status).toBe('connected')
 })
 
-test('the default engine keeps the current user readable while workspace operations stay inert', () => {
+test('the default engine keeps the viewer and directory readable while workspace operations stay inert', () => {
   const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
-  setHostState({ currentUser: alice, workspaces: {} })
+  const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
+  signIn(alice, [bob])
   expect(NO_ENGINE.getCurrentUser()).toEqual(alice)
-  expect(NO_ENGINE.getWorkspaceDirectory()).toBeUndefined()
+  // The directory belongs to the app, not to a workspace, so it needs no engine.
+  expect(NO_ENGINE.getDirectory()).toEqual([alice, bob])
+  let updates = 0
+  const unsubscribe = NO_ENGINE.subscribeDirectory(() => updates++)
+  signIn(alice)
+  unsubscribe()
+  expect([NO_ENGINE.getDirectory(), updates]).toEqual([[alice], 1])
   expect(NO_ENGINE.getPresenceSnapshot('one', 'field')).toBe(
     NO_ENGINE.getPresenceSnapshot('two', 'cursor')
   )

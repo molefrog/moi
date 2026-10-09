@@ -10,11 +10,10 @@ import type {
 
 import {
   getCurrentUser,
-  getWorkspaceDirectory,
+  getDirectory,
   subscribeCurrentUserStore,
-  subscribeWorkspaceUsersStore
+  subscribeDirectoryStore
 } from './host-state'
-import type { WorkspaceDirectory } from './host-state'
 import { CollabStore, DISCONNECTED_STATE } from './store'
 import type { ClientState, PresenceEntry } from './store'
 
@@ -32,8 +31,10 @@ export type CollabEngineApi = {
   subscribe: (listener: () => void) => Unsubscribe
   getCurrentUser: () => UserProfile | undefined
   subscribeCurrentUser: (listener: () => void) => Unsubscribe
-  getWorkspaceDirectory: () => WorkspaceDirectory | undefined
-  subscribeWorkspaceUsers: (listener: () => void) => Unsubscribe
+  // Everyone an outer host published. Undefined without a host, in which
+  // case live users stand in.
+  getDirectory: () => readonly UserProfile[] | undefined
+  subscribeDirectory: (listener: () => void) => Unsubscribe
   getLocation: () => ConnectionLocation | null
   setLocation: (location: ConnectionLocation | null) => void
   setPresence: (registration: PresenceRegistration) => void
@@ -53,8 +54,8 @@ export const NO_ENGINE: CollabEngineApi = {
   subscribe: () => noop,
   getCurrentUser,
   subscribeCurrentUser: subscribeCurrentUserStore,
-  getWorkspaceDirectory: () => undefined,
-  subscribeWorkspaceUsers: () => noop,
+  getDirectory,
+  subscribeDirectory: subscribeDirectoryStore,
   getLocation: () => null,
   setLocation: noop,
   setPresence: noop,
@@ -91,10 +92,8 @@ export class CollabClient implements CollabEngineApi {
     this.enabled ? this.store.subscribe(listener) : noop
   getCurrentUser = getCurrentUser
   subscribeCurrentUser = subscribeCurrentUserStore
-  getWorkspaceDirectory = (): WorkspaceDirectory | undefined =>
-    getWorkspaceDirectory(this.workspaceId)
-  subscribeWorkspaceUsers = (listener: () => void): Unsubscribe =>
-    subscribeWorkspaceUsersStore(this.workspaceId, listener)
+  getDirectory = getDirectory
+  subscribeDirectory = subscribeDirectoryStore
   getLocation = (): ConnectionLocation | null => (this.enabled ? this.store.getLocation() : null)
   setLocation = (location: ConnectionLocation | null): void => {
     this.store.setLocation(location)

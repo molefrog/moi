@@ -38,12 +38,11 @@ function describeTab(tab: string) {
 function renderUsers(options: FakeEngineOptions, list = false) {
   const engine = createFakeEngine({ page: 'overview', ...options })
   const state = engine.getUsersSnapshot()
-  const directory = engine.getWorkspaceDirectory()
   const users = summarizeWorkspaceUsers(state.connections, {
     currentUser: options.self,
     connectionId: state.connectionId,
     page: 'overview',
-    users: directory?.status === 'ready' ? [...directory.users] : []
+    users: engine.getDirectory() ?? []
   })
   return renderToStaticMarkup(
     <Router ssrPath="/workspace/test/overview">
@@ -168,19 +167,14 @@ test('self and peers only on the current tab have informational menu rows', () =
   expect(html).not.toContain('<button')
 })
 
-test('loading and authoritative empty directories do not leak live users into avatars', () => {
-  for (const options of [
-    { users: [self, active], directoryStatus: 'loading' as const },
-    { users: [] }
-  ]) {
-    const html = renderUsers({
-      self,
-      otherConnections: [connection(active, 'overview')],
-      ...options
-    })
-    expect(html).not.toContain('aria-label="Self"')
-    expect(html).not.toContain('Active colleague')
-  }
+test('an authoritative empty directory does not leak live users into avatars', () => {
+  const html = renderUsers({
+    self,
+    users: [],
+    otherConnections: [connection(active, 'overview')]
+  })
+  expect(html).not.toContain('aria-label="Self"')
+  expect(html).not.toContain('Active colleague')
 })
 
 test('menu is hidden without a current user', () => {

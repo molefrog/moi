@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { CollabEngineApi } from './client'
 import { createFakeEngine } from './testing/fake-engine'
-import { setHostState } from './host-state'
+import { publishUsers } from './host-state'
 import {
   useMe,
   usePeers,
@@ -10,8 +10,7 @@ import {
   usePublishPresence,
   useUser,
   useUsers,
-  useWorkspaceUsers,
-  useWorkspaceDirectory
+  useWorkspaceUsers
 } from './hooks'
 import { AppletPresenceProvider, CollabContext, pageFromPath } from './provider'
 import type { WorkspaceUser } from './hooks'
@@ -95,9 +94,31 @@ function Disabled() {
   return <Observer />
 }
 test('hooks are safe without a backend or applet and resolve missing users to undefined', () => {
-  setHostState({ currentUser: undefined, workspaces: {} })
+  publishUsers({ users: [] })
   const html = renderToStaticMarkup(<Disabled />)
   expect(html).toContain('[]')
+})
+
+test('a published directory resolves users without a workspace engine', () => {
+  publishUsers({ me: 'alice', users: [alice, bob] })
+  try {
+    function Global() {
+      return encodeURIComponent(
+        JSON.stringify({ me: useMe(), user: useUser('bob'), users: useWorkspaceUsers() })
+      )
+    }
+    // No room is joined here, so everyone resolves and reads as offline.
+    expect(JSON.parse(decodeURIComponent(renderToStaticMarkup(<Global />)))).toEqual({
+      me: { ...alice, status: 'offline' },
+      user: { ...bob, status: 'offline' },
+      users: [
+        { ...alice, status: 'offline' },
+        { ...bob, status: 'offline' }
+      ]
+    })
+  } finally {
+    publishUsers({ users: [] })
+  }
 })
 
 test('user hooks preserve missing names for self, peers, and offline members', () => {
@@ -215,7 +236,7 @@ test('workspace users include self and offline members with workspace-wide statu
   expect(render().all).toEqual([])
 })
 
-test('absent, loading, and empty directories preserve distinct user resolution', () => {
+test('absent and empty directories preserve distinct user resolution', () => {
   const engine = createFakeEngine({
     self: alice,
     users: [alice, bob],
@@ -225,12 +246,7 @@ test('absent, loading, and empty directories preserve distinct user resolution',
   function Directory() {
     const me = useMe()
     return encodeURIComponent(
-      JSON.stringify({
-        status: useWorkspaceDirectory()?.status,
-        users: useWorkspaceUsers(),
-        me,
-        hasMe: me !== undefined
-      })
+      JSON.stringify({ users: useWorkspaceUsers(), me, hasMe: me !== undefined })
     )
   }
   const render = () =>
@@ -251,13 +267,13 @@ test('absent, loading, and empty directories preserve distinct user resolution',
     me: { ...alice, status: 'active' },
     hasMe: true
   }
+  // Without a host directory, the viewer and live users stand in.
   expect(render()).toEqual(fallback)
-  engine.setDirectoryStatus('loading')
-  expect(render()).toEqual({ status: 'loading', users: [], hasMe: false })
+  // An empty host directory is authoritative, even over the viewer.
   engine.setUsers([])
-  expect(render()).toEqual({ status: 'ready', users: [], hasMe: false })
+  expect(render()).toEqual({ users: [], hasMe: false })
   engine.setUsers([alice, bob])
-  expect(render()).toEqual({ status: 'ready', ...fallback })
+  expect(render()).toEqual(fallback)
   engine.setUsers(undefined)
   expect(render()).toEqual(fallback)
 })

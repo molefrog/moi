@@ -1,8 +1,7 @@
 import type { UserProfile, Connection, PresenceRegistration } from '@/lib/collab/types'
 import { COLLAB_PROTOCOL_VERSION } from '@/lib/collab/protocol'
 import type { CollabEngineApi } from '../client'
-import { normalizeWorkspaceUsers } from '../host-state'
-import type { WorkspaceDirectory } from '../host-state'
+import { normalizeUsers } from '../host-state'
 import { CollabStore } from '../store'
 
 export type FakeEngineOptions = {
@@ -11,32 +10,23 @@ export type FakeEngineOptions = {
   otherConnections?: Connection[]
   // Full fixture directory, including users who are offline.
   users?: readonly UserProfile[]
-  directoryStatus?: WorkspaceDirectory['status']
 }
 export type FakeEngine = CollabEngineApi & {
   setOtherConnections: (otherConnections: Connection[]) => void
   setUsers: (users: readonly UserProfile[] | undefined) => void
-  setDirectoryStatus: (status: WorkspaceDirectory['status'] | undefined) => void
 }
 
 export function createFakeEngine({
   self,
   page = 'preview',
   otherConnections = [],
-  users,
-  directoryStatus = users === undefined ? undefined : 'ready'
+  users
 }: FakeEngineOptions): FakeEngine {
   const store = new CollabStore()
   const presence = new Map<string, PresenceRegistration>()
   const userListeners = new Set<() => void>()
-  const directory = users === undefined ? undefined : normalizeWorkspaceUsers(users)
+  let directory = users === undefined ? undefined : normalizeUsers(users)
   let profiles = directory ?? (self ? [self] : [])
-  let directorySnapshot: WorkspaceDirectory | undefined =
-    directoryStatus === 'ready'
-      ? { status: directoryStatus, users: directory ?? [] }
-      : directoryStatus === 'loading'
-        ? { status: directoryStatus }
-        : undefined
   let currentOtherConnections = otherConnections
   let location: Connection['location'] = { page, status: 'active' }
   const connections = (): Connection[] => [
@@ -89,8 +79,8 @@ export function createFakeEngine({
     subscribe: store.subscribe,
     getCurrentUser: () => self,
     subscribeCurrentUser: () => () => {},
-    getWorkspaceDirectory: () => directorySnapshot,
-    subscribeWorkspaceUsers: listener => {
+    getDirectory: () => directory,
+    subscribeDirectory: listener => {
       userListeners.add(listener)
       return () => {
         userListeners.delete(listener)
@@ -109,21 +99,10 @@ export function createFakeEngine({
       announce()
     },
     setUsers: next => {
-      const directory = next === undefined ? undefined : normalizeWorkspaceUsers(next)
-      directorySnapshot =
-        directory === undefined ? undefined : { status: 'ready', users: directory }
+      directory = next === undefined ? undefined : normalizeUsers(next)
       if (directory) profiles = directory
       userListeners.forEach(listener => listener())
       announce()
-    },
-    setDirectoryStatus: status => {
-      directorySnapshot =
-        status === 'ready'
-          ? { status, users: profiles }
-          : status === 'loading'
-            ? { status }
-            : undefined
-      userListeners.forEach(listener => listener())
     }
   }
 }
