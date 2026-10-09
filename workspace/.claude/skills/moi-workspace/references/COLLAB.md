@@ -27,8 +27,8 @@ This tracks tab visibility, not idle time. A user on another page can still be a
 
 Use `useMe()` when an action needs the current user's identity, such as assigning a task
 to yourself. Use `useUser(id)` to resolve a stored author or assignee, including an offline
-member. Both return `undefined` when the profile cannot be resolved, including while the
-workspace directory loads. Handle that before reading profile fields.
+member. Both return `undefined` when the profile cannot be resolved. Handle that before
+reading profile fields.
 
 #### `useWorkspaceUsers` and `usePeers`
 
@@ -39,8 +39,9 @@ Use `usePeers()` to find other connected users on the current page. It excludes 
 user and combines multiple browser tabs into one user. Set `scope: 'workspace'` to include
 other pages; its status filter accepts `'active'` or `'away'`.
 
-A host-supplied directory is authoritative, including an empty list. Without one, user
-lookups fall back to your profile and connected users; they cannot discover offline members.
+A host-supplied directory is authoritative, including an empty list, and is the same in
+every workspace. Without one, user lookups fall back to your profile and connected users;
+they cannot discover offline members.
 
 ### Components
 

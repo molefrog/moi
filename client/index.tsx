@@ -23,8 +23,12 @@ if (import.meta.hot) {
   startHmrWatchdog()
 }
 
+// Installed while this module evaluates, not inside `init`: an outer host's
+// script runs right after this bundle and calls `window.moi.collab.publishUsers`
+// straight away, before the async startup below has finished.
+installHostApi()
+
 export async function init(el: HTMLElement) {
-  installHostApi()
   // Startup config and any proxy-verified user load in parallel with the
   // main chunk, so both are available synchronously from the first render.
   const [{ mount }, config, proxyUser] = await Promise.all([

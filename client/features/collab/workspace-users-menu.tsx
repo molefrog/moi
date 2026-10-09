@@ -19,7 +19,7 @@ import { tabFromPath } from '@/lib/navigation'
 import { User } from './components/user'
 import { UserAvatarGroup } from './components/user-avatar-group'
 import { pageFromPath, useCollabEnabled, useCollabEngine } from './provider'
-import { useConnectionState, useWorkspaceUsers, useWorkspaceDirectory } from './hooks'
+import { useConnectionState, useWorkspaceUsers } from './hooks'
 import { summarizeWorkspaceUsers } from './users'
 import type { WorkspaceUserInfo } from './users'
 
@@ -42,7 +42,6 @@ export function WorkspaceUsersMenu({
   const engine = useCollabEngine()
   const state = useConnectionState()
   const workspaceUsers = useWorkspaceUsers()
-  const directory = useWorkspaceDirectory()
   const currentUser = useSyncExternalStore(
     engine.subscribeCurrentUser,
     engine.getCurrentUser,
@@ -89,10 +88,7 @@ export function WorkspaceUsersMenu({
             onOpenTab(tab)
           }}
         />
-        {directory?.status === 'loading' && (
-          <p className="px-2 py-1 text-xs text-muted-foreground">Loading workspace users…</p>
-        )}
-        {users.length === 0 && directory?.status !== 'loading' && (
+        {users.length === 0 && (
           <p className="px-2 py-1 text-xs text-muted-foreground">No workspace users to show.</p>
         )}
       </PopoverContent>
