@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "gh-stack": {
+      "source": "github/gh-stack",
+      "sourceType": "github",
+      "skillPath": "skills/gh-stack/SKILL.md",
+      "computedHash": "6a5289601eedbeedc2d79c2d8627277afb9b9a3fbd78b4da3399a46dd788ae0a"
+    },
     "shadcn": {
       "source": "shadcn/ui",
       "sourceType": "github",
