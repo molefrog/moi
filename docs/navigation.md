@@ -6,8 +6,8 @@ moi links point to places in the current workspace:
 `moi:/views/events?eventId=123` becomes `/workspace/<id>/views/events?eventId=123`.
 moi fills in the workspace ID and server address. Use `moi:/` with one slash.
 
-The browser URL sets the open tab and passes values to views. All ways of opening a workspace
-link follow the same rules.
+The browser URL sets the open tab and passes values to views. The app and `moi.resolveUrl`
+use the same resolver in `lib/navigation.ts` for workspace links, files, and web addresses.
 
 Where links are used:
 
@@ -23,16 +23,17 @@ Where links are used:
   Query values are not passed to widgets or built-in UI.
 - **Views:** `moi:/views/events?eventId=123` opens the `events` view. Query values become
   its component's `params` prop: `{ eventId: '123' }`.
-- **Chats:** `moi:/chats/<session-id>` selects an existing chat, opens its home tab, and
-  reveals the chat panel. The URL becomes the home tab's plain URL; query values are not
-  forwarded to the view.
+- **Chats:** `moi:/chat` reveals or focuses the current chat, preserving selection and pin.
+  `moi:/chats/<session-id>` selects an existing chat and reveals the chat panel. Both use
+  the workspace's last opened tab, like a bare workspace URL, and restore its remembered
+  view parameters. Query values on chat links are ignored.
 - **Files:** `moi:/files/clips/video.mp4` opens a file relative to the workspace root through
   `/api/workspaces/<id>/files/clips/video.mp4`. Query strings and fragments stay on the file URL.
 - **Web addresses:** `https://example.com` (or HTTP) opens an ordinary web address.
   Its query values go to that destination.
 
-Chats without tab attribution use Overview. Missing chats or missing home tabs fall back to
-Overview without changing selection. Opening a different chat unpins the current chat.
+Missing chats restore the last opened tab without changing selection. Opening a different chat
+unpins the current chat.
 Share the `moi:/chats/<session-id>` link to identify an exact chat; the resulting address bar URL identifies only its tab.
 
 ## View parameters

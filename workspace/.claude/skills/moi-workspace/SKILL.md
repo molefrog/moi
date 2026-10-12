@@ -120,7 +120,10 @@ Use the task-specific sections below for workflow guidance. The CLI will grow ov
 Use `moi:/` addresses in chat, CLI commands, and applets. They refer to the current workspace,
 independently of its domain and deployment path.
 
-Supported destinations: `moi:/overview`, `moi:/scratchpad`, and `moi:/views/<id>`.
+Supported destinations: `moi:/overview`, `moi:/scratchpad`, `moi:/views/<id>`,
+`moi:/chat`, and `moi:/chats/<session-id>`. Both chat links open the workspace's last opened tab
+and reveal the chat. `moi:/chat` keeps the current selection and pin; an exact chat link selects
+that chat.
 Run `moi tabs` to discover views and their addresses. Widgets are not navigation destinations.
 
 Put view params in the query string. Values are strings; read the target view's `Params` type

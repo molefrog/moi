@@ -1,70 +1,44 @@
 import { describe, expect, test } from 'bun:test'
-import {
-  addressPath,
-  canonicalSearch,
-  chatSessionIdFromPath,
-  destinationHref,
-  legacyTabFromPath,
-  parseMoiHref,
-  readViewParams,
-  resolveUrl,
-  tabFromPath,
-  workspaceTabPath
-} from './navigation'
+import { resolveUrl } from './navigation'
 
-const context = { apiBase: '/api/workspaces/abc', workspacePath: '/workspace/abc' }
+const context = { workspaceId: 'abc' }
 
-describe('workspace addresses', () => {
-  test('tab IDs are the workspace-relative paths', () => {
-    expect(parseMoiHref('moi:/views/events?eventId=123')).toEqual({
-      tab: 'views/events',
-      search: '?eventId=123'
-    })
-    expect(workspaceTabPath('ws1', 'views/events')).toBe('/workspace/ws1/views/events')
-  })
+describe('resolveUrl', () => {
+  test.each(['overview', 'scratchpad', 'views/events', 'chat', 'chats/session-1'])(
+    'resolves %s inside the supplied workspace',
+    path => {
+      expect(resolveUrl(`moi:/${path}`, context)).toBe(`/workspace/abc/${path}`)
+      expect(resolveUrl(`moi:/${path}`, { workspaceId: 'other', base: '/prefix/' })).toBe(
+        `/prefix/workspace/other/${path}`
+      )
+    }
+  )
 
-  test('old browser bookmarks resolve without accepting legacy tab IDs in new addresses', () => {
-    expect(legacyTabFromPath('view:orders')).toBe('views/orders')
-    expect(legacyTabFromPath('view-builder:abc')).toBeNull()
-    expect(legacyTabFromPath('view:%65vents')).toBe('views/events')
-    expect(legacyTabFromPath('view:%2565vents')).toBeNull()
-    expect(legacyTabFromPath('view:a/b')).toBeNull()
-    expect(legacyTabFromPath('views/orders')).toBeNull()
-    expect(() => parseMoiHref('moi:/view:orders')).toThrow()
-  })
-
-  test('round trips a destination independently of workspace, origin, and deployment prefix', () => {
-    const href = 'moi:/views/events?eventId=123'
-    const address = parseMoiHref(href)
-    expect(destinationHref(address)).toBe(href)
-    expect(addressPath('abc', address)).toBe('/workspace/abc/views/events?eventId=123')
-    expect(addressPath('other', address, '/prefix/')).toBe(
-      '/prefix/workspace/other/views/events?eventId=123'
+  test('normalizes portable addresses for CLI validation without a workspace', () => {
+    expect(resolveUrl('moi:/views/%65vents?b=2&a=1')).toBe('moi:/views/events?a=1&b=2')
+    expect(resolveUrl('moi:/chats/provider%3Aid', context)).toBe(
+      '/workspace/abc/chats/provider%3Aid'
     )
-    expect(resolveUrl(href, context)).toBe('/workspace/abc/views/events?eventId=123')
-    expect(resolveUrl(href, { ...context, workspacePath: '/prefix/workspace/abc' })).toBe(
-      '/prefix/workspace/abc/views/events?eventId=123'
+    expect(resolveUrl('moi:/chats/%252f', context)).toBe('/workspace/abc/chats/%252f')
+    expect(resolveUrl('moi:/views/events', { workspaceId: 'a/b' })).toBe(
+      '/workspace/a%2Fb/views/events'
     )
   })
-  test('accepts encoded IDs supported by the applet server', () => {
-    expect(parseMoiHref('moi:/views/%65vents_2026-09')).toEqual({
-      tab: 'views/events_2026-09',
-      search: ''
-    })
-  })
 
-  test('query values remain strings and follow URLSearchParams.get semantics', () => {
+  test('encodes query values once and preserves repeated values', () => {
     const values = { title: 'Grüße & a/b?c=#100% +', enabled: 'false', page: '02', empty: '' }
-    const href = `moi:/views/events?${new URLSearchParams(values)}`
-    expect(readViewParams(parseMoiHref(href).search)).toEqual(values)
-    expect(readViewParams('?x=1&x=2')).toEqual({ x: '1' })
-    expect(readViewParams('?x=&x=2')).toEqual({ x: '' })
-    expect(canonicalSearch('?b=2&a=1&b=3')).toBe('?a=1&b=2&b=3')
-    expect(readViewParams(parseMoiHref('moi:/views/events?x=1&x=2').search)).toEqual({ x: '1' })
-    expect(readViewParams('')).toEqual({})
-    expect(Object.hasOwn(readViewParams('__proto__=safe'), '__proto__')).toBe(true)
+    const resolved = new URL(
+      resolveUrl(`moi:/views/events?${new URLSearchParams(values)}`, context),
+      'https://moi.test'
+    )
+    for (const [key, value] of Object.entries(values))
+      expect(resolved.searchParams.get(key)).toBe(value)
+    expect(resolveUrl('moi:/views/events?b=2&x=1&x=2&a=1', context)).toBe(
+      '/workspace/abc/views/events?a=1&b=2&x=1&x=2'
+    )
   })
-  test('rejects ambiguous, malformed, private, and unsupported destinations', () => {
+
+  test('rejects malformed or unsupported addresses, including retired bookmarks', () => {
     for (const href of [
       null,
       2,
@@ -72,6 +46,8 @@ describe('workspace addresses', () => {
       '/views/events',
       'view:events',
       'moi://views/events',
+      'moi:/view:events',
+      'moi:/agent',
       'moi:/views/',
       'moi:/views/a/b',
       'moi:/views/%2f',
@@ -82,69 +58,52 @@ describe('workspace addresses', () => {
       'moi:/views/../overview',
       'moi:/views/a#part',
       'moi:/view-builders/a',
-      'moi:/agent',
+      'moi:/chat/',
+      'moi:/chat#part',
       'moi:/chats/',
       'moi:/chats/a/b',
       'moi:/chats/%2f',
       'moi:/chats/%',
-      'moi:/files/a.md'
-    ]) {
-      expect(() => parseMoiHref(href)).toThrow()
-    }
+      'moi:/chats/%00',
+      'moi:/chats/..'
+    ])
+      expect(() => resolveUrl(href, context)).toThrow()
   })
-  test('chat entry routes round trip without becoming workspace tabs', () => {
-    const address = parseMoiHref('moi:/chats/%61bc')
-    expect(address).toEqual({ sessionId: 'abc', search: '' })
-    expect(destinationHref(address)).toBe('moi:/chats/abc')
-    expect(addressPath('ws1', address, '/prefix')).toBe('/prefix/workspace/ws1/chats/abc')
-    expect(resolveUrl('moi:/chats/abc', context)).toBe('/workspace/abc/chats/abc')
-    expect(tabFromPath('chats/abc')).toBeNull()
-    expect(chatSessionIdFromPath('chats/provider%3Aid')).toBe('provider:id')
-    expect(chatSessionIdFromPath('chats/%252f')).toBe('%2f')
-    expect(chatSessionIdFromPath('chats/..')).toBeNull()
-  })
-  test('current tabs round trip through browser paths', () => {
-    for (const tab of ['overview', 'scratchpad', 'views/events'] as const) {
-      expect(tabFromPath(tab)).toBe(tab)
-    }
-  })
-  test('web hrefs stay web hrefs; executable protocols cannot use the API', () => {
+
+  test('keeps ordinary web addresses and rejects executable protocols', () => {
     expect(resolveUrl('https://example.com/a?q=b', context)).toBe('https://example.com/a?q=b')
     expect(() => resolveUrl('javascript:alert(1)', context)).toThrow()
     expect(() => resolveUrl('data:text/html,hello', context)).toThrow()
   })
-})
 
-describe('workspace file addresses', () => {
-  test('resolves files using the existing API route, including before a bridge is attached', () => {
+  test('resolves files through their API endpoint, including before a bridge attaches', () => {
     expect(resolveUrl('moi:/files/clips/video.mp4', context)).toBe(
       '/api/workspaces/abc/files/clips/video.mp4'
     )
-    expect(resolveUrl('moi:/files/photo.png', { apiBase: '/api/workspaces/other' })).toBe(
-      '/api/workspaces/other/files/photo.png'
+    expect(resolveUrl('moi:/files/photo.png', { workspaceId: 'abc', base: '/prefix' })).toBe(
+      '/api/workspaces/abc/files/photo.png'
+    )
+    expect(resolveUrl('moi:/files/photo.png', { apiBase: '__APPLET_API_BASE__' })).toBe(
+      '__APPLET_API_BASE__/files/photo.png'
     )
   })
 
-  test('encodes spaces and Unicode and preserves escaped filename characters exactly once', () => {
+  test('encodes file names once and preserves file queries and media fragments', () => {
     expect(resolveUrl('moi:/files/clips/Grüße intro.mp4', context)).toBe(
       '/api/workspaces/abc/files/clips/Gr%C3%BC%C3%9Fe%20intro.mp4'
     )
-    const path = 'moi:/files/clips/100%25%3F%23%20intro.mp4'
-    expect(resolveUrl(path, context)).toBe(
+    expect(resolveUrl('moi:/files/clips/100%25%3F%23%20intro.mp4', context)).toBe(
       '/api/workspaces/abc/files/clips/100%25%3F%23%20intro.mp4'
     )
     expect(resolveUrl('moi:/files/literal%252F.png', context)).toBe(
       '/api/workspaces/abc/files/literal%252F.png'
     )
-  })
-
-  test('preserves file queries and media fragments', () => {
-    expect(resolveUrl('moi:/files/clips/video.mp4?version=2#t=10,20', context)).toBe(
-      '/api/workspaces/abc/files/clips/video.mp4?version=2#t=10,20'
+    expect(resolveUrl('moi:/files/video.mp4?version=2#t=10,20', context)).toBe(
+      '/api/workspaces/abc/files/video.mp4?version=2#t=10,20'
     )
   })
 
-  test('rejects malformed escapes, path separators, empty segments, and traversal', () => {
+  test('rejects unsafe file paths before URL normalization can hide traversal', () => {
     for (const path of [
       'moi://files/photo.png',
       'moi:/files/',
@@ -158,8 +117,7 @@ describe('workspace file addresses', () => {
       'moi:/files/clips/%00.mp4',
       'moi:/files/clips/100%.mp4',
       'moi:/files/clips/%C3.mp4'
-    ]) {
+    ])
       expect(() => resolveUrl(path, context)).toThrow()
-    }
   })
 })

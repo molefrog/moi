@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { useRouter } from 'wouter'
 import { usePathname } from 'wouter/use-browser-location'
 
-import { legacyTabFromPath, tabFromPath, workspacePath } from '@/lib/navigation'
+import { tabFromPath } from '@/lib/workspace-tabs'
 
 import { CollabClient, NO_ENGINE } from './client'
 import type { CollabEngineApi } from './client'
@@ -13,9 +13,9 @@ export const CollabContext = createContext<CollabEngineApi>(NO_ENGINE)
 const AppletPresenceContext = createContext<AppletPresence | null>(null)
 
 export function pageFromPath(path: string, workspaceId: string, base = ''): string {
-  const prefix = workspacePath(workspaceId, base) + '/'
+  const prefix = `${base.replace(/\/$/, '')}/workspace/${encodeURIComponent(workspaceId)}/`
   const page = path.startsWith(prefix) ? path.slice(prefix.length) : ''
-  return tabFromPath(page) ?? legacyTabFromPath(page) ?? (page || 'overview')
+  return tabFromPath(page) ?? (page || 'overview')
 }
 
 export type CollabProviderProps = {

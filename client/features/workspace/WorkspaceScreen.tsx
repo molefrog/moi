@@ -157,7 +157,7 @@ export function WorkspaceScreen({ widgets, views: allViews }: WorkspaceScreenPro
   // Split needs enough row width; the saved mode remains the user's intent.
   const wantsSplit = layout.layoutMode === 'split'
   const mode: LayoutMode = wantsSplit && canUseSplit ? 'split' : 'fullscreen'
-  const revealLinkedChat = useCallback(() => {
+  const revealChat = useCallback(() => {
     setFloatingChatOpen(true)
     setChatFocusRequest(request => request + 1)
   }, [])
@@ -174,7 +174,7 @@ export function WorkspaceScreen({ widgets, views: allViews }: WorkspaceScreenPro
     onNavigationClick
   } = useWorkspaceNavigation({
     views: allViews,
-    onOpenChat: revealLinkedChat
+    onOpenChat: revealChat
   })
 
   // Chat comes after navigation, and takes the address: every message carries

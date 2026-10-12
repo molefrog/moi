@@ -14,7 +14,7 @@ import {
 } from '@/client/components/ui/popover'
 import { cn } from '@/client/lib/cn'
 import type { WorkspaceTabId } from '@/lib/types'
-import { tabFromPath } from '@/lib/navigation'
+import { tabFromPath } from '@/lib/workspace-tabs'
 
 import { User } from './components/user'
 import { UserAvatarGroup } from './components/user-avatar-group'

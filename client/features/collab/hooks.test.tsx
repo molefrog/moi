@@ -25,7 +25,7 @@ test('presence pages follow nested navigation paths and deployment bases, decodi
     'views/board'
   )
   expect(pageFromPath('/workspace/test/views/%2562oard', 'test')).toBe('views/%2562oard')
-  expect(pageFromPath('/workspace/test/view:board', 'test')).toBe('views/board')
+  expect(pageFromPath('/workspace/test/view:board', 'test')).toBe('view:board')
   expect(pageFromPath('/workspace/test', 'test')).toBe('overview')
 })
 

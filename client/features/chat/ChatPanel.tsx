@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
-import { Link } from 'wouter'
+import { useRouter } from 'wouter'
 
 import { IconArrowBackUp, IconChevronDown, IconChevronsRight, IconX } from '@tabler/icons-react'
 import { draftSessionId } from '@/lib/session-drafts'
-import { addressPath } from '@/lib/navigation'
+import { resolveUrl } from '@/lib/navigation'
 import { useCurrentTabId } from './sessions/useSelectedSession'
 
 import { canSubmitComposerAction, focusComposer } from '@/client/components/shared/Composer'
@@ -91,6 +91,7 @@ export function ChatPanel({
   viewDraft
 }: ChatPanelProps) {
   const workspaceId = useWorkspaceId()
+  const { base } = useRouter()
   const { data: sessions } = useWorkspaceSessions(workspaceId)
   const sourceName = sessions?.find(session => session.sessionId === forkedFromSessionId)?.summary
   const tabId = useCurrentTabId()
@@ -204,8 +205,11 @@ export function ChatPanel({
         >
           <div className="mx-auto flex w-full max-w-(--chat-max-container) flex-1 flex-col gap-6">
             {forkedFromSessionId && (
-              <Link
-                href={addressPath(workspaceId, { sessionId: forkedFromSessionId, search: '' })}
+              <a
+                href={resolveUrl(`moi:/chats/${encodeURIComponent(forkedFromSessionId)}`, {
+                  workspaceId,
+                  base
+                })}
                 className="block text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 <div className="flex items-center gap-3">
@@ -222,7 +226,7 @@ export function ChatPanel({
                     </span>
                   </div>
                 </div>
-              </Link>
+              </a>
             )}
             {showEmptyState && (
               <ChatEmptyState

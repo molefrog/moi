@@ -1,13 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 
 import type { ViewInfo, WorkspaceTabsState } from '@/lib/types'
+import { normalizeWorkspaceTabs } from '@/lib/workspace-layout'
 
-import {
-  effectiveOpenTabs,
-  normalizeTabsState,
-  resolveActiveTab,
-  tabAvailable
-} from './tab-resolution'
+import { effectiveOpenTabs, resolveActiveTab, tabAvailable } from './tab-resolution'
 
 const views: ViewInfo[] = [
   { id: 'orders', status: 'compiled', title: 'Orders' },
@@ -23,13 +19,13 @@ const tabs = (open: WorkspaceTabsState['open'], active: WorkspaceTabsState['acti
   active
 })
 
-describe('normalizeTabsState', () => {
+describe('normalizeWorkspaceTabs', () => {
   test('falls back to defaults on missing/empty state', () => {
-    expect(normalizeTabsState(undefined)).toEqual({
+    expect(normalizeWorkspaceTabs(undefined)).toEqual({
       open: ['overview', 'scratchpad'],
       active: 'overview'
     })
-    expect(normalizeTabsState(tabs([], 'scratchpad'))).toEqual({
+    expect(normalizeWorkspaceTabs(tabs([], 'scratchpad'))).toEqual({
       open: ['overview', 'scratchpad'],
       active: 'overview'
     })
@@ -37,7 +33,7 @@ describe('normalizeTabsState', () => {
 
   test('pins Overview first, dedupes open, and preserves a valid active tab', () => {
     expect(
-      normalizeTabsState(tabs(['scratchpad', 'overview', 'scratchpad'], 'scratchpad'))
+      normalizeWorkspaceTabs(tabs(['scratchpad', 'overview', 'scratchpad'], 'scratchpad'))
     ).toEqual({
       open: ['overview', 'scratchpad'],
       active: 'scratchpad'
@@ -77,7 +73,7 @@ describe('resolveActiveTab', () => {
   const state = tabs(['overview', 'scratchpad', 'views/orders'], 'overview')
 
   test('a bare URL resolves to the saved default', () => {
-    expect(resolveActiveTab(null, state, views)).toBe('overview')
+    expect(resolveActiveTab(undefined, state, views)).toBe('overview')
   })
 
   test('a valid URL tab wins, even when not in the open set', () => {
@@ -91,11 +87,11 @@ describe('resolveActiveTab', () => {
 
   test('an unavailable saved default falls back to the first surviving tab', () => {
     const stale = tabs(['views/gone', 'views/orders'], 'views/gone')
-    expect(resolveActiveTab(null, stale, views)).toBe('views/orders')
+    expect(resolveActiveTab(undefined, stale, views)).toBe('views/orders')
   })
 
   test('when nothing survives, the default open set answers', () => {
     const dead = tabs(['views/gone'], 'views/gone')
-    expect(resolveActiveTab(null, dead, [])).toBe('overview')
+    expect(resolveActiveTab(undefined, dead, [])).toBe('overview')
   })
 })

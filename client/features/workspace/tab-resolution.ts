@@ -4,13 +4,9 @@
 // turn (URL segment + layout + what actually exists) into the rendered state.
 import type { ViewInfo, WorkspaceTabId, WorkspaceTabsState } from '@/lib/types'
 import { viewIdFromTab } from '@/lib/workspace-tabs'
-import { createDefaultWorkspaceTabs, normalizeWorkspaceTabs } from '@/lib/workspace-layout'
+import { createDefaultWorkspaceTabs } from '@/lib/workspace-layout'
 
 const DEFAULT_TABS = createDefaultWorkspaceTabs()
-
-export function normalizeTabsState(tabs: WorkspaceTabsState | undefined): WorkspaceTabsState {
-  return normalizeWorkspaceTabs(tabs)
-}
 
 // Whether a tab id points at something that exists: static tabs always do,
 // view tabs only while their pending or compiled view exists.
@@ -31,11 +27,11 @@ export function effectiveOpenTabs(tabs: WorkspaceTabsState, views: ViewInfo[]): 
 // can show recovery and report the correct address to the agent. A bare URL
 // uses the saved default.
 export function resolveActiveTab(
-  requested: WorkspaceTabId | null,
+  requested: WorkspaceTabId | undefined,
   tabs: WorkspaceTabsState,
   views: ViewInfo[]
 ): WorkspaceTabId {
-  if (requested !== null) {
+  if (requested !== undefined) {
     return requested
   }
   const open = effectiveOpenTabs(tabs, views)

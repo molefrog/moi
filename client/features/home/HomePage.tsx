@@ -34,7 +34,7 @@ import {
 } from '@/client/features/home/workspace-presentation'
 import { resolveWorkspaceTheme } from '@/lib/themes'
 import type { DiscoveredWorkspace, WorkspaceEntry } from '@/lib/types'
-import { workspaceTabPath } from '@/lib/navigation'
+import { resolveUrl } from '@/lib/navigation'
 
 import { WorkspacePreview } from './WorkspacePreview'
 
@@ -198,7 +198,7 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
             <TooltipTrigger
               render={
                 <Link
-                  href={workspaceTabPath(workspace.id, 'overview')}
+                  href={resolveUrl('moi:/chat', { workspaceId: workspace.id })}
                   aria-label={`Chat in ${name}`}
                   style={getWorkspaceThemeStyle(theme)}
                   className="absolute right-3 bottom-3 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"

@@ -3,7 +3,20 @@ import { join } from 'node:path'
 
 const CLI = join(import.meta.dir, '..', 'cli.ts')
 
-test.each(['moi:/overview', 'moi:/chats/chat-1'])(
+test.each([
+  'moi:/files/photo.png',
+  'https://example.com',
+  'moi:/view:orders',
+  'moi:/views/../overview'
+])('navigation CLI rejects %s before contacting the server', async href => {
+  const proc = Bun.spawn(['bun', CLI, 'navigate', href], { stdout: 'pipe', stderr: 'pipe' })
+  const [error, code] = await Promise.all([new Response(proc.stderr).text(), proc.exited])
+  expect(code).toBe(1)
+  expect(error).not.toContain('connect')
+  expect(error.length).toBeGreaterThan(0)
+})
+
+test.each(['moi:/overview', 'moi:/chat', 'moi:/chats/chat-1'])(
   'navigation CLI sends %s and waits for acknowledgement',
   async href => {
     let request: unknown

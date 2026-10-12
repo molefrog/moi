@@ -5,7 +5,7 @@ import {
 } from '@/client/features/chat/sessions/browser-tab-state'
 import { useCallback, useMemo } from 'react'
 import { useParams } from 'wouter'
-import { tabFromPath } from '@/lib/navigation'
+import { isWorkspaceTabId } from '@/lib/workspace-tabs'
 import type { WorkspaceSessionSelection, WorkspaceTabId } from '@/lib/types'
 import { composerDraftKey } from '@/lib/session-drafts'
 import { useUiStore } from '@/client/store/ui'
@@ -166,7 +166,8 @@ export function renameSelectedSessionInCache(
 }
 
 export function useCurrentTabId(): WorkspaceTabId {
-  return tabFromPath(useParams()['*'] ?? '') ?? 'overview'
+  const tab = useParams()['*']
+  return isWorkspaceTabId(tab) ? tab : 'overview'
 }
 
 export function selectedSessionForTab(

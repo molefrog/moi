@@ -37,7 +37,7 @@ import { toast } from '@/client/components/ui/toast'
 import { createRateLimiter, type RateLimiter } from '@/client/lib/rate-limit'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import { isParamsRecord } from '@/lib/workspace-tabs'
-import { resolveUrl, workspacePath } from '@/lib/navigation'
+import { resolveUrl } from '@/lib/navigation'
 
 type HostAppletBridge = SharedAppletBridge & {
   readonly collab: AppletCollabApi | undefined
@@ -127,10 +127,6 @@ function createRuntime(workspaceId: string) {
     connect(identity: AppletIdentity, base = '') {
       let alive = true
       const source = appletSource(identity)
-      const urlContext = {
-        apiBase: `/api/workspaces/${encodeURIComponent(workspaceId)}`,
-        workspacePath: workspacePath(workspaceId, base)
-      }
       const bridge: HostAppletBridge = {
         get collab() {
           return alive ? appletCollabApi : undefined
@@ -149,17 +145,14 @@ function createRuntime(workspaceId: string) {
         navigate(url) {
           if (!alive) return
           try {
-            if (typeof url !== 'string') throw new Error('Navigation needs a URL')
-            resolveUrl(url, urlContext)
-            emitter.emit('navigate', url)
+            emitter.emit('navigate', resolveUrl(url))
           } catch (error) {
             drop(identity, `navigate() was dropped: ${errorMessage(error)}`)
           }
         },
         resolveUrl(url) {
           if (!alive) return ''
-          if (typeof url !== 'string') throw new Error('A URL is required')
-          return resolveUrl(url, urlContext)
+          return resolveUrl(url, { workspaceId, base })
         },
         sendChatMessage(input, legacyContext) {
           if (!alive) return

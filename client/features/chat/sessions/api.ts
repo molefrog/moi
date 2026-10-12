@@ -1,17 +1,27 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
+import { useCallback } from 'react'
 
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { sessionViewOptions } from '@/client/features/chat/sessions/session-view'
 import { readSelectedSession, writeSelectedSession } from './browser-tab-state'
-import { selectedSessionKey } from './useSelectedSession'
+import {
+  selectedSessionKey,
+  selectedSessionOptions,
+  usePinnedSession,
+  useSelectedSession
+} from './useSelectedSession'
+import { useCollabEnabled } from '@/client/features/collab'
+import { useLatestRef } from '@/client/lib/use-latest-ref'
+import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import type {
   SessionConfig,
   SessionInfo,
   SessionRecord,
-  WorkspaceSessionSelection
+  WorkspaceSessionSelection,
+  WorkspaceTabId
 } from '@/lib/types'
 
 export function workspaceSessionsOptions(workspaceId: string) {
@@ -24,6 +34,46 @@ export function workspaceSessionsOptions(workspaceId: string) {
 
 export function useWorkspaceSessions(workspaceId: string) {
   return useQuery(workspaceSessionsOptions(workspaceId))
+}
+
+// Select the linked chat on the destination tab, unpinning a different chat first.
+export function useSelectLinkedChat() {
+  const workspaceId = useWorkspaceId()
+  const queryClient = useQueryClient()
+  const collabEnabled = useCollabEnabled()
+  const [, , selectSessionForTab] = useSelectedSession()
+  const { pinAsync } = usePinnedSession()
+  const stateRef = useLatestRef({ collabEnabled, selectSessionForTab, pinAsync })
+  // Stable so selection updates do not restart a pending chat link.
+  return useCallback(
+    async (sessionId: string, tab: WorkspaceTabId, signal: AbortSignal): Promise<boolean> => {
+      const { collabEnabled, selectSessionForTab, pinAsync } = stateRef.current
+      signal.throwIfAborted()
+      let sessions =
+        queryClient.getQueryData<SessionInfo[]>(workspaceKeys.sessions(workspaceId)) ?? []
+      if (!sessions.some(session => session.sessionId === sessionId))
+        sessions = await queryClient.fetchQuery(workspaceSessionsOptions(workspaceId))
+      signal.throwIfAborted()
+      if (!sessions.some(session => session.sessionId === sessionId)) return false
+      await queryClient.ensureQueryData(selectedSessionOptions(workspaceId))
+      if (collabEnabled)
+        await queryClient.ensureQueryData(selectedSessionOptions(workspaceId, 'browser-tab'))
+      signal.throwIfAborted()
+      const pinned = queryClient.getQueryData<WorkspaceSessionSelection>(
+        selectedSessionKey(workspaceId)
+      )?.pinned
+      if (pinned && pinned !== sessionId) {
+        await pinAsync(null)
+        signal.throwIfAborted()
+      }
+      if (pinned !== sessionId) {
+        await selectSessionForTab(sessionId, tab)
+        signal.throwIfAborted()
+      }
+      return true
+    },
+    [queryClient, stateRef, workspaceId]
+  )
 }
 
 export function removeArchivedSession(

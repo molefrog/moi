@@ -6,7 +6,7 @@ import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
 
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
-import { resolveUrl, workspacePath } from '@/lib/navigation'
+import { resolveUrl } from '@/lib/navigation'
 import { cn } from '@/client/lib/cn'
 
 const remarkPlugins = [remarkGfm]
@@ -64,8 +64,8 @@ export function MarkdownContent({ size = 'sm', content }: MarkdownContentProps) 
           if (node.tagName === 'a' && key === 'href' && url.startsWith('moi:')) {
             try {
               return resolveUrl(url, {
-                apiBase: `/api/workspaces/${encodeURIComponent(workspaceId)}`,
-                workspacePath: workspacePath(workspaceId, base)
+                workspaceId,
+                base
               })
             } catch {
               return ''

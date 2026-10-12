@@ -4,7 +4,8 @@ import { resolve } from 'path'
 import { parseAppletSelector } from '@/lib/applet-selector'
 import { resolveWorkspaceTheme } from '@/lib/themes'
 import type { WorkspaceEntry } from '@/lib/types'
-import { destinationHref, moiHref, parseMoiHref } from '@/lib/navigation'
+import { resolveUrl } from '@/lib/navigation'
+import { isWorkspaceTabId } from '@/lib/workspace-tabs'
 import { navigationRelay } from './navigation-relay'
 
 import { clearAppletLog, getAppletLog, getAppletLogCount } from './applet-log'
@@ -243,7 +244,7 @@ export const control = Bun.serve({
             const result = await createViewFromSession(match, data.fromSessionId, data.requirements)
             let warning: string | undefined
             try {
-              await navigationRelay.navigate(match.id, moiHref(`views/${result.viewId}`))
+              await navigationRelay.navigate(match.id, `moi:/views/${result.viewId}`)
             } catch (error) {
               const message = error instanceof Error ? error.message : 'Navigation failed'
               warning = `View was created, but could not open it: ${message}. Open it with moi navigate 'moi:/views/${result.viewId}'.`
@@ -321,10 +322,11 @@ export const control = Bun.serve({
           const match = await resolveWorkspace(ws, data.path)
           if (!match) return
           try {
-            const address = parseMoiHref(data.href)
-            const href = destinationHref(address)
-            if ('tab' in address)
-              assertNavigableTab(address.tab, await getWorkspaceViews(match.path))
+            const href = resolveUrl(data.href)
+            if (!href.startsWith('moi:/') || href.startsWith('moi:/files/'))
+              throw new Error('Navigation needs a workspace page address')
+            const tab = href.slice(5).split('?', 1)[0]
+            if (isWorkspaceTabId(tab)) assertNavigableTab(tab, await getWorkspaceViews(match.path))
             await navigationRelay.navigate(match.id, href)
             ws.send(JSON.stringify({ ok: true, href }))
           } catch (error) {

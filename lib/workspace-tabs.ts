@@ -10,9 +10,18 @@ export function isWorkspaceTabId(value: unknown): value is WorkspaceTabId {
   )
 }
 
+export function tabFromPath(path: string): WorkspaceTabId | undefined {
+  try {
+    const tab = decodeURIComponent(path)
+    return isWorkspaceTabId(tab) ? tab : undefined
+  } catch {
+    return undefined
+  }
+}
+
 export const viewTabId = (viewId: string): WorkspaceTabId => `views/${viewId}`
-export const viewIdFromTab = (tab: WorkspaceTabId): string | null =>
-  tab.startsWith('views/') ? tab.slice('views/'.length) : null
+export const viewIdFromTab = (tab: WorkspaceTabId): string | undefined =>
+  tab.startsWith('views/') ? tab.slice('views/'.length) : undefined
 
 // A record check shared by JSON boundary validators.
 export function isParamsRecord(value: unknown): value is Record<string, unknown> {

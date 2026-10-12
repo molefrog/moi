@@ -22,7 +22,7 @@ import {
   deriveThemeColors
 } from '@/lib/themes'
 import type { AgentTheme, ColorTheme, FontTheme, RadiusTheme } from '@/lib/themes'
-import { parseMoiHref } from '@/lib/navigation'
+import { resolveUrl } from '@/lib/navigation'
 import { EXPERIMENTAL_FEATURES, experimentalFlagName } from '@/lib/experimental'
 import type { ExperimentalFeatures } from '@/lib/experimental'
 import type {
@@ -2485,7 +2485,9 @@ const navigate = defineCommand({
   },
   run({ args }) {
     try {
-      parseMoiHref(args.href)
+      const href = resolveUrl(args.href)
+      if (!href.startsWith('moi:/') || href.startsWith('moi:/files/'))
+        throw new Error('Navigation needs a workspace page address')
     } catch (error) {
       console.error(error instanceof Error ? error.message : 'Invalid workspace address')
       process.exit(1)

@@ -8,8 +8,17 @@ import { Workspace } from './WorkspaceContext'
 import { CollabContext } from '@/client/features/collab/provider'
 import { NO_ENGINE } from '@/client/features/collab/client'
 import { createFakeEngine } from '@/client/features/collab/testing/fake-engine'
-import { selectedSessionKey } from '@/client/features/chat/sessions/useSelectedSession'
-import type { SessionInfo, ViewInfo, WorkspaceSessionSelection, WorkspaceTabId } from '@/lib/types'
+import {
+  selectedSessionKey,
+  useCurrentTabId
+} from '@/client/features/chat/sessions/useSelectedSession'
+import type {
+  SessionInfo,
+  ViewInfo,
+  WorkspaceSessionSelection,
+  WorkspaceTabId,
+  WorkspaceTabsState
+} from '@/lib/types'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import * as workspaceEvents from '@/client/runtime/useWorkspaceEvents'
 import { WorkspaceLayoutContext } from './WorkspaceLayoutContext'
@@ -21,6 +30,7 @@ type ReadNavigationOptions = {
   queryClient?: QueryClient
   onOpenChat?: () => void
   collab?: boolean
+  tabs?: WorkspaceTabsState
 }
 
 function readNavigation(
@@ -32,7 +42,8 @@ function readNavigation(
     navigate,
     queryClient = new QueryClient(),
     onOpenChat = () => {},
-    collab = false
+    collab = false,
+    tabs = createDefaultWorkspaceLayout().tabs
   }: ReadNavigationOptions = {}
 ) {
   const queryKey = workspaceKeys.views('abc')
@@ -73,7 +84,7 @@ function readNavigation(
             <Route path="/workspace/:id/*?">
               <WorkspaceLayoutContext
                 value={{
-                  layout: createDefaultWorkspaceLayout(),
+                  layout: { ...createDefaultWorkspaceLayout(), tabs },
                   setLayout: () => {},
                   name: null,
                   cwd: null,
@@ -105,6 +116,15 @@ test('view params decode exactly once through the real router', () => {
   expect(result.appletParams).toEqual(params)
 })
 
+test('view params keep the first repeated value and ordinary object keys', () => {
+  const result = readNavigation('views/events', 'x=1&x=2&__proto__=safe', [
+    { id: 'events', status: 'compiled', title: 'Events' }
+  ])
+  expect(result.appletParams.x).toBe('1')
+  expect(Object.hasOwn(result.appletParams, '__proto__')).toBe(true)
+  expect(result.appletParams.__proto__).toBe('safe')
+})
+
 test('encoded IDs resolve under a deployment base without decoding nested escapes', () => {
   const views: ViewInfo[] = [{ id: 'events', status: 'compiled', title: 'events' }]
   expect(readNavigation('views/%65vents', '', views, { base: '/prefix' }).activeTab).toBe(
@@ -115,6 +135,23 @@ test('encoded IDs resolve under a deployment base without decoding nested escape
   )
 })
 
+test.each([
+  ['views/%65vents', 'views/events'],
+  ['views/%2565vents', 'overview']
+])('current tab decodes the route %s once', (path, expected) => {
+  function CurrentTab() {
+    return <output>{useCurrentTabId()}</output>
+  }
+  const html = renderToStaticMarkup(
+    <Router base="/prefix" ssrPath={`/prefix/workspace/abc/${path}`}>
+      <Route path="/workspace/:id/*?">
+        <CurrentTab />
+      </Route>
+    </Router>
+  )
+  expect(html).toBe(`<output>${expected}</output>`)
+})
+
 test('missing views keep their destination without becoming the default tab', () => {
   const result = readNavigation('views/missing', '?eventId=123', [])
   expect(result.activeTab).toBe('views/missing')
@@ -123,15 +160,16 @@ test('missing views keep their destination without becoming the default tab', ()
 })
 
 test('chat entry routes never render the unavailable page or become tabs', () => {
+  expect(readNavigation('chat', '', []).isUnavailable).toBe(false)
+  expect(readNavigation('chat', '', []).activeTab).toBe('overview')
   expect(readNavigation('chats/%61bc', '', []).isUnavailable).toBe(false)
   expect(readNavigation('chats/missing', '', []).activeTab).toBe('overview')
 })
 
-test('legacy browser paths select the same view under a deployment base', () => {
+test('retired browser paths show recovery under a deployment base', () => {
   const views: ViewInfo[] = [{ id: 'events', status: 'compiled', title: 'events' }]
   const result = readNavigation('view:%65vents', 'eventId=123', views, { base: '/prefix' })
-  expect(result.activeTab).toBe('views/events')
-  expect(result.isUnavailable).toBe(false)
+  expect(result.isUnavailable).toBe(true)
   expect(result.appletParams).toEqual({ eventId: '123' })
   expect(readNavigation('view:%2565vents', '', views).isUnavailable).toBe(true)
 })
@@ -177,6 +215,8 @@ test.each(['', '/', '/prefix'])(
         },
         queryClient
       })
+      await navigate('moi:/overview')
+      expect(routedPaths).toEqual([])
       await navigate('moi:/views/orders?order=o-1')
       await navigate('moi:/files/clips/a%20b.mp4?version=2#t=5')
       await navigate('https://example.com/')
@@ -205,6 +245,15 @@ test.each(['', '/', '/prefix'])(
         `${prefix}/workspace/abc/views/orders?order=o-1`,
         `${prefix}/workspace/abc/views/new`
       ])
+
+      const laterRefresh = Promise.withResolvers<ViewInfo[]>()
+      freshViews = laterRefresh.promise
+      const cancelled = navigate('moi:/views/later')
+      await navigate('moi:/scratchpad')
+      laterRefresh.resolve([...views, { id: 'later', status: 'draft', requirements: '' }])
+      await expect(Promise.resolve(cancelled)).rejects.toMatchObject({ name: 'AbortError' })
+      expect(routedPaths.at(-1)).toBe(`${prefix}/workspace/abc/scratchpad`)
+      expect(routedPaths).not.toContain(`${prefix}/workspace/abc/views/later`)
     } finally {
       registration.mockRestore()
       if (windowDescriptor) Object.defineProperty(globalThis, 'window', windowDescriptor)
@@ -250,8 +299,8 @@ function createChatNavigationFixture(collab: boolean) {
     configurable: true,
     value: {
       location: {
-        href: 'http://localhost/prefix/workspace/abc/views/source',
-        pathname: '/prefix/workspace/abc/views/source',
+        href: 'http://localhost/prefix/workspace/abc/scratchpad',
+        pathname: '/prefix/workspace/abc/scratchpad',
         search: '',
         hash: ''
       }
@@ -296,12 +345,13 @@ function createChatNavigationFixture(collab: boolean) {
       navigate = callback
     }
   )
-  readNavigation('overview', '', views, {
+  readNavigation('scratchpad', '', views, {
     base: '/prefix',
     navigate: (path, options) => routed.push({ path, ...options }),
     queryClient,
     onOpenChat: () => revealed.push(true),
-    collab
+    collab,
+    tabs: { open: ['overview', 'scratchpad'], active: 'scratchpad' }
   })
   return {
     queryClient,
@@ -334,15 +384,44 @@ for (const collab of [false, true]) {
     afterEach(() => fixture.cleanup())
 
     test.each([
-      ['Overview', 'general', 'overview', null],
-      ['Scratchpad', 'notes', 'scratchpad', null],
-      ['a closed compiled view and unpins another chat', 'orders', 'views/orders', 'other'],
-      ['a pending view and preserves the requested pin', 'draft', 'views/draft', 'draft']
-    ] as const)('opens %s', async (_name, id, tab, pinned) => {
+      { selected: { overview: 'previous' }, pinned: null },
+      { selected: { overview: 'previous' }, pinned: 'other' },
+      { selected: {}, pinned: null }
+    ] satisfies WorkspaceSessionSelection[])(
+      'opens the current chat without changing selection %j',
+      async selection => {
+        const { queryClient, navigate, routed, revealed, writes, storage } = fixture
+        queryClient.setQueryData(selectedSessionKey('abc'), selection)
+        const local = { selected: { overview: 'local' }, pinned: null }
+        if (collab) queryClient.setQueryData(selectedSessionKey('abc', 'browser-tab'), local)
+        await navigate('moi:/chat')
+        expect(routed).toEqual([])
+        expect(revealed).toEqual([true])
+        expect(
+          queryClient.getQueryData<WorkspaceSessionSelection>(selectedSessionKey('abc'))
+        ).toEqual(selection)
+        if (collab)
+          expect(
+            queryClient.getQueryData<WorkspaceSessionSelection>(
+              selectedSessionKey('abc', 'browser-tab')
+            )
+          ).toEqual(local)
+        expect(writes).toEqual([])
+        expect(storage.size).toBe(0)
+      }
+    )
+
+    test.each([
+      ['a general chat', 'general', null],
+      ['a Scratchpad chat', 'notes', null],
+      ['a view chat and unpins another chat', 'orders', 'other'],
+      ['a pending view chat and preserves its pin', 'draft', 'draft'],
+      ['a chat whose original view was removed', 'gone', null]
+    ] as const)('opens %s on the current tab', async (_name, id, pinned) => {
       const { queryClient, selection, navigate, routed, revealed, writes, storage } = fixture
       queryClient.setQueryData(selectedSessionKey('abc'), { ...selection, pinned })
       await navigate(`moi:/chats/${id}`)
-      expect(routed).toEqual([{ path: `/prefix/workspace/abc/${tab}`, replace: false }])
+      expect(routed).toEqual([])
       expect(revealed).toEqual([true])
       expect(
         queryClient.getQueryData<WorkspaceSessionSelection>(selectedSessionKey('abc'))?.pinned
@@ -354,13 +433,14 @@ for (const collab of [false, true]) {
       const scope = collab ? 'browser-tab' : 'shared'
       expect(
         queryClient.getQueryData<WorkspaceSessionSelection>(selectedSessionKey('abc', scope))
-          ?.selected[tab]
+          ?.selected.scratchpad
       ).toBe(id)
       expect(writes.map(write => write.url)).toEqual([
         ...(pinned ? ['/api/workspaces/abc/pinned-session'] : []),
         ...(collab ? [] : ['/api/workspaces/abc/selected-session'])
       ])
-      if (collab) expect(JSON.parse(storage.get('moi:collab:abc:session')!).selected[tab]).toBe(id)
+      if (collab)
+        expect(JSON.parse(storage.get('moi:collab:abc:session')!).selected.scratchpad).toBe(id)
     })
 
     test('waits for pin state on a direct load before selecting', async () => {
@@ -380,19 +460,19 @@ for (const collab of [false, true]) {
       expect(revealed).toEqual([true])
     })
 
-    test('opens chats with persisted Agent tab attribution on Overview', async () => {
+    test('opens chats with persisted Agent tab attribution on the current tab', async () => {
       const { queryClient, sessions, navigate, routed, revealed } = fixture
       queryClient.setQueryData(workspaceKeys.sessions('abc'), [
         ...sessions,
         { sessionId: 'legacy', summary: 'Legacy', lastModified: 1, tabId: 'agent' }
       ])
       await navigate('moi:/chats/legacy')
-      expect(routed).toEqual([{ path: '/prefix/workspace/abc/overview', replace: false }])
+      expect(routed).toEqual([])
       expect(revealed).toEqual([true])
       expect(
         queryClient.getQueryData<WorkspaceSessionSelection>(
           selectedSessionKey('abc', collab ? 'browser-tab' : 'shared')
-        )?.selected.overview
+        )?.selected.scratchpad
       ).toBe('legacy')
     })
 
@@ -422,7 +502,7 @@ for (const collab of [false, true]) {
         expect(revealed).toEqual([])
         saving.resolve(Response.json({ sessionId: 'general' }))
         await opening
-        expect(routed).toEqual([{ path: '/prefix/workspace/abc/overview', replace: false }])
+        expect(routed).toEqual([])
         expect(revealed).toEqual([true])
       })
 
@@ -435,40 +515,42 @@ for (const collab of [false, true]) {
       })
     }
 
-    test.each(['missing', 'gone'])(
-      'falls back for %s without changing selection or pin',
-      async id => {
-        const { queryClient, selection, navigate, writes, routed, revealed } = fixture
-        const original = { ...selection, pinned: 'pin' }
-        queryClient.setQueryData(selectedSessionKey('abc'), original)
-        await navigate(`moi:/chats/${id}`)
-        expect(routed).toEqual([{ path: '/prefix/workspace/abc/overview', replace: false }])
-        expect(
-          queryClient.getQueryData<WorkspaceSessionSelection>(selectedSessionKey('abc'))
-        ).toEqual(original)
-        expect(writes).toEqual([])
-        expect(revealed).toEqual([])
-      }
-    )
-
-    test('navigation away cancels a pending lookup without changing selection or pin', async () => {
-      const { queryClient, responses, sessions, selection, navigate, writes, routed, revealed } =
-        fixture
+    test('a missing chat keeps the current tab, selection, and pin', async () => {
+      const { queryClient, selection, navigate, writes, routed, revealed } = fixture
       const original = { ...selection, pinned: 'pin' }
       queryClient.setQueryData(selectedSessionKey('abc'), original)
-      const refresh = Promise.withResolvers<SessionInfo[]>()
-      responses.sessions = refresh.promise
-      const opening = navigate('moi:/chats/new')
-      await navigate('moi:/scratchpad')
-      refresh.resolve([...sessions, { sessionId: 'new', summary: 'New', lastModified: 2 }])
-      await expect(opening).rejects.toMatchObject({ name: 'AbortError' })
+      await navigate('moi:/chats/missing')
+      expect(routed).toEqual([])
       expect(
         queryClient.getQueryData<WorkspaceSessionSelection>(selectedSessionKey('abc'))
       ).toEqual(original)
       expect(writes).toEqual([])
       expect(revealed).toEqual([])
-      expect(routed.at(-1)?.path).toBe('/prefix/workspace/abc/scratchpad')
     })
+
+    test.each(['moi:/overview', 'moi:/chat'])(
+      'navigation to %s cancels a pending lookup without changing selection or pin',
+      async href => {
+        const { queryClient, responses, sessions, selection, navigate, writes, routed, revealed } =
+          fixture
+        const original = { ...selection, pinned: 'pin' }
+        queryClient.setQueryData(selectedSessionKey('abc'), original)
+        const refresh = Promise.withResolvers<SessionInfo[]>()
+        responses.sessions = refresh.promise
+        const opening = navigate('moi:/chats/new')
+        await navigate(href)
+        refresh.resolve([...sessions, { sessionId: 'new', summary: 'New', lastModified: 2 }])
+        await expect(opening).rejects.toMatchObject({ name: 'AbortError' })
+        expect(
+          queryClient.getQueryData<WorkspaceSessionSelection>(selectedSessionKey('abc'))
+        ).toEqual(original)
+        expect(writes).toEqual([])
+        expect(revealed).toEqual(href === 'moi:/chat' ? [true] : [])
+        expect(routed).toEqual(
+          href === 'moi:/chat' ? [] : [{ path: '/prefix/workspace/abc/overview', replace: false }]
+        )
+      }
+    )
 
     test('refreshes a missing cached chat before falling back', async () => {
       const { responses, sessions, navigate, revealed } = fixture

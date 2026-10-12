@@ -38,8 +38,8 @@ describe('tab id round-trips', () => {
   test('view tabs', () => {
     expect(viewTabId('orders')).toBe('views/orders')
     expect(viewIdFromTab('views/orders')).toBe('orders')
-    expect(viewIdFromTab('overview')).toBeNull()
-    expect(viewIdFromTab('scratchpad')).toBeNull()
+    expect(viewIdFromTab('overview')).toBeUndefined()
+    expect(viewIdFromTab('scratchpad')).toBeUndefined()
   })
 })
 

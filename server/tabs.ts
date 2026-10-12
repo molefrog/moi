@@ -1,6 +1,5 @@
 // Tab discovery with portable navigation addresses.
 import type { ViewInfo, WorkspaceTabId } from '@/lib/types'
-import { moiHref } from '@/lib/navigation'
 import { viewTabId } from '@/lib/workspace-tabs'
 
 // One row of `moi tabs`. `isDefault` marks the workspace's saved default tab
@@ -27,7 +26,7 @@ export function assembleTabRows(views: ViewInfo[], defaultTab: WorkspaceTabId): 
   ].map(row => ({
     ...row,
     isDefault: row.id === defaultTab,
-    href: moiHref(row.id)
+    href: `moi:/${row.id}`
   }))
 }
 
@@ -38,6 +37,6 @@ export function assertNavigableTab(tab: WorkspaceTabId, views: ViewInfo[]): void
   const rows = assembleTabRows(views, 'overview')
   if (rows.some(row => row.id === tab)) return
   throw new Error(
-    `Unknown destination "${moiHref(tab)}". Valid addresses: ${rows.map(row => row.href).join(', ')}`
+    `Unknown destination "moi:/${tab}". Valid addresses: ${rows.map(row => row.href).join(', ')}`
   )
 }
