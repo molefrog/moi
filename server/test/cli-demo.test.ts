@@ -32,7 +32,7 @@ async function runCli(args: string[], env: Record<string, string> = {}): Promise
   return { code, stdout, stderr }
 }
 
-const DEMO = { MOI_CLOUD_DEMO: '1' }
+const DEMO = { MOI_DEMO: '1' }
 
 // Generous timeouts: each case cold-spawns a fresh `bun` compiling the whole
 // CLI import graph, which can take well over the 5s default on CI.

@@ -14,7 +14,8 @@ import { requestJson } from './http'
 // reconnecting is that signal, so the store re-fetches there.
 
 const DEFAULTS: ClientAppConfig = {
-  cloudDemo: false,
+  environment: 'local',
+  demo: false,
   experimental: { ...EXPERIMENTAL_DEFAULTS },
   demoInstallUrl: 'https://moi.computer'
 }

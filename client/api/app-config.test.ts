@@ -12,7 +12,8 @@ afterEach(() => {
 
 test('startup receives confirmed config while a failed refresh cannot enable a local profile from cached config', async () => {
   const config: ClientAppConfig = {
-    cloudDemo: false,
+    environment: 'local',
+    demo: false,
     experimental: { collab: true },
     demoInstallUrl: 'https://moi.computer'
   }

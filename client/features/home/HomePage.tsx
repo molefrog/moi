@@ -74,7 +74,7 @@ export function HomePage() {
 
   function handleAdd(suggestion: DiscoveredWorkspace) {
     // Cloud demo: adding workspaces is off — offer the promo dialog instead.
-    if (appConfig.cloudDemo) {
+    if (appConfig.demo) {
       setPromoDialogOpen(true)
       return
     }

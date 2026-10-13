@@ -34,7 +34,7 @@ beforeEach(async () => {
     MOI_CONTROL_PORT: '1',
     MOI_SERVER: undefined,
     MOI_SERVICE: undefined,
-    MOI_CLOUD_DEMO: undefined,
+    MOI_DEMO: undefined,
     MOI_DEV: undefined,
     // A legacy environment setting does not enable plain start.
     MOI_COLLAB: '1',

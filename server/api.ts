@@ -959,7 +959,7 @@ workspaces.put('/order', async c => {
 const DEMO_CREATE_BLOCKED = 'Workspace creation is not available in the moi demo'
 
 workspaces.post('/', async c => {
-  if (getAppConfig().cloudDemo) return c.text(DEMO_CREATE_BLOCKED, 403)
+  if (getAppConfig().demo) return c.text(DEMO_CREATE_BLOCKED, 403)
   const body = await c.req.json()
   if (!body?.path) return c.text('Missing path', 400)
   const requestedType: unknown = body?.type ?? 'claude-code'
@@ -1016,12 +1016,7 @@ async function harnessAvailability(): Promise<Record<string, HarnessAvailability
 // backends whose runtime is missing.
 workspaces.get('/create', async c => {
   c.header('Cache-Control', 'no-store')
-  const installed = {
-    'claude-code': false,
-    codex: true,
-    openclaw: false,
-    hermes: false
-  } // await detectInstalledHarnesses()
+  const installed = await detectInstalledHarnesses()
   return c.json({
     root: createdWorkspacesRoot(),
     displayRoot: tildify(createdWorkspacesRoot()),
@@ -1033,7 +1028,7 @@ workspaces.get('/create', async c => {
 // Create a brand-new workspace: a fresh folder under createdWorkspacesRoot(),
 // provisioned (skills + `.moi/` scaffold) and registered.
 workspaces.post('/create', async c => {
-  if (getAppConfig().cloudDemo) return c.text(DEMO_CREATE_BLOCKED, 403)
+  if (getAppConfig().demo) return c.text(DEMO_CREATE_BLOCKED, 403)
   const body = await c.req.json()
   const requestedType: unknown = body?.type ?? 'claude-code'
   if (!isHarnessType(requestedType)) {

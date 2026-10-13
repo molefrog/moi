@@ -1,6 +1,6 @@
 // Cloud demo protections on the API: both workspace-creation routes refuse
 // with 403, and GET /api/config exposes the flag to the client. The demo flag
-// comes from the startup config, toggled here via MOI_CLOUD_DEMO + the
+// comes from the startup config, toggled here via MOI_DEMO + the
 // resetAppConfig test seam.
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 
@@ -9,7 +9,7 @@ import { resetAppConfig } from './app-config'
 import { claudeCodeHarness } from './harness/claude-code'
 
 const originalClaudeAvailability = claudeCodeHarness.availability
-const envKeys = ['MOI_CLOUD_DEMO', 'MOI_DEMO_INSTALL_URL']
+const envKeys = ['MOI_ENVIRONMENT', 'MOI_DEMO', 'MOI_DEMO_INSTALL_URL']
 let savedEnv: Record<string, string | undefined>
 
 // Deployment env vars are pinned so a real config.json on the machine running the
@@ -18,7 +18,8 @@ let savedEnv: Record<string, string | undefined>
 // validating the name — on a runner without the Claude CLI that 400s first.
 beforeEach(() => {
   savedEnv = Object.fromEntries(envKeys.map(key => [key, process.env[key]]))
-  process.env.MOI_CLOUD_DEMO = '1'
+  process.env.MOI_ENVIRONMENT = 'cloud'
+  process.env.MOI_DEMO = '1'
   process.env.MOI_DEMO_INSTALL_URL = 'https://moi.computer'
   resetAppConfig()
   claudeCodeHarness.availability = async () => ({ status: 'available' })
@@ -61,14 +62,15 @@ test('GET /api/config reports the demo flag and install url', async () => {
 
   expect(response.status).toBe(200)
   expect(body).toEqual({
-    cloudDemo: true,
+    environment: 'cloud',
+    demo: true,
     experimental: { collab: false },
     demoInstallUrl: 'https://moi.computer'
   })
 })
 
 test('without the demo flag, creation is not blocked by the gate', async () => {
-  process.env.MOI_CLOUD_DEMO = '0'
+  process.env.MOI_DEMO = '0'
   resetAppConfig()
 
   const response = await api.request('/api/workspaces/create', {

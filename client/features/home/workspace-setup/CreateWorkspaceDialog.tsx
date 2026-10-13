@@ -59,7 +59,7 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
 
   // Cloud demo: creating workspaces is off — the same trigger opens the
   // cloud-demo promo dialog instead. After every hook so the hook order is stable.
-  if (appConfig.cloudDemo) {
+  if (appConfig.demo) {
     return <DemoDialog trigger={trigger} />
   }
 

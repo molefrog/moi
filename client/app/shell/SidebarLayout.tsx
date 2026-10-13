@@ -147,10 +147,10 @@ function Sidebar({ workspaces }: SidebarProps) {
 }
 
 function SidebarFooterAction() {
-  const { cloudDemo } = useAppConfig()
+  const { demo } = useAppConfig()
   const updateControl = useUpdateControl()
 
-  if (cloudDemo) {
+  if (demo) {
     return (
       <DemoDialog
         trigger={

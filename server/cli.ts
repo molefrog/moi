@@ -3165,7 +3165,7 @@ function exitIfDemoBlocked(): void {
   // The agent on a managed machine can't read the config (see below).
   if (!canUseDataDir()) return
   const config = getAppConfig()
-  if (!config.cloudDemo) return
+  if (!config.demo) return
   console.log(
     '\n' +
       pc.yellow('◆') +

@@ -352,10 +352,13 @@ export type AppSettings = {
 // Client-safe startup config, served by GET /api/config. Deployment settings
 // come from config.json and MOI_* env overrides; experimental flags come from
 // explicit CLI options. See server/app-config.ts.
+export type AppEnvironment = 'local' | 'cloud'
+
 export type ClientAppConfig = {
-  // Cloud demo deployment: workspace creation is blocked; the UI offers the
+  environment: AppEnvironment
+  // Demo mode: workspace creation is blocked; the UI offers the
   // cloud-demo promo dialog instead.
-  cloudDemo: boolean
+  demo: boolean
   experimental: ExperimentalFeatures
   // Link target for the cloud-demo promo dialog.
   demoInstallUrl: string
