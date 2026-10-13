@@ -136,12 +136,16 @@ describe('workspace import provider', () => {
       reason: 'Codex is signed out. Sign in to send messages'
     })
 
-    const login = await api.request(`/api/workspaces/${entry.id}/auth/login`, { method: 'POST' })
+    const login = await api.request(`/api/harnesses/codex/auth/login`, {
+      method: 'POST'
+    })
     expect(await login.json()).toEqual({ url: 'https://example.com/login' })
 
     // A second start reuses the pending browser URL, and the agent snapshot
     // reports the ceremony.
-    const rejoin = await api.request(`/api/workspaces/${entry.id}/auth/login`, { method: 'POST' })
+    const rejoin = await api.request(`/api/harnesses/codex/auth/login`, {
+      method: 'POST'
+    })
     expect(await rejoin.json()).toEqual({ url: 'https://example.com/login' })
     const pending = await api.request(`/api/workspaces/${entry.id}/agent`)
     expect(((await pending.json()) as WorkspaceAgent).login).toEqual({

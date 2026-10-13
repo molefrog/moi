@@ -85,7 +85,8 @@ export const codexHarness: Harness = {
     const runtime = await pathHarnessAvailability('codex')
     return runtime.status === 'available' && ws ? getCodexAuthReadiness(ws.path) : runtime
   },
-  startLogin: ws => startCodexLogin(ws.path),
+  startLogin: startCodexLogin,
+  authStatus: getCodexAuthReadiness,
 
   onEnvChanged: workspacePath => killCodexWorkspace(workspacePath),
   stopWorkspace: workspacePath => killCodexWorkspace(workspacePath),

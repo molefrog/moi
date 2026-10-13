@@ -4,7 +4,7 @@ import type { NavigationRequest } from '@/lib/navigation'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import { wsUrl } from '@/client/lib/ws-url'
 import type {
-  AgentLoginState,
+  HarnessLoginState,
   AppSettings,
   HarnessAvailability,
   ViewInfo,
@@ -33,10 +33,10 @@ export type WorkspaceEvent =
   // ceremony timed out, auth probe flipped). Carries the new state so caches
   // patch without a refetch.
   | {
-      type: 'agent:updated'
+      type: 'harness:updated'
       workspaceId: string
       availability: HarnessAvailability
-      login?: AgentLoginState
+      login?: HarnessLoginState
     }
   // The Scratchpad canvas for `workspaceId` was saved — open tabs reload from
   // disk. `origin` is the tab that wrote it, so that tab can skip its own echo.

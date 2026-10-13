@@ -4,7 +4,7 @@ import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import type { BroadcastFrame, StreamEvent } from '@/lib/types'
 
 import { getClientFrameLog } from '../debug'
-import { agentStore } from '../../agent'
+import { harnessStore } from '../../harness-auth'
 import { addUpload } from '../../uploads'
 import * as clients from './client'
 import {
@@ -64,7 +64,7 @@ function fixture() {
     }
   }
   const spy = spyOn(clients, 'getCodexClient').mockResolvedValue(client)
-  const availabilitySpy = spyOn(agentStore, 'refresh').mockResolvedValue({ status: 'available' })
+  const availabilitySpy = spyOn(harnessStore, 'refresh').mockResolvedValue({ status: 'available' })
   const emit = (method: string, params: Json = {}) => {
     for (const listener of [...listeners])
       listener(method, { threadId: input.sessionId, ...params })

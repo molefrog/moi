@@ -7,7 +7,6 @@ import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { onWorkspaceEventsReconnect, useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 import type {
-  HarnessLogin,
   WorkspaceAgent,
   WorkspaceLayout,
   WorkspaceLayoutSave,
@@ -33,7 +32,7 @@ export function useWorkspaceLayout(workspaceId: string) {
 
 // The workspace's agent backend in one snapshot: availability (runtime
 // presence + auth), any in-flight login ceremony, the model catalog, and
-// capabilities. `agent:updated` events refresh availability and login state;
+// capabilities. `harness:updated` events refresh availability and login state;
 // focus refetches pick up model changes after a CLI update.
 export function useWorkspaceAgent(workspaceId: string) {
   const queryClient = useQueryClient()
@@ -45,7 +44,7 @@ export function useWorkspaceAgent(workspaceId: string) {
     [queryClient, workspaceId]
   )
   useWorkspaceEvent(event => {
-    if (event.type === 'agent:updated' && event.workspaceId === workspaceId) {
+    if (event.type === 'harness:updated' && event.workspaceId === workspaceId) {
       queryClient.setQueryData<WorkspaceAgent>(workspaceKeys.agent(workspaceId), prev =>
         prev ? { ...prev, availability: event.availability, login: event.login } : prev
       )
@@ -61,14 +60,6 @@ export function useWorkspaceAgent(workspaceId: string) {
     staleTime: 30_000,
     refetchOnWindowFocus: true
   })
-}
-
-export function startWorkspaceLogin(workspaceId: string): Promise<HarnessLogin> {
-  return requestJson(
-    `/api/workspaces/${workspaceId}/auth/login`,
-    { method: 'POST' },
-    'Could not start sign-in'
-  )
 }
 
 export function useWorkspaceSkills(workspaceId: string) {

@@ -10,7 +10,7 @@ import {
 
 import { Button } from '@/client/components/ui/button'
 import type { AgentUnavailable } from '@/client/lib/agent-availability'
-import type { AgentLoginState, HarnessLogin } from '@/lib/types'
+import type { HarnessLoginState, HarnessLogin } from '@/lib/types'
 
 import { ComposerBannerShell } from './ComposerBanner'
 
@@ -19,7 +19,7 @@ type AgentAvailabilityBannerProps = {
   // The server-owned ceremony. `pending` means some tab (maybe this one)
   // started a login and the server is watching for it to land; `failed` means
   // the last ceremony timed out or errored.
-  login?: AgentLoginState
+  login?: HarnessLoginState
   onStartLogin: () => Promise<HarnessLogin>
 }
 

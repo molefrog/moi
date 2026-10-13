@@ -112,8 +112,9 @@ export type Harness = {
   // Without a workspace, only check whether the runtime is installed. With a
   // workspace, also check provider state such as authentication.
   availability?(ws?: HarnessWorkspace): Promise<HarnessAvailability>
-  // Optional recovery flow the host can start without a terminal.
-  startLogin?(ws: HarnessWorkspace): Promise<HarnessLogin>
+  // Global account authentication, independent of workspace configuration.
+  startLogin?(): Promise<HarnessLogin>
+  authStatus?(): Promise<HarnessAvailability>
 
   // -- host integration hooks -------------------------------------------------
   // Env is frozen at spawn everywhere; this reaps idle sessions/processes so

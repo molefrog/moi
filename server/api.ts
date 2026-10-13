@@ -23,7 +23,8 @@ import { isWorkspaceTabId } from '@/lib/workspace-tabs'
 
 import { proxyUserState } from './collab/cloudflare-access'
 import { collabManager } from './collab/manager'
-import { agentStore } from './agent'
+import { harnessStore } from './harness-auth'
+import { harnessAuthApi } from './harness-auth-api'
 import { clientAppConfig, getAppConfig } from './app-config'
 import { getAppSettings, pickAppSettingsPatch, saveAppSettings } from './app-settings'
 import { appletForModule, recordAppletError } from './applet-log'
@@ -655,20 +656,6 @@ one.put('/env', async c => {
   return c.json(await getWorkspaceEnvView(ws.path, requiredEnvFor(ws.path)))
 })
 
-// Start a provider login ceremony. Codex returns a browser OAuth URL for the
-// host to open; Claude launches its browser flow through the CLI itself.
-// Browser-based logins reuse a pending URL; URL-less provider flows restart
-// when requested again. Completion is pushed as `agent:updated`.
-one.post('/auth/login', async c => {
-  const ws = c.get('ws')
-  if (!harnessFor(ws).startLogin) return c.text('This agent requires terminal sign-in', 409)
-  try {
-    return c.json(await agentStore.startLogin(ws))
-  } catch (err) {
-    return c.text(err instanceof Error ? err.message : 'Could not start sign-in', 500)
-  }
-})
-
 one.get('/skills', async c => {
   const ws = c.get('ws')
   return c.json(await getWorkspaceSkillsStatus(ws.path, ws.type))
@@ -683,7 +670,7 @@ one.post('/skills/update', async c => {
 // The workspace's agent backend in one snapshot: provider, availability
 // (runtime presence + auth, from the server-side cache), any in-flight login
 // ceremony, the model catalog, and capabilities. One request at workspace
-// open; the volatile parts stay fresh afterwards via `agent:updated` events,
+// open; the volatile parts stay fresh afterwards via `harness:updated` events,
 // not refetches.
 one.get('/agent', async c => {
   const ws = c.get('ws')
@@ -692,13 +679,13 @@ one.get('/agent', async c => {
   // an empty catalog — the picker hides and chat surfaces the real problem via
   // the availability banner, instead of this endpoint 500ing on page load.
   const [availability, models] = await Promise.all([
-    agentStore.getAvailability(ws),
+    harnessStore.getAvailability(ws),
     harness.listModels(ws).catch(err => {
       console.error(`[api] listModels failed for ${harness.id}`, err)
       return []
     })
   ])
-  const login = agentStore.getLogin(ws.id)
+  const login = harnessStore.getLogin(harness.id)
   return c.json({
     provider: harness.id,
     availability,
@@ -1066,6 +1053,7 @@ workspaces.route('/:id', one)
 export const api = new Hono()
 
 api.route('/api/workspaces', workspaces)
+api.route('/api/harnesses', harnessAuthApi)
 
 // Startup config (config.json in the data dir + MOI_* env), client-safe
 // subset. Immutable for the process lifetime — clients cache it forever.

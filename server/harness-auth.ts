@@ -1,60 +1,58 @@
-// Server-owned agent state: the availability cache and the login ceremony.
-//
-// The client never polls for auth. `GET /api/workspaces/:id/agent` serves the
-// snapshot from this store (one probe per workspace inside the TTL, however
-// many tabs are open); `POST .../auth/login` starts a ceremony per workspace.
-// Browser-based logins reuse their pending URL, while URL-less provider flows
-// can be started again. A watch loop re-probes until the login lands or the
-// deadline passes, and every transition is pushed to all tabs as an
-// `agent:updated` event on the workspace events socket.
+// Login is global per harness. Workspace readiness is checked independently
+// using each workspace’s environment.
 import type {
-  AgentLoginState,
+  HarnessLoginState,
   HarnessAvailability,
   HarnessLogin,
-  WorkspaceEntry
+  WorkspaceType
 } from '@/lib/types'
 
+import { listWorkspaces } from './registry'
 import { publishEvent } from './events'
 import { harnessFor } from './harness/registry'
+import type { HarnessWorkspace } from './harness/types'
 
-export type AgentUpdatedEvent = {
-  type: 'agent:updated'
+export type HarnessUpdatedEvent = {
+  type: 'harness:updated'
   workspaceId: string
   availability: HarnessAvailability
-  login?: AgentLoginState
+  login?: HarnessLoginState
 }
 
-// Only the fields the probe/login provider calls actually read — lets callers
-// that don't have a full registry entry on hand (e.g. a harness session
-// reacting to a mid-conversation send failure) still trigger a refresh.
-export type AgentWorkspace = Pick<WorkspaceEntry, 'id' | 'path' | 'type' | 'agentId'>
+// Readiness can target a harness account or an individual workspace.
+type HarnessTarget = WorkspaceType | HarnessWorkspace
 
-export type AgentStoreOptions = {
-  probe: (ws: AgentWorkspace) => Promise<HarnessAvailability>
-  startLogin: (ws: AgentWorkspace) => Promise<HarnessLogin>
-  publish: (event: AgentUpdatedEvent) => void
+function entryKey(context: HarnessTarget): string {
+  return typeof context === 'string' ? `default:${context}` : `workspace:${context.id}`
+}
+
+export type HarnessStoreOptions = {
+  probe: (ws: HarnessTarget) => Promise<HarnessAvailability>
+  startLogin: (type: WorkspaceType) => Promise<HarnessLogin>
+  publish: (event: HarnessUpdatedEvent) => void
+  onAuthChanged?: (type: WorkspaceType) => Promise<void>
   availabilityTtlMs?: number
   loginPollMs?: number
   loginDeadlineMs?: number
 }
 
 type LoginCeremony = {
-  state: AgentLoginState
+  state: HarnessLoginState
   // The in-flight provider call; joiners await it instead of starting a
   // second flow. Cleared once settled.
   starting?: Promise<HarnessLogin>
   stop: () => void
 }
 
-type AgentEntry = {
+type HarnessEntry = {
   cached?: { value: HarnessAvailability; checkedAt: number }
   // In-flight probe, shared by concurrent callers.
   probe?: Promise<HarnessAvailability>
   login?: LoginCeremony
 }
 
-function failedProbeAvailability(ws: AgentWorkspace, err: unknown): HarnessAvailability {
-  console.error(`[agent] availability probe failed for ${ws.type ?? 'claude-code'}`, err)
+function failedProbeAvailability(ws: HarnessTarget, err: unknown): HarnessAvailability {
+  console.error(`[harness-auth] availability probe failed for ${harnessFor(ws).id}`, err)
   return { status: 'unavailable', reason: 'Could not check agent availability' }
 }
 
@@ -64,33 +62,35 @@ function sameAvailability(a: HarnessAvailability, b: HarnessAvailability): boole
   return a.reason === b.reason
 }
 
-export function createAgentStore(options: AgentStoreOptions) {
+export function createHarnessStore(options: HarnessStoreOptions) {
   const ttlMs = options.availabilityTtlMs ?? 30_000
   const pollMs = options.loginPollMs ?? 2_000
   const deadlineMs = options.loginDeadlineMs ?? 3 * 60_000
-  const entries = new Map<string, AgentEntry>()
+  const entries = new Map<string, HarnessEntry>()
 
-  function entryFor(workspaceId: string): AgentEntry {
-    let entry = entries.get(workspaceId)
+  function entryFor(context: HarnessTarget): HarnessEntry {
+    const key = entryKey(context)
+    let entry = entries.get(key)
     if (!entry) {
       entry = {}
-      entries.set(workspaceId, entry)
+      entries.set(key, entry)
     }
     return entry
   }
 
-  function publish(workspaceId: string, availability: HarnessAvailability) {
-    const login = entries.get(workspaceId)?.login?.state
+  async function publish(context: HarnessTarget, availability: HarnessAvailability) {
+    if (typeof context === 'string') return options.onAuthChanged?.(context)
+    const login = getLogin(context.type ?? 'claude-code')
     options.publish({
-      type: 'agent:updated',
-      workspaceId,
+      type: 'harness:updated',
+      workspaceId: context.id,
       availability,
       ...(login ? { login } : {})
     })
   }
 
-  async function probeFresh(ws: AgentWorkspace): Promise<HarnessAvailability> {
-    const entry = entryFor(ws.id)
+  async function probeFresh(ws: HarnessTarget): Promise<HarnessAvailability> {
+    const entry = entryFor(ws)
     if (!entry.probe) {
       entry.probe = Promise.resolve()
         .then(() => options.probe(ws))
@@ -104,8 +104,8 @@ export function createAgentStore(options: AgentStoreOptions) {
     return value
   }
 
-  async function getAvailability(ws: AgentWorkspace): Promise<HarnessAvailability> {
-    const entry = entryFor(ws.id)
+  async function getAvailability(ws: HarnessTarget): Promise<HarnessAvailability> {
+    const entry = entryFor(ws)
     if (entry.cached && Date.now() - entry.cached.checkedAt < ttlMs) {
       return entry.cached.value
     }
@@ -116,20 +116,20 @@ export function createAgentStore(options: AgentStoreOptions) {
   // that suspect the cached snapshot is stale for a reason other than an env
   // change (e.g. a send just failed, which can mean the provider was signed
   // out from outside moi — a `codex logout` in a terminal, say).
-  async function refresh(ws: AgentWorkspace): Promise<HarnessAvailability> {
+  async function refresh(ws: HarnessTarget): Promise<HarnessAvailability> {
     const value = await probeFresh(ws)
-    publish(ws.id, value)
+    await publish(ws, value)
     return value
   }
 
-  function getLogin(workspaceId: string): AgentLoginState | undefined {
-    return entries.get(workspaceId)?.login?.state
+  function getLogin(context: WorkspaceType): HarnessLoginState | undefined {
+    return entries.get(entryKey(context))?.login?.state
   }
 
   // Re-probe until the login lands or the deadline passes. One loop per
   // ceremony; a replaced or completed ceremony stops its loop.
   function watch(
-    ws: AgentWorkspace,
+    type: WorkspaceType,
     login: LoginCeremony,
     initialAvailability: HarnessAvailability
   ) {
@@ -142,24 +142,24 @@ export function createAgentStore(options: AgentStoreOptions) {
       clearTimeout(timer)
     }
     const tick = async () => {
-      const value = await probeFresh(ws)
+      const value = await probeFresh(type)
       if (stopped) return
-      const entry = entryFor(ws.id)
+      const entry = entryFor(type)
       if (value.status === 'available') {
         entry.login = undefined
-        publish(ws.id, value)
+        await publish(type, value)
         return
       }
       if (Date.now() >= deadline) {
         // Keep the failed state so the composer can show it; the next
         // startLogin replaces it.
         login.state = { state: 'failed', reason: 'Sign-in did not complete. Try again' }
-        publish(ws.id, value)
+        await publish(type, value)
         return
       }
       if (!sameAvailability(value, publishedAvailability)) {
         publishedAvailability = value
-        publish(ws.id, value)
+        await publish(type, value)
       }
       timer = setTimeout(tick, pollMs)
       timer.unref?.()
@@ -169,8 +169,8 @@ export function createAgentStore(options: AgentStoreOptions) {
     timer.unref?.()
   }
 
-  async function startLogin(ws: AgentWorkspace): Promise<HarnessLogin> {
-    const entry = entryFor(ws.id)
+  async function startLogin(type: WorkspaceType): Promise<HarnessLogin> {
+    const entry = entryFor(type)
     // Concurrent starts share the provider call. Once started, browser-based
     // flows reuse their URL; URL-less flows can be launched again on demand.
     const current = entry.login
@@ -180,44 +180,67 @@ export function createAgentStore(options: AgentStoreOptions) {
     }
 
     current?.stop()
-    const starting = options.startLogin(ws)
+    const starting = options.startLogin(type)
     const login: LoginCeremony = { state: { state: 'pending' }, starting, stop: () => {} }
     entry.login = login
     try {
       const result = await starting
+      if (entry.login !== login) return result
       login.starting = undefined
       login.state = { state: 'pending', ...(result.url ? { url: result.url } : {}) }
       const availability = entry.cached?.value ?? {
         status: 'login-required',
         reason: 'Waiting for sign-in'
       }
-      publish(ws.id, availability)
-      watch(ws, login, availability)
+      await publish(type, availability)
+      watch(type, login, availability)
       return result
     } catch (err) {
-      entry.login = undefined
+      if (entry.login === login) entry.login = undefined
       throw err
     }
   }
 
   // Drop the cached snapshot so the next read re-probes (e.g. after an env
   // change swaps credentials).
-  function invalidate(workspaceId: string) {
-    const entry = entries.get(workspaceId)
-    if (entry) entry.cached = undefined
+  function invalidate(context: HarnessTarget) {
+    const entry = entries.get(entryKey(context))
+    if (!entry) return
+    entry.cached = undefined
+    entry.login?.stop()
+    entry.login = undefined
   }
 
   return { getAvailability, refresh, getLogin, startLogin, invalidate }
 }
 
-export type AgentStore = ReturnType<typeof createAgentStore>
+export type HarnessStore = ReturnType<typeof createHarnessStore>
 
-export const agentStore = createAgentStore({
-  probe: async ws => (await harnessFor(ws).availability?.(ws)) ?? { status: 'available' },
-  startLogin: ws => {
-    const start = harnessFor(ws).startLogin
-    if (!start) throw new Error('This agent requires terminal sign-in')
-    return start(ws)
+export const harnessStore = createHarnessStore({
+  probe: async context => {
+    const harness = harnessFor(context)
+    if (typeof context !== 'string') {
+      return (await harness.availability?.(context)) ?? { status: 'available' }
+    }
+    if (!harness.authStatus)
+      return { status: 'unavailable', reason: 'This agent requires terminal sign-in' }
+    return harness.authStatus()
   },
-  publish: publishEvent
+  startLogin: type => {
+    const start = harnessFor(type).startLogin
+    if (!start) throw new Error('This agent requires terminal sign-in')
+    return start()
+  },
+  publish: publishEvent,
+  onAuthChanged: async type => {
+    // Shared credentials still need an independent check in each workspace.
+    try {
+      const workspaces = await listWorkspaces()
+      await Promise.all(
+        workspaces.filter(ws => harnessFor(ws).id === type).map(ws => harnessStore.refresh(ws))
+      )
+    } catch (error) {
+      console.error('[harness-auth] could not refresh workspaces after login', error)
+    }
+  }
 })

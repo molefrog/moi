@@ -211,12 +211,15 @@ Workspace availability also checks provider authentication when a workspace is
 given. Claude Code is probed with `claude auth status` under the effective
 workspace env; `claude auth login` launches its browser sign-in from the composer. Codex
 uses app-server `account/read` and returns a browser OAuth URL through
-`account/login/start`. The server owns the recovery loop (`server/agent.ts`):
+`account/login/start`. The server owns the recovery loop (`server/harness-auth.ts`):
 `GET /api/workspaces/:id/agent` serves a cached availability snapshot alongside
-the model catalog, `POST .../auth/login` reuses a pending browser URL or restarts
+the model catalog. `GET /api/harnesses/:type/auth` checks global authentication;
+`POST /api/harnesses/:type/auth/login` reuses a pending browser URL or restarts
 a URL-less provider flow, and a server-side watch loop re-probes until the login
-lands or times out, pushing `agent:updated` events to every tab. The composer
-renders that state; it never polls.
+lands or times out, pushing `harness:updated` events to every tab. The composer
+renders that state; it never polls. Login is global per harness and uses the
+process environment, without workspace overrides. Each workspace is rechecked
+independently when login state changes.
 
 ## What a harness adapter must support
 
@@ -303,7 +306,7 @@ doubles as the evaluation rubric for new harnesses.
   server?
 - Push health/auth status events from the backend itself (the server watch
   loop still discovers login completion by re-probing; a provider callback
-  would let `agent:updated` fire without polling anywhere).
+  would let `harness:updated` fire without polling anywhere).
 
 ## Capability comparison
 

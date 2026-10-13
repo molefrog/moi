@@ -41,7 +41,7 @@ import {
   CODEX_TURN_ACCESS
 } from './permissions'
 import { generateCodexSessionTitle, renameCodexSessionIfUnchanged } from './session-title'
-import { agentStore } from '../../agent'
+import { harnessStore } from '../../harness-auth'
 import { debug } from '../../debug'
 import { broadcast } from '../../state'
 import { hasSessionConfig, saveSessionConfig } from '../../session-config'
@@ -458,7 +458,7 @@ function applyCompletionMeta(
 
 // A failed send may reflect an external logout. Refresh the cached banner now.
 function refreshAvailability(workspaceId: string, workspacePath: string) {
-  void agentStore.refresh({ id: workspaceId, path: workspacePath, type: 'codex' })
+  void harnessStore.refresh({ id: workspaceId, path: workspacePath, type: 'codex' })
 }
 
 function handleNotification(rec: SessionRecord, method: string, params: Record<string, unknown>) {

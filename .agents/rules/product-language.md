@@ -6,6 +6,9 @@ alwaysApply: true
 - Write the product name as `moi` in all prose and user-facing copy. Preserve existing casing only for technical identifiers.
 - Use sentence case for headings, labels, actions, navigation, and messages.
 - Prefer the product nouns workspace, chat, agent, model, widget, view, connector, session, and run.
+- Use agent in UI copy for Claude Code, Codex, and other supported coding tools, such as “Connect an agent”.
+- Use harness for internal integration and authentication names, including types, functions, files, API routes, and events: `HarnessLoginState`, `startHarnessLogin`, `/api/harnesses/:type/auth`.
+- Keep agent for actual agent identities, subagents, and provider-native terminology such as OpenClaw’s `agentId`; do not rename those to harness.
 - Use chat for user-facing language and UI concepts.
 - Use session for internal identifiers, state, persistence, protocols, and hooks that expose session state.
 - Use thread only when matching terminology from an external provider or SDK.

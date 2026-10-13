@@ -499,11 +499,11 @@ export type HarnessAvailability =
 // Codex returns a URL for the browser. Claude opens it from its own CLI.
 export type HarnessLogin = { url?: string }
 
-// The server-owned login ceremony for a workspace. `pending` means a watch loop
+// The server-owned login ceremony for a harness. `pending` means a watch loop
 // is re-probing the provider until the login lands or the deadline passes;
-// transitions arrive as `agent:updated` events, so every tab shows the same
+// transitions arrive as `harness:updated` events, so every tab shows the same
 // ceremony without polling.
-export type AgentLoginState =
+export type HarnessLoginState =
   | { state: 'pending'; url?: string }
   | { state: 'failed'; reason: string }
 
@@ -763,7 +763,7 @@ export type Model = {
 }
 
 // GET /api/workspaces/:id/agent. Model changes arrive on refetch;
-// `agent:updated` events refresh availability and login state.
+// `harness:updated` events refresh availability and login state.
 export type WorkspaceAgent = {
   // The agent backend that produced this snapshot — matches the workspace
   // provider.
@@ -771,7 +771,7 @@ export type WorkspaceAgent = {
   // Runtime presence and provider auth state, from the server-side cache.
   availability: HarnessAvailability
   // Present while a login ceremony is in flight or after one failed.
-  login?: AgentLoginState
+  login?: HarnessLoginState
   models: Model[]
   // Whether this provider supports live token-by-token streaming (the picker
   // shows the "Live typing" toggle only when true). Provider-wide, not per-model

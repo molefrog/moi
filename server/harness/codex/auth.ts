@@ -49,7 +49,7 @@ export function codexOutdatedAvailability(
   }
 }
 
-export async function getCodexAuthReadiness(workspacePath: string): Promise<HarnessAvailability> {
+export async function getCodexAuthReadiness(workspacePath?: string): Promise<HarnessAvailability> {
   const client = await getCodexClient(workspacePath)
   const outdated = codexOutdatedAvailability(client.cliVersion)
   if (outdated) return outdated
@@ -57,8 +57,8 @@ export async function getCodexAuthReadiness(workspacePath: string): Promise<Harn
   return codexAccountReadiness(account)
 }
 
-export async function startCodexLogin(workspacePath: string): Promise<HarnessLogin> {
-  const client = await getCodexClient(workspacePath)
+export async function startCodexLogin(): Promise<HarnessLogin> {
+  const client = await getCodexClient()
   const login = await client.rpc<CodexLoginResponse>('account/login/start', {
     type: 'chatgpt',
     useHostedLoginSuccessPage: true,

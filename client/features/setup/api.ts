@@ -6,6 +6,7 @@ import { useUiStore } from '@/client/store/ui'
 import type {
   DiscoveredWorkspace,
   HarnessAvailability,
+  HarnessLogin,
   HarnessInstallations,
   WorkspaceEntry,
   WorkspaceType
@@ -83,4 +84,12 @@ export function useCreateWorkspace() {
       )
     }
   })
+}
+
+export function startHarnessLogin(type: WorkspaceType): Promise<HarnessLogin> {
+  return requestJson(
+    `/api/harnesses/${type}/auth/login`,
+    { method: 'POST' },
+    'Could not start sign-in'
+  )
 }

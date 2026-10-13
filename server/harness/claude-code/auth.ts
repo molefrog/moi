@@ -1,3 +1,4 @@
+import { homedir } from 'node:os'
 import type { HarnessAvailability, HarnessLogin } from '@/lib/types'
 
 import { agentCommand } from '../../agent-launcher'
@@ -29,13 +30,13 @@ export function claudeAuthReadiness(result: ClaudeAuthProbeResult): HarnessAvail
 // Claude Code documents exit 0 as logged in and exit 1 as logged out. Run the
 // probe with the same workspace env as the actual Agent SDK subprocess so
 // API-key and enterprise provider configuration match the eventual send.
-export async function getClaudeAuthReadiness(workspacePath: string): Promise<HarnessAvailability> {
+export async function getClaudeAuthReadiness(workspacePath?: string): Promise<HarnessAvailability> {
   const executable = findHarnessExecutable('claude-code')
   if (!executable) return unavailable('Claude is not installed')
 
-  const workspaceEnv = await resolveWorkspaceEnv(workspacePath)
+  const workspaceEnv = workspacePath ? await resolveWorkspaceEnv(workspacePath) : {}
   const proc = Bun.spawn(agentCommand([executable, 'auth', 'status']), {
-    cwd: workspacePath,
+    cwd: workspacePath ?? homedir(),
     env: { ...process.env, ...workspaceEnv },
     stdin: 'ignore',
     stdout: 'ignore',
@@ -54,14 +55,13 @@ export async function getClaudeAuthReadiness(workspacePath: string): Promise<Har
   }
 }
 
-export async function startClaudeLogin(workspacePath: string): Promise<HarnessLogin> {
+export async function startClaudeLogin(): Promise<HarnessLogin> {
   const executable = findHarnessExecutable('claude-code')
   if (!executable) throw new Error('Claude is not installed')
 
-  const workspaceEnv = await resolveWorkspaceEnv(workspacePath)
   Bun.spawn(agentCommand([executable, 'auth', 'login']), {
-    cwd: workspacePath,
-    env: { ...process.env, ...workspaceEnv },
+    cwd: homedir(),
+    env: process.env,
     stdin: 'ignore',
     stdout: 'ignore',
     stderr: 'ignore'
