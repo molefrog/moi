@@ -18,7 +18,7 @@ import {
 } from './workspace-agent-options'
 
 const WORKSPACE_AGENT_DESCRIPTION = 'Choose which agent moi will use to build your workspace'
-type WorkspaceAgentStepProps = {
+type WorkspaceAgentSelectorProps = {
   title: string
   selectedType: WorkspaceType
   options: WorkspaceAgentOption[]
@@ -33,7 +33,7 @@ type WorkspaceAgentStepProps = {
   onSubmit: () => void
 }
 
-export function WorkspaceAgentStep({
+export function WorkspaceAgentSelector({
   title,
   selectedType,
   options,
@@ -46,7 +46,7 @@ export function WorkspaceAgentStep({
   pendingLabel,
   onTypeChange,
   onSubmit
-}: WorkspaceAgentStepProps) {
+}: WorkspaceAgentSelectorProps) {
   const hasSentMessageFromMoi = useUiStore(state => state.hasSentMessageFromMoi)
   const selectableType = resolveWorkspaceAgentSelection(options, selectedType)
   const selectedUnavailable = selectableType !== selectedType
@@ -79,7 +79,7 @@ export function WorkspaceAgentStep({
             <Skeleton className="h-32 min-w-32 flex-1" />
           </div>
         ) : (
-          <WorkspaceAgentSelector
+          <WorkspaceAgentCards
             options={options}
             selectedType={selectedUnavailable ? undefined : selectedType}
             onTypeChange={onTypeChange}
@@ -110,17 +110,13 @@ export function WorkspaceAgentStep({
   )
 }
 
-type WorkspaceAgentSelectorProps = {
+type WorkspaceAgentCardsProps = {
   options: WorkspaceAgentOption[]
   selectedType?: WorkspaceType
   onTypeChange: (type: WorkspaceType) => void
 }
 
-function WorkspaceAgentSelector({
-  options,
-  selectedType,
-  onTypeChange
-}: WorkspaceAgentSelectorProps) {
+function WorkspaceAgentCards({ options, selectedType, onTypeChange }: WorkspaceAgentCardsProps) {
   return (
     <div role="group" aria-label="Agent" className="flex flex-wrap justify-center gap-2">
       {options.map(option => (

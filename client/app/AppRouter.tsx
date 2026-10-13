@@ -4,6 +4,8 @@ import { Redirect, Route, Switch, useLocation } from 'wouter'
 
 import { setWorkspaceSwitchHandler } from '@/client/features/chat/connection/chat-connection'
 
+import { OnboardingFlow } from '@/client/features/setup/onboarding/onboarding-flow'
+
 import { HomeRoute } from './routes/HomeRoute'
 import { WorkspaceRoute } from './routes/WorkspaceRoute'
 
@@ -39,14 +41,20 @@ export function AppRouter() {
 
   return (
     <Switch>
-      <Route path="/" component={HomeRoute} />
       <Route path="/dev/*?" component={DevLazy} />
-      {/* The wildcard is the destination path (`views/orders`, `overview`, …) —
+      <Route>
+        <OnboardingFlow>
+          <Switch>
+            <Route path="/" component={HomeRoute} />
+            {/* The wildcard is the destination path (`views/orders`, `overview`, …) —
           the URL is the tab address, read downstream with `useParams`. This
           pattern is its only definition. Keyed by workspace id only, so tab
           switches never remount the workspace tree. */}
-      <Route path="/workspace/:id/*?">
-        {(params: { id: string }) => <WorkspaceRoute key={params.id} id={params.id} />}
+            <Route path="/workspace/:id/*?">
+              {(params: { id: string }) => <WorkspaceRoute key={params.id} id={params.id} />}
+            </Route>
+          </Switch>
+        </OnboardingFlow>
       </Route>
     </Switch>
   )

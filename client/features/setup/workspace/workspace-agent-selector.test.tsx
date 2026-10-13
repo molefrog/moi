@@ -5,7 +5,7 @@ import { parseHTML } from 'linkedom'
 
 import { Dialog } from '@/client/components/ui/dialog'
 import type { HarnessInstallations } from '@/lib/types'
-import { WorkspaceAgentStep } from './WorkspaceAgentStep'
+import { WorkspaceAgentSelector } from './workspace-agent-selector'
 import { getCreateWorkspaceAgentOptions } from './workspace-agent-options'
 
 const missing: HarnessInstallations = {
@@ -20,7 +20,7 @@ function renderStep(installed?: HarnessInstallations, isChecking = false, errorM
     createElement(
       Dialog,
       { open: true },
-      createElement(WorkspaceAgentStep, {
+      createElement(WorkspaceAgentSelector, {
         title: 'Create new workspace',
         options: getCreateWorkspaceAgentOptions(installed),
         isLoading: isChecking && !installed,

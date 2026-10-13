@@ -5,10 +5,10 @@ import { Dialog, DialogClose } from '@/client/components/ui/dialog'
 import { workspaceDisplayName } from '@/client/features/home/workspace-presentation'
 import type { HarnessAvailability, WorkspaceType } from '@/lib/types'
 
-import { WorkspaceAgentStep } from './WorkspaceAgentStep'
+import { WorkspaceAgentSelector } from './workspace-agent-selector'
 import { getImportWorkspaceAgentOptions } from './workspace-agent-options'
-import { WorkspaceDialogContent } from './WorkspaceDialogContent'
-import type { WorkspaceImportChoice } from './useWorkspaceImport'
+import { WorkspaceDialogContent } from './workspace-dialog-content'
+import type { WorkspaceImportChoice } from './use-workspace-import'
 
 type ImportWorkspaceDialogProps = {
   choice: WorkspaceImportChoice
@@ -47,7 +47,7 @@ export function ImportWorkspaceDialog({
       onOpenChangeComplete={handleOpenChangeComplete}
     >
       <WorkspaceDialogContent showCloseButton={!isPending}>
-        <WorkspaceAgentStep
+        <WorkspaceAgentSelector
           title={`Import ${workspaceDisplayName(choice.workspace)}`}
           selectedType={choice.selectedType}
           options={getImportWorkspaceAgentOptions({

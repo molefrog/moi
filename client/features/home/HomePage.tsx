@@ -3,16 +3,12 @@ import { useState } from 'react'
 import { IconChevronRight, IconEggCracked, IconLoader2, IconPlus } from '@tabler/icons-react'
 import { Link, useLocation } from 'wouter'
 
-import {
-  useDiscoveredWorkspaces,
-  useWorkspacePreview,
-  useWorkspaces,
-  useWorkspaceSetupInfo
-} from './api'
-import { CreateWorkspaceDialog } from './workspace-setup/CreateWorkspaceDialog'
-import { ImportWorkspaceDialog } from './workspace-setup/ImportWorkspaceDialog'
-import { DemoDialog } from './workspace-setup/DemoDialog'
-import { useWorkspaceImport } from './workspace-setup/useWorkspaceImport'
+import { useDiscoveredWorkspaces, useWorkspacePreview, useWorkspaces } from './api'
+import { useWorkspaceSetupInfo } from '@/client/features/setup/api'
+import { CreateWorkspaceDialog } from '@/client/features/setup/workspace/create-workspace-dialog'
+import { ImportWorkspaceDialog } from '@/client/features/setup/workspace/import-workspace-dialog'
+import { DemoDialog } from '@/client/features/setup/demo/demo-dialog'
+import { useWorkspaceImport } from '@/client/features/setup/workspace/use-workspace-import'
 import { HomeLogo } from './HomeLogo'
 import { useAppConfig } from '@/client/api/app-config'
 import { AgentBlobatar } from '@/client/components/shared/AgentBlobatar'

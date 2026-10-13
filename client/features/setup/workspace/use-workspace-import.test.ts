@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { workspaceImportDefaultType } from './useWorkspaceImport'
+import { workspaceImportDefaultType } from './use-workspace-import'
 import type { DiscoveredWorkspace } from '@/lib/types'
 
 describe('workspaceImportDefaultType', () => {

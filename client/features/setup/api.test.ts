@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import type { WorkspaceEntry } from '@/lib/types'
 
-import { upsertWorkspaceEntry } from './api'
+import { upsertWorkspaceEntry } from '@/client/features/setup/api'
 
 const existing: WorkspaceEntry = {
   id: 'one',
