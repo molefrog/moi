@@ -6,6 +6,7 @@ import { useUiStore } from '@/client/store/ui'
 import type {
   DiscoveredWorkspace,
   HarnessAvailability,
+  HarnessInstallations,
   WorkspaceEntry,
   WorkspacePreview,
   WorkspaceType
@@ -70,6 +71,7 @@ export type ImportWorkspaceInput = {
 export type WorkspaceSetupInfo = {
   root: string
   displayRoot: string
+  installed: HarnessInstallations
   // Per-backend runtime availability (are the Claude/Codex CLIs installed?),
   // keyed by workspace type. Missing entries mean available.
   availability?: Partial<Record<WorkspaceType, HarnessAvailability>>

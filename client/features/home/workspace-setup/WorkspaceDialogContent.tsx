@@ -14,7 +14,7 @@ export function WorkspaceDialogContent({
   return (
     <DialogContent
       showCloseButton={showCloseButton}
-      className="block w-[calc(100%-2rem)] max-w-xl overflow-hidden p-6 sm:max-w-xl"
+      className="block max-h-[calc(100dvh-2rem)] w-max max-w-[calc(100vw-2rem)] overflow-y-auto p-6 sm:max-w-[calc(100vw-2rem)]"
     >
       {children}
     </DialogContent>

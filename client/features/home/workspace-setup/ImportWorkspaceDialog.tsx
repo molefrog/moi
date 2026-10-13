@@ -6,48 +6,17 @@ import { workspaceDisplayName } from '@/client/features/home/workspace-presentat
 import type { HarnessAvailability, WorkspaceType } from '@/lib/types'
 
 import { WorkspaceAgentStep } from './WorkspaceAgentStep'
+import { getImportWorkspaceAgentOptions } from './workspace-agent-options'
 import { WorkspaceDialogContent } from './WorkspaceDialogContent'
 import type { WorkspaceImportChoice } from './useWorkspaceImport'
 
-type ImportWorkspaceStepProps = {
+type ImportWorkspaceDialogProps = {
   choice: WorkspaceImportChoice
   availability?: Partial<Record<WorkspaceType, HarnessAvailability>>
   isPending: boolean
   errorMessage?: string
   onTypeChange: (type: WorkspaceType) => void
   onSubmit: () => void
-}
-
-function ImportWorkspaceStep({
-  choice,
-  availability,
-  isPending,
-  errorMessage,
-  onTypeChange,
-  onSubmit
-}: ImportWorkspaceStepProps) {
-  return (
-    <WorkspaceAgentStep
-      title={`Import ${workspaceDisplayName(choice.workspace)}`}
-      selectedType={choice.selectedType}
-      detectedTypes={choice.workspace.types}
-      availability={availability}
-      isPending={isPending}
-      errorMessage={errorMessage}
-      secondaryAction={
-        <DialogClose render={<Button variant="secondary" />} disabled={isPending}>
-          Cancel
-        </DialogClose>
-      }
-      primaryLabel="Add workspace"
-      pendingLabel="Adding…"
-      onTypeChange={onTypeChange}
-      onSubmit={onSubmit}
-    />
-  )
-}
-
-type ImportWorkspaceDialogProps = ImportWorkspaceStepProps & {
   onReset: () => void
 }
 
@@ -78,11 +47,22 @@ export function ImportWorkspaceDialog({
       onOpenChangeComplete={handleOpenChangeComplete}
     >
       <WorkspaceDialogContent showCloseButton={!isPending}>
-        <ImportWorkspaceStep
-          choice={choice}
-          availability={availability}
+        <WorkspaceAgentStep
+          title={`Import ${workspaceDisplayName(choice.workspace)}`}
+          selectedType={choice.selectedType}
+          options={getImportWorkspaceAgentOptions({
+            availability,
+            detectedTypes: choice.workspace.types
+          })}
           isPending={isPending}
           errorMessage={errorMessage}
+          secondaryAction={
+            <DialogClose render={<Button variant="secondary" />} disabled={isPending}>
+              Cancel
+            </DialogClose>
+          }
+          primaryLabel="Add workspace"
+          pendingLabel="Adding…"
           onTypeChange={onTypeChange}
           onSubmit={onSubmit}
         />

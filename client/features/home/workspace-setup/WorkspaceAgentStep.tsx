@@ -5,84 +5,27 @@ import { IconCircleCheckFilled } from '@tabler/icons-react'
 import { Button } from '@/client/components/ui/button'
 import { workspaceProviderIcon } from '@/client/components/shared/WorkspaceIcon'
 import { DialogDescription, DialogTitle } from '@/client/components/ui/dialog'
+import { Skeleton } from '@/client/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { workspaceTypeLabel } from '@/client/features/home/workspace-presentation'
 import { cn } from '@/client/lib/cn'
 import { useUiStore } from '@/client/store/ui'
-import { WORKSPACE_TYPE_ORDER } from '@/lib/workspace-types'
-import type { HarnessAvailability, WorkspaceType } from '@/lib/types'
+import type { WorkspaceType } from '@/lib/types'
+
+import {
+  resolveWorkspaceAgentSelection,
+  type WorkspaceAgentOption
+} from './workspace-agent-options'
 
 const WORKSPACE_AGENT_DESCRIPTION = 'Choose which agent moi will use to build your workspace'
-// Backends whose workspaces belong to an agent installed on the machine: moi
-// imports them (via discovery or `moi <provider> init`) and never creates one.
-const IMPORT_ONLY_DESCRIPTION: Partial<Record<WorkspaceType, string>> = {
-  openclaw: 'To connect an OpenClaw agent, run',
-  hermes: 'To connect a Hermes agent, run'
-}
-const IMPORT_ONLY_COMMAND: Partial<Record<WorkspaceType, string>> = {
-  openclaw: 'moi openclaw init',
-  hermes: 'moi hermes init'
-}
-
-const workspaceAgentDescription: Record<WorkspaceType, string> = {
-  'claude-code': 'Anthropic',
-  codex: 'OpenAI',
-  openclaw: 'Open-source',
-  hermes: 'Nous Research'
-}
-
-export type WorkspaceAgentOption = {
-  type: WorkspaceType
-  description: string
-  disabled: boolean
-  disabledReason?: string
-  disabledCommand?: string
-}
-
-type WorkspaceAgentOptionsInput = {
-  availability?: Partial<Record<WorkspaceType, HarnessAvailability>>
-  detectedTypes?: WorkspaceType[]
-}
-
-export function getWorkspaceAgentOptions({
-  availability,
-  detectedTypes = []
-}: WorkspaceAgentOptionsInput): WorkspaceAgentOption[] {
-  return WORKSPACE_TYPE_ORDER.map(type => {
-    const state = availability?.[type]
-    const unavailableReason = state && state.status !== 'available' ? state.reason : undefined
-    const importOnlyReason = !detectedTypes.includes(type)
-      ? IMPORT_ONLY_DESCRIPTION[type]
-      : undefined
-    const importOnlyCommand = !detectedTypes.includes(type) ? IMPORT_ONLY_COMMAND[type] : undefined
-    const disabledReason = unavailableReason ?? importOnlyReason
-
-    return {
-      type,
-      description: workspaceAgentDescription[type],
-      disabled: Boolean(disabledReason),
-      ...(disabledReason ? { disabledReason } : {}),
-      ...(!unavailableReason && importOnlyCommand ? { disabledCommand: importOnlyCommand } : {})
-    }
-  })
-}
-
-export function resolveWorkspaceAgentSelection(
-  options: WorkspaceAgentOption[],
-  selectedType: WorkspaceType
-): WorkspaceType | undefined {
-  const selected = options.find(option => option.type === selectedType)
-  if (selected && !selected.disabled) return selected.type
-  return options.find(option => !option.disabled)?.type
-}
-
 type WorkspaceAgentStepProps = {
   title: string
   selectedType: WorkspaceType
-  detectedTypes?: WorkspaceType[]
-  availability?: Partial<Record<WorkspaceType, HarnessAvailability>>
+  options: WorkspaceAgentOption[]
+  isLoading?: boolean
   isPending: boolean
   errorMessage?: string
+  emptyMessage?: string
   secondaryAction: ReactNode
   primaryLabel: string
   pendingLabel?: string
@@ -93,10 +36,11 @@ type WorkspaceAgentStepProps = {
 export function WorkspaceAgentStep({
   title,
   selectedType,
-  detectedTypes,
-  availability,
+  options,
+  isLoading = false,
   isPending,
   errorMessage,
+  emptyMessage,
   secondaryAction,
   primaryLabel,
   pendingLabel,
@@ -104,7 +48,6 @@ export function WorkspaceAgentStep({
   onSubmit
 }: WorkspaceAgentStepProps) {
   const hasSentMessageFromMoi = useUiStore(state => state.hasSentMessageFromMoi)
-  const options = getWorkspaceAgentOptions({ availability, detectedTypes })
   const selectableType = resolveWorkspaceAgentSelection(options, selectedType)
   const selectedUnavailable = selectableType !== selectedType
   const subscriptionTip =
@@ -115,31 +58,46 @@ export function WorkspaceAgentStep({
         : undefined
 
   useEffect(() => {
-    if (selectableType && selectedUnavailable) onTypeChange(selectableType)
-  }, [onTypeChange, selectableType, selectedUnavailable])
+    if (!isPending && selectableType && selectedUnavailable) onTypeChange(selectableType)
+  }, [isPending, onTypeChange, selectableType, selectedUnavailable])
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-0.5 pr-8">
+      <div className="flex w-0 min-w-full flex-col gap-0.5 pr-8">
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>{WORKSPACE_AGENT_DESCRIPTION}</DialogDescription>
       </div>
 
       <div className="flex flex-col gap-4">
-        <WorkspaceAgentSelector
-          options={options}
-          selectedType={selectedUnavailable ? undefined : selectedType}
-          onTypeChange={onTypeChange}
-        />
+        {isLoading ? (
+          <div
+            className="flex flex-wrap justify-center gap-2"
+            role="status"
+            aria-label="Checking installed agents"
+          >
+            <Skeleton className="size-32 shrink-0" />
+            <Skeleton className="size-32 shrink-0" />
+          </div>
+        ) : (
+          <WorkspaceAgentSelector
+            options={options}
+            selectedType={selectedUnavailable ? undefined : selectedType}
+            onTypeChange={onTypeChange}
+          />
+        )}
         {!hasSentMessageFromMoi && subscriptionTip && (
-          <p className="text-sm text-muted-foreground">{subscriptionTip}</p>
+          <p className="w-0 min-w-full text-sm text-muted-foreground">{subscriptionTip}</p>
         )}
       </div>
 
       {errorMessage && (
-        <p role="alert" className="text-xs text-destructive">
+        <p role="alert" className="w-0 min-w-full text-xs text-destructive">
           {errorMessage}
         </p>
+      )}
+
+      {emptyMessage && !selectableType && !isPending && !errorMessage && (
+        <p className="w-0 min-w-full text-sm text-muted-foreground">{emptyMessage}</p>
       )}
 
       <div className="flex items-center justify-end gap-2">
@@ -164,11 +122,7 @@ function WorkspaceAgentSelector({
   onTypeChange
 }: WorkspaceAgentSelectorProps) {
   return (
-    <div
-      role="group"
-      aria-label="Agent"
-      className={cn('grid gap-2', options.length > 2 ? 'grid-cols-4' : 'grid-cols-2')}
-    >
+    <div role="group" aria-label="Agent" className="flex flex-wrap justify-center gap-2">
       {options.map(option => (
         <WorkspaceAgentOptionButton
           key={option.type}
@@ -207,7 +161,7 @@ function WorkspaceAgentOptionButton({
         onSelect(option.type)
       }}
       className={cn(
-        'relative flex w-full flex-col items-start justify-between gap-6 rounded-xl bg-card p-4 text-left ring-1 ring-border transition-opacity outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+        'relative flex size-32 shrink-0 flex-col items-start justify-between gap-6 rounded-xl bg-card p-4 text-left ring-1 ring-border transition-opacity outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
         !selected && 'opacity-70',
         !selected && !option.disabled && 'cursor-pointer hover:opacity-100',
         option.disabled && 'cursor-not-allowed'
@@ -238,13 +192,13 @@ function WorkspaceAgentOptionButton({
   return (
     <Tooltip>
       <TooltipTrigger render={button} />
-      <TooltipContent className={cn('max-w-64', option.disabledCommand && 'max-w-none leading-5')}>
+      <TooltipContent className="max-w-[calc(100vw-2rem)] leading-5 sm:max-w-96">
         <span className="text-center">
           {option.disabledReason}
           {option.disabledCommand && (
             <>
               <br />
-              <code className="rounded-xs bg-accent px-1 py-0.5 font-mono whitespace-nowrap">
+              <code className="rounded-xs bg-accent px-1 py-0.5 font-mono wrap-anywhere">
                 {option.disabledCommand}
               </code>
             </>

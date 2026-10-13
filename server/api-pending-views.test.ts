@@ -176,7 +176,7 @@ describe('pending view availability', () => {
     })
     const draft = (await createResponse.json()) as PendingView
     const reason =
-      'Run curl -fsSL https://chatgpt.com/codex/install.sh | sh in your terminal to install Codex'
+      'Run in terminal to install Codex: curl -fsSL https://chatgpt.com/codex/install.sh | sh'
     codexHarness.availability = async () => ({ status: 'unavailable', reason })
 
     const response = await api.request(`/api/workspaces/${workspace.id}/views/${draft.id}/submit`, {

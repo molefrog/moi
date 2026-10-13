@@ -72,13 +72,13 @@ describe('workspace import provider', () => {
     {
       type: 'claude-code' as const,
       harness: claudeCodeHarness,
-      reason: 'Run curl -fsSL https://claude.ai/install.sh | sh in your terminal to install Claude'
+      reason: 'Run in terminal to install Claude Code: curl -fsSL https://claude.ai/install.sh | sh'
     },
     {
       type: 'codex' as const,
       harness: codexHarness,
       reason:
-        'Run curl -fsSL https://chatgpt.com/codex/install.sh | sh in your terminal to install Codex'
+        'Run in terminal to install Codex: curl -fsSL https://chatgpt.com/codex/install.sh | sh'
     }
   ])('rejects unavailable $type before provisioning', async ({ type, harness, reason }) => {
     harness.availability = async () => ({ status: 'unavailable', reason })
@@ -99,13 +99,13 @@ describe('workspace import provider', () => {
     {
       type: 'claude-code' as const,
       harness: claudeCodeHarness,
-      reason: 'Run curl -fsSL https://claude.ai/install.sh | sh in your terminal to install Claude'
+      reason: 'Run in terminal to install Claude Code: curl -fsSL https://claude.ai/install.sh | sh'
     },
     {
       type: 'codex' as const,
       harness: codexHarness,
       reason:
-        'Run curl -fsSL https://chatgpt.com/codex/install.sh | sh in your terminal to install Codex'
+        'Run in terminal to install Codex: curl -fsSL https://chatgpt.com/codex/install.sh | sh'
     }
   ])('reports unavailable $type for a registered workspace', async ({ type, harness, reason }) => {
     harness.availability = async () => ({ status: 'unavailable', reason })

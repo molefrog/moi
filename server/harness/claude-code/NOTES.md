@@ -33,7 +33,7 @@ login-shell PATH (`../shell-path.ts`, probed once at startup), so a moi server
 launched outside a terminal still finds CLIs from `~/.local/bin`, homebrew,
 and version-manager shims. There is no SDK bundled-executable fallback. If the
 command is missing, setup and existing workspaces report:
-`Run curl -fsSL https://claude.ai/install.sh | sh in your terminal to install Claude`.
+`Run in terminal to install Claude Code: curl -fsSL https://claude.ai/install.sh | sh`.
 
 **In-place updates.** Claude Code can replace its binary at the same path
 while moi keeps running, changing which models are available.

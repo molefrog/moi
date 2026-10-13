@@ -5,6 +5,7 @@ import { delimiter, join } from 'node:path'
 
 import {
   findHarnessExecutable,
+  detectInstalledHarnesses,
   firstExecutable,
   pathHarnessAvailability,
   requireHarnessExecutable
@@ -29,6 +30,44 @@ async function addExecutable(command: string): Promise<string> {
 }
 
 describe('PATH harness executables', () => {
+  test("ignores moi's bundled OpenClaw command even when bun run adds it to PATH", async () => {
+    const bundledBin = join(import.meta.dir, '..', '..', 'node_modules', '.bin')
+    const searchPath = [bundledBin, tempDir].join(delimiter)
+    expect(findHarnessExecutable('openclaw', searchPath)).toBeNull()
+    expect((await detectInstalledHarnesses(searchPath)).openclaw).toBe(false)
+
+    const installed = await addExecutable('openclaw')
+    expect(findHarnessExecutable('openclaw', searchPath)).toBe(installed)
+    expect((await detectInstalledHarnesses(searchPath)).openclaw).toBe(true)
+  })
+
+  test('detects installations without profiles, credentials, or gateways', async () => {
+    expect(await detectInstalledHarnesses(tempDir)).toEqual({
+      'claude-code': false,
+      codex: false,
+      openclaw: false,
+      hermes: false
+    })
+    for (const command of ['claude', 'codex', 'openclaw', 'hermes']) await addExecutable(command)
+    expect(await detectInstalledHarnesses(tempDir)).toEqual({
+      'claude-code': true,
+      codex: true,
+      openclaw: true,
+      hermes: true
+    })
+    await rm(join(tempDir, 'codex'))
+    expect((await detectInstalledHarnesses(tempDir)).codex).toBe(false)
+  })
+
+  test('does not mistake a bundled OpenClaw package or a non-executable file for a CLI', async () => {
+    // moi has the optional SDK installed; only a command on the search PATH
+    // establishes that the user's OpenClaw harness is installed.
+    await Bun.write(join(tempDir, 'openclaw'), 'not executable')
+    expect((await detectInstalledHarnesses(tempDir)).openclaw).toBe(false)
+    await chmod(join(tempDir, 'openclaw'), 0o755)
+    expect((await detectInstalledHarnesses(tempDir)).openclaw).toBe(true)
+  })
+
   test('resolves Claude and Codex only from the supplied PATH', async () => {
     const claude = await addExecutable('claude')
     const codex = await addExecutable('codex')
@@ -44,10 +83,10 @@ describe('PATH harness executables', () => {
     expect(findHarnessExecutable('codex', tempDir)).toBeNull()
     expect(await pathHarnessAvailability('claude-code', tempDir)).toEqual({
       status: 'unavailable',
-      reason: 'Run curl -fsSL https://claude.ai/install.sh | sh in your terminal to install Claude'
+      reason: 'Run in terminal to install Claude Code: curl -fsSL https://claude.ai/install.sh | sh'
     })
     expect(() => requireHarnessExecutable('codex', tempDir)).toThrow(
-      'Run curl -fsSL https://chatgpt.com/codex/install.sh | sh in your terminal to install Codex'
+      'Run in terminal to install Codex: curl -fsSL https://chatgpt.com/codex/install.sh | sh'
     )
   })
 })
@@ -74,7 +113,7 @@ describe('mergeSearchPaths', () => {
     expect(merged).toBe(['/shell/bin', '/usr/bin', '/proc/bin'].join(delimiter))
   })
 
-  test('tolerates null and undefined segments', () => {
-    expect(mergeSearchPaths(null, undefined, '/usr/bin')).toBe('/usr/bin')
+  test('tolerates undefined segments', () => {
+    expect(mergeSearchPaths(undefined, '/usr/bin', undefined)).toBe('/usr/bin')
   })
 })

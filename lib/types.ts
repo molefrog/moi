@@ -484,6 +484,8 @@ export type WorkspaceSkillsUpdateFailure = WorkspaceSkillsStatus & {
   error: string
 }
 
+export type HarnessInstallations = Record<WorkspaceType, boolean>
+
 // Setup checks only runtime availability. Workspace checks may also report
 // that the provider needs a login the host can start.
 export type HarnessAvailability =

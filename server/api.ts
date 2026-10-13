@@ -40,6 +40,7 @@ import {
   serveAppletThumbnail
 } from './thumbnails'
 import { getClientFrameLog, getWireLog } from './harness/debug'
+import { detectInstalledHarnesses } from './harness/executable'
 import { allHarnesses, harnessFor, isHarnessType } from './harness/registry'
 import {
   discoverWorkspaces,
@@ -1013,13 +1014,21 @@ async function harnessAvailability(): Promise<Record<string, HarnessAvailability
 // Where `/workspace/create` places new folders — the client shows the resolved
 // location while the user types a name. `availability` lets the dialog disable
 // backends whose runtime is missing.
-workspaces.get('/create', async c =>
-  c.json({
+workspaces.get('/create', async c => {
+  c.header('Cache-Control', 'no-store')
+  const installed = {
+    'claude-code': false,
+    codex: true,
+    openclaw: false,
+    hermes: false
+  } // await detectInstalledHarnesses()
+  return c.json({
     root: createdWorkspacesRoot(),
     displayRoot: tildify(createdWorkspacesRoot()),
+    installed,
     availability: await harnessAvailability()
   })
-)
+})
 
 // Create a brand-new workspace: a fresh folder under createdWorkspacesRoot(),
 // provisioned (skills + `.moi/` scaffold) and registered.

@@ -19,6 +19,7 @@ import type { WorkspaceType } from '@/lib/types'
 
 import { DemoDialog } from './DemoDialog'
 import { WorkspaceAgentStep } from './WorkspaceAgentStep'
+import { getCreateWorkspaceAgentOptions } from './workspace-agent-options'
 import { WorkspaceDialogContent } from './WorkspaceDialogContent'
 
 type CreateWorkspaceDialogProps = {
@@ -43,6 +44,17 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
   const trimmedName = name.trim()
   const nameError = trimmedName ? validateWorkspaceFolderName(trimmedName) : null
   const isCreating = createMutation.isPending
+  const isChecking = info.isPending || info.isFetching
+  const installed = info.isError ? undefined : info.data?.installed
+  const options = getCreateWorkspaceAgentOptions(installed)
+  const selectedAvailable = options.some(option => option.type === type && !option.disabled)
+  const detectionError = !isChecking && !installed ? 'Could not check installed agents.' : undefined
+  const canUseAgent = !isChecking && !detectionError && selectedAvailable
+  const agentError =
+    detectionError ??
+    (!isChecking && !selectedAvailable
+      ? 'This agent is no longer available. Choose another agent.'
+      : undefined)
 
   // Cloud demo: creating workspaces is off — the same trigger opens the
   // cloud-demo promo dialog instead. After every hook so the hook order is stable.
@@ -63,12 +75,13 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
   }
 
   function continueToName() {
+    if (!canUseAgent) return
     createMutation.reset()
     setStep('name')
   }
 
   function createWorkspace() {
-    if (!trimmedName || nameError || isCreating) return
+    if (!trimmedName || nameError || isCreating || !canUseAgent) return
     createMutation.reset()
     createMutation.mutate({ name: trimmedName, type }, { onSuccess: entry => finish(entry.id) })
   }
@@ -76,7 +89,10 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
   return (
     <Dialog
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={nextOpen => {
+        setOpen(nextOpen)
+        if (nextOpen) void info.refetch({ cancelRefetch: false })
+      }}
       onOpenChangeComplete={nextOpen => {
         if (!nextOpen) resetDialog()
       }}
@@ -87,8 +103,11 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
           <WorkspaceAgentStep
             title="Create new workspace"
             selectedType={type}
-            availability={info.data?.availability}
-            isPending={false}
+            options={options}
+            isLoading={isChecking && !installed}
+            errorMessage={detectionError}
+            emptyMessage="Install at least one agent to create a new workspace"
+            isPending={isChecking || Boolean(detectionError)}
             secondaryAction={<ExistingFolderButton />}
             primaryLabel="Next"
             onTypeChange={setType}
@@ -98,8 +117,10 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
           <WorkspaceNameStep
             name={name}
             validationError={nameError}
-            requestError={createMutation.error?.message}
+            requestError={agentError ?? createMutation.error?.message}
             isPending={isCreating}
+            canUseAgent={canUseAgent}
+            onBack={() => setStep('agent')}
             onNameChange={setName}
             onSubmit={createWorkspace}
           />
@@ -114,6 +135,8 @@ type WorkspaceNameStepProps = {
   validationError: string | null
   requestError?: string
   isPending: boolean
+  canUseAgent: boolean
+  onBack: () => void
   onNameChange: (name: string) => void
   onSubmit: () => void
 }
@@ -123,6 +146,8 @@ function WorkspaceNameStep({
   validationError,
   requestError,
   isPending,
+  canUseAgent,
+  onBack,
   onNameChange,
   onSubmit
 }: WorkspaceNameStepProps) {
@@ -167,7 +192,13 @@ function WorkspaceNameStep({
       )}
 
       <div className="flex items-center justify-end gap-2">
-        <Button type="submit" disabled={!name.trim() || Boolean(validationError) || isPending}>
+        <Button variant="secondary" type="button" disabled={isPending} onClick={onBack}>
+          Back
+        </Button>
+        <Button
+          type="submit"
+          disabled={!name.trim() || Boolean(validationError) || isPending || !canUseAgent}
+        >
           {isPending ? 'Creating…' : 'Create workspace'}
         </Button>
       </div>
@@ -184,7 +215,7 @@ function ExistingFolderButton() {
       variant="secondary"
       aria-disabled
       onClick={event => event.preventDefault()}
-      className="cursor-not-allowed opacity-50"
+      className="cursor-not-allowed bg-accent text-muted-foreground hover:bg-accent"
     >
       Use existing folder
     </Button>
