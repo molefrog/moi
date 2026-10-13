@@ -62,7 +62,7 @@ export function WorkspaceAgentStep({
   }, [isPending, onTypeChange, selectableType, selectedUnavailable])
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex min-w-[min(22rem,calc(100vw-5rem))] flex-col gap-5">
       <div className="flex w-0 min-w-full flex-col gap-0.5 pr-8">
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>{WORKSPACE_AGENT_DESCRIPTION}</DialogDescription>
@@ -75,8 +75,8 @@ export function WorkspaceAgentStep({
             role="status"
             aria-label="Checking installed agents"
           >
-            <Skeleton className="size-32 shrink-0" />
-            <Skeleton className="size-32 shrink-0" />
+            <Skeleton className="h-32 min-w-32 flex-1" />
+            <Skeleton className="h-32 min-w-32 flex-1" />
           </div>
         ) : (
           <WorkspaceAgentSelector
@@ -161,7 +161,7 @@ function WorkspaceAgentOptionButton({
         onSelect(option.type)
       }}
       className={cn(
-        'relative flex size-32 shrink-0 flex-col items-start justify-between gap-6 rounded-xl bg-card p-4 text-left ring-1 ring-border transition-opacity outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+        'relative flex h-32 min-w-32 flex-1 flex-col items-start justify-between gap-6 rounded-xl bg-card p-4 text-left ring-1 ring-border transition-opacity outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
         !selected && 'opacity-70',
         !selected && !option.disabled && 'cursor-pointer hover:opacity-100',
         option.disabled && 'cursor-not-allowed'
