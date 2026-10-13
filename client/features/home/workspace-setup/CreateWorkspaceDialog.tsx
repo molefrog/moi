@@ -47,6 +47,7 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
   const isChecking = info.isPending || info.isFetching
   const installed = info.isError ? undefined : info.data?.installed
   const options = getCreateWorkspaceAgentOptions(installed)
+  const selectableAgents = options.filter(option => !option.disabled)
   const selectedAvailable = options.some(option => option.type === type && !option.disabled)
   const detectionError = !isChecking && !installed ? 'Could not check installed agents.' : undefined
   const canUseAgent = !isChecking && !detectionError && selectedAvailable
@@ -60,6 +61,12 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
   // cloud-demo promo dialog instead. After every hook so the hook order is stable.
   if (appConfig.cloudDemo) {
     return <DemoDialog trigger={trigger} />
+  }
+
+  // Once on the name step, rechecks must not silently switch the chosen agent.
+  if (open && step === 'agent' && !isChecking && selectableAgents.length === 1) {
+    setType(selectableAgents[0].type)
+    setStep('name')
   }
 
   function finish(workspaceId: string) {
@@ -120,7 +127,11 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
             requestError={agentError ?? createMutation.error?.message}
             isPending={isCreating}
             canUseAgent={canUseAgent}
-            onBack={() => setStep('agent')}
+            onBack={
+              selectableAgents.length === 1 && selectedAvailable
+                ? undefined
+                : () => setStep('agent')
+            }
             onNameChange={setName}
             onSubmit={createWorkspace}
           />
@@ -136,7 +147,7 @@ type WorkspaceNameStepProps = {
   requestError?: string
   isPending: boolean
   canUseAgent: boolean
-  onBack: () => void
+  onBack?: () => void
   onNameChange: (name: string) => void
   onSubmit: () => void
 }
@@ -192,9 +203,11 @@ function WorkspaceNameStep({
       )}
 
       <div className="flex items-center justify-end gap-2">
-        <Button variant="secondary" type="button" disabled={isPending} onClick={onBack}>
-          Back
-        </Button>
+        {onBack && (
+          <Button variant="secondary" type="button" disabled={isPending} onClick={onBack}>
+            Back
+          </Button>
+        )}
         <Button
           type="submit"
           disabled={!name.trim() || Boolean(validationError) || isPending || !canUseAgent}
