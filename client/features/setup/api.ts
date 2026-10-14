@@ -93,3 +93,23 @@ export function startHarnessLogin(type: WorkspaceType): Promise<HarnessLogin> {
     'Could not start sign-in'
   )
 }
+
+export function useHarnessAuth(installed: HarnessInstallations | undefined, enabled: boolean) {
+  const types = (['claude-code', 'codex'] as const).filter(type => installed?.[type])
+  return useQuery({
+    queryKey: ['harness-auth', types],
+    enabled: enabled && types.length > 0,
+    queryFn: () =>
+      Promise.all(
+        types.map(async type => {
+          const { availability } = await requestJson<{ availability: HarnessAvailability }>(
+            `/api/harnesses/${type}/auth`
+          )
+          if (availability.status === 'unavailable') throw new Error(availability.reason)
+          return availability
+        })
+      ),
+    refetchOnMount: 'always',
+    refetchInterval: 5_000
+  })
+}

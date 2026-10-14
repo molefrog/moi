@@ -3,7 +3,8 @@ import type { AppEnvironment, HarnessInstallations } from '@/lib/types'
 export function getOnboardingStep(
   environment: AppEnvironment,
   installed: HarnessInstallations,
-  workspaceCount: number
+  workspaceCount: number,
+  hasAuthenticatedHarness: boolean
 ): 'agent' | 'workspace' | undefined {
   const hasAgent =
     installed['claude-code'] ||
@@ -11,6 +12,6 @@ export function getOnboardingStep(
     (environment === 'local' && (installed.openclaw || installed.hermes))
 
   if (!hasAgent) return 'agent'
-  if (workspaceCount === 0) return 'workspace'
+  if (workspaceCount === 0) return hasAuthenticatedHarness ? 'workspace' : 'agent'
   return undefined
 }

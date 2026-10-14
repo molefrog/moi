@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Router } from 'wouter'
 import { renderToStaticMarkup } from 'react-dom/server'
 
+import type { HarnessAvailability } from '@/lib/types'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { OnboardingFlow } from './onboarding-flow'
 
@@ -20,17 +21,44 @@ beforeEach(() => {
 
 afterEach(() => configSpy.mockRestore())
 
-function renderSetup(installed?: boolean, workspaceCount = 0, failed = false) {
+function renderSetup(
+  installed?: boolean,
+  workspaceCount = 0,
+  failed = false,
+  authStatus: HarnessAvailability['status'] | 'pending' | 'error' = 'available',
+  codexStatus?: HarnessAvailability['status']
+) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   if (installed !== undefined) {
     client.setQueryData(workspaceKeys.setupInfo, {
-      installed: { 'claude-code': installed, codex: false, openclaw: false, hermes: false },
+      installed: {
+        'claude-code': installed,
+        codex: codexStatus !== undefined,
+        openclaw: false,
+        hermes: false
+      },
       availability: { 'claude-code': { status: 'login-required', reason: 'Sign in' } }
     })
     client.setQueryData(
       workspaceKeys.all,
       Array.from({ length: workspaceCount }, () => ({ id: 'test' }))
     )
+  }
+  const authKey = ['harness-auth', codexStatus ? ['claude-code', 'codex'] : ['claude-code']]
+  if (authStatus !== 'pending') {
+    client.setQueryData(authKey, [
+      { status: authStatus },
+      ...(codexStatus ? [{ status: codexStatus }] : [])
+    ])
+  }
+  if (authStatus === 'error') {
+    client
+      .getQueryCache()
+      .find({ queryKey: authKey })
+      ?.setState({
+        status: 'error',
+        error: new Error('Auth check failed')
+      })
   }
   if (failed) {
     client
@@ -71,7 +99,7 @@ test('installed agents with no workspaces show the workspace step', () => {
 })
 
 test('signed-out agents do not return existing workspaces to onboarding', () => {
-  expect(renderSetup(true, 1)).toContain('Existing workspace')
+  expect(renderSetup(true, 1, false, 'login-required')).toContain('Existing workspace')
 })
 
 test('failed detection shows a retry instead of assuming no agent is installed', () => {
@@ -89,4 +117,33 @@ test('demo bypasses setup even before detection loads', () => {
     demoInstallUrl: 'https://moi.computer'
   })
   expect(renderSetup()).toContain('Existing workspace')
+})
+
+test('signed-out agents show the agent stub before the first workspace', () => {
+  expect(renderSetup(true, 0, false, 'login-required')).toContain('Agent setup will appear here.')
+})
+
+test('pending login checks keep onboarding in loading', () => {
+  expect(renderSetup(true, 0, false, 'pending')).toContain('Checking agents and workspaces')
+})
+
+test('failed login checks show retry instead of the agent step', () => {
+  const html = renderSetup(true, 0, false, 'error')
+  expect(html).toContain('Could not check your setup')
+  expect(html).not.toContain('Connect an agent')
+})
+
+test('existing workspaces ignore pending and failed global login checks', () => {
+  for (const status of ['pending', 'error'] as const) {
+    expect(renderSetup(true, 1, false, status)).toContain('Existing workspace')
+  }
+})
+
+test('one connected harness is enough to continue', () => {
+  expect(renderSetup(true, 0, false, 'login-required', 'available')).toContain(
+    'Create your first workspace'
+  )
+  expect(renderSetup(true, 0, false, 'login-required', 'login-required')).toContain(
+    'Connect an agent'
+  )
 })

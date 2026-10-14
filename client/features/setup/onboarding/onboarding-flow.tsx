@@ -6,7 +6,7 @@ import { workspaceKeys } from '@/client/api/workspace-keys'
 import { Button } from '@/client/components/ui/button'
 import { Skeleton } from '@/client/components/ui/skeleton'
 import { useWorkspaces } from '@/client/features/home/api'
-import { useWorkspaceSetupInfo } from '@/client/features/setup/api'
+import { useHarnessAuth, useWorkspaceSetupInfo } from '@/client/features/setup/api'
 import { onWorkspaceEventsReconnect, useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 
 import { AgentStep } from './agent-step'
@@ -28,11 +28,16 @@ function DetectedOnboardingFlow({ children }: OnboardingFlowProps) {
   const { environment } = useAppConfig()
   const agents = useWorkspaceSetupInfo()
   const workspaces = useWorkspaces()
+  const needsAuth = workspaces.data?.length === 0
+  const auth = useHarnessAuth(agents.data?.installed, needsAuth)
+  const hasLoginHarness = agents.data?.installed['claude-code'] || agents.data?.installed.codex
+  const checkingAuth = needsAuth && hasLoginHarness
   const queryClient = useQueryClient()
 
   // Keep detection alive even when onboarding replaces the normal app shell.
   useEffect(() => {
     const refresh = () => {
+      void queryClient.invalidateQueries({ queryKey: ['harness-auth'] })
       void queryClient.invalidateQueries({ queryKey: workspaceKeys.setupInfo, exact: true })
       void queryClient.invalidateQueries({ queryKey: workspaceKeys.all, exact: true })
     }
@@ -50,7 +55,7 @@ function DetectedOnboardingFlow({ children }: OnboardingFlowProps) {
     }
   })
 
-  if (agents.isError || workspaces.isError) {
+  if (agents.isError || workspaces.isError || (checkingAuth && auth.isError)) {
     return (
       <OnboardingLayout title="Could not check your setup">
         <div role="alert" className="flex flex-col items-start gap-4">
@@ -58,10 +63,11 @@ function DetectedOnboardingFlow({ children }: OnboardingFlowProps) {
             Try again to load your agents and workspaces.
           </p>
           <Button
-            disabled={agents.isFetching || workspaces.isFetching}
+            disabled={agents.isFetching || workspaces.isFetching || auth.isFetching}
             onClick={() => {
               void agents.refetch()
               void workspaces.refetch()
+              if (checkingAuth) void auth.refetch()
             }}
           >
             Try again
@@ -71,7 +77,7 @@ function DetectedOnboardingFlow({ children }: OnboardingFlowProps) {
     )
   }
 
-  if (agents.isPending || workspaces.isPending) {
+  if (agents.isPending || workspaces.isPending || (checkingAuth && auth.isPending)) {
     return (
       <OnboardingLayout title="Getting ready">
         <div
@@ -86,7 +92,12 @@ function DetectedOnboardingFlow({ children }: OnboardingFlowProps) {
     )
   }
 
-  const step = getOnboardingStep(environment, agents.data.installed, workspaces.data.length)
+  const step = getOnboardingStep(
+    environment,
+    agents.data.installed,
+    workspaces.data.length,
+    auth.data?.some(availability => availability.status === 'available') ?? false
+  )
   if (step === 'agent') return <AgentStep />
   if (step === 'workspace') return <WorkspaceStep />
   return children
