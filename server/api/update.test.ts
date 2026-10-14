@@ -2,8 +2,8 @@ import { afterEach, describe, expect, test } from 'bun:test'
 
 import type { UpdateStatus } from '@/lib/types'
 
-import { api } from './api'
-import { __resetUpdateStateForTests, installUpdate, scheduleRestartForUpdate } from './update'
+import { api } from './index'
+import { __resetUpdateStateForTests, installUpdate, scheduleRestartForUpdate } from '../update'
 
 describe('update API', () => {
   afterEach(() => __resetUpdateStateForTests())

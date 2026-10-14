@@ -49,7 +49,7 @@ import {
   type ToolCallUpdate,
   isTextBlock
 } from './wire'
-import { harnessStore } from '../../harness-auth'
+import { harnessStore } from '../auth'
 import { debug } from '../../debug'
 import { broadcast } from '../../state'
 import { hasSessionConfig, saveSessionConfig } from '../../session-config'

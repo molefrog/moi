@@ -1,4 +1,3 @@
-import { startHarnessLogin } from '@/client/features/setup/api'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import { resolveAgentAvailability, type AgentAvailability } from '@/client/lib/agent-availability'
 
@@ -41,7 +40,7 @@ export function useWorkspaceComposerState(
           <AgentAvailabilityBanner
             availability={unavailable}
             login={agent?.login}
-            onStartLogin={() => startHarnessLogin(agent?.provider ?? 'claude-code')}
+            harnessType={agent?.provider ?? 'claude-code'}
           />
         )
       }

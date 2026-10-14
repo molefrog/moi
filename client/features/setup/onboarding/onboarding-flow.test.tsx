@@ -44,12 +44,12 @@ function renderSetup(
       Array.from({ length: workspaceCount }, () => ({ id: 'test' }))
     )
   }
-  const authKey = ['harness-auth', codexStatus ? ['claude-code', 'codex'] : ['claude-code']]
+  const authKey = ['harness-auth', 'claude-code']
   if (authStatus !== 'pending') {
-    client.setQueryData(authKey, [
-      { status: authStatus },
-      ...(codexStatus ? [{ status: codexStatus }] : [])
-    ])
+    client.setQueryData(authKey, { availability: { status: authStatus } })
+  }
+  if (codexStatus) {
+    client.setQueryData(['harness-auth', 'codex'], { availability: { status: codexStatus } })
   }
   if (authStatus === 'error') {
     client
@@ -119,8 +119,10 @@ test('demo bypasses setup even before detection loads', () => {
   expect(renderSetup()).toContain('Existing workspace')
 })
 
-test('signed-out agents show the agent stub before the first workspace', () => {
-  expect(renderSetup(true, 0, false, 'login-required')).toContain('Agent setup will appear here.')
+test('signed-out agents show the agent screen before the first workspace', () => {
+  const html = renderSetup(true, 0, false, 'login-required')
+  expect(html).toContain('Connect at least one agent to use moi.')
+  expect(html).toContain('Log in to Claude Code')
 })
 
 test('pending login checks keep onboarding in loading', () => {

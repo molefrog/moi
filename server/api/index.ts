@@ -21,28 +21,28 @@ import type {
 } from '@/lib/types'
 import { isWorkspaceTabId } from '@/lib/workspace-tabs'
 
-import { proxyUserState } from './collab/cloudflare-access'
-import { collabManager } from './collab/manager'
-import { harnessStore } from './harness-auth'
-import { harnessAuthApi } from './harness-auth-api'
-import { clientAppConfig, getAppConfig } from './app-config'
-import { getAppSettings, pickAppSettingsPatch, saveAppSettings } from './app-settings'
-import { appletForModule, recordAppletError } from './applet-log'
-import { apiBaseFor, parseAppletTail, serveWorkspaceFile } from './applets'
-import { applyEnvChanged } from './env-apply'
-import { publishEvent } from './events'
-import { callFunction, parseFunctionPath } from './functions'
-import { processIcon } from './icon'
-import { getWorkspacePreview, loadLayout, mergeLayoutForSave, saveLayout } from './layout'
+import { proxyUserState } from '../collab/cloudflare-access'
+import { collabManager } from '../collab/manager'
+import { harnessStore } from '../harness/auth'
+import { harnesses } from './harnesses'
+import { clientAppConfig, getAppConfig } from '../app-config'
+import { getAppSettings, pickAppSettingsPatch, saveAppSettings } from '../app-settings'
+import { appletForModule, recordAppletError } from '../applet-log'
+import { apiBaseFor, parseAppletTail, serveWorkspaceFile } from '../applets'
+import { applyEnvChanged } from '../env-apply'
+import { publishEvent } from '../events'
+import { callFunction, parseFunctionPath } from '../functions'
+import { processIcon } from '../icon'
+import { getWorkspacePreview, loadLayout, mergeLayoutForSave, saveLayout } from '../layout'
 import {
   getAppletThumbnailRecords,
   isValidAppletId,
   saveAppletThumbnails,
   serveAppletThumbnail
-} from './thumbnails'
-import { getClientFrameLog, getWireLog } from './harness/debug'
-import { detectInstalledHarnesses } from './harness/executable'
-import { allHarnesses, harnessFor, isHarnessType } from './harness/registry'
+} from '../thumbnails'
+import { getClientFrameLog, getWireLog } from '../harness/debug'
+import { detectInstalledHarnesses } from '../harness/executable'
+import { allHarnesses, harnessFor, isHarnessType } from '../harness/registry'
 import {
   discoverWorkspaces,
   getWorkspace,
@@ -51,26 +51,26 @@ import {
   removeWorkspace,
   reorderWorkspaces,
   tildify
-} from './registry'
-import { loadScratchpadDoc, saveScratchpadDoc } from './scratchpad'
-import { MAX_ASSET_BYTES, scratchpadAssetFile, storeScratchpadAsset } from './scratchpad-assets'
+} from '../registry'
+import { loadScratchpadDoc, saveScratchpadDoc } from '../scratchpad'
+import { MAX_ASSET_BYTES, scratchpadAssetFile, storeScratchpadAsset } from '../scratchpad-assets'
 import {
   getPinnedSession,
   getSelectedSession,
   getWorkspaceSessionSelection,
   pinSession,
   saveSelectedSession
-} from './selected-session'
-import type { SelectedSessionUpdate } from './selected-session'
-import { saveSessionConfig } from './session-config'
-import type { SessionConfigPatch } from './session-config'
-import { getSessionRecord, withSessionRecords } from './session-store'
-import { archiveWorkspaceSession } from './session-archive'
-import { DIST_DIR, prebuilt } from './static'
-import { getWorkspaceSkillsStatus, updateWorkspaceSkills } from './skill-update'
-import { serveWorkspaceImagePreview } from './preview'
-import { MAX_UPLOAD_BYTES, addUpload, addWorkspaceFileUpload, getUpload } from './uploads'
-import { requiredEnvFor } from './required-env'
+} from '../selected-session'
+import type { SelectedSessionUpdate } from '../selected-session'
+import { saveSessionConfig } from '../session-config'
+import type { SessionConfigPatch } from '../session-config'
+import { getSessionRecord, withSessionRecords } from '../session-store'
+import { archiveWorkspaceSession } from '../session-archive'
+import { DIST_DIR, prebuilt } from '../static'
+import { getWorkspaceSkillsStatus, updateWorkspaceSkills } from '../skill-update'
+import { serveWorkspaceImagePreview } from '../preview'
+import { MAX_UPLOAD_BYTES, addUpload, addWorkspaceFileUpload, getUpload } from '../uploads'
+import { requiredEnvFor } from '../required-env'
 import {
   deleteView,
   listCompiledViews,
@@ -78,25 +78,25 @@ import {
   serveView,
   updateViewTitle,
   ViewMutationError
-} from './views'
+} from '../views'
 import {
   createPendingView,
   discardPendingView,
   getPendingView,
   updatePendingView,
   PendingViewError
-} from './pending-views'
-import { submitView, ViewStartupError } from './view-sessions'
-import { listWidgets, serveWidget } from './widgets'
-import { getWorkspaceConfig, setWorkspaceConfig } from './workspace-config'
+} from '../pending-views'
+import { submitView, ViewStartupError } from '../view-sessions'
+import { listWidgets, serveWidget } from '../widgets'
+import { getWorkspaceConfig, setWorkspaceConfig } from '../workspace-config'
 import {
   createdWorkspacesRoot,
   provisionWorkspace,
   validateWorkspaceFolderName
-} from './workspace-init'
-import { resolveWorkspaceImportMetadata } from './workspace-import'
-import type { WorkspaceImportMetadata } from './workspace-import'
-import { getWorkspaceEnvView, parseEnvUpdate, updateWorkspaceEnv } from './workspace-env'
+} from '../workspace-init'
+import { resolveWorkspaceImportMetadata } from '../workspace-import'
+import type { WorkspaceImportMetadata } from '../workspace-import'
+import { getWorkspaceEnvView, parseEnvUpdate, updateWorkspaceEnv } from '../workspace-env'
 import {
   getCachedUpdateStatus,
   hasRunningAgentSessions,
@@ -104,7 +104,7 @@ import {
   restartPendingForUpdate,
   scheduleRestartForUpdate,
   updateInProgress
-} from './update'
+} from '../update'
 
 // The resolved workspace is stashed on the context by `withWorkspace`, so every
 // `/api/workspaces/:id/*` handler can read it without re-querying the registry.
@@ -1053,7 +1053,7 @@ workspaces.route('/:id', one)
 export const api = new Hono()
 
 api.route('/api/workspaces', workspaces)
-api.route('/api/harnesses', harnessAuthApi)
+api.route('/api/harnesses', harnesses)
 
 // Startup config (config.json in the data dir + MOI_* env), client-safe
 // subset. Immutable for the process lifetime — clients cache it forever.

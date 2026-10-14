@@ -4,9 +4,9 @@
 // resetAppConfig test seam.
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 
-import { api } from './api'
-import { resetAppConfig } from './app-config'
-import { claudeCodeHarness } from './harness/claude-code'
+import { api } from './index'
+import { resetAppConfig } from '../app-config'
+import { claudeCodeHarness } from '../harness/claude-code'
 
 const originalClaudeAvailability = claudeCodeHarness.availability
 const envKeys = ['MOI_ENVIRONMENT', 'MOI_DEMO', 'MOI_DEMO_INSTALL_URL']

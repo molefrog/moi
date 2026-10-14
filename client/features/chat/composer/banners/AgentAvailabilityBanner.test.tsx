@@ -11,7 +11,7 @@ test('offers login when the agent supports it', () => {
         status: 'login-required',
         reason: 'Sign in'
       },
-      onStartLogin: async () => ({})
+      harnessType: 'claude-code'
     })
   )
 
@@ -23,7 +23,7 @@ test('shows a disconnected state without login copy or action', () => {
   const html = renderToStaticMarkup(
     createElement(AgentAvailabilityBanner, {
       availability: { status: 'disconnected' },
-      onStartLogin: async () => ({})
+      harnessType: 'claude-code'
     })
   )
 
@@ -40,7 +40,7 @@ test('shows a generic unavailable reason without suggesting login', () => {
         status: 'unavailable',
         reason: 'Agent runtime is unavailable'
       },
-      onStartLogin: async () => ({})
+      harnessType: 'claude-code'
     })
   )
 
@@ -58,7 +58,7 @@ test('keeps the login action available while a login is pending', () => {
         reason: 'Sign in'
       },
       login: { state: 'pending', url: 'https://example.com/login' },
-      onStartLogin: async () => ({})
+      harnessType: 'claude-code'
     })
   )
 
@@ -74,7 +74,7 @@ test('surfaces a failed ceremony and offers login again', () => {
         reason: 'Sign in'
       },
       login: { state: 'failed', reason: 'Sign-in did not complete. Try again' },
-      onStartLogin: async () => ({})
+      harnessType: 'claude-code'
     })
   )
 

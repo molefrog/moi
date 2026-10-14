@@ -68,6 +68,7 @@ Socket-protocol notes the layers rely on (all defined in `lib/types.ts`):
 ```
 server/harness/
   README.md          this file
+  auth.ts            shared login lifecycle and readiness checks
   debug.ts           shared debug taps (wire + client-frame rings) for /dev/harness
   detect.ts          which harness owns a directory — `moi init`'s auto-detection
                      (Hermes profile → OpenClaw agent → Codex → Claude Code)
@@ -211,15 +212,28 @@ Workspace availability also checks provider authentication when a workspace is
 given. Claude Code is probed with `claude auth status` under the effective
 workspace env; `claude auth login` launches its browser sign-in from the composer. Codex
 uses app-server `account/read` and returns a browser OAuth URL through
-`account/login/start`. The server owns the recovery loop (`server/harness-auth.ts`):
+`account/login/start`. The server owns the recovery loop (`server/harness/auth.ts`):
 `GET /api/workspaces/:id/agent` serves a cached availability snapshot alongside
 the model catalog. `GET /api/harnesses/:type/auth` checks global authentication;
-`POST /api/harnesses/:type/auth/login` reuses a pending browser URL or restarts
-a URL-less provider flow, and a server-side watch loop re-probes until the login
-lands or times out, pushing `harness:updated` events to every tab. The composer
-renders that state; it never polls. Login is global per harness and uses the
-process environment, without workspace overrides. Each workspace is rechecked
-independently when login state changes.
+`POST /api/harnesses/:type/auth/login` starts or resumes one login per harness.
+Codex uses browser OAuth locally and `chatgptDeviceCode` in cloud. Claude Code
+runs `auth login`: locally it opens its callback URL, and its printed manual-code
+link is available as a fallback; cloud uses that link and pipes the returned
+`code#state` into the CLI. Credentials are stored by the harness, never by moi.
+`POST .../auth/login/:id/code` submits a code; `DELETE .../auth/login/:id` cancels
+that attempt. IDs prevent an old browser tab from changing a newer attempt.
+Provider failures and a ten-minute deadline stop the attempt. Server shutdown
+also cleans up active login processes.
+
+Onboarding and the composer dialog reuse the same connection panel. The panel
+polls global status while open; workspace availability still arrives through
+`harness:updated` events. Login uses the process environment, without workspace
+overrides. Each workspace is rechecked independently when login state changes.
+
+Verified against Claude Code 2.1.289 (CLI stdout/stdin probe) and Codex 0.160.0
+(generated app-server schema), plus the official
+[Claude login docs](https://code.claude.com/docs/en/troubleshoot-install) and
+[Codex auth protocol](https://developers.openai.com/codex/app-server).
 
 ## What a harness adapter must support
 

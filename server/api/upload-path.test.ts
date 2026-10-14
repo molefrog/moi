@@ -2,9 +2,9 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, rm, symlink, truncate } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { api } from './api'
-import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from './registry'
-import { getUpload, MAX_UPLOAD_BYTES } from './uploads'
+import { api } from './index'
+import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../registry'
+import { getUpload, MAX_UPLOAD_BYTES } from '../uploads'
 import type { UploadInfo } from '@/lib/types'
 
 let temp: string

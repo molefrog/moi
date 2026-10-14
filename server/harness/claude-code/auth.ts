@@ -1,5 +1,8 @@
+import { stripVTControlCharacters } from 'node:util'
+import { getAppConfig } from '../../app-config'
+import type { HarnessLoginAttempt } from '../types'
 import { homedir } from 'node:os'
-import type { HarnessAvailability, HarnessLogin } from '@/lib/types'
+import type { HarnessAvailability } from '@/lib/types'
 
 import { agentCommand } from '../../agent-launcher'
 import { resolveWorkspaceEnv } from '../../workspace-env'
@@ -55,16 +58,77 @@ export async function getClaudeAuthReadiness(workspacePath?: string): Promise<Ha
   }
 }
 
-export async function startClaudeLogin(): Promise<HarnessLogin> {
-  const executable = findHarnessExecutable('claude-code')
-  if (!executable) throw new Error('Claude is not installed')
+// The printed link is the CLI's manual-code fallback. Local login also opens
+// its callback URL automatically; cloud suppresses that server-side browser.
+export function claudeLoginUrl(output: string): string | undefined {
+  const text = stripVTControlCharacters(output)
+  return text.match(/https:\/\/[^\s]+(?=\s)/g)?.find(value => {
+    try {
+      const url = new URL(value)
+      return url.searchParams.get('response_type') === 'code' && url.searchParams.has('state')
+    } catch {
+      return false
+    }
+  })
+}
 
-  Bun.spawn(agentCommand([executable, 'auth', 'login']), {
+export async function startClaudeLogin(): Promise<HarnessLoginAttempt> {
+  const executable = findHarnessExecutable('claude-code')
+  if (!executable) throw new Error('Claude Code is not installed')
+  const proc = Bun.spawn(agentCommand([executable, 'auth', 'login']), {
     cwd: homedir(),
-    env: process.env,
-    stdin: 'ignore',
-    stdout: 'ignore',
+    env: { ...process.env, ...(getAppConfig().environment === 'cloud' ? { BROWSER: 'true' } : {}) },
+    stdin: 'pipe',
+    stdout: 'pipe',
     stderr: 'ignore'
-  }).unref()
-  return {}
+  })
+  const completed = proc.exited.then(code => {
+    if (code !== 0) throw new Error('Claude Code sign-in failed or expired. Try again')
+  })
+  // The process can fail before its URL is available.
+  void completed.catch(() => {})
+  const timeout = setTimeout(() => proc.kill(), 30_000)
+  try {
+    let output = ''
+    const decoder = new TextDecoder()
+    const reader = proc.stdout.getReader()
+    let url: string | undefined
+    while (!url) {
+      const chunk = await reader.read()
+      if (chunk.done)
+        throw new Error(
+          'Claude Code did not return a sign-in link. Update Claude Code and try again'
+        )
+      output += decoder.decode(chunk.value, { stream: true })
+      if (output.length > 65_536) throw new Error('Could not read the Claude Code sign-in link')
+      url = claudeLoginUrl(output)
+    }
+    reader.releaseLock()
+    // Drain subsequent CLI output without storing authorization codes or tokens.
+    void proc.stdout.pipeTo(new WritableStream({ write() {} })).catch(() => {})
+    const state = new URL(url).searchParams.get('state')
+    return {
+      id: crypto.randomUUID(),
+      url,
+      acceptsCode: true,
+      completed,
+      cancel: () => {
+        proc.kill()
+      },
+      submitCode: async code => {
+        const parts = code.trim().split('#')
+        if (parts.length !== 2 || !parts[0] || parts[1] !== state || /\s/.test(code.trim())) {
+          throw new Error('Copy the full code from this sign-in attempt and try again')
+        }
+        if (proc.exitCode !== null) throw new Error('Sign-in expired. Start again')
+        proc.stdin.write(code.trim() + '\n')
+        await proc.stdin.flush()
+      }
+    }
+  } catch (error) {
+    proc.kill()
+    throw error
+  } finally {
+    clearTimeout(timeout)
+  }
 }

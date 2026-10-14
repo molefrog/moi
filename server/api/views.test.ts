@@ -7,29 +7,29 @@ import { stringify } from 'devalue'
 
 import type { ViewInfo } from '@/lib/types'
 
-import { api } from './api'
-import { DATA_DIR } from './data-dir'
-import { setEventServer } from './events'
-import { codexHarness } from './harness/codex'
-import { getClientFrameLog } from './harness/debug'
-import { loadLayout, saveLayout } from './layout'
-import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from './registry'
-import { listPendingViews, createPendingView, setPendingViewStorePath } from './pending-views'
-import { buildAllViews, handleBundleViews, updateViewTitle } from './views'
+import { api } from './index'
+import { DATA_DIR } from '../data-dir'
+import { setEventServer } from '../events'
+import { codexHarness } from '../harness/codex'
+import { getClientFrameLog } from '../harness/debug'
+import { loadLayout, saveLayout } from '../layout'
+import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../registry'
+import { listPendingViews, createPendingView, setPendingViewStorePath } from '../pending-views'
+import { buildAllViews, handleBundleViews, updateViewTitle } from '../views'
 import {
   DEFAULT_SESSION_STORE_PATH,
   getSessionRecord,
   patchSessionRecord,
   setSessionStorePath
-} from './session-store'
+} from '../session-store'
 import {
   DEFAULT_SELECTED_SESSION_PATH,
   getWorkspaceSessionSelection,
   pinSession,
   saveSelectedSession,
   setSelectedSessionPath
-} from './selected-session'
-import { silenceConsole } from './test/quiet'
+} from '../selected-session'
+import { silenceConsole } from '../test/quiet'
 
 silenceConsole('log')
 silenceConsole('error')
@@ -59,7 +59,7 @@ beforeEach(async () => {
   await mkdir(viewsDir, { recursive: true })
   await mkdir(dataDir, { recursive: true })
   await symlink(
-    join(import.meta.dir, '..', 'node_modules'),
+    join(import.meta.dir, '../..', 'node_modules'),
     join(workspaceDir, '.moi', 'node_modules')
   )
   await Promise.all([

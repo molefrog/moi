@@ -1,12 +1,13 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { jsonRequest, requestJson } from '@/client/api/http'
+import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useUiStore } from '@/client/store/ui'
 import type {
   DiscoveredWorkspace,
   HarnessAvailability,
   HarnessLogin,
+  HarnessLoginState,
   HarnessInstallations,
   WorkspaceEntry,
   WorkspaceType
@@ -94,22 +95,28 @@ export function startHarnessLogin(type: WorkspaceType): Promise<HarnessLogin> {
   )
 }
 
-export function useHarnessAuth(installed: HarnessInstallations | undefined, enabled: boolean) {
-  const types = (['claude-code', 'codex'] as const).filter(type => installed?.[type])
-  return useQuery({
-    queryKey: ['harness-auth', types],
-    enabled: enabled && types.length > 0,
-    queryFn: () =>
-      Promise.all(
-        types.map(async type => {
-          const { availability } = await requestJson<{ availability: HarnessAvailability }>(
-            `/api/harnesses/${type}/auth`
-          )
-          if (availability.status === 'unavailable') throw new Error(availability.reason)
-          return availability
-        })
-      ),
-    refetchOnMount: 'always',
-    refetchInterval: 5_000
+export type HarnessAuth = {
+  availability: HarnessAvailability
+  login?: HarnessLoginState
+}
+
+export function harnessAuthOptions(type: WorkspaceType) {
+  return queryOptions({
+    queryKey: ['harness-auth', type],
+    queryFn: () => requestJson<HarnessAuth>(`/api/harnesses/${type}/auth`),
+    staleTime: 2_000,
+    refetchInterval: 2_000
   })
+}
+
+export function useHarnessConnection(type: WorkspaceType, enabled = true) {
+  return useQuery({ ...harnessAuthOptions(type), enabled })
+}
+
+export function submitHarnessLoginCode(type: WorkspaceType, id: string, code: string) {
+  return requestVoid(`/api/harnesses/${type}/auth/login/${id}/code`, jsonRequest('POST', { code }))
+}
+
+export function cancelHarnessLogin(type: WorkspaceType, id: string) {
+  return requestVoid(`/api/harnesses/${type}/auth/login/${id}`, { method: 'DELETE' })
 }

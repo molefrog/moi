@@ -3,7 +3,7 @@
 // relayed over the control port — the workspace's processes must be reaped and
 // every connected client told to refetch. Both entry points call this so the
 // side effects can never drift apart.
-import { harnessStore } from './harness-auth'
+import { harnessStore } from './harness/auth'
 import { publishEvent } from './events'
 import { restartWorker } from './functions'
 import { allHarnesses } from './harness/registry'

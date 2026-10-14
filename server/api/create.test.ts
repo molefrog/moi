@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test'
 
-import { api } from './api'
-import { claudeCodeHarness } from './harness/claude-code'
-import { codexHarness } from './harness/codex'
-import * as executables from './harness/executable'
+import { api } from './index'
+import { claudeCodeHarness } from '../harness/claude-code'
+import { codexHarness } from '../harness/codex'
+import * as executables from '../harness/executable'
 import type { HarnessInstallations } from '@/lib/types'
 
 const originalClaudeAvailability = claudeCodeHarness.availability

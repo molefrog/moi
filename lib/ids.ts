@@ -13,7 +13,7 @@ export const newWorkspaceId = customAlphabet(ALPHABET, 10)
 // `create`, `discover` and `order` match those instead, and `ws` is claimed by
 // the live-event WebSocket upgrade in `server/web.ts` before Hono sees the
 // request. A workspace registered under one of these would persist fine and
-// then be unreachable in the app. `server/api-reserved-ids.test.ts` re-derives
+// then be unreachable in the app. `server/api/reserved-ids.test.ts` re-derives
 // this list from the router so a new collection route cannot outgrow it.
 export const RESERVED_WORKSPACE_IDS = ['create', 'discover', 'order', 'ws']
 

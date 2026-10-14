@@ -8,6 +8,7 @@ import { rm } from 'node:fs/promises'
 import index from '../client/index.html'
 import { api } from './api'
 import { getAppConfig } from './app-config'
+import { harnessStore } from './harness/auth'
 import { AttachmentUploadError } from './attachment-message'
 import { PORT } from './constants'
 import { control } from './control'
@@ -304,6 +305,7 @@ async function shutdown() {
   try {
     control.stop(true)
   } catch {}
+  harnessStore.shutdown()
   for (const h of allHarnesses()) h.shutdown?.()
   killAllWorkers()
   killBuildWorkers()

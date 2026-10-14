@@ -95,11 +95,11 @@ describe('the server never loads React', () => {
     expect(forbiddenImports(`import { toRichText } from '@tldraw/tlschema'`)).toEqual([])
   })
 
-  // `api.ts` (every HTTP route) and `control.ts` (the CLI's control port, which
+  // `api/index.ts` (every HTTP route) and `control.ts` (the CLI's control port, which
   // pulls in the scratchpad writer, bundler, harnesses…) together import
   // practically the whole server. `web.ts` is left out only because importing it
   // binds the HTTP port; it adds nothing but the Bun.serve wiring on top of these.
-  test.each(['server/api.ts', 'server/control.ts'])('%s loads without React', async entry => {
+  test.each(['server/api/index.ts', 'server/control.ts'])('%s loads without React', async entry => {
     expect(await reactModulesLoadedBy(join(ROOT, entry))).toEqual([])
   })
 

@@ -3,14 +3,14 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { api } from './api'
-import { claudeCodeHarness } from './harness/claude-code'
-import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from './registry'
+import { api } from './index'
+import { claudeCodeHarness } from '../harness/claude-code'
+import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../registry'
 import {
   DEFAULT_SELECTED_SESSION_PATH,
   getSelectedSession,
   setSelectedSessionPath
-} from './selected-session'
+} from '../selected-session'
 
 let tempDir = ''
 const originalListSessions = claudeCodeHarness.listSessions

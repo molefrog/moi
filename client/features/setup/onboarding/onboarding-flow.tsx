@@ -1,12 +1,12 @@
 import { useEffect, type ReactNode } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueries, useQueryClient } from '@tanstack/react-query'
 
 import { useAppConfig } from '@/client/api/app-config'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { Button } from '@/client/components/ui/button'
 import { Skeleton } from '@/client/components/ui/skeleton'
 import { useWorkspaces } from '@/client/features/home/api'
-import { useHarnessAuth, useWorkspaceSetupInfo } from '@/client/features/setup/api'
+import { harnessAuthOptions, useWorkspaceSetupInfo } from '@/client/features/setup/api'
 import { onWorkspaceEventsReconnect, useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 
 import { AgentStep } from './agent-step'
@@ -29,9 +29,14 @@ function DetectedOnboardingFlow({ children }: OnboardingFlowProps) {
   const agents = useWorkspaceSetupInfo()
   const workspaces = useWorkspaces()
   const needsAuth = workspaces.data?.length === 0
-  const auth = useHarnessAuth(agents.data?.installed, needsAuth)
-  const hasLoginHarness = agents.data?.installed['claude-code'] || agents.data?.installed.codex
-  const checkingAuth = needsAuth && hasLoginHarness
+  const auth = useQueries({
+    queries: (['claude-code', 'codex'] as const)
+      .filter(type => needsAuth && agents.data?.installed[type])
+      .map(harnessAuthOptions)
+  })
+  const authFailed = auth.some(
+    query => query.isError || query.data?.availability.status === 'unavailable'
+  )
   const queryClient = useQueryClient()
 
   // Keep detection alive even when onboarding replaces the normal app shell.
@@ -55,7 +60,7 @@ function DetectedOnboardingFlow({ children }: OnboardingFlowProps) {
     }
   })
 
-  if (agents.isError || workspaces.isError || (checkingAuth && auth.isError)) {
+  if (agents.isError || workspaces.isError || authFailed) {
     return (
       <OnboardingLayout title="Could not check your setup">
         <div role="alert" className="flex flex-col items-start gap-4">
@@ -63,11 +68,13 @@ function DetectedOnboardingFlow({ children }: OnboardingFlowProps) {
             Try again to load your agents and workspaces.
           </p>
           <Button
-            disabled={agents.isFetching || workspaces.isFetching || auth.isFetching}
+            disabled={
+              agents.isFetching || workspaces.isFetching || auth.some(query => query.isFetching)
+            }
             onClick={() => {
               void agents.refetch()
               void workspaces.refetch()
-              if (checkingAuth) void auth.refetch()
+              for (const query of auth) void query.refetch()
             }}
           >
             Try again
@@ -77,7 +84,7 @@ function DetectedOnboardingFlow({ children }: OnboardingFlowProps) {
     )
   }
 
-  if (agents.isPending || workspaces.isPending || (checkingAuth && auth.isPending)) {
+  if (agents.isPending || workspaces.isPending || auth.some(query => query.isPending)) {
     return (
       <OnboardingLayout title="Getting ready">
         <div
@@ -96,9 +103,9 @@ function DetectedOnboardingFlow({ children }: OnboardingFlowProps) {
     environment,
     agents.data.installed,
     workspaces.data.length,
-    auth.data?.some(availability => availability.status === 'available') ?? false
+    auth.some(query => query.data?.availability.status === 'available')
   )
-  if (step === 'agent') return <AgentStep />
+  if (step === 'agent') return <AgentStep installed={agents.data.installed} />
   if (step === 'workspace') return <WorkspaceStep />
   return children
 }

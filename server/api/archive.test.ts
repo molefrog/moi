@@ -3,24 +3,24 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { api } from './api'
-import { claudeCodeHarness } from './harness/claude-code'
-import { codexHarness } from './harness/codex'
-import { hermesHarness } from './harness/hermes'
+import { api } from './index'
+import { claudeCodeHarness } from '../harness/claude-code'
+import { codexHarness } from '../harness/codex'
+import { hermesHarness } from '../harness/hermes'
 import {
   DEFAULT_ARCHIVED_SESSIONS_PATH,
   archivedAcpSessions,
   setArchivedSessionsPath
-} from './harness/acp/archived'
-import { openclawHarness } from './harness/openclaw'
-import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from './registry'
+} from '../harness/acp/archived'
+import { openclawHarness } from '../harness/openclaw'
+import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../registry'
 import {
   DEFAULT_SELECTED_SESSION_PATH,
   getSelectedSession,
   saveSelectedSession,
   setSelectedSessionPath
-} from './selected-session'
-import { silenceConsole } from './test/quiet'
+} from '../selected-session'
+import { silenceConsole } from '../test/quiet'
 
 // One test makes `archiveSession` throw; the route logs that error on purpose.
 silenceConsole('error')

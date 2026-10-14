@@ -3,9 +3,14 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { api } from './api'
-import { codexHarness } from './harness/codex'
-import { DEFAULT_REGISTRY_PATH, getWorkspace, registerWorkspace, setRegistryPath } from './registry'
+import { api } from './index'
+import { codexHarness } from '../harness/codex'
+import {
+  DEFAULT_REGISTRY_PATH,
+  getWorkspace,
+  registerWorkspace,
+  setRegistryPath
+} from '../registry'
 
 const originalStopWorkspace = codexHarness.stopWorkspace
 let tempDir: string

@@ -5,10 +5,10 @@ import { join } from 'node:path'
 
 import type { WorkspaceAgent, WorkspaceEntry } from '@/lib/types'
 
-import { api } from './api'
-import { claudeCodeHarness } from './harness/claude-code'
-import { codexHarness } from './harness/codex'
-import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from './registry'
+import { api } from './index'
+import { claudeCodeHarness } from '../harness/claude-code'
+import { codexHarness } from '../harness/codex'
+import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../registry'
 
 let tempDir: string
 const originalClaudeAvailability = claudeCodeHarness.availability

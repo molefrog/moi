@@ -2,8 +2,8 @@ import { expect, spyOn, test } from 'bun:test'
 
 import type { HarnessAvailability, WorkspaceEntry } from '@/lib/types'
 
-import type { HarnessUpdatedEvent } from './harness-auth'
-import { createHarnessStore as createStore, type HarnessStoreOptions } from './harness-auth'
+import type { HarnessUpdatedEvent } from './auth'
+import { createHarnessStore as createStore, type HarnessStoreOptions } from './auth'
 
 function createHarnessStore(options: HarnessStoreOptions) {
   const store = createStore({
@@ -353,4 +353,114 @@ test('one global login updates multiple workspaces without sharing their readine
   expect(store.getLogin('codex')).toBeUndefined()
   expect(await store.getAvailability(second)).toEqual(signedOut)
   expect(events.at(-1)?.login).toBeUndefined()
+})
+
+test('keeps device instructions and cancels only the matching attempt', async () => {
+  let cancelled = 0
+  let submitted = ''
+  const store = createStore({
+    probe: async () => signedOut,
+    startLogin: async () => ({
+      id: 'attempt-1',
+      url: 'https://example.com/device',
+      userCode: 'ABCD',
+      acceptsCode: true,
+      cancel: () => {
+        cancelled++
+      },
+      submitCode: code => {
+        submitted = code
+      }
+    }),
+    publish: () => {}
+  })
+  try {
+    const first = await store.startLogin('codex')
+    expect(await store.startLogin('codex')).toEqual(first)
+    expect(first).toEqual({
+      id: 'attempt-1',
+      url: 'https://example.com/device',
+      userCode: 'ABCD',
+      acceptsCode: true
+    })
+    await expect(store.submitCode('codex', 'old-attempt', 'secret')).rejects.toThrow('ended')
+    await expect(store.cancelLogin('codex', 'old-attempt')).rejects.toThrow('ended')
+    expect(cancelled).toBe(0)
+    await store.submitCode('codex', 'attempt-1', 'code#state')
+    expect(submitted).toBe('code#state')
+    await store.cancelLogin('codex', 'attempt-1')
+    expect(cancelled).toBe(1)
+    expect(store.getLogin('codex')).toBeUndefined()
+  } finally {
+    store.shutdown()
+  }
+})
+
+test('provider failure stops the login and allows a fresh attempt', async () => {
+  let cancelled = 0
+  const store = createStore({
+    probe: async () => signedOut,
+    startLogin: async () => ({
+      id: 'attempt',
+      url: 'https://example.com',
+      completed: Promise.reject(new Error('Provider refused code')),
+      cancel: () => {
+        cancelled++
+      }
+    }),
+    publish: () => {},
+    loginPollMs: 5
+  })
+  try {
+    await store.startLogin('codex')
+    await until(() => store.getLogin('codex')?.state === 'failed')
+    expect(cancelled).toBe(1)
+  } finally {
+    store.shutdown()
+  }
+})
+
+test('deadline cancels the provider process', async () => {
+  let cancelled = 0
+  const store = createStore({
+    probe: async () => signedOut,
+    startLogin: async () => ({
+      url: 'https://example.com',
+      cancel: () => {
+        cancelled++
+      }
+    }),
+    publish: () => {},
+    loginPollMs: 5,
+    loginDeadlineMs: 10
+  })
+  try {
+    await store.startLogin('claude-code')
+    await until(() => store.getLogin('claude-code')?.state === 'failed')
+    expect(cancelled).toBe(1)
+  } finally {
+    store.shutdown()
+  }
+})
+
+test('does not confuse existing credentials with completion of a new login', async () => {
+  let finish = () => {}
+  const completed = new Promise<void>(resolve => {
+    finish = resolve
+  })
+  const store = createStore({
+    probe: async () => ({ status: 'available' }),
+    startLogin: async () => ({ url: 'https://example.com', completed }),
+    publish: () => {},
+    loginPollMs: 5
+  })
+  try {
+    await store.startLogin('codex')
+    await Bun.sleep(20)
+    expect(store.getLogin('codex')?.state).toBe('pending')
+    finish()
+    await until(() => !store.getLogin('codex'))
+  } finally {
+    store.shutdown()
+  }
 })

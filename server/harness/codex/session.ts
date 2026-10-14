@@ -41,7 +41,7 @@ import {
   CODEX_TURN_ACCESS
 } from './permissions'
 import { generateCodexSessionTitle, renameCodexSessionIfUnchanged } from './session-title'
-import { harnessStore } from '../../harness-auth'
+import { harnessStore } from '../auth'
 import { debug } from '../../debug'
 import { broadcast } from '../../state'
 import { hasSessionConfig, saveSessionConfig } from '../../session-config'

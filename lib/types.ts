@@ -496,15 +496,20 @@ export type HarnessAvailability =
   | { status: 'login-required'; reason: string }
   | { status: 'unavailable'; reason: string }
 
-// Codex returns a URL for the browser. Claude opens it from its own CLI.
-export type HarnessLogin = { url?: string }
+// Public instructions for an in-progress harness login. Credentials stay in the CLI.
+export type HarnessLogin = {
+  id?: string
+  url?: string
+  userCode?: string
+  acceptsCode?: boolean
+}
 
 // The server-owned login ceremony for a harness. `pending` means a watch loop
 // is re-probing the provider until the login lands or the deadline passes;
 // transitions arrive as `harness:updated` events, so every tab shows the same
 // ceremony without polling.
 export type HarnessLoginState =
-  | { state: 'pending'; url?: string }
+  | ({ state: 'pending' } & HarnessLogin)
   | { state: 'failed'; reason: string }
 
 export type WorkspaceIcon =

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import type { BroadcastFrame, StreamEvent } from '@/lib/types'
 
 import { getClientFrameLog } from '../debug'
-import { harnessStore } from '../../harness-auth'
+import { harnessStore } from '../auth'
 import { addUpload } from '../../uploads'
 import * as clients from './client'
 import {

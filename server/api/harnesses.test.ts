@@ -3,15 +3,15 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { harnessStore } from './harness-auth'
-import { api } from './api'
-import { codexHarness } from './harness/codex'
+import { harnessStore } from '../harness/auth'
+import { api } from './index'
+import { codexHarness } from '../harness/codex'
 import {
   DEFAULT_REGISTRY_PATH,
   listWorkspaces,
   registerWorkspace,
   setRegistryPath
-} from './registry'
+} from '../registry'
 
 const original = {
   startLogin: codexHarness.startLogin,
@@ -81,4 +81,37 @@ test('rejects unknown agents and unsupported login', async () => {
   expect((await api.request('/api/harnesses/hermes/auth/login', { method: 'POST' })).status).toBe(
     409
   )
+})
+
+test('code and cancel endpoints validate input and attempt identity', async () => {
+  let submitted = ''
+  let cancelled = false
+  codexHarness.startLogin = async () => ({
+    id: 'test-attempt',
+    url: 'https://example.com',
+    acceptsCode: true,
+    submitCode: code => {
+      submitted = code
+    },
+    cancel: () => {
+      cancelled = true
+    }
+  })
+  await api.request('/api/harnesses/codex/auth/login', { method: 'POST' })
+  const submit = (id: string, code: unknown) =>
+    api.request(`/api/harnesses/codex/auth/login/${id}/code`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    })
+  expect((await submit('test-attempt', '')).status).toBe(400)
+  expect((await submit('test-attempt', 123)).status).toBe(400)
+  expect((await submit('old-attempt', 'code')).status).toBe(400)
+  expect((await submit('test-attempt', 'code#state')).status).toBe(200)
+  expect(submitted).toBe('code#state')
+  expect(
+    (await api.request('/api/harnesses/codex/auth/login/test-attempt', { method: 'DELETE' })).status
+  ).toBe(200)
+  expect(cancelled).toBe(true)
+  expect((await submit('test-attempt', 'code')).status).toBe(400)
 })

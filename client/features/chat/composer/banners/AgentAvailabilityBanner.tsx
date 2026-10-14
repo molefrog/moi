@@ -1,16 +1,15 @@
-import { type ReactNode, useState } from 'react'
+import { type ReactNode } from 'react'
 
 import {
   IconAlertCircle,
-  IconLoader2,
   IconLogin,
   IconPlugConnectedX,
   type TablerIcon
 } from '@tabler/icons-react'
 
-import { Button } from '@/client/components/ui/button'
+import { HarnessLoginDialog } from '@/client/features/setup/onboarding/harness/harness-login-dialog'
 import type { AgentUnavailable } from '@/client/lib/agent-availability'
-import type { HarnessLoginState, HarnessLogin } from '@/lib/types'
+import type { HarnessLoginState, WorkspaceType } from '@/lib/types'
 
 import { ComposerBannerShell } from './ComposerBanner'
 
@@ -20,17 +19,17 @@ type AgentAvailabilityBannerProps = {
   // started a login and the server is watching for it to land; `failed` means
   // the last ceremony timed out or errored.
   login?: HarnessLoginState
-  onStartLogin: () => Promise<HarnessLogin>
+  harnessType: WorkspaceType
 }
 
 export function AgentAvailabilityBanner({
   availability,
   login,
-  onStartLogin
+  harnessType
 }: AgentAvailabilityBannerProps) {
   switch (availability.status) {
     case 'login-required':
-      return <LoginRequiredBanner login={login} onStartLogin={onStartLogin} />
+      return <LoginRequiredBanner login={login} harnessType={harnessType} />
     case 'disconnected':
       return (
         <AvailabilityMessage icon={IconPlugConnectedX}>Reconnecting to moi…</AvailabilityMessage>
@@ -40,48 +39,21 @@ export function AgentAvailabilityBanner({
   }
 }
 
-type LoginRequiredBannerProps = Pick<AgentAvailabilityBannerProps, 'login' | 'onStartLogin'>
+type LoginRequiredBannerProps = Pick<AgentAvailabilityBannerProps, 'login' | 'harnessType'>
 
-function LoginRequiredBanner({ login, onStartLogin }: LoginRequiredBannerProps) {
-  const [starting, setStarting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const failure = login?.state === 'failed' ? login.reason : null
-  const loginError = error ?? failure
-
-  const startLogin = async () => {
-    const authWindow = window.open('about:blank', 'moi-agent-login')
-    if (authWindow) authWindow.opener = null
-    setStarting(true)
-    setError(null)
-    try {
-      const result = await onStartLogin()
-      if (result.url) {
-        if (!authWindow) throw new Error('Allow pop-ups, then try again')
-        authWindow.location.href = result.url
-      } else {
-        authWindow?.close()
-      }
-    } catch (err) {
-      authWindow?.close()
-      setError(err instanceof Error ? err.message : 'Could not start sign-in')
-    } finally {
-      setStarting(false)
-    }
-  }
-
+function LoginRequiredBanner({ login, harnessType }: LoginRequiredBannerProps) {
   return (
     <ComposerBannerShell role="alert" className="flex items-center gap-2">
       <IconLogin size={20} stroke={1.5} />
-      <div className="min-w-0 flex-1 space-y-1">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="wrap-break-word">Log in to your agent to send messages</div>
-        {loginError && <div className="wrap-break-word text-destructive">{loginError}</div>}
+        {login?.state === 'failed' && (
+          <div className="wrap-break-word text-destructive">{login.reason}</div>
+        )}
       </div>
-
-      <Button type="button" size="sm" onClick={() => void startLogin()} disabled={starting}>
-        {starting && <IconLoader2 stroke={1.75} className="animate-spin" />}
-        Log in
-      </Button>
+      {(harnessType === 'claude-code' || harnessType === 'codex') && (
+        <HarnessLoginDialog type={harnessType} />
+      )}
     </ComposerBannerShell>
   )
 }

@@ -5,10 +5,10 @@ import { tmpdir } from 'node:os'
 
 import type { WorkspaceEntry } from '@/lib/types'
 
-import { api } from './api'
-import { setEventServer } from './events'
-import { loadLayout } from './layout'
-import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from './registry'
+import { api } from './index'
+import { setEventServer } from '../events'
+import { loadLayout } from '../layout'
+import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../registry'
 
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
