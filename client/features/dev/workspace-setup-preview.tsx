@@ -113,7 +113,7 @@ function SetupPreview({ mocks, client, environment, harness, scenario }: SetupPr
       </header>
       <main className="flex min-h-0 flex-1 overflow-y-auto">
         {scenario === 'welcome' ? (
-          <WorkspaceWelcomeState />
+          <WorkspaceWelcomeState name="My workspace" workspaceType={harness} />
         ) : scenario === 'loading' ? (
           <WorkspaceLoadingState />
         ) : (

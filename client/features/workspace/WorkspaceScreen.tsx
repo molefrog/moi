@@ -130,12 +130,17 @@ export function WorkspaceScreen({
   views: allViews,
   contentPending
 }: WorkspaceScreenProps) {
-  const { layout, setLayout, workspaceId } = useWorkspaceLayoutCtx()
+  const { layout, setLayout, workspaceId, name, provider } = useWorkspaceLayoutCtx()
   const {
     content: setupContent,
     ready,
     chatHidden
-  } = useWorkspaceSetup(workspaceId, contentPending)
+  } = useWorkspaceSetup(workspaceId, contentPending, {
+    name: name ?? 'Workspace',
+    icon: layout.icon,
+    workspaceType: provider,
+    workspaceTheme: layout.theme
+  })
   const theme = resolveWorkspaceTheme(layout.theme)
   const viewActions = useViewActions()
   const {

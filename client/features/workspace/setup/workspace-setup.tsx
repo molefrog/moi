@@ -1,7 +1,11 @@
 import { Activity, useCallback, useState, type ReactNode } from 'react'
 
 import { useWorkspaceAgent } from '../api'
-import { useWorkspaceWelcome, WorkspaceWelcomeState } from './workspace-welcome-state'
+import {
+  useWorkspaceWelcome,
+  WorkspaceWelcomeState,
+  type WorkspaceWelcomeStateProps
+} from './workspace-welcome-state'
 import { WorkspaceLoginState } from './workspace-login-state'
 import {
   HarnessUnavailableState,
@@ -10,7 +14,11 @@ import {
   WorkspaceMissingState
 } from './workspace-recovery-states'
 
-export function useWorkspaceSetup(workspaceId: string, contentPending = false) {
+export function useWorkspaceSetup(
+  workspaceId: string,
+  contentPending = false,
+  welcome: WorkspaceWelcomeStateProps = {}
+) {
   const { data, isError, isPending, isFetching, isFetchedAfterMount, refetch } =
     useWorkspaceAgent(workspaceId)
   // A cached failure is only a hint until this visit's check has settled.
@@ -59,7 +67,11 @@ export function useWorkspaceSetup(workspaceId: string, contentPending = false) {
   const ready = !recovery && !contentPending && !checking
   const { welcoming, entering } = useWorkspaceWelcome(workspaceId, ready)
   return {
-    content: welcoming ? <WorkspaceWelcomeState /> : (recovery ?? <WorkspaceLoadingState />),
+    content: welcoming ? (
+      <WorkspaceWelcomeState {...welcome} />
+    ) : (
+      (recovery ?? <WorkspaceLoadingState />)
+    ),
     ready: ready && !welcoming,
     chatHidden: Boolean(recovery) || entering
   }
