@@ -1,10 +1,12 @@
 import { Activity, useCallback, useState, type ReactNode } from 'react'
 
 import { useWorkspaceAgent } from '../api'
+import { useWorkspaceWelcome, WorkspaceWelcomeState } from './workspace-welcome-state'
 import { WorkspaceLoginState } from './workspace-login-state'
 import {
   HarnessUnavailableState,
   WorkspaceCheckFailedState,
+  WorkspaceLoadingState,
   WorkspaceMissingState
 } from './workspace-recovery-states'
 
@@ -54,7 +56,13 @@ export function useWorkspaceSetup(workspaceId: string, contentPending = false) {
   }
 
   const recovery = renderRecovery()
-  return { recovery, ready: !recovery && !contentPending && !checking }
+  const ready = !recovery && !contentPending && !checking
+  const { welcoming, entering } = useWorkspaceWelcome(workspaceId, ready)
+  return {
+    content: welcoming ? <WorkspaceWelcomeState /> : (recovery ?? <WorkspaceLoadingState />),
+    ready: ready && !welcoming,
+    chatHidden: Boolean(recovery) || entering
+  }
 }
 
 type WorkspaceActivityProps = {

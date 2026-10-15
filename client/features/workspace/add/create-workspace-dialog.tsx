@@ -18,6 +18,7 @@ import { WORKSPACE_TYPE_ORDER } from '@/lib/workspace-types'
 import type { WorkspaceType } from '@/lib/types'
 
 import { DemoDialog } from '@/client/features/demo/demo-dialog'
+import { welcomeNewWorkspace } from '../setup/workspace-welcome-state'
 import { WorkspaceAgentSelector } from './workspace-agent-selector'
 import { getCreateWorkspaceAgentOptions } from './workspace-agent-options'
 import { WorkspaceDialogContent } from './workspace-dialog-content'
@@ -63,6 +64,7 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
   }
 
   function finish(workspaceId: string) {
+    welcomeNewWorkspace(workspaceId)
     setOpen(false)
     navigate(`/workspace/${workspaceId}`)
   }

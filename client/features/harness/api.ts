@@ -32,7 +32,3 @@ export function useHarnessConnection(type: WorkspaceType) {
 export function submitHarnessLoginCode(type: WorkspaceType, id: string, code: string) {
   return requestVoid(`/api/harnesses/${type}/auth/login/${id}/code`, jsonRequest('POST', { code }))
 }
-
-export function cancelHarnessLogin(type: WorkspaceType, id: string) {
-  return requestVoid(`/api/harnesses/${type}/auth/login/${id}`, { method: 'DELETE' })
-}

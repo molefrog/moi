@@ -7,12 +7,7 @@ import { Input } from '@/client/components/ui/input'
 import { toast } from '@/client/components/ui/toast'
 import { workspaceTypeLabel } from '@/client/features/workspace/workspace-presentation'
 import { Skeleton } from '@/client/components/ui/skeleton'
-import {
-  cancelHarnessLogin,
-  startHarnessLogin,
-  submitHarnessLoginCode,
-  useHarnessConnection
-} from './api'
+import { startHarnessLogin, submitHarnessLoginCode, useHarnessConnection } from './api'
 
 export type LoginHarness = 'claude-code' | 'codex'
 
@@ -36,9 +31,8 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
     if (connected) onConnected?.()
   }, [connected, onConnected])
   const action = useMutation({
-    mutationFn: async (kind: 'start' | 'cancel' | 'submit') => {
+    mutationFn: async (kind: 'start' | 'submit') => {
       if (kind === 'start') await startHarnessLogin(type)
-      if (kind === 'cancel' && pending?.id) await cancelHarnessLogin(type, pending.id)
       if (kind === 'submit' && pending?.id) {
         await submitHarnessLoginCode(type, pending.id, code)
         setCode('')
@@ -143,13 +137,6 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
                   </Button>
                 </form>
               )}
-              <Button
-                variant="ghost"
-                disabled={action.isPending}
-                onClick={() => action.mutate('cancel')}
-              >
-                Cancel sign-in
-              </Button>
             </>
           ) : (
             <Button disabled={action.isPending} onClick={() => action.mutate('start')}>

@@ -42,6 +42,7 @@ test('cloud Codex explains the setting and displays a code to enter on the provi
   })
   expect(html).toContain('ChatGPT security settings')
   expect(html).toContain('ABCD-1234')
+  expect(html).not.toContain('Cancel sign-in')
   expect(html).toContain('Copy code')
   expect(html).not.toContain('Authorization code')
 })
@@ -55,6 +56,7 @@ test('local Codex uses a browser link without code instructions', () => {
       url: 'https://auth.openai.com/authorize'
     }
   })
+  expect(html).not.toContain('Cancel sign-in')
   expect(html).toContain('Open sign-in page')
   expect(html).not.toContain('ChatGPT security settings')
   expect(html).not.toContain('Authorization code')
@@ -73,7 +75,7 @@ test('Claude uses the same code input in cloud and as a local fallback', () => {
     })
     expect(html).toContain('Authorization code')
     expect(html).toContain('Submit code')
-    expect(html).toContain('Cancel sign-in')
+    expect(html).not.toContain('Cancel sign-in')
     expect(html).toContain(environment === 'local' ? 'browser window' : 'full authorization code')
   }
 })
@@ -86,4 +88,16 @@ test('connected, failed, and loading states do not offer a misleading login', ()
   expect(failed).toContain('Could not check agent login status')
   expect(failed).not.toContain('Log in to Codex')
   expect(render('codex', 'local')).not.toContain('Log in to Codex')
+})
+
+test('failed and expired login attempts still allow starting again', () => {
+  for (const reason of ['Sign-in failed', 'Sign-in expired']) {
+    const html = render('codex', 'cloud', {
+      availability: signedOut,
+      login: { state: 'failed', reason }
+    })
+    expect(html).toContain(reason)
+    expect(html).toContain('Log in to Codex')
+    expect(html).not.toContain('Cancel sign-in')
+  }
 })

@@ -70,7 +70,6 @@ import { viewIdFromTab, viewTabId } from '@/lib/workspace-tabs'
 
 import { WorkspaceSplitLayout } from './WorkspaceSplitLayout'
 import { useWorkspaceSetup, WorkspaceActivity } from './setup/workspace-setup'
-import { WorkspaceLoadingState } from './setup/workspace-recovery-states'
 import { UnavailablePage } from './UnavailablePage'
 
 const Scratchpad = lazy(() =>
@@ -132,7 +131,11 @@ export function WorkspaceScreen({
   contentPending
 }: WorkspaceScreenProps) {
   const { layout, setLayout, workspaceId } = useWorkspaceLayoutCtx()
-  const { recovery, ready } = useWorkspaceSetup(workspaceId, contentPending)
+  const {
+    content: setupContent,
+    ready,
+    chatHidden
+  } = useWorkspaceSetup(workspaceId, contentPending)
   const theme = resolveWorkspaceTheme(layout.theme)
   const viewActions = useViewActions()
   const {
@@ -477,12 +480,12 @@ export function WorkspaceScreen({
     <div
       className={cn(
         '@container/workspace relative flex h-full min-h-0 min-w-0 flex-1 flex-col-reverse overflow-hidden bg-background shadow-md transition-[border-radius,background-color] duration-100 ease-out motion-reduce:transition-none',
-        mode === 'split' && !recovery && 'rounded-xl'
+        mode === 'split' && !chatHidden && 'rounded-xl'
       )}
     >
       {!ready && (
         <section aria-label="Workspace setup" className="flex min-h-0 flex-1 overflow-y-auto">
-          {recovery ?? <WorkspaceLoadingState />}
+          {setupContent}
         </section>
       )}
       <WorkspaceActivity ready={ready}>
@@ -623,11 +626,11 @@ export function WorkspaceScreen({
             {...splitLayoutConstraints}
             workspace={workspacePanel}
             chat={
-              <WorkspaceActivity ready={!contentPending && !recovery}>
+              <WorkspaceActivity ready={!contentPending && !chatHidden}>
                 {dockedChat}
               </WorkspaceActivity>
             }
-            open={mode === 'split' && !recovery}
+            open={mode === 'split' && !chatHidden}
             chatWidth={dockedChatWidth}
             onCollapse={() => setMode('fullscreen')}
             onChatWidthChange={setDockedChatWidth}

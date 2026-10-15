@@ -13,7 +13,7 @@ import * as events from '@/client/runtime/useWorkspaceEvents'
 import type { WorkspaceAgent, HarnessAvailability } from '@/lib/types'
 import { ScopedPortal } from '@/ui-components/scoped-portal'
 import { useWorkspaceSetup, WorkspaceActivity } from './workspace-setup'
-import { WorkspaceLoadingState } from './workspace-recovery-states'
+import { welcomeNewWorkspace } from './workspace-welcome-state'
 
 type SetupFixtureProps = {
   workspaceId: string
@@ -22,13 +22,12 @@ type SetupFixtureProps = {
 }
 
 function SetupFixture({ workspaceId, contentPending, children }: SetupFixtureProps) {
-  const { ready, recovery } = useWorkspaceSetup(workspaceId, contentPending)
+  const { ready, content, chatHidden } = useWorkspaceSetup(workspaceId, contentPending)
   return (
     <>
+      <div data-chat-hidden={chatHidden} />
       <WorkspaceActivity ready={ready}>{children}</WorkspaceActivity>
-      {!ready && (
-        <section aria-label="Workspace setup">{recovery ?? <WorkspaceLoadingState />}</section>
-      )}
+      {!ready && <section aria-label="Workspace setup">{content}</section>}
     </>
   )
 }
@@ -407,4 +406,105 @@ test('an older response cannot overwrite a newer auth event and reopen login', a
   })
   expect(document.querySelector('[aria-label="Workspace setup"]')).toBeNull()
   expect(document.querySelector<HTMLElement>('[data-content]')?.style.display).not.toBe('none')
+})
+
+async function finishWelcome() {
+  await act(async () => {
+    await Bun.sleep(3050)
+  })
+}
+
+function chatHidden(document: Document) {
+  return document.querySelector('[data-chat-hidden]')?.getAttribute('data-chat-hidden') === 'true'
+}
+
+test('creation shows welcome for three seconds before revealing a ready workspace and chat', async () => {
+  welcomeNewWorkspace('test')
+  const { document } = await mount({ status: 'available' })
+  expect(document.body.textContent).toContain('Welcome to your workspace')
+  expect(document.querySelector('[data-content]')).toBeNull()
+  expect(chatHidden(document)).toBe(true)
+  await act(async () => {
+    await Bun.sleep(100)
+  })
+  expect(document.body.textContent).toContain('Welcome to your workspace')
+  await finishWelcome()
+  expect(document.body.textContent).not.toContain('Welcome to your workspace')
+  expect(document.querySelector('[data-content]')).not.toBeNull()
+  expect(chatHidden(document)).toBe(false)
+})
+
+test('welcome precedes login and chat stays hidden until login is verified', async () => {
+  welcomeNewWorkspace('test')
+  const { document, update, requests } = await mount()
+  expect(document.body.textContent).toContain('Welcome to your workspace')
+  expect(document.body.textContent).not.toContain('Log in to Codex')
+  expect(requests).toContain('/api/workspaces/test/agent?refresh=true')
+  await finishWelcome()
+  expect(document.body.textContent).toContain('Log in to Codex')
+  expect(chatHidden(document)).toBe(true)
+  await update({ status: 'available' })
+  expect(document.querySelector('[data-content]')).not.toBeNull()
+  expect(chatHidden(document)).toBe(false)
+})
+
+test('slow content keeps chat collapsed after welcome, then normal loading behavior resumes', async () => {
+  welcomeNewWorkspace('test')
+  const { document, setContentPending } = await mount({ status: 'available' }, false, false, true)
+  await finishWelcome()
+  expect(document.body.textContent).not.toContain('Welcome to your workspace')
+  expect(document.querySelector('[role="status"]')).not.toBeNull()
+  expect(chatHidden(document)).toBe(true)
+  await setContentPending(false)
+  expect(chatHidden(document)).toBe(false)
+  expect(document.querySelector('[data-content]')).not.toBeNull()
+  await setContentPending(true)
+  expect(chatHidden(document)).toBe(false)
+})
+
+test('leaving during welcome consumes the handoff and cancels its timer', async () => {
+  welcomeNewWorkspace('test')
+  const first = await mount({ status: 'available' })
+  expect(first.document.body.textContent).toContain('Welcome to your workspace')
+  await cleanup()
+  const second = await mount({ status: 'available' })
+  expect(second.document.body.textContent).not.toContain('Welcome to your workspace')
+  expect(chatHidden(second.document)).toBe(false)
+  await finishWelcome()
+  expect(second.document.querySelector('[data-content]')).not.toBeNull()
+  expect(chatHidden(second.document)).toBe(false)
+})
+
+test('welcome finishes while readiness is pending without opening chat', async () => {
+  welcomeNewWorkspace('test')
+  let resolve!: (status: HarnessAvailability) => void
+  const check = new Promise<HarnessAvailability>(done => {
+    resolve = done
+  })
+  const { document } = await mount(
+    { status: 'login-required', reason: 'Sign in' },
+    false,
+    false,
+    false,
+    check
+  )
+  await finishWelcome()
+  expect(document.querySelector('[role="status"]')).not.toBeNull()
+  expect(chatHidden(document)).toBe(true)
+  await act(async () => {
+    resolve({ status: 'available' })
+    await Bun.sleep(30)
+  })
+  expect(document.querySelector('[data-content]')).not.toBeNull()
+  expect(chatHidden(document)).toBe(false)
+})
+
+test('unavailable agent replaces welcome and keeps chat hidden', async () => {
+  welcomeNewWorkspace('test')
+  const { document } = await mount({ status: 'unavailable', reason: 'Agent is missing' })
+  expect(document.body.textContent).toContain('Welcome to your workspace')
+  await finishWelcome()
+  expect(document.body.textContent).toContain('Agent is missing')
+  expect(chatHidden(document)).toBe(true)
+  expect(document.querySelector('[data-content]')).toBeNull()
 })
