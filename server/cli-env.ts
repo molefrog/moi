@@ -21,7 +21,7 @@ import { type EnvUpdate, discoverDotenvKeys } from './workspace-env'
 // The server owns the registry and the env stores: it applies a write at once
 // and queues writes per workspace, so the CLI never touches the files itself.
 // That is also the only way in for the agent on a managed machine, whose OS
-// user can't open moi's data folder (docs/managed-machine.md).
+// user can't open moi's data folder (docs/config.md).
 
 function serverFail(message: string): never {
   console.error('\n' + pc.red('✗') + ' ' + message + '\n')

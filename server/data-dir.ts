@@ -10,7 +10,7 @@ import { accessSync, constants } from 'node:fs'
 export const DATA_DIR = process.env.MOI_DATA_DIR || envPaths('moi', { suffix: '' }).data
 
 // Can this process open moi's data folder? Not when it's the agent's own OS
-// user on a managed machine (docs/managed-machine.md): such callers go through
+// user on a managed machine (docs/config.md): such callers go through
 // the running server instead. A folder that doesn't exist yet counts as usable.
 export function canUseDataDir(): boolean {
   try {

@@ -112,7 +112,7 @@ await Promise.all((await listWorkspaces()).map(failInterruptedViewStarts))
 
 // Managed machines serve the web side on a Unix socket file that only the
 // machine's gateway can open, so nothing else running there reaches the API
-// meant for people (docs/managed-machine.md). A socket file left by a previous
+// meant for people (docs/config.md). A socket file left by a previous
 // run would make the bind fail.
 const { unixSocket } = getAppConfig()
 if (unixSocket) await rm(unixSocket, { force: true })

@@ -28,7 +28,7 @@ export type AppConfig = {
   // inherits the user profile from Access's signed token. Null trusts no proxy.
   cloudflareAccess: CloudflareAccessConfig | null
   // Managed machines (one per organization) run moi and the agent as
-  // different OS users; see docs/managed-machine.md. These three are read
+  // different OS users; see docs/config.md. These three are read
   // from config.json only, with no env override, so the machine's start
   // script, which writes the file, is the only thing deciding them.
   // Folder that `/workspace/create` puts new workspaces in; null is `~/moi`.

@@ -3178,7 +3178,7 @@ function exitIfDemoBlocked(): void {
 }
 
 // Managed machines run the agent as its own OS user, which can't open moi's
-// data folder (docs/managed-machine.md). The system commands that set up or
+// data folder (docs/config.md). The system commands that set up or
 // run moi belong to the user that runs moi; `version` and `status` only read.
 function exitIfNotMoiUser(): void {
   const invoked = process.argv[2]

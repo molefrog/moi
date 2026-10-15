@@ -1,5 +1,5 @@
 // Managed machines run moi and the agent as different OS users (see
-// docs/managed-machine.md). `agentLauncher` in config.json names an executable
+// docs/config.md). `agentLauncher` in config.json names an executable
 // that every agent process starts through: it switches to the agent's user,
 // drops moi's powers, then execs the command. That covers harness CLIs,
 // function workers, applet builds and dependency installs. Unset (every local
