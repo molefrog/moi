@@ -173,9 +173,8 @@ type WorkspaceCardProps = {
 }
 
 function WorkspaceCard({ workspace }: WorkspaceCardProps) {
-  const { demo } = useAppConfig()
   // Warm the shared readiness cache before the user enters this workspace.
-  useWorkspaceAgent(workspace.id, !demo)
+  useWorkspaceAgent(workspace.id)
   const name = workspaceDisplayName(workspace)
   const previewQuery = useWorkspacePreview(workspace.id)
   const theme = workspace.theme ?? previewQuery.data?.theme

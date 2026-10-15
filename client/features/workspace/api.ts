@@ -34,7 +34,7 @@ export function useWorkspaceLayout(workspaceId: string) {
 // presence + auth), any in-flight login ceremony, the model catalog, and
 // capabilities. `harness:updated` events refresh availability and login state;
 // focus refetches pick up model changes after a CLI update.
-export function useWorkspaceAgent(workspaceId: string, enabled = true) {
+export function useWorkspaceAgent(workspaceId: string) {
   const queryClient = useQueryClient()
   useEffect(
     () =>
@@ -69,7 +69,6 @@ export function useWorkspaceAgent(workspaceId: string, enabled = true) {
         ? { ...result, availability: current.availability, login: current.login }
         : result
     },
-    enabled,
     staleTime: 30_000,
     // Reconfirm cached failures on entry; a recent successful check can be reused.
     refetchOnMount: query =>

@@ -295,10 +295,17 @@ test('global login success rechecks workspace readiness instead of unlocking it'
   expect(requests).toContain('/api/workspaces/test/agent?refresh=true')
 })
 
-test('demo bypasses recovery and does not check auth', async () => {
+test('demo uses the same login recovery and readiness checks', async () => {
   const { document, requests } = await mount(undefined, true)
-  expect(document.querySelector('[data-content]') !== null).toBe(true)
-  expect(requests).toEqual([])
+  expect(document.querySelector('[data-content]')).toBeNull()
+  expect(document.body.textContent).toContain('Connect your agent')
+  expect(requests).toContain('/api/workspaces/test/agent?refresh=true')
+})
+
+test('a ready demo opens the workspace normally', async () => {
+  const { document } = await mount({ status: 'available' }, true)
+  expect(document.querySelector('[data-content]')).not.toBeNull()
+  expect(document.body.textContent).not.toContain('Connect your agent')
 })
 
 test('missing folder offers deletion and returns home after removing the workspace', async () => {

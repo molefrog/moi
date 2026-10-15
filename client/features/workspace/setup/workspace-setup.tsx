@@ -1,6 +1,5 @@
 import { Activity, useCallback, useState, type ReactNode } from 'react'
 
-import { useAppConfig } from '@/client/api/app-config'
 import { useWorkspaceAgent } from '../api'
 import { WorkspaceLoginState } from './workspace-login-state'
 import {
@@ -10,11 +9,8 @@ import {
 } from './workspace-recovery-states'
 
 export function useWorkspaceSetup(workspaceId: string, contentPending = false) {
-  const { demo } = useAppConfig()
-  const { data, isError, isPending, isFetching, isFetchedAfterMount, refetch } = useWorkspaceAgent(
-    workspaceId,
-    !demo
-  )
+  const { data, isError, isPending, isFetching, isFetchedAfterMount, refetch } =
+    useWorkspaceAgent(workspaceId)
   // A cached failure is only a hint until this visit's check has settled.
   const checking =
     isPending || (isFetching && !isFetchedAfterMount && data?.availability.status !== 'available')
@@ -23,7 +19,7 @@ export function useWorkspaceSetup(workspaceId: string, contentPending = false) {
   }, [refetch])
 
   function renderRecovery() {
-    if (demo || checking) return undefined
+    if (checking) return undefined
     // Background network failures do not invalidate a known working workspace.
     if (isError && data?.availability.status === 'available') return undefined
     if (isError || !data) {
@@ -58,7 +54,7 @@ export function useWorkspaceSetup(workspaceId: string, contentPending = false) {
   }
 
   const recovery = renderRecovery()
-  return { recovery, ready: !recovery && !contentPending && (demo || !checking) }
+  return { recovery, ready: !recovery && !contentPending && !checking }
 }
 
 type WorkspaceActivityProps = {
