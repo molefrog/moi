@@ -23,7 +23,7 @@ Set in `config.json`, in moi's data folder. There is no env override, so whoever
 
 - **Agent processes start through the launcher.** `agentCommand()` and, for Claude Code, the SDK's spawn hook (`claudeCodeSpawn()`) in `server/agent-launcher.ts`. A new place that starts agent code must use one of them. Otherwise that code runs as moi's user.
 - **moi must be able to read and write the agent's files.** It reads chat histories and writes into folders the agent owns, such as the agent-owned temp folder for chat titles. The machine grants this; moi doesn't check.
-- **The `moi` CLI works for the agent through the server.** The agent's user can't open moi's data folder, so `moi env` and finding the current workspace go over the control port.
+- **The `moi` CLI reaches moi's data through the server.** The agent's user can't open moi's data folder, so `moi env` and finding the current workspace always go over the control port. Local installs do the same, so these commands need moi running everywhere.
 - **System commands belong to moi's user.** `init`, `start`, `service`, `update` and the provider `init`s refuse to run when moi's data folder can't be opened; `version` and `status` still work. The control port accepts `workspace:register` only from moi's own user. It checks the owner of the client's socket in `/proc/net/tcp`.
 
-None of this changes a local install: with no `agentLauncher` set, every path behaves as before.
+Apart from `moi env` needing moi running, none of this changes a local install: with no `agentLauncher` set, every path behaves as before.

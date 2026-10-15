@@ -382,8 +382,9 @@ export const control = Bun.serve<ControlData>({
           return
         }
 
-        // `moi env` from a user that can't open moi's data folder (the agent on
-        // a managed machine) reads and writes the workspace env through here.
+        // `moi env` reads and writes the workspace env only through here, so a
+        // write takes effect at once (same path as PUT /env), and the agent on
+        // a managed machine, which can't open moi's data folder, can use it.
         if (data.type === 'env:view') {
           const match = await resolveWorkspace(ws, data.path)
           if (!match) return
@@ -410,16 +411,6 @@ export const control = Bun.serve<ControlData>({
           const match = await resolveWorkspace(ws, data.path)
           if (!match) return
           ws.send(JSON.stringify({ env: await resolveWorkspaceEnv(match.path) }))
-          return
-        }
-
-        if (data.type === 'env:changed') {
-          // A CLI env write (`moi env set`/`unset`) already landed on disk —
-          // reap + broadcast so it takes effect (same path as PUT /env).
-          const match = await resolveWorkspace(ws, data.path)
-          if (!match) return
-          applyEnvChanged(match)
-          ws.send(JSON.stringify({ ok: true }))
           return
         }
 

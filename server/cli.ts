@@ -1310,7 +1310,7 @@ const env = defineCommand({
     const first = rawArgs.find(a => !a.startsWith('-'))
     if (first && Object.hasOwn(envSubCommands, first)) return
     const entry = await resolveCwdWorkspace()
-    const view = await readEnvView(entry.path, { withRequired: true })
+    const view = await readEnvView(entry.path)
     console.log('\n' + renderEnvView(entry, view) + '\n')
     process.exit(0)
   }

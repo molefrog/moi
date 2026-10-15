@@ -71,7 +71,7 @@ test.skipIf(asRoot)(
   async () => {
     const result = await runCli(['env'])
     expect(result.code).toBe(1)
-    expect(result.stderr).toContain('moi is not running')
+    expect(result.stderr).toContain('Is the main process running?')
     expect(result.stderr).not.toContain('EACCES')
   },
   SPAWN_TIMEOUT

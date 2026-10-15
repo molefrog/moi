@@ -1,22 +1,69 @@
 // End-to-end tests for the `moi env` CLI: each test spawns the real CLI
-// (`bun server/cli.ts env …`) against a temp workspace, with the registry and
-// env stores isolated under a temp MOI_DATA_DIR (env-paths only honors
-// XDG_DATA_HOME on Linux, so an explicit override is the only portable seam).
-// MOI_SECRET_BACKEND=file pins the file secret store so a test run can never
-// touch the real OS keychain.
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+// (`bun server/cli.ts env …`) against a temp workspace. The CLI goes through
+// the server, so the file starts the real control server in a child process,
+// on a free port, with the registry and env stores under a temp MOI_DATA_DIR
+// (env-paths only honors XDG_DATA_HOME on Linux, so an explicit override is
+// the only portable seam). The server reads the stores off disk on every
+// request, so tests set them up by writing the files. MOI_SECRET_BACKEND=file
+// pins the file secret store so a test run can never touch the real OS
+// keychain.
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'bun:test'
+import type { Subprocess } from 'bun'
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'path'
 
-const CLI = join(import.meta.dir, '..', 'cli.ts')
+const SERVER = join(import.meta.dir, '..')
+const CLI = join(SERVER, 'cli.ts')
 
 let dataHome: string
 let wsDir: string
 let outsideDir: string
+let server: Subprocess<'ignore', 'pipe', 'inherit'>
+let controlPort: string
 
 const moiDataDir = () => join(dataHome, 'moi')
 const secretsPath = () => join(moiDataDir(), 'workspace-secrets.json')
+const storeEnv = () => ({ MOI_DATA_DIR: moiDataDir(), MOI_SECRET_BACKEND: 'file' })
+
+// The real control handlers on port 0; prints the port it got.
+const CONTROL_SERVER = `
+  import { mock } from 'bun:test'
+  const path = ${JSON.stringify(join(SERVER, 'constants.ts'))}
+  const constants = await import(path)
+  mock.module(path, () => ({ ...constants, CONTROL_PORT: 0 }))
+  const { control } = await import(${JSON.stringify(join(SERVER, 'control.ts'))})
+  console.log('control-port=' + control.port)
+`
+
+beforeAll(async () => {
+  dataHome = await tempDir('moi-cli-data-')
+  server = Bun.spawn(['bun', '--eval', CONTROL_SERVER], {
+    env: { ...process.env, ...storeEnv(), MOI_SERVER: undefined },
+    stdin: 'ignore',
+    stdout: 'pipe',
+    stderr: 'inherit'
+  })
+  const reader = server.stdout.getReader()
+  const decoder = new TextDecoder()
+  let output = ''
+  while (!controlPort) {
+    const { done, value } = await reader.read()
+    if (done) throw new Error('control server did not start')
+    output += decoder.decode(value)
+    controlPort = output.match(/control-port=(\d+)/)?.[1] ?? ''
+  }
+  // Keep draining, so the server's later logs never fill the pipe.
+  void (async () => {
+    while (!(await reader.read()).done);
+  })()
+}, 30_000)
+
+afterAll(async () => {
+  server.kill()
+  await server.exited
+  await rm(dataHome, { recursive: true, force: true })
+})
 
 async function registerWorkspace(path: string) {
   await mkdir(moiDataDir(), { recursive: true })
@@ -30,7 +77,7 @@ type CliResult = { code: number; stdout: string; stderr: string }
 
 async function runCli(
   args: string[],
-  opts: { cwd?: string; stdin?: string } = {}
+  opts: { cwd?: string; stdin?: string; env?: Record<string, string> } = {}
 ): Promise<CliResult> {
   const proc = Bun.spawn(['bun', CLI, 'env', ...args], {
     cwd: opts.cwd ?? wsDir,
@@ -39,12 +86,13 @@ async function runCli(
     stderr: 'pipe',
     env: {
       ...process.env,
-      MOI_DATA_DIR: moiDataDir(),
-      MOI_SECRET_BACKEND: 'file',
+      ...storeEnv(),
+      MOI_CONTROL_PORT: controlPort,
       // No NO_COLOR override: stdout is a pipe here, exactly like an agent
       // capturing the command, so plain output must be the default.
       NO_COLOR: undefined,
-      FORCE_COLOR: undefined
+      FORCE_COLOR: undefined,
+      ...opts.env
     }
   })
   const [code, stdout, stderr] = await Promise.all([
@@ -69,14 +117,15 @@ async function storedSecrets(): Promise<Record<string, Record<string, string>>> 
 const tempDir = async (prefix: string) => realpath(await mkdtemp(join(tmpdir(), prefix)))
 
 beforeEach(async () => {
-  dataHome = await tempDir('moi-cli-data-')
+  // One server for the file, so each test starts from an empty data folder.
+  await rm(moiDataDir(), { recursive: true, force: true })
   wsDir = await tempDir('moi-cli-ws-')
   outsideDir = await tempDir('moi-cli-outside-')
   await registerWorkspace(wsDir)
 })
 
 afterEach(async () => {
-  for (const dir of [dataHome, wsDir, outsideDir]) {
+  for (const dir of [wsDir, outsideDir]) {
     await rm(dir, { recursive: true, force: true })
   }
 })
@@ -248,23 +297,10 @@ describe('moi env exec', () => {
 
   test('workspace env overrides the inherited process env', async () => {
     await writeFile(join(wsDir, '.env'), 'HOME_MADE=fresh\n')
-    const proc = Bun.spawn(
-      ['bun', CLI, 'env', 'exec', '--', 'bun', '-e', 'console.log(process.env.HOME_MADE)'],
-      {
-        cwd: wsDir,
-        stdout: 'pipe',
-        stderr: 'pipe',
-        env: {
-          ...process.env,
-          MOI_DATA_DIR: moiDataDir(),
-          MOI_SECRET_BACKEND: 'file',
-          NO_COLOR: '1',
-          HOME_MADE: 'stale'
-        }
-      }
-    )
-    await proc.exited
-    expect((await new Response(proc.stdout).text()).trim()).toBe('fresh')
+    const res = await runCli(['exec', '--', 'bun', '-e', 'console.log(process.env.HOME_MADE)'], {
+      env: { HOME_MADE: 'stale' }
+    })
+    expect(res.stdout.trim()).toBe('fresh')
   })
 
   test('does not leak auto-loaded .env values when inheritance is off', async () => {
@@ -295,4 +331,17 @@ describe('moi env exec', () => {
     expect(res.code).toBe(1)
     expect(res.stderr).toContain('Usage: moi env exec')
   })
+})
+
+describe('without a running server', () => {
+  test('says moi is not running and leaves the stores alone', async () => {
+    // Nothing listens on port 1.
+    const env = { MOI_CONTROL_PORT: '1' }
+    for (const args of [[], ['set', 'K=v'], ['exec', '--', 'true']]) {
+      const res = await runCli(args, { env })
+      expect(res.code).toBe(1)
+      expect(res.stderr).toContain('Is the main process running?')
+    }
+    expect(await storedSecrets()).toEqual({})
+  }, 30_000)
 })
