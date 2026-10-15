@@ -85,7 +85,7 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
                   ? 'Copy this code, open the sign-in page, and enter it there.'
                   : pending.acceptsCode && !waitingForBrowser
                     ? 'Open the sign-in page and finish signing in. Copy the full authorization code shown on that page and paste it here.'
-                    : 'Finish signing in in your browser, then return to moi. This screen will update automatically.'}
+                    : 'Sign in in your browser, then come back to moi. Your workspace will open once you’re connected.'}
               </p>
               {pending.userCode && (
                 <div className="flex items-center gap-3">
@@ -148,11 +148,6 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
                     Submit code
                   </Button>
                 </form>
-              )}
-              {manualLogin && environment === 'local' && (
-                <Button variant="ghost" onClick={() => setManualLogin(false)}>
-                  Back
-                </Button>
               )}
             </>
           ) : (

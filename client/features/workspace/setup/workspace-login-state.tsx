@@ -18,14 +18,14 @@ export function WorkspaceLoginState({
 }: WorkspaceLoginStateProps) {
   return (
     <div className="flex flex-1 items-center justify-center p-6">
-      <div className="flex w-full max-w-md flex-col gap-6">
+      <div className="flex w-full max-w-sm flex-col gap-6 text-center">
         <img src={workspaceProviderIcon[type]} alt="" className="size-10 self-center" />
         <h1 className="text-center text-xl font-medium">Connect your {workspaceTypeLabel[type]}</h1>
         <HarnessConnection
           type={type}
           onConnected={onRecheck}
           connectedContent={
-            <div role="status" className="flex flex-col items-start gap-4">
+            <div role="status" className="flex flex-col items-center gap-4">
               <p className="text-sm text-muted-foreground">
                 {checking
                   ? 'Checking workspace access…'

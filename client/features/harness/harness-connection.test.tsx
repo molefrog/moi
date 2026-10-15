@@ -58,7 +58,7 @@ test('local Codex uses a browser link without code instructions', () => {
   })
   expect(html).not.toContain('Cancel sign-in')
   expect(html).toContain('Open sign-in page')
-  expect(html).toContain('Finish signing in in your browser, then return to moi.')
+  expect(html).toContain('Sign in in your browser, then come back to moi.')
   expect(html).not.toContain('Having trouble signing in?')
   expect(html).not.toContain('ChatGPT security settings')
   expect(html).not.toContain('Authorization code')
@@ -74,7 +74,7 @@ test('local Claude waits for the browser callback with the code fallback hidden'
       acceptsCode: true
     }
   })
-  expect(html).toContain('This screen will update automatically')
+  expect(html).toContain('Your workspace will open once you’re connected.')
   expect(html).toContain('Having trouble signing in?')
   expect(html).not.toContain('Authorization code')
   expect(html).toContain('Open sign-in page')
