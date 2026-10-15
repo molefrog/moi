@@ -1,4 +1,4 @@
-import { WorkspaceSetup } from '@/client/features/workspace/workspace-setup'
+import { WorkspaceSetup } from '@/client/features/workspace/setup/workspace-setup'
 import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
 import { CollabProvider, useCollabEnabled } from '@/client/features/collab'
 import { useQueryClient } from '@tanstack/react-query'

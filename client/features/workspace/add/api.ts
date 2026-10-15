@@ -43,7 +43,7 @@ export type ImportWorkspaceInput = {
   type: WorkspaceType
 }
 
-export type WorkspaceSetupInfo = {
+export type WorkspaceCreationInfo = {
   root: string
   displayRoot: string
   installed: HarnessInstallations
@@ -52,9 +52,9 @@ export type WorkspaceSetupInfo = {
   availability?: Partial<Record<WorkspaceType, HarnessAvailability>>
 }
 
-export function useWorkspaceSetupInfo() {
-  return useQuery<WorkspaceSetupInfo>({
-    queryKey: workspaceKeys.setupInfo,
+export function useWorkspaceCreationInfo() {
+  return useQuery<WorkspaceCreationInfo>({
+    queryKey: workspaceKeys.creationInfo,
     // Availability can change while the app is open (the user installs the
     // agent CLI) — refetch on mount instead of caching forever.
     queryFn: () => requestJson('/api/workspaces/create'),

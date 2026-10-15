@@ -1,4 +1,4 @@
-import { workspaceTypeDescription } from '@/client/features/home/workspace-presentation'
+import { workspaceTypeDescription } from '@/client/features/workspace/workspace-presentation'
 import { HARNESS_INSTRUCTIONS } from '@/lib/harness-instructions'
 import type { HarnessAvailability, HarnessInstallations, WorkspaceType } from '@/lib/types'
 import { WORKSPACE_TYPE_ORDER } from '@/lib/workspace-types'

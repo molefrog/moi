@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 import { Button } from '@/client/components/ui/button'
 import { Dialog, DialogClose } from '@/client/components/ui/dialog'
-import { workspaceDisplayName } from '@/client/features/home/workspace-presentation'
+import { workspaceDisplayName } from '@/client/features/workspace/workspace-presentation'
 import type { HarnessAvailability, WorkspaceType } from '@/lib/types'
 
 import { WorkspaceAgentSelector } from './workspace-agent-selector'

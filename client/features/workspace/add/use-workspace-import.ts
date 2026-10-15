@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { useImportWorkspace } from '@/client/features/setup/api'
+import { useImportWorkspace } from '@/client/features/workspace/add/api'
 import { WORKSPACE_TYPE_ORDER } from '@/lib/workspace-types'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
 

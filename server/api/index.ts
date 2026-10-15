@@ -675,9 +675,22 @@ one.post('/skills/update', async c => {
 // not refetches.
 one.get('/agent', async c => {
   const ws = c.get('ws')
+  const harness = harnessFor(ws)
+  const capabilities = {
+    provider: harness.id,
+    supportsStreaming: harness.capabilities.supportsStreaming,
+    supportsArchiving: Boolean(harness.archiveSession)
+  }
+  if (!existsSync(ws.path)) {
+    return c.json({
+      ...capabilities,
+      missingWorkspacePath: ws.path,
+      availability: { status: 'unavailable', reason: 'Workspace folder not found' },
+      models: []
+    } satisfies WorkspaceAgent)
+  }
   const refresh = c.req.query('refresh') === 'true'
   if (refresh) await loginShellPath({ refresh: true })
-  const harness = harnessFor(ws)
   // A backend that can't answer (codex CLI missing, gateway down) degrades to
   // an empty catalog — the picker hides and chat surfaces the real problem via
   // the availability banner, instead of this endpoint 500ing on page load.
@@ -690,12 +703,10 @@ one.get('/agent', async c => {
   ])
   const login = harnessStore.getLogin(harness.id)
   return c.json({
-    provider: harness.id,
+    ...capabilities,
     availability,
     ...(login ? { login } : {}),
-    models,
-    supportsStreaming: harness.capabilities.supportsStreaming,
-    supportsArchiving: Boolean(harness.archiveSession)
+    models
   } satisfies WorkspaceAgent)
 })
 

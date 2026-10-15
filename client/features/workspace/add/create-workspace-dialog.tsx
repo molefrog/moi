@@ -2,7 +2,7 @@ import { type FormEvent, type ReactElement, useState } from 'react'
 
 import { useLocation } from 'wouter'
 
-import { useCreateWorkspace, useWorkspaceSetupInfo } from '@/client/features/setup/api'
+import { useCreateWorkspace, useWorkspaceCreationInfo } from '@/client/features/workspace/add/api'
 import { useAppConfig } from '@/client/api/app-config'
 import { Button } from '@/client/components/ui/button'
 import {
@@ -17,7 +17,7 @@ import { validateWorkspaceFolderName } from '@/lib/workspace-name'
 import { WORKSPACE_TYPE_ORDER } from '@/lib/workspace-types'
 import type { WorkspaceType } from '@/lib/types'
 
-import { DemoDialog } from '@/client/features/setup/demo/demo-dialog'
+import { DemoDialog } from '@/client/features/demo/demo-dialog'
 import { WorkspaceAgentSelector } from './workspace-agent-selector'
 import { getCreateWorkspaceAgentOptions } from './workspace-agent-options'
 import { WorkspaceDialogContent } from './workspace-dialog-content'
@@ -33,7 +33,7 @@ const DEFAULT_WORKSPACE_TYPE = WORKSPACE_TYPE_ORDER[0]
 export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
   const [, navigate] = useLocation()
   const appConfig = useAppConfig()
-  const info = useWorkspaceSetupInfo()
+  const info = useWorkspaceCreationInfo()
   const createMutation = useCreateWorkspace()
 
   const [open, setOpen] = useState(false)

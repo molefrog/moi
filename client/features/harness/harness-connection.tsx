@@ -5,7 +5,7 @@ import { useAppConfig } from '@/client/api/app-config'
 import { Button, buttonVariants } from '@/client/components/ui/button'
 import { Input } from '@/client/components/ui/input'
 import { toast } from '@/client/components/ui/toast'
-import { workspaceTypeLabel } from '@/client/features/home/workspace-presentation'
+import { workspaceTypeLabel } from '@/client/features/workspace/workspace-presentation'
 import { Skeleton } from '@/client/components/ui/skeleton'
 import {
   cancelHarnessLogin,

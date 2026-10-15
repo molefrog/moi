@@ -4,12 +4,12 @@ import { IconChevronRight, IconEggCracked, IconLoader2, IconPlus } from '@tabler
 import { Link, useLocation } from 'wouter'
 
 import { useDiscoveredWorkspaces, useWorkspacePreview, useWorkspaces } from './api'
-import { useWorkspaceSetupInfo } from '@/client/features/setup/api'
+import { useWorkspaceCreationInfo } from '@/client/features/workspace/add/api'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
-import { CreateWorkspaceDialog } from '@/client/features/setup/workspace/create-workspace-dialog'
-import { ImportWorkspaceDialog } from '@/client/features/setup/workspace/import-workspace-dialog'
-import { DemoDialog } from '@/client/features/setup/demo/demo-dialog'
-import { useWorkspaceImport } from '@/client/features/setup/workspace/use-workspace-import'
+import { CreateWorkspaceDialog } from '@/client/features/workspace/add/create-workspace-dialog'
+import { ImportWorkspaceDialog } from '@/client/features/workspace/add/import-workspace-dialog'
+import { DemoDialog } from '@/client/features/demo/demo-dialog'
+import { useWorkspaceImport } from '@/client/features/workspace/add/use-workspace-import'
 import { HomeLogo } from './HomeLogo'
 import { useAppConfig } from '@/client/api/app-config'
 import { AgentBlobatar } from '@/client/components/shared/AgentBlobatar'
@@ -28,7 +28,7 @@ import { useUiStore } from '@/client/store/ui'
 import {
   WorkspaceAgentIcons,
   workspaceDisplayName
-} from '@/client/features/home/workspace-presentation'
+} from '@/client/features/workspace/workspace-presentation'
 import { resolveWorkspaceTheme } from '@/lib/themes'
 import type { DiscoveredWorkspace, WorkspaceEntry } from '@/lib/types'
 import { resolveUrl } from '@/lib/navigation'
@@ -40,7 +40,7 @@ export function HomePage() {
   const [, navigate] = useLocation()
   const workspacesQuery = useWorkspaces()
   const discoveredQuery = useDiscoveredWorkspaces()
-  const setupInfo = useWorkspaceSetupInfo()
+  const creationInfo = useWorkspaceCreationInfo()
   const importFlow = useWorkspaceImport({
     onSuccess: entry => navigate(`/workspace/${entry.id}`)
   })
@@ -154,7 +154,7 @@ export function HomePage() {
       {importFlow.choice && (
         <ImportWorkspaceDialog
           choice={importFlow.choice}
-          availability={setupInfo.data?.availability}
+          availability={creationInfo.data?.availability}
           isPending={importFlow.isPending}
           errorMessage={importFlow.error?.message}
           onTypeChange={importFlow.selectType}

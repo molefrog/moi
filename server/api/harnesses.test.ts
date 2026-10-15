@@ -136,3 +136,25 @@ test('workspace recovery refreshes PATH and bypasses cached readiness', async ()
     modelsSpy.mockRestore()
   }
 })
+
+test('missing workspace folder is reported before starting the harness', async () => {
+  const path = join(dir, 'missing-workspace')
+  const workspace = await registerWorkspace(path, { type: 'codex' })
+  workspaceId = workspace.id
+  const availabilitySpy = spyOn(codexHarness, 'availability')
+  const modelsSpy = spyOn(codexHarness, 'listModels')
+  try {
+    const response = await api.request(`/api/workspaces/${workspace.id}/agent?refresh=true`)
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      missingWorkspacePath: path,
+      availability: { status: 'unavailable', reason: 'Workspace folder not found' },
+      models: []
+    })
+    expect(availabilitySpy).not.toHaveBeenCalled()
+    expect(modelsSpy).not.toHaveBeenCalled()
+  } finally {
+    availabilitySpy.mockRestore()
+    modelsSpy.mockRestore()
+  }
+})

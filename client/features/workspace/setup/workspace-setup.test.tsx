@@ -239,3 +239,22 @@ test('demo bypasses recovery and does not check auth', async () => {
   expect(document.querySelector('[data-content]') !== null).toBe(true)
   expect(requests).toEqual([])
 })
+
+test('missing folder shows its path without agent branding or login', async () => {
+  const { document, client, key } = await mount({
+    status: 'unavailable',
+    reason: 'Workspace folder not found'
+  })
+  await act(async () => {
+    client.setQueryData<WorkspaceAgent>(key, previous => ({
+      ...previous!,
+      missingWorkspacePath: '/tmp/missing-workspace'
+    }))
+    await Bun.sleep(20)
+  })
+  expect(document.querySelector('h1')?.textContent).toBe('Workspace folder not found')
+  expect(document.body.textContent).toContain('/tmp/missing-workspace')
+  expect(document.body.textContent).not.toContain('Your agent is unavailable')
+  expect(document.body.textContent).not.toContain('Log in')
+  expect(document.querySelector('img')).toBeNull()
+})
