@@ -1,4 +1,3 @@
-import { WorkspaceSetup } from '@/client/features/workspace/setup/workspace-setup'
 import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
 import { CollabProvider, useCollabEnabled } from '@/client/features/collab'
 import { useQueryClient } from '@tanstack/react-query'
@@ -67,14 +66,13 @@ function WorkspaceContent({ id }: WorkspaceRouteProps) {
 
   return (
     <SidebarLayout>
-      <WorkspaceSetup workspaceId={id} contentPending={contentPending}>
-        {/* Reset the screen when switching between shared and browser tab state. */}
-        <WorkspaceScreen
-          key={collabEnabled ? 'browser-tab' : 'shared'}
-          widgets={widgets.data}
-          views={views.data ?? []}
-        />
-      </WorkspaceSetup>
+      {/* Reset the screen when switching between shared and browser tab state. */}
+      <WorkspaceScreen
+        key={collabEnabled ? 'browser-tab' : 'shared'}
+        contentPending={contentPending}
+        widgets={widgets.data}
+        views={views.data ?? []}
+      />
     </SidebarLayout>
   )
 }

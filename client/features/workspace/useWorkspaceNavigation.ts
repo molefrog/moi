@@ -39,10 +39,11 @@ const rememberedAddresses = new Map<string, Map<WorkspaceTabId, string>>()
 
 type UseWorkspaceNavigationOptions = {
   views: ViewInfo[]
+  enabled?: boolean
   onOpenChat: () => void
 }
 
-export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNavigationOptions) {
+export function useWorkspaceNavigation({ views, onOpenChat, enabled = true }: UseWorkspaceNavigationOptions) {
   const queryClient = useQueryClient()
   const { workspaceId } = useWorkspaceLayoutCtx()
   const [tabsState, saveTabs] = useWorkspaceTabs()
@@ -98,6 +99,7 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
       { replace = false }: NavigationOptions = {},
       controller = new AbortController()
     ) => {
+      if (!enabled) throw new Error('Workspace is not ready')
       const target = resolveUrl(href, { workspaceId, base })
       navigationRequest.current?.controller.abort()
       if (!target.startsWith(prefix)) {
@@ -147,7 +149,7 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
         if (navigationRequest.current?.controller === controller) navigationRequest.current = null
       }
     },
-    [base, currentPage, latest, prefix, queryClient, selectLinkedChat, setLocation, workspaceId]
+    [base, currentPage, enabled, latest, prefix, queryClient, selectLinkedChat, setLocation, workspaceId]
   )
 
   useEffect(() => {
@@ -174,12 +176,12 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
   )
 
   useAppletEvent(workspaceId, 'navigate', href => {
-    void navigate(href).catch(reportError)
+    if (enabled) void navigate(href).catch(reportError)
   })
   useNavigationClient(workspaceId, navigate)
 
   useEffect(() => {
-    if (path && !isChatLink) return
+    if (!enabled || (path && !isChatLink)) return
     let href = tabUrl(remembered, activeTab)
     if (isChatLink) {
       try {
@@ -193,15 +195,15 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
       if (!controller.signal.aborted) reportError(error)
     })
     return () => controller.abort()
-  }, [activeTab, isChatLink, navigate, path, remembered, reportError, search])
+  }, [activeTab, enabled, isChatLink, navigate, path, remembered, reportError, search])
 
   useEffect(() => {
-    if (!isAvailableTab) return
+    if (!enabled || !isAvailableTab) return
     remembered.set(activeTab, `moi:/${activeTab}${search}`)
     const current = latest.current.tabsState
     const open = current.open.includes(activeTab) ? current.open : [...current.open, activeTab]
     if (open !== current.open || current.active !== activeTab) setTabs({ open, active: activeTab })
-  }, [activeTab, isAvailableTab, latest, remembered, search, setTabs])
+  }, [activeTab, enabled, isAvailableTab, latest, remembered, search, setTabs])
 
   // React bubbling includes applet/chat portals. Native modified clicks and
   // downloads keep a real href, so the browser can handle them normally.

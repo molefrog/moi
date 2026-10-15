@@ -1,5 +1,5 @@
 import { afterEach, expect, spyOn, test } from 'bun:test'
-import { act, useState, type ComponentProps } from 'react'
+import { act, useState, type ComponentProps, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
 import * as router from 'wouter'
@@ -12,7 +12,26 @@ import { workspaceKeys } from '@/client/api/workspace-keys'
 import * as events from '@/client/runtime/useWorkspaceEvents'
 import type { WorkspaceAgent, HarnessAvailability } from '@/lib/types'
 import { ScopedPortal } from '@/ui-components/scoped-portal'
-import { WorkspaceSetup } from './workspace-setup'
+import { useWorkspaceSetup, WorkspaceActivity } from './workspace-setup'
+import { WorkspaceLoadingState } from './workspace-recovery-states'
+
+type SetupFixtureProps = {
+  workspaceId: string
+  contentPending?: boolean
+  children: ReactNode
+}
+
+function SetupFixture({ workspaceId, contentPending, children }: SetupFixtureProps) {
+  const { ready, recovery } = useWorkspaceSetup(workspaceId, contentPending)
+  return (
+    <>
+      <WorkspaceActivity ready={ready}>{children}</WorkspaceActivity>
+      {!ready && (
+        <section aria-label="Workspace setup">{recovery ?? <WorkspaceLoadingState />}</section>
+      )}
+    </>
+  )
+}
 
 let cleanup = async () => {}
 afterEach(() => cleanup())
@@ -122,9 +141,9 @@ async function mount(
   const render = () => {
     root.render(
       <QueryClientProvider client={client}>
-        <WorkspaceSetup workspaceId="test" contentPending={contentPending}>
+        <SetupFixture workspaceId="test" contentPending={contentPending}>
           <Content />
-        </WorkspaceSetup>
+        </SetupFixture>
       </QueryClientProvider>
     )
   }
@@ -214,9 +233,9 @@ test('a cold entry shows only a loading spinner until readiness is known', async
   const client = new QueryClient()
   const html = renderToStaticMarkup(
     <QueryClientProvider client={client}>
-      <WorkspaceSetup workspaceId="cold">
+      <SetupFixture workspaceId="cold">
         <div>Workspace content</div>
-      </WorkspaceSetup>
+      </SetupFixture>
     </QueryClientProvider>
   )
   client.clear()

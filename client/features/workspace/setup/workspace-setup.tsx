@@ -6,31 +6,18 @@ import { WorkspaceLoginState } from './workspace-login-state'
 import {
   HarnessUnavailableState,
   WorkspaceCheckFailedState,
-  WorkspaceLoadingState,
   WorkspaceMissingState
 } from './workspace-recovery-states'
 
-type WorkspaceSetupProps = {
-  workspaceId: string
-  contentPending?: boolean
-  children: ReactNode
-}
-
-export function WorkspaceSetup({
-  workspaceId,
-  contentPending = false,
-  children
-}: WorkspaceSetupProps) {
+export function useWorkspaceSetup(workspaceId: string, contentPending = false) {
   const { demo } = useAppConfig()
   const { data, isError, isPending, isFetching, refetch } = useWorkspaceAgent(workspaceId, !demo)
-  const [opened, setOpened] = useState(false)
   const recheck = useCallback(() => {
     void refetch()
   }, [refetch])
 
   function renderRecovery() {
-    if (demo) return contentPending ? <WorkspaceLoadingState /> : undefined
-    if (isPending) return <WorkspaceLoadingState />
+    if (demo || isPending) return undefined
     if (isError || !data) {
       return <WorkspaceCheckFailedState retrying={isFetching} onRetry={recheck} />
     }
@@ -38,9 +25,7 @@ export function WorkspaceSetup({
       return <WorkspaceMissingState workspaceId={workspaceId} />
     }
     const { provider, availability } = data
-    if (availability.status === 'available') {
-      return contentPending ? <WorkspaceLoadingState /> : undefined
-    }
+    if (availability.status === 'available') return undefined
     if (
       availability.status === 'login-required' &&
       (provider === 'claude-code' || provider === 'codex')
@@ -65,21 +50,17 @@ export function WorkspaceSetup({
   }
 
   const recovery = renderRecovery()
-  const ready = recovery === undefined
-  // Mount once ready, then preserve workspace state during recovery.
-  if (ready && !opened) setOpened(true)
+  return { recovery, ready: !recovery && !contentPending && (demo || !isPending) }
+}
 
-  return (
-    <>
-      {opened && <Activity mode={ready ? 'visible' : 'hidden'}>{children}</Activity>}
-      {!ready && (
-        <section
-          aria-label="Workspace setup"
-          className="flex h-full min-h-0 flex-1 overflow-y-auto bg-background text-foreground shadow-md"
-        >
-          {recovery}
-        </section>
-      )}
-    </>
-  )
+type WorkspaceActivityProps = {
+  ready: boolean
+  children: ReactNode
+}
+
+// Defer the first mount, then preserve drafts, tabs and portals during recovery.
+export function WorkspaceActivity({ ready, children }: WorkspaceActivityProps) {
+  const [opened, setOpened] = useState(false)
+  if (ready && !opened) setOpened(true)
+  return opened ? <Activity mode={ready ? 'visible' : 'hidden'}>{children}</Activity> : null
 }
