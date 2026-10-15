@@ -82,7 +82,7 @@ export function HarnessUnavailableState({
 export function WorkspaceLoadingState() {
   return (
     <div className="flex flex-1 items-center justify-center">
-      <Spinner className="text-muted-foreground" />
+      <Spinner className="size-6 text-muted-foreground" stroke={1.5} />
     </div>
   )
 }
