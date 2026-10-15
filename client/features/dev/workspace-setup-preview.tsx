@@ -24,6 +24,7 @@ import { useHarnessConnection } from '@/client/features/harness/api'
 import {
   createSetupMocks,
   MOCK_SIGN_IN_URL,
+  MOCK_CODE_SIGN_IN_URL,
   PREVIEW_WORKSPACE_ID,
   SETUP_SCENARIOS
 } from './workspace-setup-mocks'
@@ -67,9 +68,9 @@ function SetupPreview({ mocks, client, environment, harness, scenario }: SetupPr
       className="flex h-dvh flex-col bg-background text-foreground"
       onClickCapture={event => {
         const link = (event.target as Element).closest('a')
-        if (link?.href === MOCK_SIGN_IN_URL) {
+        if (link?.href === MOCK_SIGN_IN_URL || link?.href === MOCK_CODE_SIGN_IN_URL) {
           event.preventDefault()
-          setProvider(harness === 'claude-code' ? 'code' : 'browser')
+          setProvider(link.href === MOCK_CODE_SIGN_IN_URL ? 'code' : 'browser')
         }
       }}
     >

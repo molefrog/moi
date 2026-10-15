@@ -1,7 +1,10 @@
 import { stripVTControlCharacters } from 'node:util'
 import { getAppConfig } from '../../app-config'
 import type { HarnessLoginAttempt } from '../types'
-import { homedir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
+import { mkdtemp, chmod, rm } from 'node:fs/promises'
+import { join } from 'node:path'
+import { openBrowser } from '../../open-browser'
 import type { HarnessAvailability } from '@/lib/types'
 
 import { agentCommand } from '../../agent-launcher'
@@ -59,8 +62,7 @@ export async function getClaudeAuthReadiness(workspacePath?: string): Promise<Ha
   }
 }
 
-// The printed link is the CLI's manual-code fallback. Local login also opens
-// its callback URL automatically; cloud suppresses that server-side browser.
+// Read an OAuth URL from CLI output or the captured browser invocation.
 export function claudeLoginUrl(output: string): string | undefined {
   const text = stripVTControlCharacters(output)
   return text.match(/https:\/\/[^\s]+(?=\s)/g)?.find(value => {
@@ -76,60 +78,87 @@ export function claudeLoginUrl(output: string): string | undefined {
 export async function startClaudeLogin(): Promise<HarnessLoginAttempt> {
   const executable = findHarnessExecutable('claude-code')
   if (!executable) throw new Error('Claude Code is not installed')
-  const proc = Bun.spawn(agentCommand([executable, 'auth', 'login']), {
-    cwd: homedir(),
-    env: { ...process.env, ...(getAppConfig().environment === 'cloud' ? { BROWSER: 'true' } : {}) },
-    stdin: 'pipe',
-    stdout: 'pipe',
-    stderr: 'ignore'
-  })
-  const completed = proc.exited.then(code => {
-    if (code !== 0) throw new Error('Claude Code sign-in failed or expired. Try again')
-  })
-  // The process can fail before its URL is available.
-  void completed.catch(() => {})
-  const timeout = setTimeout(() => proc.kill(), 30_000)
+  const local = getAppConfig().environment === 'local'
+  const captureDir = local ? await mkdtemp(join(tmpdir(), 'moi-claude-login-')) : undefined
   try {
-    let output = ''
-    const decoder = new TextDecoder()
-    const reader = proc.stdout.getReader()
-    let url: string | undefined
-    while (!url) {
-      const chunk = await reader.read()
-      if (chunk.done)
-        throw new Error(
-          'Claude Code did not return a sign-in link. Update Claude Code and try again'
-        )
-      output += decoder.decode(chunk.value, { stream: true })
-      if (output.length > 65_536) throw new Error('Could not read the Claude Code sign-in link')
-      url = claudeLoginUrl(output)
+    const capturePath = captureDir ? join(captureDir, 'url') : undefined
+    const browser = captureDir ? join(captureDir, 'browser') : 'true'
+    if (captureDir) {
+      // Capture the exact callback URL the CLI opens; its printed URL is code-only.
+      await Bun.write(browser, `#!/bin/sh\nprintf '%s\\n' "$1" > "$MOI_LOGIN_URL_FILE"\n`)
+      await chmod(browser, 0o700)
     }
-    reader.releaseLock()
-    // Drain subsequent CLI output without storing authorization codes or tokens.
-    void proc.stdout.pipeTo(new WritableStream({ write() {} })).catch(() => {})
-    const state = new URL(url).searchParams.get('state')
-    return {
-      id: crypto.randomUUID(),
-      url,
-      acceptsCode: true,
-      completed,
-      cancel: () => {
-        proc.kill()
-      },
-      submitCode: async code => {
-        const parts = code.trim().split('#')
-        if (parts.length !== 2 || !parts[0] || parts[1] !== state || /\s/.test(code.trim())) {
-          throw new Error('Copy the full code from this sign-in attempt and try again')
-        }
-        if (proc.exitCode !== null) throw new Error('Sign-in expired. Start again')
-        proc.stdin.write(code.trim() + '\n')
-        await proc.stdin.flush()
+    const proc = Bun.spawn(agentCommand([executable, 'auth', 'login']), {
+      cwd: homedir(),
+      env: { ...process.env, BROWSER: browser, MOI_LOGIN_URL_FILE: capturePath },
+      stdin: 'pipe',
+      stdout: 'pipe',
+      stderr: 'ignore'
+    })
+    const completed = proc.exited.then(code => {
+      if (code !== 0) throw new Error('Claude Code sign-in failed or expired. Try again')
+    })
+    // The process can fail before its URL is available.
+    void completed.catch(() => {})
+    const timeout = setTimeout(() => proc.kill(), 30_000)
+    try {
+      let output = ''
+      const decoder = new TextDecoder()
+      const reader = proc.stdout.getReader()
+      let url: string | undefined
+      while (!url) {
+        const chunk = await reader.read()
+        if (chunk.done)
+          throw new Error(
+            'Claude Code did not return a sign-in link. Update Claude Code and try again'
+          )
+        output += decoder.decode(chunk.value, { stream: true })
+        if (output.length > 65_536) throw new Error('Could not read the Claude Code sign-in link')
+        url = claudeLoginUrl(output)
       }
+      reader.releaseLock()
+      // Drain subsequent CLI output without storing authorization codes or tokens.
+      void proc.stdout.pipeTo(new WritableStream({ write() {} })).catch(() => {})
+      const codeUrl = url
+      if (capturePath) {
+        const file = Bun.file(capturePath)
+        let callbackUrl: string | undefined
+        while (!callbackUrl) {
+          if (proc.exitCode !== null)
+            throw new Error('Claude Code did not open a local sign-in link. Try again')
+          if (await file.exists()) callbackUrl = claudeLoginUrl(await file.text())
+          if (!callbackUrl) await Bun.sleep(50)
+        }
+        url = callbackUrl
+        void openBrowser(url)
+      }
+      const state = new URL(codeUrl).searchParams.get('state')
+      return {
+        id: crypto.randomUUID(),
+        url,
+        codeUrl,
+        acceptsCode: true,
+        completed,
+        cancel: () => {
+          proc.kill()
+        },
+        submitCode: async code => {
+          const parts = code.trim().split('#')
+          if (parts.length !== 2 || !parts[0] || parts[1] !== state || /\s/.test(code.trim())) {
+            throw new Error('Copy the full code from this sign-in attempt and try again')
+          }
+          if (proc.exitCode !== null) throw new Error('Sign-in expired. Start again')
+          proc.stdin.write(code.trim() + '\n')
+          await proc.stdin.flush()
+        }
+      }
+    } catch (error) {
+      proc.kill()
+      throw error
+    } finally {
+      clearTimeout(timeout)
     }
-  } catch (error) {
-    proc.kill()
-    throw error
   } finally {
-    clearTimeout(timeout)
+    if (captureDir) await rm(captureDir, { recursive: true, force: true })
   }
 }

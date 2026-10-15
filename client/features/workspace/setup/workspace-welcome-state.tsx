@@ -5,10 +5,10 @@ import { APP_ICON_IDS } from '@/client/lib/app-icon-registry'
 
 const greetings = [
   'Welcome to',
+  'This is',
   'Make yourself at home in',
-  'Good things start in',
-  'No clutter yet. Welcome to',
-  'Your next big idea starts in'
+  'A fresh start in',
+  'Good to see you in'
 ]
 
 export type WorkspaceWelcomeStateProps = Omit<

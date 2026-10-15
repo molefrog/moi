@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as executable from '../executable'
 import * as config from '../../app-config'
+import * as browser from '../../open-browser'
 
 import { claudeAuthReadiness, claudeLoginUrl, startClaudeLogin } from './auth'
 
@@ -48,13 +49,14 @@ test('local and cloud Claude login accept only their full code and finish with t
   const find = spyOn(executable, 'findHarnessExecutable').mockReturnValue(path)
   const appConfig = config.getAppConfig()
   const cfg = spyOn(config, 'getAppConfig')
+  const open = spyOn(browser, 'openBrowser').mockResolvedValue()
   try {
     for (const environment of ['local', 'cloud'] as const) {
       cfg.mockReturnValue({ ...appConfig, environment })
       await Bun.write(
         path,
         `#!/bin/sh
-${environment === 'cloud' ? '[ "$BROWSER" = true ] || exit 2' : ''}
+${environment === 'cloud' ? '[ "$BROWSER" = true ] || exit 2' : '"$BROWSER" "https://claude.com/oauth/authorize?response_type=code&state=test-state&redirect_uri=http%3A%2F%2Flocalhost%3A1234%2Fcallback"'}
 printf 'Visit: https://claude.com/oauth/authorize?response_type=code&state=test-state\\n'
 read code
 [ "$code" = 'test-code#test-state' ] || exit 1
@@ -63,6 +65,17 @@ read code
       await chmod(path, 0o755)
       const login = await startClaudeLogin()
       expect(login.acceptsCode).toBe(true)
+      expect(login.codeUrl).toBe(
+        'https://claude.com/oauth/authorize?response_type=code&state=test-state'
+      )
+      if (environment === 'local') {
+        expect(new URL(login.url!).searchParams.get('redirect_uri')).toBe(
+          'http://localhost:1234/callback'
+        )
+        expect(open).toHaveBeenCalledWith(login.url)
+      } else {
+        expect(login.url).toBe(login.codeUrl)
+      }
       expect(login.id).toBeDefined()
       await expect(login.submitCode?.('wrong-state#old')).rejects.toThrow('full code')
       await login.submitCode?.('test-code#test-state')
@@ -71,6 +84,7 @@ read code
   } finally {
     find.mockRestore()
     cfg.mockRestore()
+    open.mockRestore()
     await rm(dir, { recursive: true, force: true })
   }
 })

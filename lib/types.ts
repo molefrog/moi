@@ -500,6 +500,7 @@ export type HarnessAvailability =
 export type HarnessLogin = {
   id?: string
   url?: string
+  codeUrl?: string
   userCode?: string
   acceptsCode?: boolean
 }

@@ -57,7 +57,7 @@ test('local Codex uses a browser link without code instructions', () => {
     }
   })
   expect(html).not.toContain('Cancel sign-in')
-  expect(html).toContain('Open sign-in page')
+  expect(html).toContain('Open browser')
   expect(html).toContain('Sign in in your browser, then come back to moi.')
   expect(html).not.toContain('Having trouble signing in?')
   expect(html).not.toContain('ChatGPT security settings')
@@ -70,14 +70,17 @@ test('local Claude waits for the browser callback with the code fallback hidden'
     login: {
       state: 'pending',
       id: 'test',
-      url: 'https://claude.com/oauth/authorize',
+      url: 'https://claude.com/oauth/authorize?redirect_uri=http%3A%2F%2Flocalhost%3A1234%2Fcallback',
+      codeUrl: 'https://claude.com/oauth/manual',
       acceptsCode: true
     }
   })
   expect(html).toContain('Your workspace will open once you’re connected.')
   expect(html).toContain('Having trouble signing in?')
   expect(html).not.toContain('Authorization code')
-  expect(html).toContain('Open sign-in page')
+  expect(html).toContain('Open browser')
+  expect(html).toContain('redirect_uri=http%3A%2F%2Flocalhost%3A1234%2Fcallback')
+  expect(html).not.toContain('https://claude.com/oauth/manual')
   expect(html).not.toContain('<h2')
 })
 
@@ -91,9 +94,9 @@ test('cloud Claude asks for the full code from the sign-in page', () => {
       acceptsCode: true
     }
   })
-  expect(html).toContain('full authorization code shown on that page')
+  expect(html).toContain('Paste the code here:')
   expect(html).toContain('Authorization code')
-  expect(html).toContain('Submit code')
+  expect(html).toContain('Continue')
   expect(html).not.toContain('Having trouble signing in?')
 })
 

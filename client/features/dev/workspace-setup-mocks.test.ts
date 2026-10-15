@@ -1,5 +1,10 @@
 import { expect, test } from 'bun:test'
-import { createSetupMocks, MOCK_SIGN_IN_URL, PREVIEW_WORKSPACE_ID } from './workspace-setup-mocks'
+import {
+  createSetupMocks,
+  MOCK_CODE_SIGN_IN_URL,
+  MOCK_SIGN_IN_URL,
+  PREVIEW_WORKSPACE_ID
+} from './workspace-setup-mocks'
 
 for (const environment of ['local', 'cloud'] as const) {
   for (const harness of ['claude-code', 'codex'] as const) {
@@ -7,7 +12,12 @@ for (const environment of ['local', 'cloud'] as const) {
       const mocks = createSetupMocks(environment, harness, 'login')
       const base = `/api/harnesses/${harness}/auth`
       const login = await (await mocks.request(`${base}/login`, { method: 'POST' })).json()
-      expect(login.url).toBe(MOCK_SIGN_IN_URL)
+      expect(login.url).toBe(
+        harness === 'claude-code' && environment === 'cloud'
+          ? MOCK_CODE_SIGN_IN_URL
+          : MOCK_SIGN_IN_URL
+      )
+      expect(login.codeUrl).toBe(harness === 'claude-code' ? MOCK_CODE_SIGN_IN_URL : undefined)
       expect(login.acceptsCode).toBe(harness === 'claude-code' ? true : undefined)
       expect(login.userCode).toBe(
         harness === 'codex' && environment === 'cloud' ? 'MOCK-1234' : undefined

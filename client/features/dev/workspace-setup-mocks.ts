@@ -7,6 +7,7 @@ import type {
 import type { LoginHarness } from '@/client/features/harness/harness-connection'
 
 export const PREVIEW_WORKSPACE_ID = 'setup-preview'
+export const MOCK_CODE_SIGN_IN_URL = 'https://example.invalid/moi-code-sign-in'
 export const MOCK_SIGN_IN_URL = 'https://example.invalid/moi-sign-in'
 export const SETUP_SCENARIOS = [
   'welcome',
@@ -74,9 +75,12 @@ export function createSetupMocks(
       login = {
         state: 'pending',
         id: 'mock-login',
-        url: MOCK_SIGN_IN_URL,
+        url:
+          harness === 'claude-code' && environment === 'cloud'
+            ? MOCK_CODE_SIGN_IN_URL
+            : MOCK_SIGN_IN_URL,
         ...(harness === 'claude-code'
-          ? { acceptsCode: true }
+          ? { acceptsCode: true, codeUrl: MOCK_CODE_SIGN_IN_URL }
           : environment === 'cloud'
             ? { userCode: 'MOCK-1234' }
             : {})

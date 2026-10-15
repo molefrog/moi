@@ -84,7 +84,7 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
                 {pending.userCode
                   ? 'Copy this code, open the sign-in page, and enter it there.'
                   : pending.acceptsCode && !waitingForBrowser
-                    ? 'Open the sign-in page and finish signing in. Copy the full authorization code shown on that page and paste it here.'
+                    ? 'Sign in to get the authorization code.'
                     : 'Sign in in your browser, then come back to moi. Your workspace will open once you’re connected.'}
               </p>
               {pending.userCode && (
@@ -106,15 +106,11 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
               {pending.url && (
                 <a
                   className={buttonVariants({ variant: 'secondary' })}
-                  href={pending.url}
+                  href={manualLogin ? (pending.codeUrl ?? pending.url) : pending.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  onClick={() => {
-                    // Claude's printed URL uses its manual-code fallback.
-                    if (waitingForBrowser && pending.acceptsCode) setManualLogin(true)
-                  }}
                 >
-                  Open sign-in page
+                  Open browser
                 </a>
               )}
               {waitingForBrowser && pending.acceptsCode && (
@@ -124,17 +120,18 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
               )}
               {!waitingForBrowser && pending.acceptsCode && (
                 <form
-                  className="flex flex-col gap-2"
+                  className="mt-3 flex flex-col gap-3"
                   onSubmit={event => {
                     event.preventDefault()
                     action.mutate('submit')
                   }}
                 >
-                  <label htmlFor={inputId} className="text-sm">
-                    Authorization code
+                  <label htmlFor={inputId} className="text-sm text-muted-foreground">
+                    Paste the code here:
                   </label>
                   <Input
                     id={inputId}
+                    aria-label="Authorization code"
                     value={code}
                     onChange={event => setCode(event.target.value)}
                     autoComplete="off"
@@ -142,10 +139,10 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
                   />
                   <Button
                     type="submit"
-                    variant="secondary"
+                    className="mt-3"
                     disabled={!code.trim() || action.isPending}
                   >
-                    Submit code
+                    {action.isPending ? 'Connecting…' : 'Continue'}
                   </Button>
                 </form>
               )}
