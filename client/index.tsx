@@ -29,6 +29,15 @@ if (import.meta.hot) {
 installHostApi()
 
 export async function init(el: HTMLElement) {
+  // This isolated dev document installs mocks before config, sockets, or the app start.
+  if (
+    process.env.NODE_ENV === 'development' &&
+    location.pathname === '/dev/workspace-setup/preview'
+  ) {
+    const { mountSetupPreview } = await import('./features/dev/workspace-setup-preview')
+    await mountSetupPreview(el)
+    return
+  }
   // Startup config and any proxy-verified user load in parallel with the
   // main chunk, so both are available synchronously from the first render.
   const [{ mount }, config, proxyUser] = await Promise.all([

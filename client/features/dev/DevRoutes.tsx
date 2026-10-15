@@ -4,6 +4,7 @@ import { Redirect, Route, Switch } from 'wouter'
 import { ChatStatesPage } from './ChatStatesPage'
 import { BlobatarShapesPage } from './BlobatarShapesPage'
 import { DevIndexPage } from './DevIndexPage'
+import { WorkspaceSetupPage } from './workspace-setup-page'
 import { HarnessDebugPage } from './HarnessDebugPage'
 import { TextureLabPage } from './TextureLabPage'
 import { ToolCallsPage } from './ToolCallsPage'
@@ -27,6 +28,7 @@ export default function DevRoutes() {
           <CollabPage />
         </Suspense>
       </Route>
+      <Route path="/dev/workspace-setup" component={WorkspaceSetupPage} />
       <Route path="/dev/harness" component={HarnessDebugPage} />
       <Route path="/dev/blobatar-shapes" component={BlobatarShapesPage} />
       <Route path="/dev/chat-states" component={ChatStatesPage} />

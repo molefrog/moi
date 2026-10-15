@@ -8,6 +8,12 @@ type DevRouteEntry = {
 
 const DEV_ROUTES: DevRouteEntry[] = [
   {
+    path: '/dev/workspace-setup',
+    title: 'Workspace setup',
+    description:
+      'Click through welcome and agent login with isolated mock data for local and cloud.'
+  },
+  {
     path: '/dev/collab',
     title: 'Collab',
     description: 'Collaboration components, live hook previews, and local user settings.'
