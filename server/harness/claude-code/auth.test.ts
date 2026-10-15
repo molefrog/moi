@@ -43,7 +43,7 @@ test('reads the manual URL from CLI output, including terminal hyperlinks', () =
   expect(claudeLoginUrl('Visit: https://claude.com/oauth')).toBeUndefined()
 })
 
-test('local and cloud Claude login accept only their full code and finish with the CLI', async () => {
+test('Claude login waits for the browser capture after printing its URL and accepts only its full code', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'moi-auth-cli-'))
   const path = join(dir, 'claude')
   const find = spyOn(executable, 'findHarnessExecutable').mockReturnValue(path)
@@ -56,8 +56,8 @@ test('local and cloud Claude login accept only their full code and finish with t
       await Bun.write(
         path,
         `#!/bin/sh
-${environment === 'cloud' ? '[ "$BROWSER" = true ] || exit 2' : '"$BROWSER" "https://claude.com/oauth/authorize?response_type=code&state=test-state&redirect_uri=http%3A%2F%2Flocalhost%3A1234%2Fcallback"'}
 printf 'Visit: https://claude.com/oauth/authorize?response_type=code&state=test-state\\n'
+${environment === 'cloud' ? '[ "$BROWSER" = true ] || exit 2' : 'sleep 0.2; "$BROWSER" "https://claude.com/oauth/authorize?response_type=code&state=test-state&redirect_uri=http%3A%2F%2Flocalhost%3A1234%2Fcallback"'}
 read code
 [ "$code" = 'test-code#test-state' ] || exit 1
 `

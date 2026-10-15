@@ -11,7 +11,9 @@ for (const environment of ['local', 'cloud'] as const) {
     test(`${environment} ${harness} uses mock instructions and completes without credentials`, async () => {
       const mocks = createSetupMocks(environment, harness, 'login')
       const base = `/api/harnesses/${harness}/auth`
-      const login = await (await mocks.request(`${base}/login`, { method: 'POST' })).json()
+      const starting = mocks.request(`${base}/login`, { method: 'POST' })
+      expect((await (await mocks.request(base)).json()).login).toEqual({ state: 'pending' })
+      const login = await (await starting).json()
       expect(login.url).toBe(
         harness === 'claude-code' && environment === 'cloud'
           ? MOCK_CODE_SIGN_IN_URL

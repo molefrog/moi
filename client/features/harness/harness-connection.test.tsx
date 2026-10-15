@@ -40,7 +40,10 @@ test('cloud Codex explains the setting and displays a code to enter on the provi
       userCode: 'ABCD-1234'
     }
   })
-  expect(html).toContain('ChatGPT security settings')
+  expect(html).toContain('Enable device code sign-in for Codex')
+  expect(html).toContain('https://chatgpt.com/settings/security')
+  expect(html).toContain('<ol')
+  expect(html).toContain('https://auth.openai.com/codex/device')
   expect(html).toContain('ABCD-1234')
   expect(html).not.toContain('Cancel sign-in')
   expect(html).toContain('Copy code')
@@ -119,5 +122,30 @@ test('failed and expired login attempts still allow starting again', () => {
     expect(html).toContain(reason)
     expect(html).toContain('Log in')
     expect(html).not.toContain('Cancel sign-in')
+    expect(html).not.toContain('Sign in in your browser')
+    expect(html).not.toContain('Open browser')
+  }
+})
+
+test('cloud Codex shows only Log in before a login attempt starts', () => {
+  const html = render('codex', 'cloud', { availability: signedOut })
+  expect(html).toContain('Log in')
+  expect(html).not.toContain('Open settings')
+  expect(html).not.toContain('device code sign-in')
+  expect(html).not.toContain('Copy code')
+})
+
+test('starting login keeps the button until the browser link is ready', () => {
+  for (const type of ['claude-code', 'codex'] as const) {
+    for (const environment of ['local', 'cloud'] as const) {
+      const html = render(type, environment, {
+        availability: signedOut,
+        login: { state: 'pending' }
+      })
+      expect(html).toContain('Starting sign-in…')
+      expect(html).toContain('disabled')
+      expect(html).not.toContain('Sign in in your browser')
+      expect(html).not.toContain('Open browser')
+    }
   }
 })

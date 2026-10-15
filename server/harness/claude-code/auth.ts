@@ -121,11 +121,12 @@ export async function startClaudeLogin(): Promise<HarnessLoginAttempt> {
       void proc.stdout.pipeTo(new WritableStream({ write() {} })).catch(() => {})
       const codeUrl = url
       if (capturePath) {
-        const file = Bun.file(capturePath)
         let callbackUrl: string | undefined
         while (!callbackUrl) {
           if (proc.exitCode !== null)
             throw new Error('Claude Code did not open a local sign-in link. Try again')
+          // Bun.file caches a missing file; the browser helper may write it later.
+          const file = Bun.file(capturePath)
           if (await file.exists()) callbackUrl = claudeLoginUrl(await file.text())
           if (!callbackUrl) await Bun.sleep(50)
         }

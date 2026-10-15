@@ -1,13 +1,15 @@
 import { useEffect, useId, useState, type ReactNode } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
+import { cn } from '@/client/lib/cn'
 import { useAppConfig } from '@/client/api/app-config'
 import { Button, buttonVariants } from '@/client/components/ui/button'
 import { Input } from '@/client/components/ui/input'
-import { toast } from '@/client/components/ui/toast'
 import { workspaceTypeLabel } from '@/client/features/workspace/workspace-presentation'
 import { Skeleton } from '@/client/components/ui/skeleton'
 import { startHarnessLogin, submitHarnessLoginCode, useHarnessConnection } from './api'
+
+import { DeviceLoginSteps } from './device-login-steps'
 
 export type LoginHarness = 'claude-code' | 'codex'
 
@@ -26,9 +28,10 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
   const inputId = useId()
   const name = workspaceTypeLabel[type]
   const login = auth.data?.login
-  const pending = login?.state === 'pending' ? login : undefined
+  const pending = login?.state === 'pending' && login.url ? login : undefined
+  const starting = login?.state === 'pending' && !login.url
   const waitingForBrowser = environment === 'local' && !manualLogin
-  const connected = !pending && auth.data?.availability.status === 'available'
+  const connected = !starting && !pending && auth.data?.availability.status === 'available'
   useEffect(() => {
     if (connected) onConnected?.()
   }, [connected, onConnected])
@@ -44,13 +47,19 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
         setCode('')
       }
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['harness-auth'] })
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['harness-auth'] })
   })
   const checkError = auth.isError || auth.data?.availability.status === 'unavailable'
   const failure = action.error?.message ?? (login?.state === 'failed' ? login.reason : undefined)
 
   return (
-    <section className="flex flex-col gap-3" aria-label={name}>
+    <section
+      className={cn(
+        '@container flex w-full flex-col gap-3 self-center',
+        !pending?.userCode && 'max-w-xs'
+      )}
+      aria-label={name}
+    >
       {auth.isPending ? (
         <Skeleton className="h-10 w-full" />
       ) : checkError ? (
@@ -72,37 +81,15 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
         ))
       ) : (
         <>
-          {type === 'codex' && environment === 'cloud' && (
-            <p className="text-sm text-muted-foreground">
-              Enable device code login in your ChatGPT security settings first. For a managed
-              ChatGPT workspace, ask your admin to enable it.
-            </p>
-          )}
-          {pending ? (
+          {pending?.userCode ? (
+            <DeviceLoginSteps code={pending.userCode} url={pending.url} />
+          ) : pending ? (
             <>
               <p role="status" className="text-sm text-muted-foreground">
-                {pending.userCode
-                  ? 'Copy this code, open the sign-in page, and enter it there.'
-                  : pending.acceptsCode && !waitingForBrowser
-                    ? 'Sign in to get the authorization code.'
-                    : 'Sign in in your browser, then come back to moi. Your workspace will open once you’re connected.'}
+                {pending.acceptsCode && !waitingForBrowser
+                  ? 'Sign in to get the authorization code.'
+                  : 'Sign in in your browser, then come back to moi. Your workspace will open once you’re connected.'}
               </p>
-              {pending.userCode && (
-                <div className="flex items-center gap-3">
-                  <code className="text-sm">{pending.userCode}</code>
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      navigator.clipboard.writeText(pending.userCode!).then(
-                        () => toast.add({ title: 'Code copied', type: 'success' }),
-                        () => toast.add({ title: 'Could not copy code', type: 'error' })
-                      )
-                    }}
-                  >
-                    Copy code
-                  </Button>
-                </div>
-              )}
               {pending.url && (
                 <a
                   className={buttonVariants({ variant: 'secondary' })}
@@ -148,8 +135,8 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
               )}
             </>
           ) : (
-            <Button disabled={action.isPending} onClick={() => action.mutate('start')}>
-              {action.isPending ? 'Starting sign-in…' : 'Log in'}
+            <Button disabled={action.isPending || starting} onClick={() => action.mutate('start')}>
+              {action.isPending || starting ? 'Starting sign-in…' : 'Log in'}
             </Button>
           )}
         </>

@@ -72,6 +72,8 @@ export function createSetupMocks(
     const authPath = `/api/harnesses/${harness}/auth`
     if (path === authPath && method === 'GET') return Response.json({ availability, login })
     if (path === `${authPath}/login` && method === 'POST') {
+      login = { state: 'pending' }
+      await new Promise(resolve => setTimeout(resolve, 500))
       login = {
         state: 'pending',
         id: 'mock-login',
