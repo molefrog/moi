@@ -56,9 +56,24 @@ export function useWorkspaceAgent(workspaceId: string, enabled = true) {
   })
   return useQuery<WorkspaceAgent>({
     queryKey: workspaceKeys.agent(workspaceId),
-    queryFn: () => requestJson(`/api/workspaces/${workspaceId}/agent?refresh=true`),
+    queryFn: async ({ signal }) => {
+      const key = workspaceKeys.agent(workspaceId)
+      const previous = queryClient.getQueryData<WorkspaceAgent>(key)
+      const result = await requestJson<WorkspaceAgent>(
+        `/api/workspaces/${workspaceId}/agent?refresh=true`,
+        { signal }
+      )
+      // A live auth event received during this request is newer than its snapshot.
+      const current = queryClient.getQueryData<WorkspaceAgent>(key)
+      return current && current !== previous
+        ? { ...result, availability: current.availability, login: current.login }
+        : result
+    },
     enabled,
     staleTime: 30_000,
+    // Reconfirm cached failures on entry; a recent successful check can be reused.
+    refetchOnMount: query =>
+      query.state.data?.availability.status === 'available' ? true : 'always',
     refetchOnWindowFocus: true
   })
 }

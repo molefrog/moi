@@ -40,7 +40,8 @@ async function mount(
   status: HarnessAvailability = { status: 'login-required', reason: 'Sign in' },
   demo = false,
   globalConnected = false,
-  contentPending = false
+  contentPending = false,
+  check?: Promise<HarnessAvailability>
 ) {
   const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>')
   const globals = {
@@ -98,7 +99,7 @@ async function mount(
         }
         if (path === '/api/workspaces/test/agent?refresh=true') {
           if (fail) throw new Error('Offline')
-          return Response.json(data)
+          return Response.json(check ? { ...data, availability: await check } : data)
         }
         if (path === '/api/harnesses/codex/auth') return Response.json(globalAuth)
         throw new Error(`Unexpected request: ${path}`)
@@ -185,6 +186,9 @@ async function mount(
     update,
     click,
     requests,
+    setCheck: (value: Promise<HarnessAvailability>) => {
+      check = value
+    },
     setFail: (value: boolean) => {
       fail = value
     },
@@ -275,7 +279,7 @@ test('unavailable and failed status checks show recovery and retry a fresh check
   setFail(false)
   await click('Try again')
   expect(document.body.textContent).toContain('Install Codex in your terminal')
-  expect(requests.filter(path => path.endsWith('/agent?refresh=true')).length).toBe(2)
+  expect(requests.filter(path => path.endsWith('/agent?refresh=true')).length).toBe(3)
 })
 
 test('global login success rechecks workspace readiness instead of unlocking it', async () => {
@@ -318,4 +322,82 @@ test('missing folder offers deletion and returns home after removing the workspa
   await click('Delete workspace')
   expect(requests).toContain('/api/workspaces/test')
   expect(destinations).toEqual(['/'])
+})
+
+test('cached sign-out waits for verification without briefly showing login', async () => {
+  const check = Promise.withResolvers<HarnessAvailability>()
+  const { document } = await mount(undefined, false, false, false, check.promise)
+  expect(document.querySelector('[aria-label="Loading"]')).not.toBeNull()
+  expect(document.body.textContent).not.toContain('Connect your agent')
+  await act(async () => {
+    check.resolve({ status: 'available' })
+    await Bun.sleep(20)
+  })
+  expect(document.querySelector('[data-content]')).not.toBeNull()
+  expect(document.querySelector('[aria-label="Workspace setup"]')).toBeNull()
+})
+
+test('confirmed sign-out shows login and keeps it visible while retrying', async () => {
+  const check = Promise.withResolvers<HarnessAvailability>()
+  const { document, client, key, setCheck } = await mount(
+    undefined,
+    false,
+    false,
+    false,
+    check.promise
+  )
+  expect(document.body.textContent).not.toContain('Connect your agent')
+  await act(async () => {
+    check.resolve({ status: 'login-required', reason: 'Signed out' })
+    await Bun.sleep(20)
+  })
+  expect(document.body.textContent).toContain('Connect your agent')
+  const retry = Promise.withResolvers<HarnessAvailability>()
+  setCheck(retry.promise)
+  await act(async () => {
+    void client.refetchQueries({ queryKey: key })
+    await Bun.sleep(20)
+  })
+  expect(document.body.textContent).toContain('Connect your agent')
+  expect(document.querySelector('[aria-label="Loading"]')).toBeNull()
+  await act(async () => {
+    retry.resolve({ status: 'login-required', reason: 'Still signed out' })
+    await Bun.sleep(20)
+  })
+})
+
+test('background checks and network failures preserve a ready workspace', async () => {
+  const { document, client, key, setCheck, setFail } = await mount({ status: 'available' })
+  const check = Promise.withResolvers<HarnessAvailability>()
+  setCheck(check.promise)
+  await act(async () => {
+    void client.refetchQueries({ queryKey: key })
+    await Bun.sleep(20)
+  })
+  expect(document.querySelector('[aria-label="Workspace setup"]')).toBeNull()
+  expect(document.querySelector<HTMLElement>('[data-content]')?.style.display).not.toBe('none')
+  await act(async () => {
+    check.resolve({ status: 'available' })
+    await Bun.sleep(20)
+  })
+  setFail(true)
+  await act(async () => {
+    await client.refetchQueries({ queryKey: key })
+    await Bun.sleep(20)
+  })
+  expect(document.querySelector('[aria-label="Workspace setup"]')).toBeNull()
+  expect(document.querySelector<HTMLElement>('[data-content]')?.style.display).not.toBe('none')
+})
+
+test('an older response cannot overwrite a newer auth event and reopen login', async () => {
+  const check = Promise.withResolvers<HarnessAvailability>()
+  const { document, update } = await mount(undefined, false, false, false, check.promise)
+  await update({ status: 'available' })
+  expect(document.querySelector('[aria-label="Workspace setup"]')).toBeNull()
+  await act(async () => {
+    check.resolve({ status: 'login-required', reason: 'Old snapshot' })
+    await Bun.sleep(20)
+  })
+  expect(document.querySelector('[aria-label="Workspace setup"]')).toBeNull()
+  expect(document.querySelector<HTMLElement>('[data-content]')?.style.display).not.toBe('none')
 })

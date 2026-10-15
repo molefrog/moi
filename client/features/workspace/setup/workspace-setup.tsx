@@ -11,13 +11,21 @@ import {
 
 export function useWorkspaceSetup(workspaceId: string, contentPending = false) {
   const { demo } = useAppConfig()
-  const { data, isError, isPending, isFetching, refetch } = useWorkspaceAgent(workspaceId, !demo)
+  const { data, isError, isPending, isFetching, isFetchedAfterMount, refetch } = useWorkspaceAgent(
+    workspaceId,
+    !demo
+  )
+  // A cached failure is only a hint until this visit's check has settled.
+  const checking =
+    isPending || (isFetching && !isFetchedAfterMount && data?.availability.status !== 'available')
   const recheck = useCallback(() => {
     void refetch()
   }, [refetch])
 
   function renderRecovery() {
-    if (demo || isPending) return undefined
+    if (demo || checking) return undefined
+    // Background network failures do not invalidate a known working workspace.
+    if (isError && data?.availability.status === 'available') return undefined
     if (isError || !data) {
       return <WorkspaceCheckFailedState retrying={isFetching} onRetry={recheck} />
     }
@@ -50,7 +58,7 @@ export function useWorkspaceSetup(workspaceId: string, contentPending = false) {
   }
 
   const recovery = renderRecovery()
-  return { recovery, ready: !recovery && !contentPending && (demo || !isPending) }
+  return { recovery, ready: !recovery && !contentPending && (demo || !checking) }
 }
 
 type WorkspaceActivityProps = {
