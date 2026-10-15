@@ -3,7 +3,7 @@ import './cli-colors' // must precede citty: sets NO_COLOR before its color flag
 import { defineCommand, runMain, showUsage } from 'citty'
 import { formatHex } from 'culori'
 import { parse as devalueParse } from 'devalue'
-import { existsSync } from 'node:fs'
+import { accessSync, constants, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'path'
 import pc from './cli-pc'
@@ -131,6 +131,12 @@ async function waitForServer(timeoutMs = 10_000): Promise<boolean> {
 }
 
 async function registerViaControl(absPath: string): Promise<string> {
+  try {
+    accessSync(absPath, constants.R_OK | constants.W_OK | constants.X_OK)
+  } catch {
+    console.error('\n' + pc.red('✗') + ` Can't open ${absPath} for reading and writing\n`)
+    process.exit(1)
+  }
   return new Promise((res, rej) => {
     const ws = new WebSocket(CONTROL_URL)
     ws.onopen = () => ws.send(JSON.stringify({ type: 'workspace:register', path: absPath }))
