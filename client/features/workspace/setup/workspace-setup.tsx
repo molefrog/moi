@@ -36,13 +36,7 @@ function CheckedWorkspaceSetup({ workspaceId, children }: WorkspaceSetupProps) {
       return <WorkspaceCheckFailedState retrying={isFetching} onRetry={recheck} />
     }
     if (data.missingWorkspacePath) {
-      return (
-        <WorkspaceMissingState
-          path={data.missingWorkspacePath}
-          retrying={isFetching}
-          onRetry={recheck}
-        />
-      )
+      return <WorkspaceMissingState workspaceId={workspaceId} />
     }
     const { provider, availability } = data
     if (availability.status === 'available') return null

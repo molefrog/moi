@@ -2,6 +2,7 @@ import { afterEach, expect, spyOn, test } from 'bun:test'
 import { act, useState, type ComponentProps } from 'react'
 import { createRoot } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
+import * as router from 'wouter'
 import { createPortal } from 'react-dom'
 import { parseHTML } from 'linkedom'
 import { notifyManager, QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -40,6 +41,13 @@ async function mount(
     experimental: { collab: false },
     demoInstallUrl: ''
   })
+  const destinations: string[] = []
+  const locationSpy = spyOn(router, 'useLocation').mockReturnValue([
+    '/workspace/test',
+    path => {
+      destinations.push(path)
+    }
+  ])
   const eventsSpy = spyOn(events, 'useWorkspaceEvent').mockImplementation(() => {})
   const reconnectSpy = spyOn(events, 'onWorkspaceEventsReconnect').mockReturnValue(() => {})
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -62,9 +70,12 @@ async function mount(
   const requests: string[] = []
   const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
     Object.assign(
-      async (input: RequestInfo | URL) => {
+      async (input: RequestInfo | URL, init?: RequestInit) => {
         const path = String(input)
         requests.push(path)
+        if (path === '/api/workspaces/test' && init?.method === 'DELETE') {
+          return new Response(null, { status: 204 })
+        }
         if (path === '/api/workspaces/test/agent?refresh=true') {
           if (fail) throw new Error('Offline')
           return Response.json(data)
@@ -98,6 +109,7 @@ async function mount(
     })
     fetchSpy.mockRestore()
     configSpy.mockRestore()
+    locationSpy.mockRestore()
     eventsSpy.mockRestore()
     reconnectSpy.mockRestore()
     notifyManager.setNotifyFunction(callback => callback())
@@ -138,6 +150,7 @@ async function mount(
     })
   }
   return {
+    destinations,
     configSpy,
     document,
     update,
@@ -240,8 +253,8 @@ test('demo bypasses recovery and does not check auth', async () => {
   expect(requests).toEqual([])
 })
 
-test('missing folder shows its path without agent branding or login', async () => {
-  const { document, client, key } = await mount({
+test('missing folder offers deletion and returns home after removing the workspace', async () => {
+  const { document, client, key, click, requests, destinations } = await mount({
     status: 'unavailable',
     reason: 'Workspace folder not found'
   })
@@ -252,9 +265,13 @@ test('missing folder shows its path without agent branding or login', async () =
     }))
     await Bun.sleep(20)
   })
-  expect(document.querySelector('h1')?.textContent).toBe('Workspace folder not found')
-  expect(document.body.textContent).toContain('/tmp/missing-workspace')
+  expect(document.querySelector('h1')?.textContent).toBe('The workspace folder is missing')
+  expect(document.body.textContent).not.toContain('/tmp/missing-workspace')
+  expect(document.body.textContent).not.toContain('Try again')
   expect(document.body.textContent).not.toContain('Your agent is unavailable')
   expect(document.body.textContent).not.toContain('Log in')
   expect(document.querySelector('img')).toBeNull()
+  await click('Delete workspace')
+  expect(requests).toContain('/api/workspaces/test')
+  expect(destinations).toEqual(['/'])
 })

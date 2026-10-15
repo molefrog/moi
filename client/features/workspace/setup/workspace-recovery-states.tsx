@@ -1,8 +1,11 @@
 import type { ReactNode } from 'react'
+import { useLocation } from 'wouter'
+import { IconFolderOff } from '@tabler/icons-react'
 
 import { workspaceProviderIcon } from '@/client/components/shared/WorkspaceIcon'
 import { Button } from '@/client/components/ui/button'
 import { Spinner } from '@/client/components/ui/spinner'
+import { useRemoveWorkspace } from '@/client/features/home/api'
 import type { HarnessAvailability, WorkspaceType } from '@/lib/types'
 
 type RecoveryRetryProps = {
@@ -20,15 +23,30 @@ export function WorkspaceCheckFailedState(props: WorkspaceCheckFailedStateProps)
   )
 }
 
-type WorkspaceMissingStateProps = RecoveryRetryProps & {
-  path: string
+type WorkspaceMissingStateProps = {
+  workspaceId: string
 }
 
-export function WorkspaceMissingState({ path, ...retry }: WorkspaceMissingStateProps) {
+export function WorkspaceMissingState({ workspaceId }: WorkspaceMissingStateProps) {
+  const [, navigate] = useLocation()
+  const remove = useRemoveWorkspace()
   return (
-    <RecoveryMessage title="Workspace folder not found" {...retry}>
-      {path}
-    </RecoveryMessage>
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
+      <IconFolderOff size={56} stroke={0.5} className="text-muted-foreground" aria-hidden />
+      <h1 className="font-medium">The workspace folder is missing</h1>
+      <Button
+        variant="secondary"
+        disabled={remove.isPending}
+        onClick={() => remove.mutate(workspaceId, { onSuccess: () => navigate('/') })}
+      >
+        {remove.isPending ? 'Deleting workspace…' : 'Delete workspace'}
+      </Button>
+      {remove.error && (
+        <p role="alert" className="text-sm text-destructive">
+          {remove.error.message}
+        </p>
+      )}
+    </div>
   )
 }
 
