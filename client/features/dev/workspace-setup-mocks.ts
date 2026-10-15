@@ -26,6 +26,7 @@ export function createSetupMocks(
     scenario === 'missing-agent'
       ? {
           status: 'unavailable',
+          code: 'not-installed',
           reason: 'This agent is not installed. Install it, then try again.'
         }
       : { status: 'login-required', reason: 'Sign in to continue.' }

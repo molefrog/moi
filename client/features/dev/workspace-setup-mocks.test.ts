@@ -55,6 +55,6 @@ test('missing installation and folder scenarios return the real recovery shapes'
       await mocks.request(`/api/workspaces/${PREVIEW_WORKSPACE_ID}/agent?refresh=true`)
     ).json()
     if (scenario === 'missing-folder') expect(data.missingWorkspacePath).toBeDefined()
-    else expect(data.availability).toMatchObject({ status: 'unavailable' })
+    else expect(data.availability).toMatchObject({ status: 'unavailable', code: 'not-installed' })
   }
 })

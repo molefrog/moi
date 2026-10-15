@@ -494,7 +494,7 @@ export type HarnessInstallations = Record<WorkspaceType, boolean>
 export type HarnessAvailability =
   | { status: 'available' }
   | { status: 'login-required'; reason: string }
-  | { status: 'unavailable'; reason: string }
+  | { status: 'unavailable'; reason: string; code?: 'not-installed' }
 
 // Public instructions for an in-progress harness login. Credentials stay in the CLI.
 export type HarnessLogin = {
