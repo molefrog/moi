@@ -32,6 +32,7 @@ import { renameSessionReferences } from '../../session-lifecycle'
 import { resolveWorkspaceEnv } from '../../workspace-env'
 import { requireHarnessExecutable } from '../executable'
 import type { SendMessageInput } from '../types'
+import { claudeSpawnEnv } from './spawn-env'
 
 // Media types Claude vision accepts; uploads.ts guarantees every image upload is
 // normalized to one of these, so the cast on `media_type` below is sound.
@@ -617,7 +618,7 @@ function createLiveSession(input: {
     settingSources: ['user', 'project'],
     // MOI_AGENT marks every shell this session spawns as agent-driven (the
     // moi CLI reads it — see agent-caller.ts), surviving the CLAUDECODE strip.
-    env: { ...process.env, ...input.workspaceEnv, CLAUDECODE: undefined, MOI_AGENT: '1' },
+    env: claudeSpawnEnv({ ...input.workspaceEnv, MOI_AGENT: '1' }),
     stderr: (data: string) => console.error('[SDK stderr]', data)
   }
   if (!input.isNew) options.resume = input.sessionId
