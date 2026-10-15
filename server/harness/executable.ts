@@ -99,7 +99,11 @@ export async function pathHarnessAvailability(
   if (path === undefined) await loginShellPath()
   return findHarnessExecutable(type, path)
     ? { status: 'available' }
-    : { status: 'unavailable', reason: executableConfig[type].unavailableReason }
+    : {
+        status: 'unavailable',
+        code: 'not-installed',
+        reason: executableConfig[type].unavailableReason
+      }
 }
 
 // Setup needs installation facts independently of auth, profiles, or gateway

@@ -4,6 +4,7 @@ import * as clientModule from './client'
 import type { CodexClient } from './client'
 import { CodexRpcError, type NotificationListener } from './transport'
 import * as config from '../../app-config'
+import * as browser from '../../open-browser'
 
 import {
   codexAccountReadiness,
@@ -108,6 +109,7 @@ test('does not flag supported or unknown Codex versions', () => {
 test('Codex chooses browser or device auth and tracks completion and cancellation', async () => {
   const appConfig = config.getAppConfig()
   const cfg = spyOn(config, 'getAppConfig')
+  const open = spyOn(browser, 'openBrowser').mockResolvedValue(undefined)
   let listener: NotificationListener = () => {}
   const calls: { method: string; params: unknown }[] = []
   const client = {
@@ -129,11 +131,14 @@ test('Codex chooses browser or device auth and tracks completion and cancellatio
   const getClient = spyOn(clientModule, 'getCodexClient').mockResolvedValue(client)
   try {
     for (const environment of ['local', 'cloud'] as const) {
+      open.mockClear()
       cfg.mockReturnValue({ ...appConfig, environment })
       const login = await startCodexLogin()
       expect(calls.at(-1)?.params).toMatchObject({
         type: environment === 'cloud' ? 'chatgptDeviceCode' : 'chatgpt'
       })
+      if (environment === 'local') expect(open).toHaveBeenCalledWith(login.url)
+      else expect(open).not.toHaveBeenCalled()
       expect(login.userCode).toBe(environment === 'cloud' ? 'ABCD-1234' : undefined)
       listener('account/login/completed', { loginId: 'test-login', success: true })
       await login.completed
@@ -146,5 +151,6 @@ test('Codex chooses browser or device auth and tracks completion and cancellatio
   } finally {
     getClient.mockRestore()
     cfg.mockRestore()
+    open.mockRestore()
   }
 })

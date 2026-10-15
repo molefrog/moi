@@ -1,6 +1,7 @@
 import type { HarnessAvailability } from '@/lib/types'
 
 import { getAppConfig } from '../../app-config'
+import { openBrowser } from '../../open-browser'
 import type { HarnessLoginAttempt } from '../types'
 
 import { CODEX_MIN_SUPPORTED_VERSION, codexCliOutdated, getCodexClient } from './client'
@@ -123,6 +124,7 @@ export async function startCodexLogin(): Promise<HarnessLoginAttempt> {
       else reject(new Error('Codex sign-in failed or expired. Try again'))
     })
   })
+  if (!cloud) void openBrowser(url)
   return {
     id: login.loginId,
     url,

@@ -20,7 +20,7 @@ export function WorkspaceLoginState({
     <div className="flex flex-1 items-center justify-center p-6">
       <div className="flex w-full max-w-md flex-col gap-6">
         <img src={workspaceProviderIcon[type]} alt="" className="size-10 self-center" />
-        <h1 className="text-center text-xl font-medium">Connect your agent</h1>
+        <h1 className="text-center text-xl font-medium">Connect your {workspaceTypeLabel[type]}</h1>
         <HarnessConnection
           type={type}
           onConnected={onRecheck}

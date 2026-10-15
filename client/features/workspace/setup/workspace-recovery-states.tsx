@@ -5,6 +5,7 @@ import { IconFolderOff } from '@tabler/icons-react'
 import { workspaceProviderIcon } from '@/client/components/shared/WorkspaceIcon'
 import { Button } from '@/client/components/ui/button'
 import { Spinner } from '@/client/components/ui/spinner'
+import { workspaceTypeLabel } from '../workspace-presentation'
 import { useRemoveWorkspace } from '@/client/features/home/api'
 import type { HarnessAvailability, WorkspaceType } from '@/lib/types'
 
@@ -60,6 +61,17 @@ export function HarnessUnavailableState({
   availability,
   ...retry
 }: HarnessUnavailableStateProps) {
+  if (availability.status === 'unavailable' && availability.code === 'not-installed') {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
+        <img src={workspaceProviderIcon[type]} alt="" className="size-10" />
+        <h1 className="font-medium">{workspaceTypeLabel[type]} is uninstalled from the device</h1>
+        <Button variant="secondary" disabled={retry.retrying} onClick={retry.onRetry}>
+          Check again
+        </Button>
+      </div>
+    )
+  }
   const needsTerminalLogin = availability.status === 'login-required'
   return (
     <RecoveryMessage

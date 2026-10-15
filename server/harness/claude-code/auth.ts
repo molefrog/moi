@@ -35,7 +35,8 @@ export function claudeAuthReadiness(result: ClaudeAuthProbeResult): HarnessAvail
 // API-key and enterprise provider configuration match the eventual send.
 export async function getClaudeAuthReadiness(workspacePath?: string): Promise<HarnessAvailability> {
   const executable = findHarnessExecutable('claude-code')
-  if (!executable) return unavailable('Claude is not installed')
+  if (!executable)
+    return { status: 'unavailable', code: 'not-installed', reason: 'Claude is not installed' }
 
   const workspaceEnv = workspacePath ? await resolveWorkspaceEnv(workspacePath) : {}
   const proc = Bun.spawn(agentCommand([executable, 'auth', 'status']), {

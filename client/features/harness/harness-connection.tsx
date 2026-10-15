@@ -22,17 +22,23 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
   const auth = useHarnessConnection(type)
   const queryClient = useQueryClient()
   const [code, setCode] = useState('')
+  const [manualLogin, setManualLogin] = useState(false)
   const inputId = useId()
   const name = workspaceTypeLabel[type]
   const login = auth.data?.login
   const pending = login?.state === 'pending' ? login : undefined
+  const waitingForBrowser = environment === 'local' && !manualLogin
   const connected = !pending && auth.data?.availability.status === 'available'
   useEffect(() => {
     if (connected) onConnected?.()
   }, [connected, onConnected])
   const action = useMutation({
     mutationFn: async (kind: 'start' | 'submit') => {
-      if (kind === 'start') await startHarnessLogin(type)
+      if (kind === 'start') {
+        setManualLogin(false)
+        setCode('')
+        await startHarnessLogin(type)
+      }
       if (kind === 'submit' && pending?.id) {
         await submitHarnessLoginCode(type, pending.id, code)
         setCode('')
@@ -45,7 +51,6 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
 
   return (
     <section className="flex flex-col gap-3" aria-label={name}>
-      <h2 className="text-sm font-medium">{name}</h2>
       {auth.isPending ? (
         <Skeleton className="h-10 w-full" />
       ) : checkError ? (
@@ -76,13 +81,11 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
           {pending ? (
             <>
               <p role="status" className="text-sm text-muted-foreground">
-                {type === 'claude-code' && environment === 'local'
-                  ? 'Finish signing in in the browser window. If it did not open, use the link below and paste the code here.'
-                  : pending.userCode
-                    ? 'Copy this code, open the sign-in page, and enter it there.'
-                    : pending.acceptsCode
-                      ? 'Open the sign-in page, then copy the full authorization code back here.'
-                      : 'Finish signing in in your browser. This screen will update automatically.'}
+                {pending.userCode
+                  ? 'Copy this code, open the sign-in page, and enter it there.'
+                  : pending.acceptsCode && !waitingForBrowser
+                    ? 'Open the sign-in page and finish signing in. Copy the full authorization code shown on that page and paste it here.'
+                    : 'Finish signing in in your browser, then return to moi. This screen will update automatically.'}
               </p>
               {pending.userCode && (
                 <div className="flex items-center gap-3">
@@ -102,15 +105,24 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
               )}
               {pending.url && (
                 <a
-                  className={buttonVariants()}
+                  className={buttonVariants({ variant: 'secondary' })}
                   href={pending.url}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => {
+                    // Claude's printed URL uses its manual-code fallback.
+                    if (waitingForBrowser && pending.acceptsCode) setManualLogin(true)
+                  }}
                 >
                   Open sign-in page
                 </a>
               )}
-              {pending.acceptsCode && (
+              {waitingForBrowser && pending.acceptsCode && (
+                <Button variant="ghost" onClick={() => setManualLogin(true)}>
+                  Having trouble signing in?
+                </Button>
+              )}
+              {!waitingForBrowser && pending.acceptsCode && (
                 <form
                   className="flex flex-col gap-2"
                   onSubmit={event => {
@@ -137,10 +149,15 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
                   </Button>
                 </form>
               )}
+              {manualLogin && environment === 'local' && (
+                <Button variant="ghost" onClick={() => setManualLogin(false)}>
+                  Back
+                </Button>
+              )}
             </>
           ) : (
             <Button disabled={action.isPending} onClick={() => action.mutate('start')}>
-              {action.isPending ? 'Starting sign-in…' : `Log in to ${name}`}
+              {action.isPending ? 'Starting sign-in…' : 'Log in'}
             </Button>
           )}
         </>

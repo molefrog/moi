@@ -9,6 +9,7 @@ import { dirname, join, resolve } from 'path'
 import pc from './cli-pc'
 
 import { isAgentCaller } from './agent-caller'
+import { openBrowser } from './open-browser'
 import { getAppConfig, initializeAppConfig } from './app-config'
 
 import { appletSelectorMatches, parseAppletSelector } from '@/lib/applet-selector'
@@ -149,13 +150,6 @@ async function registerViaControl(absPath: string): Promise<string> {
     }
     ws.onerror = () => void probeControlServer().then(p => rej(new Error(controlFailureMessage(p))))
   })
-}
-
-async function openBrowser(url: string) {
-  try {
-    if (process.platform === 'darwin') await Bun.$`open ${url}`.quiet()
-    else if (process.platform === 'linux') await Bun.$`xdg-open ${url}`.quiet()
-  } catch {}
 }
 
 // Spawn the server as a child. MOI_SERVER=1 tells the child it is the actual

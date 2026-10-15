@@ -61,7 +61,10 @@ function failedProbeAvailability(ws: HarnessTarget, err: unknown): HarnessAvaila
 function sameAvailability(a: HarnessAvailability, b: HarnessAvailability): boolean {
   if (a.status !== b.status) return false
   if (a.status === 'available' || b.status === 'available') return true
-  return a.reason === b.reason
+  return (
+    a.reason === b.reason &&
+    (a.status !== 'unavailable' || b.status !== 'unavailable' || a.code === b.code)
+  )
 }
 
 export function createHarnessStore(options: HarnessStoreOptions) {

@@ -58,26 +58,43 @@ test('local Codex uses a browser link without code instructions', () => {
   })
   expect(html).not.toContain('Cancel sign-in')
   expect(html).toContain('Open sign-in page')
+  expect(html).toContain('Finish signing in in your browser, then return to moi.')
+  expect(html).not.toContain('Having trouble signing in?')
   expect(html).not.toContain('ChatGPT security settings')
   expect(html).not.toContain('Authorization code')
 })
 
-test('Claude uses the same code input in cloud and as a local fallback', () => {
-  for (const environment of ['local', 'cloud'] as const) {
-    const html = render('claude-code', environment, {
-      availability: signedOut,
-      login: {
-        state: 'pending',
-        id: 'test',
-        url: 'https://claude.com/oauth/authorize',
-        acceptsCode: true
-      }
-    })
-    expect(html).toContain('Authorization code')
-    expect(html).toContain('Submit code')
-    expect(html).not.toContain('Cancel sign-in')
-    expect(html).toContain(environment === 'local' ? 'browser window' : 'full authorization code')
-  }
+test('local Claude waits for the browser callback with the code fallback hidden', () => {
+  const html = render('claude-code', 'local', {
+    availability: signedOut,
+    login: {
+      state: 'pending',
+      id: 'test',
+      url: 'https://claude.com/oauth/authorize',
+      acceptsCode: true
+    }
+  })
+  expect(html).toContain('This screen will update automatically')
+  expect(html).toContain('Having trouble signing in?')
+  expect(html).not.toContain('Authorization code')
+  expect(html).toContain('Open sign-in page')
+  expect(html).not.toContain('<h2')
+})
+
+test('cloud Claude asks for the full code from the sign-in page', () => {
+  const html = render('claude-code', 'cloud', {
+    availability: signedOut,
+    login: {
+      state: 'pending',
+      id: 'test',
+      url: 'https://claude.com/oauth/authorize',
+      acceptsCode: true
+    }
+  })
+  expect(html).toContain('full authorization code shown on that page')
+  expect(html).toContain('Authorization code')
+  expect(html).toContain('Submit code')
+  expect(html).not.toContain('Having trouble signing in?')
 })
 
 test('connected, failed, and loading states do not offer a misleading login', () => {
@@ -86,8 +103,8 @@ test('connected, failed, and loading states do not offer a misleading login', ()
     availability: { status: 'unavailable', reason: 'Network failed' }
   })
   expect(failed).toContain('Could not check agent login status')
-  expect(failed).not.toContain('Log in to Codex')
-  expect(render('codex', 'local')).not.toContain('Log in to Codex')
+  expect(failed).not.toContain('Log in')
+  expect(render('codex', 'local')).not.toContain('Log in')
 })
 
 test('failed and expired login attempts still allow starting again', () => {
@@ -97,7 +114,7 @@ test('failed and expired login attempts still allow starting again', () => {
       login: { state: 'failed', reason }
     })
     expect(html).toContain(reason)
-    expect(html).toContain('Log in to Codex')
+    expect(html).toContain('Log in')
     expect(html).not.toContain('Cancel sign-in')
   }
 })
