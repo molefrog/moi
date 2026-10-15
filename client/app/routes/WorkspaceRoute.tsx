@@ -1,3 +1,5 @@
+import { WorkspaceSetup } from '@/client/features/workspace/workspace-setup'
+import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
 import { CollabProvider, useCollabEnabled } from '@/client/features/collab'
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -41,7 +43,8 @@ function WorkspaceContent({ id }: WorkspaceRouteProps) {
   const collabEnabled = useCollabEnabled()
   const queryClient = useQueryClient()
   const [selectedSessionId] = useSelectedSession()
-  const { isLoading: layoutLoading } = useWorkspaceLayoutCtx()
+  const { isLoading: layoutLoading, layout } = useWorkspaceLayoutCtx()
+  useWorkspaceTheme(layout.theme)
   const widgets = useWidgets(id)
   const views = useViews(id)
   useAppletCacheInvalidation()
@@ -65,19 +68,21 @@ function WorkspaceContent({ id }: WorkspaceRouteProps) {
 
   return (
     <SidebarLayout>
-      {fresh ? (
-        <div className="flex h-full items-center justify-center">
-          <LedLogo sprite="moi" effect="chaos" />
-        </div>
-      ) : (
-        // Browser tab state is read when the screen mounts. Reset the screen
-        // when it switches between shared workspace tabs and browser tab state.
-        <WorkspaceScreen
-          key={collabEnabled ? 'browser-tab' : 'shared'}
-          widgets={widgets.data}
-          views={views.data ?? []}
-        />
-      )}
+      <WorkspaceSetup workspaceId={id}>
+        {fresh ? (
+          <div className="flex h-full items-center justify-center">
+            <LedLogo sprite="moi" effect="chaos" />
+          </div>
+        ) : (
+          // Browser tab state is read when the screen mounts. Reset the screen
+          // when it switches between shared workspace tabs and browser tab state.
+          <WorkspaceScreen
+            key={collabEnabled ? 'browser-tab' : 'shared'}
+            widgets={widgets.data}
+            views={views.data ?? []}
+          />
+        )}
+      </WorkspaceSetup>
     </SidebarLayout>
   )
 }

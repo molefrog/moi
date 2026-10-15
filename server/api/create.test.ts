@@ -140,3 +140,22 @@ test('rejects creation if the executable disappeared after setup', async () => {
   expect(response.status).toBe(400)
   expect(await response.text()).toBe('Install Codex')
 })
+
+test('creation checks installation without requiring login', async () => {
+  const authSpy = spyOn(codexHarness, 'authStatus').mockResolvedValue({
+    status: 'login-required',
+    reason: 'Signed out'
+  })
+  try {
+    const response = await api.request('/api/workspaces/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '', type: 'codex' })
+    })
+    expect(response.status).toBe(400)
+    expect(await response.text()).toBe('Folder name is required')
+    expect(authSpy).not.toHaveBeenCalled()
+  } finally {
+    authSpy.mockRestore()
+  }
+})

@@ -1,17 +1,17 @@
+import { workspaceTypeDescription } from '@/client/features/home/workspace-presentation'
 import { HARNESS_INSTRUCTIONS } from '@/lib/harness-instructions'
 import type { HarnessAvailability, HarnessInstallations, WorkspaceType } from '@/lib/types'
 import { WORKSPACE_TYPE_ORDER } from '@/lib/workspace-types'
 
 type WorkspaceAgentConfig = {
-  description: string
   importOnly: boolean
 }
 
 const workspaceAgents: Record<WorkspaceType, WorkspaceAgentConfig> = {
-  'claude-code': { description: 'Anthropic', importOnly: false },
-  codex: { description: 'OpenAI', importOnly: false },
-  openclaw: { description: 'Open-source', importOnly: true },
-  hermes: { description: 'Nous Research', importOnly: true }
+  'claude-code': { importOnly: false },
+  codex: { importOnly: false },
+  openclaw: { importOnly: true },
+  hermes: { importOnly: true }
 }
 
 export type WorkspaceAgentOption = {
@@ -34,7 +34,7 @@ export function getCreateWorkspaceAgentOptions(
     const disabled = config.importOnly || !installed[type]
     return {
       type,
-      description: config.description,
+      description: workspaceTypeDescription[type],
       disabled,
       disabledReason: disabled ? instruction.reason : undefined,
       disabledCommand: disabled ? instruction.command : undefined
@@ -62,7 +62,7 @@ export function getImportWorkspaceAgentOptions({
     const disabledReason = showInstruction ? instruction.reason : unavailableReason
     return {
       type,
-      description: config.description,
+      description: workspaceTypeDescription[type],
       disabled: Boolean(disabledReason),
       disabledReason,
       disabledCommand: showInstruction ? instruction.command : undefined

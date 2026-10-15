@@ -42,6 +42,7 @@ import {
 } from '../thumbnails'
 import { getClientFrameLog, getWireLog } from '../harness/debug'
 import { detectInstalledHarnesses } from '../harness/executable'
+import { loginShellPath } from '../harness/shell-path'
 import { allHarnesses, harnessFor, isHarnessType } from '../harness/registry'
 import {
   discoverWorkspaces,
@@ -674,12 +675,14 @@ one.post('/skills/update', async c => {
 // not refetches.
 one.get('/agent', async c => {
   const ws = c.get('ws')
+  const refresh = c.req.query('refresh') === 'true'
+  if (refresh) await loginShellPath({ refresh: true })
   const harness = harnessFor(ws)
   // A backend that can't answer (codex CLI missing, gateway down) degrades to
   // an empty catalog — the picker hides and chat surfaces the real problem via
   // the availability banner, instead of this endpoint 500ing on page load.
   const [availability, models] = await Promise.all([
-    harnessStore.getAvailability(ws),
+    refresh ? harnessStore.refresh(ws) : harnessStore.getAvailability(ws),
     harness.listModels(ws).catch(err => {
       console.error(`[api] listModels failed for ${harness.id}`, err)
       return []

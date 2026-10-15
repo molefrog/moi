@@ -4,26 +4,24 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { AgentAvailabilityBanner } from './AgentAvailabilityBanner'
 
-test('offers login when the agent supports it', () => {
+test('shows login-required messaging without a dialog', () => {
   const html = renderToStaticMarkup(
     createElement(AgentAvailabilityBanner, {
       availability: {
         status: 'login-required',
         reason: 'Sign in'
-      },
-      harnessType: 'claude-code'
+      }
     })
   )
 
   expect(html).toContain('Log in to your agent to send messages')
-  expect(html).toContain('>Log in</button>')
+  expect(html).not.toContain('<button')
 })
 
 test('shows a disconnected state without login copy or action', () => {
   const html = renderToStaticMarkup(
     createElement(AgentAvailabilityBanner, {
-      availability: { status: 'disconnected' },
-      harnessType: 'claude-code'
+      availability: { status: 'disconnected' }
     })
   )
 
@@ -39,8 +37,7 @@ test('shows a generic unavailable reason without suggesting login', () => {
       availability: {
         status: 'unavailable',
         reason: 'Agent runtime is unavailable'
-      },
-      harnessType: 'claude-code'
+      }
     })
   )
 
@@ -48,36 +45,4 @@ test('shows a generic unavailable reason without suggesting login', () => {
   expect(html).toContain('tabler-icon-alert-circle')
   expect(html).not.toContain('Log in')
   expect(html).not.toContain('<button')
-})
-
-test('keeps the login action available while a login is pending', () => {
-  const html = renderToStaticMarkup(
-    createElement(AgentAvailabilityBanner, {
-      availability: {
-        status: 'login-required',
-        reason: 'Sign in'
-      },
-      login: { state: 'pending', url: 'https://example.com/login' },
-      harnessType: 'claude-code'
-    })
-  )
-
-  expect(html).toContain('>Log in</button>')
-  expect(html).not.toContain(' disabled=""')
-})
-
-test('surfaces a failed ceremony and offers login again', () => {
-  const html = renderToStaticMarkup(
-    createElement(AgentAvailabilityBanner, {
-      availability: {
-        status: 'login-required',
-        reason: 'Sign in'
-      },
-      login: { state: 'failed', reason: 'Sign-in did not complete. Try again' },
-      harnessType: 'claude-code'
-    })
-  )
-
-  expect(html).toContain('Sign-in did not complete. Try again')
-  expect(html).toContain('>Log in</button>')
 })

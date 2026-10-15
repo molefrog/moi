@@ -38,7 +38,6 @@ import { useViewActions } from '@/client/features/views/useViewActions'
 import { useViewDrafts } from '@/client/features/views/useViewDrafts'
 import { useFitsSplitLayout } from '@/client/features/workspace/useFitsSplitLayout'
 import { useWorkspaceComposerState } from '@/client/features/chat/composer/useWorkspaceComposerState'
-import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
 import { resolveWorkspaceTheme } from '@/lib/themes'
 import {
   hasRunningWorkspaceActivity,
@@ -148,8 +147,6 @@ export function WorkspaceScreen({ widgets, views: allViews }: WorkspaceScreenPro
     pendingViews,
     onSave: (viewId, requirements) => viewActions.save(viewId, requirements)
   })
-
-  useWorkspaceTheme(layout.theme)
 
   const hasAppletWidgets = widgets.some(widget => !isDefaultWidget(widget.id))
   const hasWorkspaceApplets = hasAppletWidgets || views.length > 0

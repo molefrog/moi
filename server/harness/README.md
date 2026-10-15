@@ -225,10 +225,13 @@ that attempt. IDs prevent an old browser tab from changing a newer attempt.
 Provider failures and a ten-minute deadline stop the attempt. Server shutdown
 also cleans up active login processes.
 
-Onboarding and the composer dialog reuse the same connection panel. The panel
-polls global status while open; workspace availability still arrives through
+Workspace setup embeds the reusable connection panel. Home and workspace
+creation do not require login. The panel polls global status while open;
+workspace availability still arrives through
 `harness:updated` events. Login uses the process environment, without workspace
 overrides. Each workspace is rechecked independently when login state changes.
+`GET /api/workspaces/:id/agent?refresh=true` refreshes the shell PATH and bypasses
+the readiness cache for entry, recovery retry, and post-login verification.
 
 Verified against Claude Code 2.1.289 (CLI stdout/stdin probe) and Codex 0.160.0
 (generated app-server schema), plus the official

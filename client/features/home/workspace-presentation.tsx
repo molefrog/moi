@@ -8,6 +8,13 @@ export const workspaceTypeLabel: Record<WorkspaceType, string> = {
   hermes: 'Hermes'
 }
 
+export const workspaceTypeDescription: Record<WorkspaceType, string> = {
+  'claude-code': 'Anthropic',
+  codex: 'OpenAI',
+  openclaw: 'Open-source',
+  hermes: 'Nous Research'
+}
+
 type WorkspaceAgentIconsProps = {
   types: WorkspaceType[]
 }

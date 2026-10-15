@@ -36,13 +36,7 @@ export function useWorkspaceComposerState(
   const agentUnavailableBanner: ComposerBanner | undefined = unavailable
     ? {
         tone: 'default',
-        content: (
-          <AgentAvailabilityBanner
-            availability={unavailable}
-            login={agent?.login}
-            harnessType={agent?.provider ?? 'claude-code'}
-          />
-        )
+        content: <AgentAvailabilityBanner availability={unavailable} />
       }
     : undefined
   let chatErrorBanner: ComposerBanner | undefined

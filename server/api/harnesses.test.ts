@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, expect, test } from 'bun:test'
+import * as shellPath from '../harness/shell-path'
+import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -114,4 +115,24 @@ test('code and cancel endpoints validate input and attempt identity', async () =
   ).toBe(200)
   expect(cancelled).toBe(true)
   expect((await submit('test-attempt', 'code')).status).toBe(400)
+})
+
+test('workspace recovery refreshes PATH and bypasses cached readiness', async () => {
+  const workspace = await registerWorkspace(dir, { type: 'codex' })
+  workspaceId = workspace.id
+  const pathSpy = spyOn(shellPath, 'loginShellPath').mockResolvedValue('/test/bin')
+  const modelsSpy = spyOn(codexHarness, 'listModels').mockResolvedValue([])
+  try {
+    expect((await harnessStore.getAvailability(workspace)).status).toBe('login-required')
+    codexHarness.availability = async () => ({ status: 'available' })
+    const cached = await api.request(`/api/workspaces/${workspace.id}/agent`)
+    expect((await cached.json()).availability.status).toBe('login-required')
+    const fresh = await api.request(`/api/workspaces/${workspace.id}/agent?refresh=true`)
+    expect(fresh.status).toBe(200)
+    expect((await fresh.json()).availability.status).toBe('available')
+    expect(pathSpy).toHaveBeenCalledWith({ refresh: true })
+  } finally {
+    pathSpy.mockRestore()
+    modelsSpy.mockRestore()
+  }
 })

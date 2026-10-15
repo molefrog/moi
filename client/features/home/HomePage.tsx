@@ -5,6 +5,7 @@ import { Link, useLocation } from 'wouter'
 
 import { useDiscoveredWorkspaces, useWorkspacePreview, useWorkspaces } from './api'
 import { useWorkspaceSetupInfo } from '@/client/features/setup/api'
+import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import { CreateWorkspaceDialog } from '@/client/features/setup/workspace/create-workspace-dialog'
 import { ImportWorkspaceDialog } from '@/client/features/setup/workspace/import-workspace-dialog'
 import { DemoDialog } from '@/client/features/setup/demo/demo-dialog'
@@ -172,6 +173,9 @@ type WorkspaceCardProps = {
 }
 
 function WorkspaceCard({ workspace }: WorkspaceCardProps) {
+  const { demo } = useAppConfig()
+  // Warm the shared readiness cache before the user enters this workspace.
+  useWorkspaceAgent(workspace.id, !demo)
   const name = workspaceDisplayName(workspace)
   const previewQuery = useWorkspacePreview(workspace.id)
   const theme = workspace.theme ?? previewQuery.data?.theme

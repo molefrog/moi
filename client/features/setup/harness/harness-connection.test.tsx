@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderToStaticMarkup } from 'react-dom/server'
 import * as config from '@/client/api/app-config'
-import type { HarnessAuth } from '../../api'
+import type { HarnessAuth } from './api'
 import { HarnessConnection, type LoginHarness } from './harness-connection'
 
 let cfg: ReturnType<typeof spyOn<typeof config, 'useAppConfig'>>
@@ -11,12 +11,7 @@ beforeEach(() => {
 })
 afterEach(() => cfg.mockRestore())
 
-function render(
-  type: LoginHarness,
-  environment: 'local' | 'cloud',
-  data?: HarnessAuth,
-  installed = true
-) {
+function render(type: LoginHarness, environment: 'local' | 'cloud', data?: HarnessAuth) {
   cfg.mockReturnValue({
     environment,
     demo: false,
@@ -27,7 +22,7 @@ function render(
   if (data) client.setQueryData(['harness-auth', type], data)
   const html = renderToStaticMarkup(
     <QueryClientProvider client={client}>
-      <HarnessConnection type={type} installed={installed} />
+      <HarnessConnection type={type} />
     </QueryClientProvider>
   )
   client.clear()
@@ -83,10 +78,7 @@ test('Claude uses the same code input in cloud and as a local fallback', () => {
   }
 })
 
-test('missing, connected, failed, and loading states do not offer a misleading login', () => {
-  expect(render('claude-code', 'local', undefined, false)).toContain(
-    'Run in terminal to install Claude Code'
-  )
+test('connected, failed, and loading states do not offer a misleading login', () => {
   expect(render('codex', 'local', { availability: { status: 'available' } })).toContain('Connected')
   const failed = render('codex', 'cloud', {
     availability: { status: 'unavailable', reason: 'Network failed' }

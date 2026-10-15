@@ -1,30 +1,30 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useState, type ReactNode } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { useAppConfig } from '@/client/api/app-config'
-import { Button } from '@/client/components/ui/button'
+import { Button, buttonVariants } from '@/client/components/ui/button'
 import { Input } from '@/client/components/ui/input'
 import { toast } from '@/client/components/ui/toast'
 import { workspaceTypeLabel } from '@/client/features/home/workspace-presentation'
 import { Skeleton } from '@/client/components/ui/skeleton'
-import { HARNESS_INSTRUCTIONS } from '@/lib/harness-instructions'
 import {
   cancelHarnessLogin,
   startHarnessLogin,
   submitHarnessLoginCode,
   useHarnessConnection
-} from '../../api'
+} from './api'
 
 export type LoginHarness = 'claude-code' | 'codex'
 
 type HarnessConnectionProps = {
   type: LoginHarness
-  installed: boolean
+  onConnected?: () => void
+  connectedContent?: ReactNode
 }
 
-export function HarnessConnection({ type, installed }: HarnessConnectionProps) {
+export function HarnessConnection({ type, onConnected, connectedContent }: HarnessConnectionProps) {
   const { environment } = useAppConfig()
-  const auth = useHarnessConnection(type, installed)
+  const auth = useHarnessConnection(type)
   const queryClient = useQueryClient()
   const [code, setCode] = useState('')
   const inputId = useId()
@@ -32,6 +32,9 @@ export function HarnessConnection({ type, installed }: HarnessConnectionProps) {
   const login = auth.data?.login
   const pending = login?.state === 'pending' ? login : undefined
   const connected = !pending && auth.data?.availability.status === 'available'
+  useEffect(() => {
+    if (connected) onConnected?.()
+  }, [connected, onConnected])
   const action = useMutation({
     mutationFn: async (kind: 'start' | 'cancel' | 'submit') => {
       if (kind === 'start') await startHarnessLogin(type)
@@ -49,12 +52,7 @@ export function HarnessConnection({ type, installed }: HarnessConnectionProps) {
   return (
     <section className="flex flex-col gap-3" aria-label={name}>
       <h2 className="text-sm font-medium">{name}</h2>
-      {!installed ? (
-        <p className="text-sm text-muted-foreground">
-          {HARNESS_INSTRUCTIONS[type].reason}{' '}
-          <code className="break-all">{HARNESS_INSTRUCTIONS[type].command}</code>
-        </p>
-      ) : auth.isPending ? (
+      {auth.isPending ? (
         <Skeleton className="h-10 w-full" />
       ) : checkError ? (
         <div role="alert" className="flex flex-col items-start gap-2">
@@ -68,9 +66,11 @@ export function HarnessConnection({ type, installed }: HarnessConnectionProps) {
           </Button>
         </div>
       ) : connected ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          Connected
-        </p>
+        (connectedContent ?? (
+          <p role="status" className="text-sm text-muted-foreground">
+            Connected
+          </p>
+        ))
       ) : (
         <>
           {type === 'codex' && environment === 'cloud' && (
@@ -107,9 +107,14 @@ export function HarnessConnection({ type, installed }: HarnessConnectionProps) {
                 </div>
               )}
               {pending.url && (
-                <Button render={<a href={pending.url} target="_blank" rel="noopener noreferrer" />}>
+                <a
+                  className={buttonVariants()}
+                  href={pending.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   Open sign-in page
-                </Button>
+                </a>
               )}
               {pending.acceptsCode && (
                 <form

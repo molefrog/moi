@@ -34,7 +34,7 @@ export function useWorkspaceLayout(workspaceId: string) {
 // presence + auth), any in-flight login ceremony, the model catalog, and
 // capabilities. `harness:updated` events refresh availability and login state;
 // focus refetches pick up model changes after a CLI update.
-export function useWorkspaceAgent(workspaceId: string) {
+export function useWorkspaceAgent(workspaceId: string, enabled = true) {
   const queryClient = useQueryClient()
   useEffect(
     () =>
@@ -56,7 +56,8 @@ export function useWorkspaceAgent(workspaceId: string) {
   })
   return useQuery<WorkspaceAgent>({
     queryKey: workspaceKeys.agent(workspaceId),
-    queryFn: () => requestJson(`/api/workspaces/${workspaceId}/agent`),
+    queryFn: () => requestJson(`/api/workspaces/${workspaceId}/agent?refresh=true`),
+    enabled,
     staleTime: 30_000,
     refetchOnWindowFocus: true
   })
