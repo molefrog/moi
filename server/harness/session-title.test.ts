@@ -1,9 +1,14 @@
 import { describe, expect, test } from 'bun:test'
+import { existsSync } from 'node:fs'
+import { stat } from 'node:fs/promises'
+import { join } from 'node:path'
 
 import {
   buildSessionTitleSource,
+  createSessionTitleTempDir,
   parseGeneratedSessionTitle,
   parseGeneratedSessionTitleJson,
+  removeSessionTitleTempDir,
   runSessionTitleCommand
 } from './session-title'
 
@@ -72,5 +77,15 @@ describe('runSessionTitleCommand', () => {
     })
     abort.abort()
     expect(await result).toBeNull()
+  })
+})
+
+describe('the title command folder', () => {
+  test('is open to every user and removed afterwards', async () => {
+    const path = await createSessionTitleTempDir()
+    expect((await stat(path)).mode & 0o777).toBe(0o777)
+    await Bun.write(join(path, 'result.json'), '{}')
+    await removeSessionTitleTempDir(path)
+    expect(existsSync(path)).toBe(false)
   })
 })
