@@ -20,7 +20,8 @@ afterEach(() => cleanup())
 async function mount(
   status: HarnessAvailability = { status: 'login-required', reason: 'Sign in' },
   demo = false,
-  globalConnected = false
+  globalConnected = false,
+  contentPending = false
 ) {
   const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>')
   const globals = {
@@ -118,14 +119,17 @@ async function mount(
       else Reflect.deleteProperty(globalThis, key)
     }
   }
-  await act(async () => {
+  const render = () => {
     root.render(
       <QueryClientProvider client={client}>
-        <WorkspaceSetup workspaceId="test">
+        <WorkspaceSetup workspaceId="test" contentPending={contentPending}>
           <Content />
         </WorkspaceSetup>
       </QueryClientProvider>
     )
+  }
+  await act(async () => {
+    render()
     await Bun.sleep(20)
   })
   await act(async () => {
@@ -150,6 +154,12 @@ async function mount(
     })
   }
   return {
+    setContentPending: async (value: boolean) => {
+      contentPending = value
+      await act(async () => {
+        render()
+      })
+    },
     destinations,
     configSpy,
     document,
@@ -178,6 +188,21 @@ test('fresh readiness from home opens the workspace without another request', as
   expect(requests).toEqual([])
 })
 
+test('one loading state waits for workspace content after readiness succeeds', async () => {
+  const { document, setContentPending } = await mount({ status: 'available' }, false, false, true)
+  expect(document.querySelector('[aria-label="Loading"]')).not.toBeNull()
+  expect(document.querySelector('[data-content]')).toBeNull()
+  await setContentPending(false)
+  expect(document.querySelector('[aria-label="Loading"]')).toBeNull()
+  expect(document.querySelector('[data-content]')).not.toBeNull()
+})
+
+test('login can resolve without waiting for workspace content', async () => {
+  const { document } = await mount(undefined, false, false, true)
+  expect(document.body.textContent).toContain('Log in to Codex')
+  expect(document.querySelector('[aria-label="Loading"]')).toBeNull()
+})
+
 test('a cold entry shows only a loading spinner until readiness is known', async () => {
   const { configSpy } = await mount(undefined, true)
   configSpy.mockReturnValue({
@@ -197,7 +222,7 @@ test('a cold entry shows only a loading spinner until readiness is known', async
   client.clear()
   expect(html).toContain('aria-label="Loading"')
   expect(html).not.toContain('Checking your agent')
-  expect(html).not.toContain('Workspace setup')
+  expect(html).not.toContain('<h1')
   expect(html).not.toContain('Workspace content')
 })
 

@@ -5,7 +5,6 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useAppConfig } from '@/client/api/app-config'
-import { LedLogo } from '@/client/components/shared/LedLogo'
 import { SidebarLayout } from '@/client/app/shell/SidebarLayout'
 import { useSelectedSession } from '@/client/features/chat/sessions/useSelectedSession'
 import { useAppletCacheInvalidation } from '@/client/features/applets/useApplet'
@@ -63,25 +62,18 @@ function WorkspaceContent({ id }: WorkspaceRouteProps) {
     }
   })
 
-  const fresh =
+  const contentPending =
     layoutLoading || selectedSessionId === undefined || widgets.isLoading || views.isLoading
 
   return (
     <SidebarLayout>
-      <WorkspaceSetup workspaceId={id}>
-        {fresh ? (
-          <div className="flex h-full items-center justify-center">
-            <LedLogo sprite="moi" effect="chaos" />
-          </div>
-        ) : (
-          // Browser tab state is read when the screen mounts. Reset the screen
-          // when it switches between shared workspace tabs and browser tab state.
-          <WorkspaceScreen
-            key={collabEnabled ? 'browser-tab' : 'shared'}
-            widgets={widgets.data}
-            views={views.data ?? []}
-          />
-        )}
+      <WorkspaceSetup workspaceId={id} contentPending={contentPending}>
+        {/* Reset the screen when switching between shared and browser tab state. */}
+        <WorkspaceScreen
+          key={collabEnabled ? 'browser-tab' : 'shared'}
+          widgets={widgets.data}
+          views={views.data ?? []}
+        />
       </WorkspaceSetup>
     </SidebarLayout>
   )

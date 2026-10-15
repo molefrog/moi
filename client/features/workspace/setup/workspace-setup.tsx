@@ -12,25 +12,24 @@ import {
 
 type WorkspaceSetupProps = {
   workspaceId: string
+  contentPending?: boolean
   children: ReactNode
 }
 
-export function WorkspaceSetup(props: WorkspaceSetupProps) {
+export function WorkspaceSetup({
+  workspaceId,
+  contentPending = false,
+  children
+}: WorkspaceSetupProps) {
   const { demo } = useAppConfig()
-  return demo ? props.children : <CheckedWorkspaceSetup {...props} />
-}
-
-function CheckedWorkspaceSetup({ workspaceId, children }: WorkspaceSetupProps) {
-  const { data, isError, isPending, isFetching, refetch } = useWorkspaceAgent(workspaceId)
-  const ready = !isError && !data?.missingWorkspacePath && data?.availability.status === 'available'
-  // Mount only after the first successful check, then preserve workspace state during recovery.
+  const { data, isError, isPending, isFetching, refetch } = useWorkspaceAgent(workspaceId, !demo)
   const [opened, setOpened] = useState(false)
-  if (ready && !opened) setOpened(true)
   const recheck = useCallback(() => {
     void refetch()
   }, [refetch])
 
   function renderRecovery() {
+    if (demo) return contentPending ? <WorkspaceLoadingState /> : undefined
     if (isPending) return <WorkspaceLoadingState />
     if (isError || !data) {
       return <WorkspaceCheckFailedState retrying={isFetching} onRetry={recheck} />
@@ -39,7 +38,9 @@ function CheckedWorkspaceSetup({ workspaceId, children }: WorkspaceSetupProps) {
       return <WorkspaceMissingState workspaceId={workspaceId} />
     }
     const { provider, availability } = data
-    if (availability.status === 'available') return null
+    if (availability.status === 'available') {
+      return contentPending ? <WorkspaceLoadingState /> : undefined
+    }
     if (
       availability.status === 'login-required' &&
       (provider === 'claude-code' || provider === 'codex')
@@ -63,15 +64,20 @@ function CheckedWorkspaceSetup({ workspaceId, children }: WorkspaceSetupProps) {
     )
   }
 
+  const recovery = renderRecovery()
+  const ready = recovery === undefined
+  // Mount once ready, then preserve workspace state during recovery.
+  if (ready && !opened) setOpened(true)
+
   return (
     <>
       {opened && <Activity mode={ready ? 'visible' : 'hidden'}>{children}</Activity>}
       {!ready && (
         <section
-          aria-label={isPending ? 'Loading workspace' : 'Workspace setup'}
+          aria-label="Workspace setup"
           className="flex h-full min-h-0 flex-1 overflow-y-auto bg-background text-foreground shadow-md"
         >
-          {renderRecovery()}
+          {recovery}
         </section>
       )}
     </>
