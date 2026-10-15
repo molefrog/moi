@@ -2,10 +2,61 @@ import { expect, test, spyOn } from 'bun:test'
 
 import * as clientModule from './client'
 import type { CodexClient } from './client'
-import type { NotificationListener } from './transport'
+import { CodexRpcError, type NotificationListener } from './transport'
 import * as config from '../../app-config'
 
-import { codexAccountReadiness, codexOutdatedAvailability, startCodexLogin } from './auth'
+import {
+  codexAccountReadiness,
+  codexOutdatedAvailability,
+  getCodexAuthReadiness,
+  startCodexLogin
+} from './auth'
+
+test('verifies ChatGPT access even when account/read still returns a signed-in account', async () => {
+  let error: Error | undefined = new CodexRpcError(
+    'failed to fetch codex rate limits: http error with status 401 Unauthorized',
+    -32603
+  )
+  const calls: string[] = []
+  let account: unknown = { account: { type: 'chatgpt' }, requiresOpenaiAuth: true }
+  const client = {
+    rpc: async (method: string) => {
+      calls.push(method)
+      if (method === 'account/read') return account
+      if (error) throw error
+      return { rateLimits: {} }
+    }
+  } as unknown as CodexClient // This probe only uses RPC and the optional CLI version.
+  const getClient = spyOn(clientModule, 'getCodexClient').mockResolvedValue(client)
+  try {
+    expect((await getCodexAuthReadiness()).status).toBe('login-required')
+    expect(calls).toEqual(['account/read', 'account/rateLimits/read'])
+    // Another metadata read cannot unlock revoked credentials.
+    expect((await getCodexAuthReadiness()).status).toBe('login-required')
+    error = undefined
+    expect((await getCodexAuthReadiness()).status).toBe('available')
+
+    for (const failure of [
+      new Error('request timed out'),
+      new CodexRpcError('HTTP 429 Too Many Requests', -32603),
+      new CodexRpcError('HTTP 503 Service Unavailable', -32603)
+    ]) {
+      error = failure
+      await expect(getCodexAuthReadiness()).rejects.toThrow(failure.message)
+    }
+
+    for (account of [
+      { account: { type: 'apiKey' }, requiresOpenaiAuth: true },
+      { account: null, requiresOpenaiAuth: false }
+    ]) {
+      calls.length = 0
+      expect((await getCodexAuthReadiness()).status).toBe('available')
+      expect(calls).toEqual(['account/read'])
+    }
+  } finally {
+    getClient.mockRestore()
+  }
+})
 
 test('requires a Codex login for an unauthenticated OpenAI provider', () => {
   expect(codexAccountReadiness({ account: null, requiresOpenaiAuth: true })).toEqual({

@@ -4,6 +4,7 @@ import { getAppConfig } from '../../app-config'
 import type { HarnessLoginAttempt } from '../types'
 
 import { CODEX_MIN_SUPPORTED_VERSION, codexCliOutdated, getCodexClient } from './client'
+import { CodexRpcError } from './transport'
 
 type CodexAccount = { type: string }
 type CodexAccountReadResponse = {
@@ -62,8 +63,32 @@ export async function getCodexAuthReadiness(workspacePath?: string): Promise<Har
   const client = await getCodexClient(workspacePath)
   const outdated = codexOutdatedAvailability(client.cliVersion)
   if (outdated) return outdated
-  const account = await client.rpc<unknown>('account/read', { refreshToken: true })
-  return codexAccountReadiness(account)
+  try {
+    const account = await client.rpc<unknown>('account/read', { refreshToken: true })
+    const readiness = codexAccountReadiness(account)
+    if (
+      isCodexAccountReadResponse(account) &&
+      account.requiresOpenaiAuth &&
+      (account.account?.type === 'chatgpt' || account.account?.type === 'chatgptAuthTokens')
+    ) {
+      // account/read can return cached identity even after token refresh fails.
+      // Verify access without starting a turn or reading credentials.
+      await client.rpc('account/rateLimits/read', { excludeResetCreditDetails: true })
+    }
+    return readiness
+  } catch (error) {
+    // Account RPCs wrap HTTP failures in JSON-RPC errors, often with code -32603.
+    if (
+      error instanceof CodexRpcError &&
+      (error.code === 401 ||
+        /\b401\b|\bunauthorized\b|authentication required|please (?:log out and sign|sign) in again/i.test(
+          error.message
+        ))
+    ) {
+      return CODEX_LOGIN_REQUIRED
+    }
+    throw error
+  }
 }
 
 export async function startCodexLogin(): Promise<HarnessLoginAttempt> {
