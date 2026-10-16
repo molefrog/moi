@@ -266,11 +266,7 @@ export function killAllCodexClients(): void {
 export async function getCodexSessions(workspacePath: string): Promise<SessionSummary[]> {
   // Startup and listing failures must both preserve the client's cached history.
   const client = await getCodexClient(workspacePath)
-  const threads = await listCodexThreads(client, {
-    cwd: workspacePath,
-    limit: 100,
-    sortKey: 'updated_at'
-  })
+  const threads = await listCodexThreads(client, workspacePath)
   return threads.map(codexThreadToSessionInfo)
 }
 
@@ -304,11 +300,7 @@ export async function getCodexWorkspacePreview(
   try {
     // Every page: agent-created tasks are filtered after listing and could
     // fill a single page.
-    const threads = await listCodexThreads(client, {
-      cwd: workspacePath,
-      limit: 100,
-      sortKey: 'updated_at'
-    })
+    const threads = await listCodexThreads(client, workspacePath)
     return selectCodexWorkspacePreview(threads, includeFirstUserMessage)
   } catch {
     return {}

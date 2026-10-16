@@ -6,6 +6,9 @@ import { CodexRpcError } from './transport'
 
 type Call = { method: string; params?: Record<string, unknown> }
 
+const workspacePath = '/workspace'
+const listParams = { cwd: workspacePath, limit: 100, sortKey: 'updated_at' }
+
 // thread/list rows carry no threadSource; thread/read reveals it per id.
 function fakeClient(
   rows: CodexThread[],
@@ -34,15 +37,17 @@ test('lists from the state DB and hides agent-created tasks', async () => {
     a2: 'agent_created_thread',
     a3: 'user'
   })
-  const params = { cwd: '/workspace', limit: 100, sortKey: 'updated_at' }
-  expect((await listCodexThreads(client, params)).map(t => t.id)).toEqual(['a1', 'a3'])
-  expect(calls[0]).toEqual({ method: 'thread/list', params: { ...params, useStateDbOnly: true } })
+  expect((await listCodexThreads(client, workspacePath)).map(t => t.id)).toEqual(['a1', 'a3'])
+  expect(calls[0]).toEqual({
+    method: 'thread/list',
+    params: { ...listParams, useStateDbOnly: true }
+  })
   expect(calls.filter(c => c.method === 'thread/read')).toHaveLength(3)
   expect(calls[1].params).toEqual({ threadId: 'a1', includeTurns: false })
 
   // Sources are cached: a refresh reads only threads it has not seen.
   calls.length = 0
-  expect((await listCodexThreads(client, params)).map(t => t.id)).toEqual(['a1', 'a3'])
+  expect((await listCodexThreads(client, workspacePath)).map(t => t.id)).toEqual(['a1', 'a3'])
   expect(calls.map(c => c.method)).toEqual(['thread/list'])
 })
 
@@ -54,7 +59,7 @@ test('uses threadSource from the listing when Codex provides it', async () => {
     ],
     {}
   )
-  expect((await listCodexThreads(client, {})).map(t => t.id)).toEqual(['b2'])
+  expect((await listCodexThreads(client, workspacePath)).map(t => t.id)).toEqual(['b2'])
   expect(calls.map(c => c.method)).toEqual(['thread/list'])
 })
 
@@ -73,13 +78,13 @@ test('falls back to the rollout scan for the known state DB listing error', asyn
     { dbOnlyError: databaseError() }
   )
   try {
-    expect((await listCodexThreads(client, { cwd: '/w' })).map(t => t.id)).toEqual(['c1'])
+    expect((await listCodexThreads(client, workspacePath)).map(t => t.id)).toEqual(['c1'])
   } finally {
     logged.mockRestore()
   }
-  expect(calls.filter(c => c.method === 'thread/list').map(c => c.params?.useStateDbOnly)).toEqual([
-    true,
-    undefined
+  expect(calls.filter(c => c.method === 'thread/list')).toEqual([
+    { method: 'thread/list', params: { ...listParams, useStateDbOnly: true } },
+    { method: 'thread/list', params: { ...listParams, useStateDbOnly: false } }
   ])
 })
 
@@ -91,8 +96,10 @@ test.each([
   new Error('failed to list threads from state database')
 ])('does not scan rollouts after %s', async error => {
   const { client, calls } = fakeClient([], {}, { dbOnlyError: error })
-  await expect(listCodexThreads(client, { cwd: '/w' })).rejects.toBe(error)
-  expect(calls).toEqual([{ method: 'thread/list', params: { cwd: '/w', useStateDbOnly: true } }])
+  await expect(listCodexThreads(client, workspacePath)).rejects.toBe(error)
+  expect(calls).toEqual([
+    { method: 'thread/list', params: { ...listParams, useStateDbOnly: true } }
+  ])
 })
 
 test('a timeout on a later page propagates without restarting or returning partial history', async () => {
@@ -105,10 +112,10 @@ test('a timeout on a later page propagates without restarting or returning parti
       return { data: [{ id: 'first-page-chat' }], nextCursor: 'page-2' } as T
     }
   }
-  await expect(listCodexThreads(client, {})).rejects.toBe(error)
+  await expect(listCodexThreads(client, workspacePath)).rejects.toBe(error)
   expect(calls).toEqual([
-    { method: 'thread/list', params: { useStateDbOnly: true } },
-    { method: 'thread/list', params: { useStateDbOnly: true, cursor: 'page-2' } }
+    { method: 'thread/list', params: { ...listParams, useStateDbOnly: true } },
+    { method: 'thread/list', params: { ...listParams, useStateDbOnly: true, cursor: 'page-2' } }
   ])
 })
 
@@ -123,7 +130,7 @@ test('a failed compatibility scan propagates instead of returning empty history'
   }
   const logged = spyOn(console, 'error').mockImplementation(() => {})
   try {
-    await expect(listCodexThreads(client, {})).rejects.toBe(error)
+    await expect(listCodexThreads(client, workspacePath)).rejects.toBe(error)
     expect(calls).toHaveLength(2)
   } finally {
     logged.mockRestore()
@@ -137,10 +144,10 @@ test('keeps threads whose source could not be read and retries them', async () =
     { d1: 'agent_created_thread' },
     { failReads }
   )
-  expect((await listCodexThreads(client, {})).map(t => t.id)).toEqual(['d1'])
+  expect((await listCodexThreads(client, workspacePath)).map(t => t.id)).toEqual(['d1'])
   failReads.clear()
   calls.length = 0
-  expect(await listCodexThreads(client, {})).toEqual([])
+  expect(await listCodexThreads(client, workspacePath)).toEqual([])
   expect(calls.map(c => c.method)).toEqual(['thread/list', 'thread/read'])
 })
 
@@ -159,5 +166,5 @@ test('keeps paging past a page of agent-created tasks', async () => {
       ) as T
     }
   }
-  expect((await listCodexThreads(client, { limit: 2 })).map(t => t.id)).toEqual(['chat-1'])
+  expect((await listCodexThreads(client, workspacePath)).map(t => t.id)).toEqual(['chat-1'])
 })

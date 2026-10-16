@@ -19,13 +19,18 @@ const threadSources = new Map<string, string | undefined>()
 // ignore useStateDbOnly; transport failures must not trigger another slow lookup.
 export async function listCodexThreads(
   client: RpcClient,
-  params: Record<string, unknown>
+  workspacePath: string
 ): Promise<CodexThread[]> {
-  const list = (extra: Record<string, unknown>) =>
-    readCodexPages<CodexThread>(client, 'thread/list', { ...params, ...extra })
+  const list = (useStateDbOnly: boolean) =>
+    readCodexPages<CodexThread>(client, 'thread/list', {
+      cwd: workspacePath,
+      limit: 100,
+      sortKey: 'updated_at',
+      useStateDbOnly
+    })
   let threads: CodexThread[]
   try {
-    threads = await list({ useStateDbOnly: true })
+    threads = await list(true)
   } catch (err) {
     // CLI 0.162 wraps the rollout error with thread-store context, but supplies
     // no distinct error code for an unavailable DB. Match its specific suffix.
@@ -36,7 +41,7 @@ export async function listCodexThreads(
     )
       throw err
     console.error('[codex] state DB thread/list failed; scanning rollouts', err)
-    threads = await list({})
+    threads = await list(false)
   }
   return withoutAgentCreatedThreads(client, threads)
 }
