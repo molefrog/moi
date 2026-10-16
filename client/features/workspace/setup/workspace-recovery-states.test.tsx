@@ -3,8 +3,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { HarnessUnavailableState } from './workspace-recovery-states'
 
 for (const [type, label] of [
-  ['codex', 'Codex'],
-  ['claude-code', 'Claude Code']
+  ['codex', 'ChatGPT'],
+  ['claude-code', 'Claude']
 ] as const) {
   test(`${label} missing installation uses the compact recovery state`, () => {
     const html = renderToStaticMarkup(

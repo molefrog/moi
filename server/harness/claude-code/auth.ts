@@ -77,7 +77,7 @@ export function claudeLoginUrl(output: string): string | undefined {
 
 export async function startClaudeLogin(): Promise<HarnessLoginAttempt> {
   const executable = findHarnessExecutable('claude-code')
-  if (!executable) throw new Error('Claude Code is not installed')
+  if (!executable) throw new Error('Claude is not installed')
   const local = getAppConfig().environment === 'local'
   const captureDir = local ? await mkdtemp(join(tmpdir(), 'moi-claude-login-')) : undefined
   try {
@@ -96,7 +96,7 @@ export async function startClaudeLogin(): Promise<HarnessLoginAttempt> {
       stderr: 'ignore'
     })
     const completed = proc.exited.then(code => {
-      if (code !== 0) throw new Error('Claude Code sign-in failed or expired. Try again')
+      if (code !== 0) throw new Error('Claude sign-in failed or expired. Try again')
     })
     // The process can fail before its URL is available.
     void completed.catch(() => {})
@@ -109,11 +109,9 @@ export async function startClaudeLogin(): Promise<HarnessLoginAttempt> {
       while (!url) {
         const chunk = await reader.read()
         if (chunk.done)
-          throw new Error(
-            'Claude Code did not return a sign-in link. Update Claude Code and try again'
-          )
+          throw new Error('Claude did not return a sign-in link. Update Claude and try again')
         output += decoder.decode(chunk.value, { stream: true })
-        if (output.length > 65_536) throw new Error('Could not read the Claude Code sign-in link')
+        if (output.length > 65_536) throw new Error('Could not read the Claude sign-in link')
         url = claudeLoginUrl(output)
       }
       reader.releaseLock()
@@ -124,7 +122,7 @@ export async function startClaudeLogin(): Promise<HarnessLoginAttempt> {
         let callbackUrl: string | undefined
         while (!callbackUrl) {
           if (proc.exitCode !== null)
-            throw new Error('Claude Code did not open a local sign-in link. Try again')
+            throw new Error('Claude did not open a local sign-in link. Try again')
           // Bun.file caches a missing file; the browser helper may write it later.
           const file = Bun.file(capturePath)
           if (await file.exists()) callbackUrl = claudeLoginUrl(await file.text())

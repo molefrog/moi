@@ -23,11 +23,11 @@ type CodexLoginResponse = {
 const CODEX_AVAILABLE: HarnessAvailability = { status: 'available' }
 const CODEX_LOGIN_REQUIRED: HarnessAvailability = {
   status: 'login-required',
-  reason: 'Codex is signed out. Sign in to send messages'
+  reason: 'ChatGPT is signed out. Sign in to send messages'
 }
 const CODEX_AUTH_UNAVAILABLE: HarnessAvailability = {
   status: 'unavailable',
-  reason: 'Could not check the Codex login status'
+  reason: 'Could not check the ChatGPT login status'
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -56,7 +56,7 @@ export function codexOutdatedAvailability(
   if (!codexCliOutdated(cliVersion)) return undefined
   return {
     status: 'unavailable',
-    reason: `Codex ${cliVersion} is out of date. Update Codex to ${CODEX_MIN_SUPPORTED_VERSION} or newer`
+    reason: `ChatGPT ${cliVersion} is out of date. Update ChatGPT to ${CODEX_MIN_SUPPORTED_VERSION} or newer`
   }
 }
 
@@ -108,7 +108,9 @@ export async function startCodexLogin(): Promise<HarnessLoginAttempt> {
   const url = cloud ? login.verificationUrl : login.authUrl
   if (!login.loginId || !url || (cloud && !login.userCode) || new URL(url).protocol !== 'https:') {
     if (login.loginId) await client.rpc('account/login/cancel', { loginId: login.loginId })
-    throw new Error('Codex did not return valid sign-in instructions. Update Codex and try again')
+    throw new Error(
+      'ChatGPT did not return valid sign-in instructions. Update ChatGPT and try again'
+    )
   }
   let unsubscribe = () => {}
   const completed = new Promise<void>((resolve, reject) => {
@@ -121,7 +123,7 @@ export async function startCodexLogin(): Promise<HarnessLoginAttempt> {
         return
       unsubscribe()
       if (params.success === true) resolve()
-      else reject(new Error('Codex sign-in failed or expired. Try again'))
+      else reject(new Error('ChatGPT sign-in failed or expired. Try again'))
     })
   })
   if (!cloud) void openBrowser(url)

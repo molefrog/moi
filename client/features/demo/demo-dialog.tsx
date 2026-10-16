@@ -183,11 +183,11 @@ function DemoDialogContent() {
                 <span>Build with</span>
                 <span className="inline-flex items-center gap-1 font-medium">
                   <img src={claudeIcon} alt="" className="size-3.5 object-contain" />
-                  Claude Code,
+                  Claude,
                 </span>
                 <span className="inline-flex items-center gap-1 font-medium">
                   <img src={openaiIcon} alt="" className="size-3.5 object-contain" />
-                  Codex,
+                  ChatGPT,
                 </span>
                 <span className="inline-flex items-center gap-1 font-medium">
                   <img src={hermesIcon} alt="" className="size-3.5 object-contain" />

@@ -48,8 +48,8 @@ describe('create workspace agent options', () => {
       hermes: false
     })
     expect(options.map(option => option.disabledReason)).toEqual([
-      'Run in terminal to install Claude Code:',
-      'Run in terminal to install Codex:'
+      'Run in terminal to install Claude:',
+      'Run in terminal to install ChatGPT:'
     ])
     expect(options.map(option => option.disabledCommand)).toEqual([
       'curl -fsSL https://claude.ai/install.sh | sh',
@@ -91,13 +91,13 @@ describe('getImportWorkspaceAgentOptions', () => {
     {
       type: 'claude-code' as const,
       description: 'Anthropic',
-      reason: 'Run in terminal to install Claude Code: curl -fsSL https://claude.ai/install.sh | sh'
+      reason: 'Run in terminal to install Claude: curl -fsSL https://claude.ai/install.sh | sh'
     },
     {
       type: 'codex' as const,
       description: 'OpenAI',
       reason:
-        'Run in terminal to install Codex: curl -fsSL https://chatgpt.com/codex/install.sh | sh'
+        'Run in terminal to install ChatGPT: curl -fsSL https://chatgpt.com/codex/install.sh | sh'
     }
   ])('keeps the vendor description and exposes the disabled reason for $type', input => {
     const options = getImportWorkspaceAgentOptions({
@@ -108,7 +108,7 @@ describe('getImportWorkspaceAgentOptions', () => {
     expect(options.find(option => option.type === input.type)).toMatchObject({
       description: input.description,
       disabled: true,
-      disabledReason: `Run in terminal to install ${input.type === 'claude-code' ? 'Claude Code' : 'Codex'}:`,
+      disabledReason: `Run in terminal to install ${input.type === 'claude-code' ? 'Claude' : 'ChatGPT'}:`,
       disabledCommand:
         input.type === 'claude-code'
           ? 'curl -fsSL https://claude.ai/install.sh | sh'

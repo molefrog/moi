@@ -7,11 +7,11 @@ type HarnessInstruction = {
 
 export const HARNESS_INSTRUCTIONS: Record<WorkspaceType, HarnessInstruction> = {
   'claude-code': {
-    reason: 'Run in terminal to install Claude Code:',
+    reason: 'Run in terminal to install Claude:',
     command: 'curl -fsSL https://claude.ai/install.sh | sh'
   },
   codex: {
-    reason: 'Run in terminal to install Codex:',
+    reason: 'Run in terminal to install ChatGPT:',
     command: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh'
   },
   openclaw: {

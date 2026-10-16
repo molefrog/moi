@@ -20,6 +20,7 @@ import { WorkspaceWelcomeState } from '@/client/features/workspace/setup/workspa
 import { WorkspaceLoadingState } from '@/client/features/workspace/setup/workspace-recovery-states'
 import type { AppEnvironment } from '@/lib/types'
 import type { LoginHarness } from '@/client/features/harness/harness-connection'
+import { workspaceTypeLabel } from '@/client/features/workspace/workspace-presentation'
 import { useHarnessConnection } from '@/client/features/harness/api'
 import {
   createSetupMocks,
@@ -95,7 +96,7 @@ function SetupPreview({ mocks, client, environment, harness, scenario }: SetupPr
               variant={harness === value ? 'default' : 'secondary'}
               onClick={() => restart({ harness: value })}
             >
-              {value === 'codex' ? 'Codex' : 'Claude Code'}
+              {workspaceTypeLabel[value]}
             </Button>
           ))}
         </div>

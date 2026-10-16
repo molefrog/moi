@@ -25,7 +25,7 @@ function renderStep(installed?: HarnessInstallations, isChecking = false, errorM
         options: getCreateWorkspaceAgentOptions(installed),
         isLoading: isChecking && !installed,
         errorMessage,
-        emptyMessage: 'Install Claude Code or Codex to create a new workspace.',
+        emptyMessage: 'Install Claude or ChatGPT to create a new workspace.',
         selectedType: 'claude-code',
         isPending: isChecking || Boolean(errorMessage),
         secondaryAction: null,
@@ -43,6 +43,7 @@ describe('create agent step states', () => {
     const document = renderStep(missing)
     const cards = [...document.querySelectorAll('[aria-label="Agent"] button')]
     expect(cards.length).toBe(2)
+    expect(cards.map(card => card.textContent)).toEqual(['ClaudeAnthropic', 'ChatGPTOpenAI'])
     expect(cards.every(card => card.getAttribute('aria-disabled') === 'true')).toBe(true)
     expect(cards.every(card => !card.hasAttribute('disabled'))).toBe(true)
     expect(
@@ -50,7 +51,7 @@ describe('create agent step states', () => {
         .find(button => button.textContent === 'Next')
         ?.hasAttribute('disabled')
     ).toBe(true)
-    expect(document.body.textContent).toContain('Install Claude Code or Codex')
+    expect(document.body.textContent).toContain('Install Claude or ChatGPT')
   })
 
   test('uses placeholders before detection and blocks progression', () => {

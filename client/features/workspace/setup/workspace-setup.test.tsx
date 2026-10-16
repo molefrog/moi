@@ -198,7 +198,7 @@ async function mount(
 
 test('signed-out workspace shows only its own login and no workspace content', async () => {
   const { document } = await mount()
-  expect(document.body.textContent).toContain('Connect your Codex')
+  expect(document.body.textContent).toContain('Log in to ChatGPT')
   expect(document.body.textContent).not.toContain('Claude Code')
   expect(document.querySelector('[data-content]')).toBeNull()
 })
@@ -221,7 +221,7 @@ test('one loading state waits for workspace content after readiness succeeds', a
 
 test('login can resolve without waiting for workspace content', async () => {
   const { document } = await mount(undefined, false, false, true)
-  expect(document.body.textContent).toContain('Connect your Codex')
+  expect(document.body.textContent).toContain('Log in to ChatGPT')
   expect(document.querySelector('[aria-label="Loading"]')).toBeNull()
 })
 
@@ -257,7 +257,7 @@ test('expiry hides content and portals, then restores the same local state', asy
   expect(
     document.querySelector<HTMLElement>('#floating-chat')?.parentElement?.parentElement?.inert
   ).toBe(true)
-  expect(document.body.textContent).toContain('Connect your Codex')
+  expect(document.body.textContent).toContain('Log in to ChatGPT')
   await update({ status: 'available' })
   expect(document.querySelector<HTMLElement>('[data-content]')?.style.display).not.toBe('none')
   expect(document.querySelector('#floating-chat')?.closest('[hidden]')).toBeNull()
@@ -271,7 +271,7 @@ test('unavailable and failed status checks show recovery and retry a fresh check
     reason: 'Install Codex in your terminal'
   })
   expect(document.body.textContent).toContain('Install Codex in your terminal')
-  expect(document.body.textContent).not.toContain('Connect your Codex')
+  expect(document.body.textContent).not.toContain('Log in to ChatGPT')
   setFail(true)
   await click('Try again')
   expect(document.body.textContent).toContain('Could not check your agent')
@@ -288,7 +288,7 @@ test('global login success rechecks workspace readiness instead of unlocking it'
     true
   )
   expect(document.body.textContent).toContain(
-    'Signed in to Codex, but this workspace still needs attention'
+    'Signed in to ChatGPT, but this workspace still needs attention'
   )
   expect(document.querySelector('[data-content]')).toBeNull()
   expect(requests).toContain('/api/workspaces/test/agent?refresh=true')
@@ -297,14 +297,14 @@ test('global login success rechecks workspace readiness instead of unlocking it'
 test('demo uses the same login recovery and readiness checks', async () => {
   const { document, requests } = await mount(undefined, true)
   expect(document.querySelector('[data-content]')).toBeNull()
-  expect(document.body.textContent).toContain('Connect your Codex')
+  expect(document.body.textContent).toContain('Log in to ChatGPT')
   expect(requests).toContain('/api/workspaces/test/agent?refresh=true')
 })
 
 test('a ready demo opens the workspace normally', async () => {
   const { document } = await mount({ status: 'available' }, true)
   expect(document.querySelector('[data-content]')).not.toBeNull()
-  expect(document.body.textContent).not.toContain('Connect your Codex')
+  expect(document.body.textContent).not.toContain('Log in to ChatGPT')
 })
 
 test('missing folder offers deletion and returns home after removing the workspace', async () => {
@@ -334,7 +334,7 @@ test('cached sign-out waits for verification without briefly showing login', asy
   const check = Promise.withResolvers<HarnessAvailability>()
   const { document } = await mount(undefined, false, false, false, check.promise)
   expect(document.querySelector('[aria-label="Loading"]')).not.toBeNull()
-  expect(document.body.textContent).not.toContain('Connect your Codex')
+  expect(document.body.textContent).not.toContain('Log in to ChatGPT')
   await act(async () => {
     check.resolve({ status: 'available' })
     await Bun.sleep(20)
@@ -352,19 +352,19 @@ test('confirmed sign-out shows login and keeps it visible while retrying', async
     false,
     check.promise
   )
-  expect(document.body.textContent).not.toContain('Connect your Codex')
+  expect(document.body.textContent).not.toContain('Log in to ChatGPT')
   await act(async () => {
     check.resolve({ status: 'login-required', reason: 'Signed out' })
     await Bun.sleep(20)
   })
-  expect(document.body.textContent).toContain('Connect your Codex')
+  expect(document.body.textContent).toContain('Log in to ChatGPT')
   const retry = Promise.withResolvers<HarnessAvailability>()
   setCheck(retry.promise)
   await act(async () => {
     void client.refetchQueries({ queryKey: key })
     await Bun.sleep(20)
   })
-  expect(document.body.textContent).toContain('Connect your Codex')
+  expect(document.body.textContent).toContain('Log in to ChatGPT')
   expect(document.querySelector('[aria-label="Loading"]')).toBeNull()
   await act(async () => {
     retry.resolve({ status: 'login-required', reason: 'Still signed out' })
@@ -442,10 +442,10 @@ test('welcome precedes login and chat stays hidden until login is verified', asy
   welcomeNewWorkspace('test')
   const { document, update, requests } = await mount()
   expect(document.querySelector('[aria-label="Workspace welcome"]')).not.toBeNull()
-  expect(document.body.textContent).not.toContain('Connect your Codex')
+  expect(document.body.textContent).not.toContain('Log in to ChatGPT')
   expect(requests).toContain('/api/workspaces/test/agent?refresh=true')
   await finishWelcome()
-  expect(document.body.textContent).toContain('Connect your Codex')
+  expect(document.body.textContent).toContain('Log in to ChatGPT')
   expect(chatHidden(document)).toBe(true)
   await update({ status: 'available' })
   expect(document.querySelector('[data-content]')).not.toBeNull()

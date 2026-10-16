@@ -221,7 +221,7 @@ export async function getCodexClient(workspacePath?: string): Promise<CodexClien
     const rec = await started
     if (clients.get(workspacePath) !== started || !rec.client.isAlive()) {
       rec.close()
-      throw new Error('Codex startup was cancelled')
+      throw new Error('ChatGPT startup was cancelled')
     }
     rec.client.onNotification(method => {
       if (method === '__exit' && clients.get(workspacePath) === started)
@@ -431,6 +431,6 @@ export async function getCodexThreadEvents(
     threadId,
     includeTurns: true
   })
-  if (!res.thread) throw new Error('Codex did not return this chat')
+  if (!res.thread) throw new Error('ChatGPT did not return this chat')
   return codexThreadToEvents(res.thread, await readSubagentRecords(client, res.thread))
 }

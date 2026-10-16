@@ -2,9 +2,9 @@ import { workspaceProviderIcon } from '@/client/components/shared/WorkspaceIcon'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
 
 export const workspaceTypeLabel: Record<WorkspaceType, string> = {
-  'claude-code': 'Claude Code',
+  'claude-code': 'Claude',
   openclaw: 'OpenClaw',
-  codex: 'Codex',
+  codex: 'ChatGPT',
   hermes: 'Hermes'
 }
 
