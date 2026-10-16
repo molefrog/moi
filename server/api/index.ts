@@ -1,3 +1,4 @@
+import { detectInstalledHarnesses } from '../harness/executable'
 import { isMessageAttachments } from '@/lib/message-attachments'
 import { Hono } from 'hono'
 import { serveStatic } from 'hono/bun'
@@ -1016,14 +1017,7 @@ async function harnessAvailability(): Promise<Record<string, HarnessAvailability
 // backends whose runtime is missing.
 workspaces.get('/create', async c => {
   c.header('Cache-Control', 'no-store')
-  const installed = {
-    'claude-code': true,
-    codex: true,
-    openclaw: false,
-    hermes: false
-  }
-
-  //await detectInstalledHarnesses()
+  const installed = await detectInstalledHarnesses()
   return c.json({
     root: createdWorkspacesRoot(),
     displayRoot: tildify(createdWorkspacesRoot()),

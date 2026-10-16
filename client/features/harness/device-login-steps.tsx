@@ -54,7 +54,7 @@ export function DeviceLoginSteps({ code, url }: DeviceLoginStepsProps) {
       <li className="flex flex-col items-start gap-3 lg:items-center">
         <IconCircleNumber2 size={24} stroke={1.5} className="shrink-0" />
         <div className="flex min-w-0 flex-col items-start gap-3 lg:items-center">
-          <p>Copy the generated one-time device code below</p>
+          <p>Copy the one-time device code provided below</p>
           <div className="flex h-8 items-center gap-2 rounded-lg border border-input bg-accent pr-2 pl-3">
             <code className="cursor-text text-sm font-medium select-text">{code}</code>
             <button

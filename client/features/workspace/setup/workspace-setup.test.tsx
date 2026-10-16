@@ -22,10 +22,13 @@ type SetupFixtureProps = {
 }
 
 function SetupFixture({ workspaceId, contentPending, children }: SetupFixtureProps) {
-  const { ready, content, chatHidden } = useWorkspaceSetup(workspaceId, contentPending)
+  const { ready, content, chatHidden, showSettings } = useWorkspaceSetup(
+    workspaceId,
+    contentPending
+  )
   return (
     <>
-      <div data-chat-hidden={chatHidden} />
+      <div data-chat-hidden={chatHidden} data-settings-available={showSettings} />
       <WorkspaceActivity ready={ready}>{children}</WorkspaceActivity>
       {!ready && <section aria-label="Workspace setup">{content}</section>}
     </>
@@ -511,4 +514,15 @@ test('unavailable agent replaces welcome and keeps chat hidden', async () => {
   expect(document.body.textContent).toContain('Agent is missing')
   expect(chatHidden(document)).toBe(true)
   expect(document.querySelector('[data-content]')).toBeNull()
+})
+
+test('workspace settings stay accessible during auth recovery and disappear when ready', async () => {
+  const { document, update } = await mount()
+  const settingsAvailable = () =>
+    document.querySelector('[data-settings-available]')?.getAttribute('data-settings-available')
+  expect(settingsAvailable()).toBe('true')
+  await update({ status: 'available' })
+  expect(settingsAvailable()).toBe('false')
+  await update({ status: 'unavailable', reason: 'Invalid workspace credentials' })
+  expect(settingsAvailable()).toBe('true')
 })

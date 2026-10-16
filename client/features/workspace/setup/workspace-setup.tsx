@@ -72,6 +72,7 @@ export function useWorkspaceSetup(
     ) : (
       (recovery ?? <WorkspaceLoadingState />)
     ),
+    showSettings: Boolean(recovery) && !welcoming && !data?.missingWorkspacePath,
     ready: ready && !welcoming,
     chatHidden: Boolean(recovery) || entering
   }
