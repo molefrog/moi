@@ -20,6 +20,7 @@ import type { WorkspaceActivityPreview } from '../types'
 import { findHarnessExecutable, requireHarnessExecutable } from '../executable'
 import { createCodexTransport, type Json, type NotificationListener } from './transport'
 import { readCodexPages } from './pagination'
+import { listCodexThreads } from './thread-list'
 import { agentCommand } from '../../agent-launcher'
 import { debug } from '../../debug'
 import { tapWire } from '../debug'
@@ -263,18 +264,21 @@ export function killAllCodexClients(): void {
 
 // Threads whose recorded cwd is exactly the workspace path, newest first.
 export async function getCodexSessions(workspacePath: string): Promise<SessionSummary[]> {
+  let client: CodexClient
   try {
-    const client = await getCodexClient(workspacePath)
-    const threads = await readCodexPages<CodexThread>(client, 'thread/list', {
-      cwd: workspacePath,
-      limit: 100,
-      sortKey: 'updated_at'
-    })
-    return threads.map(codexThreadToSessionInfo)
+    client = await getCodexClient(workspacePath)
   } catch (err) {
-    console.error('[codex] thread/list failed', err)
+    // Without an app-server there is no history to list; availability reports why.
+    console.error('[codex] app-server unavailable', err)
     return []
   }
+  // A failed lookup propagates: an empty list would read as lost history.
+  const threads = await listCodexThreads(client, {
+    cwd: workspacePath,
+    limit: 100,
+    sortKey: 'updated_at'
+  })
+  return threads.map(codexThreadToSessionInfo)
 }
 
 export async function archiveCodexThread(
@@ -305,12 +309,12 @@ export async function getCodexWorkspacePreview(
   const client = await peekCodexClient(workspacePath)
   if (!client) return {}
   try {
-    const res = await client.rpc<{ data?: CodexThread[] }>('thread/list', {
-      cwd: workspacePath,
-      limit: 50,
-      sortKey: 'updated_at'
-    })
-    return selectCodexWorkspacePreview(res.data ?? [], includeFirstUserMessage)
+    const threads = await listCodexThreads(
+      client,
+      { cwd: workspacePath, limit: 50, sortKey: 'updated_at' },
+      { allPages: false }
+    )
+    return selectCodexWorkspacePreview(threads, includeFirstUserMessage)
   } catch {
     return {}
   }

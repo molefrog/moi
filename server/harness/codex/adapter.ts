@@ -97,6 +97,8 @@ export type CodexThread = {
   createdAt?: number
   updatedAt?: number
   name?: string | null
+  // Scalar label such as `user` or `agent_created_thread`; null in thread/list.
+  threadSource?: string | null
   status?: { type?: string; activeFlags?: string[] }
   turns?: CodexTurn[]
 }

@@ -20,6 +20,7 @@ defines the protocol; generated types from the installed CLI define its exact wi
 | `permissions.ts`                       | Defines sandbox access and the default approval policy; rejects unsupported requests.                                  |
 | `auth.ts`, `discovery.ts`, `status.ts` | Check login readiness, discover workspace paths from rollout heads, and report running processes.                      |
 | `session-title.ts`                     | Generates a title with a separate ephemeral `codex exec` call and applies it if the session is still unnamed.          |
+| `thread-list.ts`                       | Lists workspace threads from the state DB and hides agent-created tasks.                                               |
 | `probe.ts`                             | Runs standalone protocol diagnostics without moi's session or workspace policy.                                        |
 
 The shared contract and event layers are in [../README.md](../README.md).
@@ -80,9 +81,22 @@ reach the harness's 30-second RPC timeout before Bun closes the connection.
   `thread/read` provides a static fallback when live resume fails.
 
 `thread/list` uses cwd filtering, `updated_at` ordering, and every cursor page.
-Repeated cursors fail instead of looping. Child-history loading is limited to
-four concurrent reads. Home-card previews reuse an existing app-server and read
-up to 50 recent sessions; rendering the home page does not spawn one per card.
+Repeated cursors fail instead of looping. Listings pass `useStateDbOnly`: the
+default mode decodes rollout heads from every workspace under
+`$CODEX_HOME/sessions` (up to 10,000 files), which can exceed the RPC deadline
+on large histories. An RPC error falls back to that scan; older CLIs ignore the
+field. A failed listing propagates instead of returning an empty list, which
+would read as lost history.
+
+The state DB also returns Codex Desktop tasks that an agent started through
+`create_thread` (`threadSource: agent_created_thread`); the rollout scan drops
+them only because their first input is a tool output, not a user message. moi
+hides them. `thread/list` returns `threadSource` as null (CLI 0.162), so each
+thread is read once with `thread/read` and its source is cached by id.
+
+Child-history loading is limited to four concurrent reads. Home-card previews
+reuse an existing app-server and read up to 50 recent sessions; rendering the
+home page does not spawn one per card.
 Workspace import discovery separately reads up to 400 recent rollout heads
 under the server's `$CODEX_HOME/sessions`, without requiring a CLI executable.
 
