@@ -1,8 +1,8 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, spyOn, test } from 'bun:test'
 
 import { CodexRpcError, createCodexTransport, type Json } from './transport'
 
-function fixture(timeoutMs = 100) {
+function fixture(timeoutMs?: number) {
   let controller!: ReadableStreamDefaultController<Uint8Array>
   const writes: Json[] = []
   let stops = 0
@@ -32,6 +32,29 @@ function fixture(timeoutMs = 100) {
 }
 
 describe('Codex JSON-RPC transport', () => {
+  test('gives chat listing 60 seconds while other RPCs retain 30 seconds', async () => {
+    const timer = spyOn(globalThis, 'setTimeout')
+    const f = fixture()
+    const listing = f.transport.rpc('thread/list').catch(() => undefined)
+    const other = f.transport.rpc('turn/start').catch(() => undefined)
+    try {
+      expect(timer.mock.calls.map(call => call[1])).toEqual([60_000, 30_000])
+    } finally {
+      timer.mockRestore()
+      f.transport.close()
+      await Promise.all([listing, other])
+    }
+  })
+
+  test('explicit transport timeouts still override chat listing defaults', async () => {
+    const f = fixture(5)
+    try {
+      await expect(f.transport.rpc('thread/list')).rejects.toThrow('timed out: thread/list')
+    } finally {
+      f.transport.close()
+    }
+  })
+
   test('handles fragmented UTF-8, batched frames, invalid JSON and a final line without newline', async () => {
     const f = fixture()
     const seen: string[] = []

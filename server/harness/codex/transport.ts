@@ -96,10 +96,15 @@ export function createCodexTransport(options: TransportOptions): CodexTransport 
     if (!alive) return Promise.reject(new Error('Codex app-server is not running'))
     const id = nextId++
     return new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        pending.delete(id)
-        reject(new Error(`Codex request timed out: ${method}`))
-      }, options.timeoutMs ?? 30_000)
+      // Chat discovery can take over 30 seconds even for a healthy app-server.
+      // Keep the shorter deadline for interactive RPCs such as start/interrupt.
+      const timer = setTimeout(
+        () => {
+          pending.delete(id)
+          reject(new Error(`Codex request timed out: ${method}`))
+        },
+        options.timeoutMs ?? (method === 'thread/list' ? 60_000 : 30_000)
+      )
       // Register before writing: a synchronous response must find its waiter.
       pending.set(id, { resolve: resolve as (value: unknown) => void, reject, timer })
       send({ jsonrpc: '2.0', id, method, params })
