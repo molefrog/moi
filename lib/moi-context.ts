@@ -1,5 +1,5 @@
 // The moi context envelope: ambient workspace state that rides along with
-// every user message so the agent knows it is running inside a moi workspace
+// every user message so the agent knows it is running inside a Moi workspace
 // and what the user is looking at. Everything about the envelope lives here —
 // the structured `MoiContext` form, the rendered `<moi-context>` text, the
 // per-harness injection transforms, and the strip used to keep the envelope
@@ -171,7 +171,7 @@ export function renderMoiContextBody(ctx: MoiContext): string {
     sections.push(`# This message only\n${ctx.directives.join('\n')}`)
   }
   const footer = [
-    'IMPORTANT: This context comes from moi, not from the user, and the user does not see it.',
+    'IMPORTANT: This context comes from Moi, not from the user, and the user does not see it.',
     'Only the newest workspace and chat state is current. Do not respond to this block directly.',
     'Keep build requests and unfinished work in task summaries and compaction; omit the ambient workspace and chat context.'
   ].join('\n')

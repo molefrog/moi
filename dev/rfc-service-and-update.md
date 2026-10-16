@@ -1,6 +1,6 @@
 # RFC: `moi service` + `moi update`
 
-Goal: the moi server can run as an always-on user-level service that survives reboots and crashes, and the CLI has a manual update command. macOS and Linux; no root/sudo anywhere.
+Goal: the Moi server can run as an always-on user-level service that survives reboots and crashes, and the CLI has a manual update command. macOS and Linux; no root/sudo anywhere.
 
 Context: today `moi start` is a foreground process attached to a terminal, and updating is a manual `bun/npm i -g`. Television (`@telepath-computer/television`) solved the same problem with a `serve --persist` flag writing launchd/systemd-user units and an agent-driven upgrade doc — useful as a reference, not a template.
 
@@ -36,7 +36,7 @@ Context: today `moi start` is a foreground process attached to a terminal, and u
 - Manual command only — no background checks, no auto-update.
 - Checks the npm registry for the latest published version and compares with the installed one.
 - Installed version is a prerelease (e.g. `0.5.2-next.1`) → say prereleases are updated manually, do nothing.
-- moi may have been globally installed with any package manager (bun, npm, pnpm, …) — the update must go through whichever one owns the current install, and never create a second shadowing install.
+- Moi may have been globally installed with any package manager (bun, npm, pnpm, …) — the update must go through whichever one owns the current install, and never create a second shadowing install.
   - `[verify]` how to reliably detect the owning package manager across bun/npm/pnpm/yarn on macOS + Linux.
 - After updating: a service-managed server should end up on the new version, verified via the version report. A foreground server (someone's terminal) gets a **warning only** — decided; never kill it.
 - Package-manager failures (e.g. EACCES on a root-owned npm prefix) surface clearly with the manual fallback command.

@@ -44,7 +44,7 @@ export function appletSendBlockedReason(availability: AgentAvailability): string
   if (availability.status === 'checking') {
     return 'The agent is still connecting'
   }
-  if (availability.status === 'disconnected') return 'This workspace is disconnected from moi'
+  if (availability.status === 'disconnected') return 'This workspace is disconnected from Moi'
   if (availability.status === 'login-required') {
     return 'Sign in to the agent to send this message'
   }

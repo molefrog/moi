@@ -21,7 +21,7 @@ export type HermesProfile = {
   agentId: string
   // Profile home ($HERMES_HOME for default, else <home>/profiles/<id>).
   home: string
-  // Workspace directory the agent runs in — the moi workspace path.
+  // Workspace directory the agent runs in — the Moi workspace path.
   path: string
   name?: string
   isDefault: boolean

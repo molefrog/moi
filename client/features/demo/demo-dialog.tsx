@@ -34,7 +34,7 @@ import { useAppConfig } from '@/client/api/app-config'
 // The canonical setup prompt from moi.computer — pasted into any agent, it
 // fetches INSTALL.md and walks itself through the install.
 const AGENT_COMMAND =
-  'Set up the moi workspace for this project. Fetch https://moi.computer/INSTALL.md, and follow the steps.'
+  'Set up the Moi workspace for this project. Fetch https://moi.computer/INSTALL.md, and follow the steps.'
 
 type DemoDialogProps = {
   // Trigger-owned (uncontrolled) or controlled via open/onOpenChange — the
@@ -45,7 +45,7 @@ type DemoDialogProps = {
 }
 
 // Shown in the cloud demo wherever a workspace would be created: the demo is
-// limited to its built-in workspaces, and the way out is installing moi.
+// limited to its built-in workspaces, and the way out is installing Moi.
 export function DemoDialog({ trigger, open, onOpenChange }: DemoDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -100,7 +100,7 @@ function FloppyArtwork({ demoInstallUrl }: FloppyArtworkProps) {
             className: 'absolute -right-3 -bottom-2 -rotate-8'
           })}
         >
-          About moi
+          About Moi
           <IconArrowUpRight data-icon="inline-end" stroke={1.5} />
         </div>
       </a>
@@ -159,7 +159,7 @@ function DemoDialogContent() {
           <div className="flex flex-col gap-0.5">
             <DialogTitle>Unlock all features</DialogTitle>
             <DialogDescription className="mt-1">
-              This is a demo version with sample workspaces. Install moi locally and connect to your
+              This is a demo version with sample workspaces. Install Moi locally and connect to your
               agent.
             </DialogDescription>
           </div>

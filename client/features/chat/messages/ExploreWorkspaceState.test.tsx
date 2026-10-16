@@ -46,7 +46,7 @@ describe('ExploreWorkspaceState', () => {
   test('keeps analysis instructions in hidden message context', () => {
     expect(WORKSPACE_ANALYSIS_PROMPT).toMatchObject({
       label: 'Explore the workspace',
-      prompt: 'Explore this workspace and suggest what moi can build based on its content'
+      prompt: 'Explore this workspace and suggest what Moi can build based on its content'
     })
 
     const html = renderExploreWorkspace()

@@ -21,7 +21,7 @@ describe('update API', () => {
     const response = await api.request('/api/update', { method: 'POST' })
 
     expect(response.status).toBe(409)
-    expect(await response.text()).toBe('This moi install cannot be updated from the app.')
+    expect(await response.text()).toBe('This Moi install cannot be updated from the app.')
   })
 
   test('refuses a second update while one is in flight', async () => {
@@ -47,7 +47,7 @@ describe('update API', () => {
     expect(await response.text()).toBe('An update is already in progress.')
   })
 
-  test('tells a click after a finished install that moi is restarting', async () => {
+  test('tells a click after a finished install that Moi is restarting', async () => {
     await installUpdate({
       runningVersion: '0.5.2',
       analysis: {
@@ -66,6 +66,6 @@ describe('update API', () => {
     const response = await api.request('/api/update', { method: 'POST' })
 
     expect(response.status).toBe(409)
-    expect(await response.text()).toBe('An update is installed — moi is restarting.')
+    expect(await response.text()).toBe('An update is installed — Moi is restarting.')
   })
 })

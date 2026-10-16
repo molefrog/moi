@@ -42,7 +42,7 @@ test('cloud demo blocks creating a workspace', async () => {
   })
 
   expect(response.status).toBe(403)
-  expect(await response.text()).toBe('Workspace creation is not available in the moi demo')
+  expect(await response.text()).toBe('Workspace creation is not available in the Moi demo')
 })
 
 test('cloud demo blocks adding an existing folder', async () => {
@@ -53,7 +53,7 @@ test('cloud demo blocks adding an existing folder', async () => {
   })
 
   expect(response.status).toBe(403)
-  expect(await response.text()).toBe('Workspace creation is not available in the moi demo')
+  expect(await response.text()).toBe('Workspace creation is not available in the Moi demo')
 })
 
 test('GET /api/config reports the demo flag and install url', async () => {

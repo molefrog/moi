@@ -13,7 +13,7 @@ export type AppletTypecheckResult = {
 
 // Bun's ambient types come from the `@types/bun` moi itself depends on — the
 // version moi was tested with, present wherever moi runs. It is found through
-// Bun's resolver from moi's own location rather than a fixed path: `bun
+// Bun's resolver from Moi's own location rather than a fixed path: `bun
 // install -g` hoists moi's dependencies beside the package, so
 // `../node_modules/@types` only exists in a dev checkout, and TypeScript never
 // falls back to node_modules for `types` entries once `typeRoots` is set. The
@@ -24,7 +24,7 @@ export function resolvePackageTypeRoot(from: string = import.meta.dir): string {
   try {
     return dirname(dirname(Bun.resolveSync('@types/bun/package.json', from)))
   } catch {
-    throw new Error("moi's bundled @types/bun is missing — reinstall moi-computer")
+    throw new Error("Moi's bundled @types/bun is missing — reinstall moi-computer")
   }
 }
 

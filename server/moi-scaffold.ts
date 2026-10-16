@@ -95,7 +95,7 @@ async function runBunInstall(moiDir: string, logPath: string): Promise<number> {
 // package.json, and lockfile stay committable — they ARE the workspace.
 const REQUIRED_IGNORES = ['.build/', '.cache/', 'node_modules/'] as const
 
-export const MOI_GITIGNORE = `# moi internals — machine-local, re-creatable state
+export const MOI_GITIGNORE = `# Moi internals — machine-local, re-creatable state
 ${REQUIRED_IGNORES.join('\n')}
 `
 

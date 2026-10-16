@@ -4,7 +4,7 @@ Updated 2026-09-05 (Asia/Nicosia). These notes replace the original conformance
 report and its implementation plan. Findings, verification limits, and proposed
 solutions are consolidated here. The fixes below are not implemented.
 
-**Fix moi's session lifecycle and protocol mapping before adding providers.**
+**Fix Moi's session lifecycle and protocol mapping before adding providers.**
 The independent host probe exposed twelve failed behavior checks despite all
 42 existing ACP tests passing. Provider compatibility then needs a few focused
 hooks: fx process isolation and history retrieval, Hermes completion/usage
@@ -13,7 +13,7 @@ migration, and custom-agent registry are not prerequisites.
 
 ## 1. Evidence and verification
 
-Fresh tests ran against moi `9bfd2ed` and `@agentclientprotocol/sdk@1.3.0`:
+Fresh tests ran against Moi `9bfd2ed` and `@agentclientprotocol/sdk@1.3.0`:
 
 | Agent  | Command            | Installed version             | Model used                          |
 | ------ | ------------------ | ----------------------------- | ----------------------------------- |
@@ -30,7 +30,7 @@ shell/write/read operations, injected environment values checked against the
 resulting file, multiple sessions, cold list/load/resume, nonexistent sessions,
 nondefault modes, cancellation during tools, and broken MCP startup. Hermes
 steering was exercised during an active shell call. The host probe separately
-drove moi's actual ACP client, session, and adapter through a mock subprocess.
+drove Moi's actual ACP client, session, and adapter through a mock subprocess.
 
 Images, successful MCP calls, permission-denial behavior, Cursor `--force`, and
 subagent transcripts have **historical capture evidence only**. Those captures
@@ -90,7 +90,7 @@ not a destructive runtime probe against a user's active sessions.
 
 The installed SDK explicitly defines `ToolCallUpdate.content` and `locations`
 as replacements. An omitted field preserves its previous value; an explicit
-`[]` clears it. moi currently fails to clear both and drops `rawOutput`.
+`[]` clears it. Moi currently fails to clear both and drops `rawOutput`.
 Preserve structured diffs and outputs instead of flattening them to `newText`.
 
 `rawOutput` and `UsageUpdate.cost` are standard fields in SDK 1.3.0; cost is a
@@ -127,7 +127,7 @@ and surface rejected changes. See [session config options](https://agentclientpr
 
 Modes are not a portable permission policy: `code` or `agent` does not imply
 bypass. Apply an explicit preset policy and answer permission requests.
-`resumeSession` already reapplies moi's no-prompt mode after `session/load`;
+`resumeSession` already reapplies Moi's no-prompt mode after `session/load`;
 adding that same load-path fix again would be redundant.
 
 ### Capabilities and authentication need separate checks
@@ -140,7 +140,7 @@ agents. No login was performed during this audit.
 
 Check advertised image/resource capabilities. An agent reading a supplied URI
 does not prove it consumed embedded content; a strict test needs an inline-only
-random marker with no readable file. moi's text-only chunk handler currently
+random marker with no readable file. Moi's text-only chunk handler currently
 drops unsupported assistant media. Unknown extension requests should receive
 prompt errors, but returning an error is not implementing the associated feature.
 
@@ -267,7 +267,7 @@ background command exited. Test this path before implementing late-output rules.
   can arrive after the start. Tool IDs can include newlines; replay IDs differ.
 - **Keep the existing permission callback policy.** Shell approval was freshly
   observed; successful MCP calls and `--force` have historical evidence.
-  The callback already supports moi's current auto-approval behavior; requiring
+  The callback already supports Moi's current auto-approval behavior; requiring
   a global flag is unnecessary.
 - **Plan mode needs an implementation:** historical captures show a
   `cursor/create_plan` request. Returning an unsupported-method error prevents
@@ -284,7 +284,7 @@ background command exited. Test this path before implementing late-output rules.
 - **Treat connector startup separately:** broken stdio MCP creation still
   returned a session ID, as with Hermes.
 
-## 5. Existing moi defects and acceptance criteria
+## 5. Existing Moi defects and acceptance criteria
 
 The independent host probe reproduced twelve failed checks, grouped below into
 nine related problems. These are host defects, independent of the provider
@@ -391,9 +391,9 @@ linked existing upstream issue is #1; no new reports were sent in this audit.
 | 6   | fx     | Invalid model accepted on the tested gateway. Validate picker values and confirmed state; do not generalize to every backend.                  |
 | 7   | Hermes | Missing file-tool completions confirmed. Honest unresolved outcomes locally; invocation-ID pairing upstream.                                   |
 | 8   | Hermes | Model rebuild omits MCP config in source. Retain/reattach specs and isolate conflicting registries.                                            |
-| 9   | Cursor | Shell approvals confirmed; MCP/force historical. Existing permission callback supports current moi policy.                                     |
+| 9   | Cursor | Shell approvals confirmed; MCP/force historical. Existing permission callback supports current Moi policy.                                     |
 | 10  | Cursor | Usage absent in tested paths. Display unavailable and accept future standard updates.                                                          |
-| 11  | All    | Universal mode reset disproved. Cursor preserves plan; Hermes preserves warm mode; moi already reapplies mode after load.                      |
+| 11  | All    | Universal mode reset disproved. Cursor preserves plan; Hermes preserves warm mode; Moi already reapplies mode after load.                      |
 | 12  | fx     | Effort option inert. No global settings swap; upstream session-local option and persistence.                                                   |
 | 13  | Hermes | Effort config not passed through constructor path. Resolve/pass session reasoning upstream; keep picker unavailable meanwhile.                 |
 | 14  | Cursor | Exact catalog variants work; separate effort override not established. Do not invent IDs or claim impossibility.                               |
@@ -402,7 +402,7 @@ linked existing upstream issue is #1; no new reports were sent in this audit.
 | 17  | Hermes | Newly found cumulative prompt usage. Delta only within a known agent instance and preserve unknown baselines.                                  |
 | 18  | Hermes | Newly found nonexistent load returns `{}`. Explicit error upstream; cautious membership checks locally.                                        |
 | 19  | Cursor | Newly found empty session cannot cold-load before its first prompt. Retain live ownership.                                                     |
-| 20  | moi    | Twelve failed host checks plus source-confirmed lifecycle gaps. Fix and regress before adding providers (§5–7).                                |
+| 20  | Moi    | Twelve failed host checks plus source-confirmed lifecycle gaps. Fix and regress before adding providers (§5–7).                                |
 
 ## 9. Sources and remaining uncertainty
 

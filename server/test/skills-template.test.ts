@@ -47,7 +47,7 @@ describe('installBundledSkills', () => {
       expect(await Bun.file(join(dir, CHEAT_SHEET)).exists()).toBe(true)
       expect(await Bun.file(join(dir, COLLAB_GUIDE)).exists()).toBe(false)
       // The rest of the skill installs normally.
-      expect(skillMd).toContain('# moi workspace')
+      expect(skillMd).toContain('# Moi workspace')
     })
   })
 

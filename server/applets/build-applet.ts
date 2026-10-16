@@ -92,7 +92,7 @@ async function validateServerExports(filePath: string): Promise<string[]> {
   return runtimeExports
 }
 
-// Server modules are keyed by their path relative to the moi root
+// Server modules are keyed by their path relative to the Moi root
 // (`.moi/widgets/hello.server.ts` → `"widgets/hello"`), posix-normalized so
 // keys are stable across platforms. Throws when the file escapes the root.
 // Both sides are canonicalized first: Bun's resolver returns realpaths
@@ -112,7 +112,7 @@ function serverModuleKey(serverPath: string, moiRoot: string): string {
     .split(sep)
     .join('/')
   if (key === '..' || key.startsWith('../')) {
-    throw new Error(`Server file "${serverPath}" escapes the moi root "${moiRoot}"`)
+    throw new Error(`Server file "${serverPath}" escapes the Moi root "${moiRoot}"`)
   }
   return key
 }
@@ -172,7 +172,7 @@ function appletRuntimePlugin(
 
       // Intercept .server imports (relative only). Resolved against the
       // importing file's directory — server files may live anywhere under
-      // the moi root, e.g. `../lib/db.server`.
+      // the Moi root, e.g. `../lib/db.server`.
       build.onResolve({ filter: /\.server(\.ts)?$/ }, args => {
         if (!args.path.startsWith('.')) return
         const baseDir =
@@ -210,7 +210,7 @@ function appletRuntimePlugin(
 // provides the same texture utilities available to host components.
 const HOST_THEME_PATH = join(import.meta.dir, '..', '..', 'client', 'theme.css')
 
-// The shadcn styling vocabulary, text-inlined from moi's OWN node_modules the
+// The shadcn styling vocabulary, text-inlined from Moi's OWN node_modules the
 // same way theme.css is. Tailwind v4 only emits utilities it can resolve:
 // installed ui components lean on `tw-animate-css` (animate-in/out, fade,
 // zoom, slide) and `shadcn/tailwind.css` (data-open/data-closed variants,

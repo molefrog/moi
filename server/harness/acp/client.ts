@@ -150,7 +150,7 @@ async function startClient(spec: AcpSpawnSpec): Promise<ClientRecord> {
     send({
       jsonrpc: '2.0',
       id: msg.id,
-      error: { code: -32601, message: `moi does not handle ${method}` }
+      error: { code: -32601, message: `Moi does not handle ${method}` }
     })
   }
 

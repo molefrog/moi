@@ -65,7 +65,7 @@ async function resolveWorkspace(
   if (!match) {
     ws.send(
       JSON.stringify({
-        error: `${reqPath} is not inside a registered moi workspace. Open it in moi, or run from the workspace root.`
+        error: `${reqPath} is not inside a registered Moi workspace. Open it in Moi, or run from the workspace root.`
       })
     )
     return null

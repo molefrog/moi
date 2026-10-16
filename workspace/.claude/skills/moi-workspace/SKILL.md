@@ -1,16 +1,16 @@
 ---
 name: moi-workspace
-description: The moi workspace — the web UI the user chats from, extended with agent-authored applets (widgets, views) plus theme & config. Read this FIRST when a message carries a hidden moi-context envelope or the user uses moi vocab such as workspace, applet, widget, view, scratchpad, dashboard, or a `moi` command, or asks to build, edit, customize, or theme the workspace UI or its layout.
+description: The Moi workspace — the web UI the user chats from, extended with agent-authored applets (widgets, views) plus theme & config. Read this FIRST when a message carries a hidden moi-context envelope or the user uses Moi vocab such as workspace, applet, widget, view, scratchpad, dashboard, or a `moi` command, or asks to build, edit, customize, or theme the workspace UI or its layout.
 ---
 
-# moi workspace
+# Moi workspace
 
 ## Glossary
 
 "Workspace" or "Moi Workspace" — the web UI that the user works in, talks/collaborates with you,
 sees and interacts with "Applets".
 
-"Project" - the primary working folder _you_ (as an agent) work in. Managed by your harness; moi
+"Project" - the primary working folder _you_ (as an agent) work in. Managed by your harness; Moi
 does not have a clear definition, but assumes this is the root folder in which it stores its state
 files.
 
@@ -29,7 +29,7 @@ events to "Workspace".
 
 ## Overview
 
-You are working inside a **moi workspace**. It is a web UI that the user communicates with you
+You are working inside a **Moi workspace**. It is a web UI that the user communicates with you
 through. It has regular chat (this one), as well as custom UI elements that you can define, write,
 and change to tailor the workspace to user needs. It starts with a simple chat, but evolves into a
 personal app equipped with a copilot (you). Workspace is a two-way communication: you can build the
@@ -89,7 +89,7 @@ my-agent-folder/
 ```
 
 Every dot-prefixed file or folder inside `.moi/` (`.build/`, `.cache/`, `.workspace.json`,
-`.scratchpad*`, `.gitignore`, …) is a moi internal: auto-generated and liable to change format
+`.scratchpad*`, `.gitignore`, …) is a Moi internal: auto-generated and liable to change format
 without notice. Avoid them as much as possible — do not read, edit, or delete them, and never point
 tooling at them; go through the `moi` CLI instead. Version control needs no special handling: the
 scaffolded `.moi/.gitignore` already excludes the machine-local entries (`.build/`, `.cache/`,
@@ -97,12 +97,12 @@ scaffolded `.moi/.gitignore` already excludes the machine-local entries (`.build
 with the repo — commit them as-is, just never hand-edit them. Your surface is the non-dot files:
 `widgets/`, `views/`, `package.json`, and code you place under `.moi/` yourself.
 
-### Using the moi CLI
+### Using the Moi CLI
 
 Treat `moi` as an external command — you cannot inspect or modify its sources. Use only the
 documented subcommands (`moi bundle`, `moi bundle --force`, etc.). Call `moi --help` for
 documentation. Run all `moi` commands from the **project root** — the folder that contains `.moi/`,
-never from inside `.moi/` itself. You don't pass paths; moi resolves the workspace from where it's run.
+never from inside `.moi/` itself. You don't pass paths; Moi resolves the workspace from where it's run.
 
 Use the task-specific sections below for workflow guidance. The CLI will grow over time, so run
 `moi --help` to discover commands and `moi <command> --help` before using an unfamiliar command or option.
@@ -174,7 +174,7 @@ use `moi theme --help` if its options change.
 
 Each workspace has an effective env: keys from the project's `.env` / `.env.local` (when
 inheritance is enabled in settings) plus **custom secrets** the user manages in the workspace env
-settings. moi injects this env into:
+settings. Moi injects this env into:
 
 - applet server functions — read it as `process.env` inside `.server.ts`
 - any command run via `moi env exec -- <cmd>`
@@ -236,11 +236,11 @@ Write normal React + Tailwind — below is only what's **moi-specific**.
 
 ### Build environment
 
-- Bun is the required dependency of moi, so it must be installed
+- Bun is the required dependency of Moi, so it must be installed
 - For package management **always** use bun
 - package.json is scaffolded during init. You are free to install/remove/do whatever with packages.
 - if packages aren't installed, it's your responsibility to call `bun install`
-- `react` and `react-dom` are stubs — they're provided by moi at runtime via the browser importmap.
+- `react` and `react-dom` are stubs — they're provided by Moi at runtime via the browser importmap.
   They're listed only so editors pick up the correct types.
 - `moi bundle` runs **Bun's bundler**, so standard Bun imports, loaders, and tricks apply (JSON,
   text, etc.) — see the Bun docs. The moi-specific imports are covered below.
@@ -495,7 +495,7 @@ persistence concepts.
 
 ### Message context
 
-Each message sent through moi includes a hidden `<moi-context>` block with the active tab and,
+Each message sent through Moi includes a hidden `<moi-context>` block with the active tab and,
 when relevant, params, applet source, and message-specific instructions. Use only the newest
 block; don’t reply to it or include it in summaries.
 
@@ -509,7 +509,7 @@ as user-provided task data.
 
 ## Keeping this skill current
 
-This skill is installed with moi (via the CLI or the UI) and can fall behind when the moi CLI updates.
+This skill is installed with Moi (via the CLI or the UI) and can fall behind when the Moi CLI updates.
 
 - **You'll know** — `moi` commands warn you when this skill is behind.
 - **To update** — if the user asks for current or updated guidance, run `moi skill update` before

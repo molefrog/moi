@@ -1,9 +1,9 @@
 # Codex harness
 
-moi drives chats through `codex app-server`, a persistent process speaking
+Moi drives chats through `codex app-server`, a persistent process speaking
 newline-delimited JSON-RPC over stdio. It provides native model and session
 lists, token deltas, steering, and interruption. Codex owns durable history;
-moi holds a display copy and translates native items into shared chat events.
+Moi holds a display copy and translates native items into shared chat events.
 
 The upstream [app-server specification](https://learn.chatgpt.com/docs/app-server)
 defines the protocol; generated types from the installed CLI define its exact wire shapes.
@@ -21,7 +21,7 @@ defines the protocol; generated types from the installed CLI define its exact wi
 | `auth.ts`, `discovery.ts`, `status.ts` | Check login readiness, discover workspace paths from rollout heads, and report running processes.                      |
 | `session-title.ts`                     | Generates a title with a separate ephemeral `codex exec` call and applies it if the session is still unnamed.          |
 | `thread-list.ts`                       | Lists workspace threads from the state DB and hides agent-created tasks.                                               |
-| `probe.ts`                             | Runs standalone protocol diagnostics without moi's session or workspace policy.                                        |
+| `probe.ts`                             | Runs standalone protocol diagnostics without Moi's session or workspace policy.                                        |
 
 The shared contract and event layers are in [../README.md](../README.md).
 
@@ -40,7 +40,7 @@ its active runs. Idle display eviction does not stop the workspace process.
 Codex resolves its own configuration and credentials, including `CODEX_HOME`
 (default `~/.codex`). Installations can share that home while running different
 binary versions. `config/read` with the workspace cwd supplies effective model,
-effort, and tier defaults; moi does not rewrite the user's Codex config.
+effort, and tier defaults; Moi does not rewrite the user's Codex config.
 
 Initialization enables `experimentalApi`, reads the version from `userAgent`,
 and then sends `initialized`. The availability check rejects parsed versions
@@ -54,7 +54,7 @@ reach the harness's 30-second RPC timeout before Bun closes the connection.
 
 ## Session lifecycle
 
-- A new chat starts under a temporary moi id. `thread/start` supplies the real
+- A new chat starts under a temporary Moi id. `thread/start` supplies the real
   id; `session_renamed` rekeys the chat, saved settings, and pending-build references.
 - View handoffs pass the source chat's saved model to `thread/fork`. Codex 0.160.0
   otherwise starts the fork with the configured default; switching an active-source
@@ -123,14 +123,14 @@ otherwise the adapter uses its advertised default. Fast mode is available when
 to `additionalSpeedTiers: ["fast"]`. A non-null configured tier takes precedence
 over the catalog default.
 
-| moi fast-mode setting | Native `serviceTier`                     |
+| Moi fast-mode setting | Native `serviceTier`                     |
 | --------------------- | ---------------------------------------- |
 | On                    | `"priority"`                             |
 | Off                   | `null`                                   |
 | Unset                 | Omitted; inherits the config/thread tier |
 
 Model, effort, and tier changes apply on the next **new turn**. `turn/steer`
-has no fields for changing them during an active turn. moi uses the persistent
+has no fields for changing them during an active turn. Moi uses the persistent
 `serviceTier` override for chat settings; it does not use the newer
 `serviceTierForTurn` override, which affects only one turn.
 
@@ -145,14 +145,14 @@ The version gate matters because older servers can silently ignore the field.
 
 `permissions.ts` selects workspace-write access and `approvalPolicy: 'on-request'`
 on start/resume. New turns explicitly set the workspace-write sandbox with
-network access disabled. moi automatically accepts supported permission
+network access disabled. Moi automatically accepts supported permission
 requests; there is no command-approval UI.
 Command/file requests use `decision: 'accept'`, legacy requests use `approved`,
 and permission extensions grant the requested network/file-system fields for
 `scope: 'turn'`. Unknown request methods receive an unsupported-method error.
 
 Native question forms (`item/tool/requestUserInput`) are not supported and
-receive the same unsupported-method error. moi does not opt into
+receive the same unsupported-method error. Moi does not opt into
 `features.default_mode_request_user_input`. MCP schema/URL elicitation is
 declined with `action: 'decline'`.
 
@@ -181,7 +181,7 @@ Before restoring support:
 
 - Native items become display turns or notices. `clientUserMessageId` is echoed
   as `clientId` on live user items, so the optimistic bubble is updated in place.
-  Replay can change item ids and omit `clientId`; they are not durable moi ids.
+  Replay can change item ids and omit `clientId`; they are not durable Moi ids.
 - Agent text and reasoning-summary deltas become cumulative previews, batched
   every 40ms. Item completion removes its pending preview. Command output
   deltas are also batched; the live tail is bounded to 64K characters until the
@@ -218,7 +218,7 @@ Before restoring support:
    frames and pending native input before assuming it is still generating.
 3. Update the selected standalone CLI with `codex update` when it supports that
    command. Already-running app-servers keep the old executable until restarted;
-   let active chats finish before restarting them or the moi dev server.
+   let active chats finish before restarting them or the Moi dev server.
 
 Read-only standalone probes (run from the repo root):
 
@@ -229,7 +229,7 @@ bun server/harness/codex/probe.ts rpc "$PWD" config/read '{}'
 ```
 
 The probe uses the invoking shell's PATH/environment, disables experimental
-fields, and logs raw frames. Use the running moi wire tap to verify workspace
+fields, and logs raw frames. Use the running Moi wire tap to verify workspace
 policy or actual UI behavior.
 
 Wire types are a hand-written subset, read defensively. Generate reference

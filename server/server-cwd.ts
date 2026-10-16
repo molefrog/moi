@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'path'
 
-// Where the moi server child process should run.
+// Where the Moi server child process should run.
 //
 // It only needs to sit in the package root when the DEV BUNDLER will run at
 // boot: Bun reads bunfig.toml and its cwd-relative `[serve.static]` plugins

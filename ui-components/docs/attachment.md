@@ -112,7 +112,7 @@ moi ui-components add attachment
 
 <Steps className="mb-0 pt-2">
 
-<Step>Install the required moi component:</Step>
+<Step>Install the required Moi component:</Step>
 
 ```bash
 moi ui-components add button

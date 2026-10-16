@@ -30,7 +30,7 @@ async function addExecutable(command: string): Promise<string> {
 }
 
 describe('PATH harness executables', () => {
-  test("ignores moi's bundled OpenClaw command even when bun run adds it to PATH", async () => {
+  test("ignores Moi's bundled OpenClaw command even when bun run adds it to PATH", async () => {
     const bundledBin = join(import.meta.dir, '..', '..', 'node_modules', '.bin')
     const searchPath = [bundledBin, tempDir].join(delimiter)
     expect(findHarnessExecutable('openclaw', searchPath)).toBeNull()

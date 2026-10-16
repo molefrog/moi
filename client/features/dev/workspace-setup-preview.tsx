@@ -137,7 +137,7 @@ function SetupPreview({ mocks, client, environment, harness, scenario }: SetupPr
                 Copy this authorization code, close this dialog, and submit it in the login screen:
               </p>
               <code>MOCK-AUTH-CODE</code>
-              <Button onClick={() => setProvider('closed')}>Back to moi</Button>
+              <Button onClick={() => setProvider('closed')}>Back to Moi</Button>
             </>
           ) : (
             <>

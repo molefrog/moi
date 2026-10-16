@@ -27,7 +27,7 @@ export function SkillUpdateBanner({
         className="flex items-center gap-1.5 text-muted-foreground"
       >
         <IconLoader2 size={20} stroke={1.5} className="shrink-0 animate-spin" />
-        <span className="wrap-break-word">Updating moi skills…</span>
+        <span className="wrap-break-word">Updating Moi skills…</span>
       </ComposerBannerShell>
     )
   }
@@ -48,7 +48,7 @@ export function SkillUpdateBanner({
         {error ? (
           <span className="wrap-break-word">{`Update failed: ${error}`}</span>
         ) : (
-          <span className="wrap-break-word">This workspace is using old moi skills</span>
+          <span className="wrap-break-word">This workspace is using old Moi skills</span>
         )}
       </div>
 

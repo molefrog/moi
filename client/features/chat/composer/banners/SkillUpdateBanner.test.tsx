@@ -26,7 +26,7 @@ describe('SkillUpdateBanner', () => {
     const html = renderBanner()
 
     expect(html).toContain('tabler-icon-folder-exclamation')
-    expect(html).toContain('This workspace is using old moi skills')
+    expect(html).toContain('This workspace is using old Moi skills')
     expect(html).toContain('Auto-update')
     expect(html).toContain('Update once')
     expect(html).toContain('aria-label="Dismiss skill update"')
@@ -39,8 +39,8 @@ describe('SkillUpdateBanner', () => {
 
     expect(html).toContain('role="status"')
     expect(html).toContain('tabler-icon-loader-2')
-    expect(html).toContain('Updating moi skills…')
-    expect(html).not.toContain('This workspace is using old moi skills')
+    expect(html).toContain('Updating Moi skills…')
+    expect(html).not.toContain('This workspace is using old Moi skills')
     expect(html).not.toContain('Auto-update')
     expect(html).not.toContain('Update once')
     expect(html).not.toContain('aria-label="Dismiss skill update"')
@@ -49,7 +49,7 @@ describe('SkillUpdateBanner', () => {
   test('keeps the existing pending state for one-time updates', () => {
     const html = renderBanner({ pendingAction: 'once' })
 
-    expect(html).toContain('This workspace is using old moi skills')
+    expect(html).toContain('This workspace is using old Moi skills')
     expect(html).toContain('Updating…')
     expect((html.match(/(?<!-)disabled=""/g) ?? []).length).toBe(2)
     expect(html).toContain('aria-label="Dismiss skill update"')

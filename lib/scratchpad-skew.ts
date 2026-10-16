@@ -53,7 +53,7 @@ export function describeNewerWriter(
   writer: ScratchpadWriter | undefined,
   ahead: SequenceAhead[]
 ): string {
-  if (writer) return `moi ${writer.moi}, tldraw ${writer.tldraw}`
+  if (writer) return `Moi ${writer.moi}, tldraw ${writer.tldraw}`
   return ahead
     .map(a =>
       a.runtimeVersion === undefined

@@ -38,7 +38,7 @@ describe('WelcomeState', () => {
     const html = renderWelcome()
 
     expect(renderedParagraphs(html)).toEqual([
-      'moi is the personal workspace built for you by your agent. It grows and adapts to your needs.',
+      'Moi is the personal workspace built for you by your agent. It grows and adapts to your needs.',
       'Ask the agent to build widgets on the Overview page, or more complex tools as separate Views. Use Scratchpad for exploring and shaping ideas with your agent.',
       'Try an example:'
     ])

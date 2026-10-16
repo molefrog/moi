@@ -11,7 +11,7 @@ Agent chat UI powered by Claude Agent SDK, Bun, React, and Tailwind.
 `AGENTS.md` files (root, `client/`, `server/`) are the canonical instructions. Claude Code v2.1.277+ reads them directly when no `CLAUDE.md` or `CLAUDE.local.md` exists in the working directory or above it. Keep project instructions in `AGENTS.md`. Rules and skills live in agent-neutral directories, with symlinks for Claude Code:
 
 - `.agents/rules/` — topic rules (canonical). `.claude/rules` is a symlink to it, so Claude Code auto-loads them. **Other agents: read the relevant rule before editing matching files:**
-  - `product-language.md` (always) — `moi` casing, sentence case, terminology, and action copy
+  - `product-language.md` (always) — `Moi` casing, sentence case, terminology, and action copy
   - `typescript.md` (`*.ts`, `*.tsx`) — props types, no `any`, `type` over `interface`
   - `tailwind.md` (`*.tsx`, `*.css`) — Tailwind-only styling, no inline styles, `cn()`
   - `icons.md` (`*.tsx`) — `@tabler/icons-react` only, sizing and stroke conventions
@@ -25,10 +25,10 @@ Claude-only config (`.claude/settings.json` hooks, `.claude/launch.json`) stays 
 
 ## Data flow
 
-- Each workspace added/imported to moi stores its settings in a `.moi/.workspace.json` file in the workspace folder (hidden filename; `server/layout.ts` is its sole reader/writer).
+- Each workspace added/imported to Moi stores its settings in a `.moi/.workspace.json` file in the workspace folder (hidden filename; `server/layout.ts` is its sole reader/writer).
 - Everything inside `.moi/` is safe to commit, so the same workspace can be shared with others — except the machine-local dot-dirs: `.build/` (bundler output), `.cache/` (derived artifacts such as applet thumbnails, see `server/thumbnails.ts`), and `.scratchpad/`. All are re-creatable and safe to delete or gitignore.
 - Prefer `.moi/.workspace.json` for state that describes the workspace itself rather than the person or device using it — e.g. chat/thread settings, widget layout, connectors. Litmus test: anyone who clones the workspace should get the same value.
-- Store per-user app state that should follow the local moi installation in the server-side `DATA_DIR`. Expose it through the API and use React Query for client caching and optimistic updates.
+- Store per-user app state that should follow the local Moi installation in the server-side `DATA_DIR`. Expose it through the API and use React Query for client caching and optimistic updates.
 - Store per-browser or per-device UI preferences in `client/store/ui.ts`.
 - Decide ownership before adding persistence. Selected sessions and other user-specific choices do not belong in `.moi/`.
 

@@ -1,4 +1,4 @@
-// The one place that knows how to turn a directory into a moi workspace:
+// The one place that knows how to turn a directory into a Moi workspace:
 // bundled skills + the `.moi/` scaffold, with the skills location keyed on the
 // agent backend. `moi init`, `moi openclaw init`, and the HTTP API (UI import /
 // create) all provision through here, so a workspace set up from the UI is

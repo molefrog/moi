@@ -17,7 +17,7 @@ import {
   type WorkspaceAgentOption
 } from './workspace-agent-options'
 
-const WORKSPACE_AGENT_DESCRIPTION = 'Choose which agent moi will use to build your workspace'
+const WORKSPACE_AGENT_DESCRIPTION = 'Choose which agent Moi will use to build your workspace'
 type WorkspaceAgentSelectorProps = {
   title: string
   selectedType: WorkspaceType
@@ -52,9 +52,9 @@ export function WorkspaceAgentSelector({
   const selectedUnavailable = selectableType !== selectedType
   const subscriptionTip =
     selectableType === 'claude-code'
-      ? 'Tip: you can use your existing Claude subscription in moi'
+      ? 'Tip: you can use your existing Claude subscription in Moi'
       : selectableType === 'codex'
-        ? 'Tip: you can use your existing ChatGPT subscription in moi'
+        ? 'Tip: you can use your existing ChatGPT subscription in Moi'
         : undefined
 
   useEffect(() => {

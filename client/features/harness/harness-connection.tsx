@@ -10,6 +10,7 @@ import { Skeleton } from '@/client/components/ui/skeleton'
 import { startHarnessLogin, submitHarnessLoginCode, useHarnessConnection } from './api'
 
 import { DeviceLoginSteps } from './device-login-steps'
+import { IconArrowRight } from '@tabler/icons-react'
 
 export type LoginHarness = 'claude-code' | 'codex'
 
@@ -54,10 +55,7 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
 
   return (
     <section
-      className={cn(
-        '@container flex w-full flex-col gap-3 self-center',
-        !pending?.userCode && 'max-w-xs'
-      )}
+      className={cn('flex w-full flex-col gap-3 self-center', !pending?.userCode && 'max-w-xs')}
       aria-label={name}
     >
       {auth.isPending ? (
@@ -88,7 +86,7 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
               <p role="status" className="text-sm text-muted-foreground">
                 {pending.acceptsCode && !waitingForBrowser
                   ? 'Sign in to get the authorization code.'
-                  : 'Sign in in your browser, then come back to moi. Your workspace will open once you’re connected.'}
+                  : 'Sign in in your browser, then come back to Moi. Your workspace will open once you’re connected.'}
               </p>
               {pending.url && (
                 <a
@@ -135,8 +133,13 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
               )}
             </>
           ) : (
-            <Button disabled={action.isPending || starting} onClick={() => action.mutate('start')}>
-              {action.isPending || starting ? 'Starting sign-in…' : 'Log in'}
+            <Button
+              className="self-center"
+              disabled={action.isPending || starting}
+              onClick={() => action.mutate('start')}
+            >
+              Continue
+              <IconArrowRight stroke={1.75} data-icon="inline-end" />
             </Button>
           )}
         </>

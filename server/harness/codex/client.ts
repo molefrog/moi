@@ -190,7 +190,7 @@ async function startClient(workspacePath?: string): Promise<ClientRecord> {
   // Native context fields require experimentalApi on this connection.
   try {
     const init = await client.rpc<{ userAgent?: string }>('initialize', {
-      clientInfo: { name: 'moi', title: 'moi', version: '0.1' },
+      clientInfo: { name: 'moi', title: 'Moi', version: '0.1' },
       capabilities: { experimentalApi: true, requestAttestation: false }
     })
     client.supportsAdditionalContext = codexSupportsAdditionalContext(init?.userAgent)

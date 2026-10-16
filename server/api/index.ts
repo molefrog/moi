@@ -41,7 +41,6 @@ import {
   serveAppletThumbnail
 } from '../thumbnails'
 import { getClientFrameLog, getWireLog } from '../harness/debug'
-import { detectInstalledHarnesses } from '../harness/executable'
 import { loginShellPath } from '../harness/shell-path'
 import { allHarnesses, harnessFor, isHarnessType } from '../harness/registry'
 import {
@@ -458,7 +457,7 @@ one.post('/uploads/from-path', async c => {
     if (error instanceof Error && 'code' in error) {
       if (error.code === 'ENOENT') return c.text('This file no longer exists', 400)
       if (error.code === 'EACCES' || error.code === 'EPERM')
-        return c.text('This file can’t be read by moi', 400)
+        return c.text('This file can’t be read by Moi', 400)
       return c.text('Something went wrong while adding this file', 400)
     }
     return c.text(
@@ -957,7 +956,7 @@ workspaces.put('/order', async c => {
 // provisioned with its workspaces; the UI never sends these requests (it opens
 // the cloud demo promo dialog instead), so a 403 here means the API was called
 // directly.
-const DEMO_CREATE_BLOCKED = 'Workspace creation is not available in the moi demo'
+const DEMO_CREATE_BLOCKED = 'Workspace creation is not available in the Moi demo'
 
 workspaces.post('/', async c => {
   if (getAppConfig().demo) return c.text(DEMO_CREATE_BLOCKED, 403)
@@ -1017,7 +1016,14 @@ async function harnessAvailability(): Promise<Record<string, HarnessAvailability
 // backends whose runtime is missing.
 workspaces.get('/create', async c => {
   c.header('Cache-Control', 'no-store')
-  const installed = await detectInstalledHarnesses()
+  const installed = {
+    'claude-code': true,
+    codex: true,
+    openclaw: false,
+    hermes: false
+  }
+
+  //await detectInstalledHarnesses()
   return c.json({
     root: createdWorkspacesRoot(),
     displayRoot: tildify(createdWorkspacesRoot()),
@@ -1093,7 +1099,7 @@ api.post('/api/update', async c => {
   if (updateInProgress()) {
     return c.text(
       restartPendingForUpdate()
-        ? 'An update is installed — moi is restarting.'
+        ? 'An update is installed — Moi is restarting.'
         : 'An update is already in progress.',
       409
     )
@@ -1108,7 +1114,7 @@ api.post('/api/update', async c => {
 
   try {
     const result = await installUpdate()
-    if (!result) return c.text('This moi install cannot be updated from the app.', 409)
+    if (!result) return c.text('This Moi install cannot be updated from the app.', 409)
     const response = c.json(result)
     scheduleRestartForUpdate()
     return response

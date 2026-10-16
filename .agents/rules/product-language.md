@@ -3,7 +3,7 @@ description: Product language and copy conventions for repo prose and the main a
 alwaysApply: true
 ---
 
-- Write the product name as `moi` in all prose and user-facing copy. Preserve existing casing only for technical identifiers.
+- Write the product name as `Moi` in all prose and user-facing copy. Preserve lowercase only for technical identifiers and `moi` CLI.
 - Use sentence case for headings, labels, actions, navigation, and messages.
 - Prefer the product nouns workspace, chat, agent, model, widget, view, connector, session, and run.
 - Use agent in UI copy for supported coding tools, such as “Connect an agent”.

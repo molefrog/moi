@@ -37,7 +37,7 @@ const DEV_ROUTES: DevRouteEntry[] = [
   {
     path: '/dev/ui-components',
     title: 'UI components',
-    description: 'Interactive previews for every component in the local moi registry.'
+    description: 'Interactive previews for every component in the local Moi registry.'
   },
   {
     path: '/dev/textures',

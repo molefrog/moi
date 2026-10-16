@@ -9,9 +9,9 @@
 //
 // Nothing is destroyed: the chat stays in the backend's own store and remains
 // visible to that agent's CLI, which is the correct boundary — moi hides a chat
-// from moi, not from the user's agent.
+// from Moi, not from the user's agent.
 //
-// Stored OUTSIDE the workspace (no repo churn) in ONE global JSON file in moi's
+// Stored OUTSIDE the workspace (no repo churn) in ONE global JSON file in Moi's
 // data dir, keyed by workspace path then session id:
 //   { "<workspacePath>": ["<sessionId>", …] }
 // Path (not registry id) is the key so the list survives re-registration, the

@@ -153,7 +153,7 @@ describe('Claude session message queue', () => {
     ])
   })
 
-  test('keeps follow-ups in moi until each preceding result, without state events', async () => {
+  test('keeps follow-ups in Moi until each preceding result, without state events', async () => {
     await send()
     const d = drivers[0]!
     const second = send({ content: 'second' })

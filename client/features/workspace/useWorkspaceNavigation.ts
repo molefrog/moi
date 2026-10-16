@@ -43,7 +43,11 @@ type UseWorkspaceNavigationOptions = {
   onOpenChat: () => void
 }
 
-export function useWorkspaceNavigation({ views, onOpenChat, enabled = true }: UseWorkspaceNavigationOptions) {
+export function useWorkspaceNavigation({
+  views,
+  onOpenChat,
+  enabled = true
+}: UseWorkspaceNavigationOptions) {
   const queryClient = useQueryClient()
   const { workspaceId } = useWorkspaceLayoutCtx()
   const [tabsState, saveTabs] = useWorkspaceTabs()
@@ -149,7 +153,17 @@ export function useWorkspaceNavigation({ views, onOpenChat, enabled = true }: Us
         if (navigationRequest.current?.controller === controller) navigationRequest.current = null
       }
     },
-    [base, currentPage, enabled, latest, prefix, queryClient, selectLinkedChat, setLocation, workspaceId]
+    [
+      base,
+      currentPage,
+      enabled,
+      latest,
+      prefix,
+      queryClient,
+      selectLinkedChat,
+      setLocation,
+      workspaceId
+    ]
   )
 
   useEffect(() => {

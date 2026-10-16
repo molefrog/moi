@@ -134,7 +134,7 @@ describe('workspace resolution', () => {
   test('errors outside any registered workspace', async () => {
     const res = await runCli([], { cwd: outsideDir })
     expect(res.code).toBe(1)
-    expect(res.stderr).toContain('not inside a registered moi workspace')
+    expect(res.stderr).toContain('not inside a registered Moi workspace')
   })
 
   test('resolves from a subdirectory of the workspace', async () => {

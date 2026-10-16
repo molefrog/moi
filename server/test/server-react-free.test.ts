@@ -7,7 +7,7 @@ import { join, relative } from 'path'
 // so moi's `react-dom` can land next to a `react` someone else locked earlier.
 // Any server-side import of React turns that into "Server failed to start"
 // before a single request is served (the tldraw-powered scratchpad writer used
-// to). The browser gets React from moi's own vendored ESM (client/vendor/react),
+// to). The browser gets React from Moi's own vendored ESM (client/vendor/react),
 // so nothing outside the browser needs it. Two guards:
 //   1. a static scan: first-party server/lib code, excluding the browser-only
 //      applet collab module, never imports `react`,
@@ -49,7 +49,7 @@ async function freePort(): Promise<number> {
 // packages are CommonJS, so every one that gets evaluated shows up in
 // `require.cache` under its `node_modules/react[-dom]/` path. `control.ts`
 // starts its control server at module load, so the child gets a free port for
-// it — otherwise the check would die with EADDRINUSE whenever a moi server
+// it — otherwise the check would die with EADDRINUSE whenever a Moi server
 // (`bun run dev`, or an installed one) is running alongside the tests.
 async function reactModulesLoadedBy(entry: string): Promise<string[]> {
   const code = [

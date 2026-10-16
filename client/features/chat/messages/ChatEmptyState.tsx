@@ -72,7 +72,7 @@ export const CHAT_WELCOME_PROMPTS = [
 
 export const WORKSPACE_ANALYSIS_PROMPT = {
   label: 'Explore the workspace',
-  prompt: 'Explore this workspace and suggest what moi can build based on its content',
+  prompt: 'Explore this workspace and suggest what Moi can build based on its content',
   context: [
     'Explore the existing workspace files before making suggestions.',
     'Briefly explain what the workspace appears to be for and which content informed your ideas.',
@@ -203,7 +203,7 @@ function WelcomeState({
       <div className="mt-2 flex flex-col gap-4">
         <div className="prose prose-sm min-w-0 wrap-anywhere prose-inherit">
           <p>
-            moi is the personal workspace built for you by your agent. It grows and adapts to your
+            Moi is the personal workspace built for you by your agent. It grows and adapts to your
             needs.
           </p>
           <p>

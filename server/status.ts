@@ -69,7 +69,7 @@ export function renderStatus(): string {
   const now = Date.now()
 
   const lines: string[] = []
-  lines.push('moi server status')
+  lines.push('Moi server status')
   lines.push('=================')
   lines.push('')
   lines.push(`version         ${VERSION}${process.env.MOI_SERVICE ? '  (service-managed)' : ''}`)

@@ -1,7 +1,7 @@
 import { userInfo } from 'node:os'
 import { delimiter } from 'node:path'
 
-// The moi server does not always start from a terminal (GUI launcher, service
+// The Moi server does not always start from a terminal (GUI launcher, service
 // manager), and a non-shell parent's PATH misses exactly the dirs agent CLIs
 // install to: ~/.local/bin, ~/.bun/bin, homebrew, version-manager shims. Probe
 // the user's login shell for its PATH and merge it into every executable

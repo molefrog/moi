@@ -1,6 +1,6 @@
 ---
 title: Drawer
-description: A side panel scoped to the current moi view.
+description: A side panel scoped to the current Moi view.
 ---
 
 ## Add

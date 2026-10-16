@@ -4,7 +4,7 @@
 // the durations itself and re-attaches them on replay. Without a recording the
 // label falls back to a plain "Worked".
 //
-// Stored OUTSIDE the workspace in ONE global JSON file in moi's data dir
+// Stored OUTSIDE the workspace in ONE global JSON file in Moi's data dir
 // (same choice, shape and locking as ./archived.ts), keyed by workspace path
 // then session id, one entry per prompt run in prompt order:
 //   { "<workspacePath>": { "<sessionId>": [12100, 3400, …] } }

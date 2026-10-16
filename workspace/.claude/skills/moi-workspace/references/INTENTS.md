@@ -2,7 +2,7 @@
 
 Intents let an applet act beyond its own UI: open another view, add context to chat, or ask the
 agent to do something. Import these functions from `moi` and call them from user event handlers,
-such as a button click; moi handles the action in the workspace.
+such as a button click; Moi handles the action in the workspace.
 
 ## Navigation and files
 
@@ -27,7 +27,7 @@ const href = `moi:/views/orders?${query}`
 <button onClick={() => navigate(href)}>Open order</button>
 ```
 
-`navigate` opens workspace pages within moi and files or HTTP(S) URLs in the current browser tab.
+`navigate` opens workspace pages within Moi and files or HTTP(S) URLs in the current browser tab.
 See [Files and assets](../SKILL.md#files-and-assets) for file examples and path encoding.
 
 ### View params and history

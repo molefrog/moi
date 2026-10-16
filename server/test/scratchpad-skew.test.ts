@@ -81,8 +81,8 @@ describe('scratchpad version skew', () => {
     )
     expect(logged).not.toHaveBeenCalled()
     logged.mockRestore()
-    expect(err?.message).toContain('written by a newer moi')
-    expect(err?.message).toContain('moi 9.9.9, tldraw 99.0.0')
+    expect(err?.message).toContain('written by a newer Moi')
+    expect(err?.message).toContain('Moi 9.9.9, tldraw 99.0.0')
     expect(err?.message).toContain(`this server has tldraw ${SCRATCHPAD_WRITER.tldraw}`)
     expect(err?.message).toContain('bun install -g moi-computer@latest')
     expect(err?.message).toContain('intact')
@@ -98,7 +98,7 @@ describe('scratchpad version skew', () => {
       () => null,
       (e: Error) => e
     )
-    expect(err?.message).toContain('written by a newer moi')
+    expect(err?.message).toContain('written by a newer Moi')
     expect(err?.message).toContain('com.tldraw.shape.note')
   })
 
@@ -119,7 +119,7 @@ describe('scratchpad version skew', () => {
       (e: Error) => e
     )
     expect(err?.message).toContain('not a version mismatch')
-    expect(err?.message).not.toContain('written by a newer moi')
+    expect(err?.message).not.toContain('written by a newer Moi')
   })
 
   test('the first save after a schema change backs up the old file as .bak', async () => {

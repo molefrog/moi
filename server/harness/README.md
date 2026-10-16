@@ -1,8 +1,8 @@
 # Harnesses
 
-A **harness** is an agent backend moi can drive: it receives user messages,
+A **harness** is an agent backend Moi can drive: it receives user messages,
 runs an agentic loop (model + tools) in a workspace, and streams back events
-that moi normalizes into its agent-agnostic display format.
+that Moi normalizes into its agent-agnostic display format.
 
 ## The layers
 
@@ -135,7 +135,7 @@ Hermes still implements; delete that block when agents move to
 Dev tooling: `/dev/harness` (live wire log + client frames + trigger
 scenarios for any workspace, backed by `GET /api/workspaces/:id/harness/debug`
 and the taps in `debug.ts`) and `codex/probe.ts` (drive the raw codex
-app-server protocol without moi).
+app-server protocol without Moi).
 
 ## Implementation status
 
@@ -186,8 +186,8 @@ per-chat model switching from the catalog `session/new` returns inline, and
 backend-generated session titles surfaced through `sessions_changed`. Agents are
 Hermes **profiles** — discovered from `$HERMES_HOME`, imported with
 `moi hermes init <profile>`, never created from the UI (OpenClaw's model).
-Sessions run in Hermes's `dont_ask` mode to match moi's bypass-permissions trust
-model. Known gaps: no mid-turn steering (moi queues instead), no subagent lanes,
+Sessions run in Hermes's `dont_ask` mode to match Moi's bypass-permissions trust
+model. Known gaps: no mid-turn steering (Moi queues instead), no subagent lanes,
 no reasoning-effort control, and `session/set_model` drops session-scoped MCP
 servers upstream. Two backend quirks are worked around in `acp/session.ts`:
 tool calls left unsettled at turn end are closed (Hermes never completes file
@@ -203,7 +203,7 @@ matches the picker even when Codex config names an unavailable model.
 
 Workspace env is fixed at process spawn. Executable lookup prefers PATH over
 the desktop bundle; config and credentials remain owned by Codex. Sessions use
-workspace-write access with network disabled, and moi automatically accepts
+workspace-write access with network disabled, and Moi automatically accepts
 supported permission requests. Command-approval UI, native question forms, and
 MCP elicitation are not implemented. See [Codex harness notes](codex/NOTES.md)
 for module ownership, ordering rules, runtime diagnostics, and boundaries.
@@ -219,7 +219,7 @@ the model catalog. `GET /api/harnesses/:type/auth` checks global authentication;
 Codex uses browser OAuth locally and `chatgptDeviceCode` in cloud. Claude Code
 runs `auth login`: locally it opens its callback URL, and its printed manual-code
 link is available as a fallback; cloud uses that link and pipes the returned
-`code#state` into the CLI. Credentials are stored by the harness, never by moi.
+`code#state` into the CLI. Credentials are stored by the harness, never by Moi.
 `POST .../auth/login/:id/code` submits a code; `DELETE .../auth/login/:id` cancels
 that attempt. IDs prevent an old browser tab from changing a newer attempt.
 Provider failures and a ten-minute deadline stop the attempt. Server shutdown
@@ -280,7 +280,7 @@ doubles as the evaluation rubric for new harnesses.
 - **Thinking/reasoning display mode** (Codex requests `summary: 'detailed'`
   so visible summaries do not depend on CLI defaults).
 - **Token streaming opt-in** (CC: `includePartialMessages`, construct-time;
-  Codex: always streams, moi gates forwarding).
+  Codex: always streams, Moi gates forwarding).
 - **Permissions / tool policy** — allowed tools, permission mode; backends
   with interactive approvals need a prompt-callback path.
 - **Env injection + cwd** — per-workspace env for the agent's shell, frozen at
@@ -328,7 +328,7 @@ doubles as the evaluation rubric for new harnesses.
 ## Capability comparison
 
 Legend: ✅ supported · ⚠️ partial/workaround · ❌ missing. The Codex column
-describes what moi exposes, not every RPC available in the upstream protocol.
+describes what Moi exposes, not every RPC available in the upstream protocol.
 
 | Feature                  | Claude Agent SDK                                    | OpenClaw gateway          | Codex app-server                      | Hermes (ACP)                         |
 | ------------------------ | --------------------------------------------------- | ------------------------- | ------------------------------------- | ------------------------------------ |

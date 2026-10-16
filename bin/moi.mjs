@@ -5,7 +5,7 @@
 // dynamic import placed AFTER the Bun guard below: a static import would be
 // hoisted and fail before the guard ever runs.
 if (!process.versions.bun) {
-  console.error('moi requires Bun (Node is not supported).')
+  console.error('Moi requires Bun (Node is not supported).')
   console.error('Install Bun:  curl -fsSL https://bun.sh/install | bash')
   console.error('Then run:     bun i -g moi-computer')
   process.exit(1)
@@ -17,7 +17,7 @@ if (!process.versions.bun) {
 // `?.` because a Bun without `Bun.semver` is old enough to reject anyway.
 const MIN_BUN = '1.3.0'
 if (!Bun.semver?.satisfies(Bun.version, `>=${MIN_BUN}`)) {
-  console.error(`moi requires Bun ${MIN_BUN} or newer (this is Bun ${Bun.version}).`)
+  console.error(`Moi requires Bun ${MIN_BUN} or newer (this is Bun ${Bun.version}).`)
   console.error('Upgrade Bun:  bun upgrade')
   process.exit(1)
 }

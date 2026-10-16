@@ -141,7 +141,7 @@ setTimeout(() => {
 }, timeoutSec * 1000)
 
 await rpc('initialize', {
-  clientInfo: { name: 'moi-codex-probe', title: 'moi codex probe', version: '0.1' },
+  clientInfo: { name: 'moi-codex-probe', title: 'Moi Codex probe', version: '0.1' },
   capabilities: { experimentalApi: false, requestAttestation: false }
 })
 send({ jsonrpc: '2.0', method: 'initialized', params: {} })

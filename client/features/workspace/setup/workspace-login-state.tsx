@@ -18,9 +18,11 @@ export function WorkspaceLoginState({
 }: WorkspaceLoginStateProps) {
   return (
     <div className="flex flex-1 items-center justify-center p-6">
-      <div className="flex w-full max-w-5xl flex-col gap-6 text-center">
-        <img src={workspaceProviderIcon[type]} alt="" className="size-10 self-center" />
-        <h1 className="text-center text-xl font-medium">Log in to {workspaceTypeLabel[type]}</h1>
+      <div className="flex w-full max-w-5xl flex-col text-center">
+        <img src={workspaceProviderIcon[type]} alt="" className="mb-4 size-10 self-center" />
+        <h1 className="mb-6 text-center text-xl font-medium">
+          Log in to {workspaceTypeLabel[type]}
+        </h1>
         <HarnessConnection
           type={type}
           onConnected={onRecheck}

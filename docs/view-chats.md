@@ -23,7 +23,7 @@ assigned. The CLI opens the pending view through the navigation channel.
 `moi views create --from-session <id> --requirements "…"` first prepares a child
 chat. Forks snapshot available source history immediately; they do not wait for
 the source turn to finish. The child ID is saved before reading its history. When
-that read succeeds, moi saves the last inherited turn as a display cutoff before
+that read succeeds, Moi saves the last inherited turn as a display cutoff before
 creating the view and sending its requirements. Unsupported forking starts a
 fresh chat. Other errors stop startup.
 

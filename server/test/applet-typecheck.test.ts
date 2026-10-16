@@ -68,7 +68,7 @@ export default function Users() {
     expect(await Bun.file(dts).text()).toBe(await Bun.file(COLLAB_DECLARATION_SOURCE_PATH).text())
   })
 
-  test('uses the @types/bun shipped with moi, not one installed in the workspace', async () => {
+  test('uses the @types/bun shipped with Moi, not one installed in the workspace', async () => {
     const shadow = join(workspaceRoot, '.moi', 'node_modules', '@types', 'bun')
     await mkdir(shadow, { recursive: true })
     await Bun.write(

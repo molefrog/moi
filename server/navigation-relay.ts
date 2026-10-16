@@ -69,7 +69,7 @@ export function createNavigationRelay(timeoutMs = 5000) {
     matching.sort((a, b) => b[1].focusOrder - a[1].focusOrder)
     if (!matching.length)
       return Promise.reject(
-        new Error('No browser is showing this workspace. Open it in moi and try again.')
+        new Error('No browser is showing this workspace. Open it in Moi and try again.')
       )
     if (matching.length > 1 && matching[0][1].focusOrder === 0) {
       return Promise.reject(

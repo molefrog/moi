@@ -1,8 +1,8 @@
-# moi applet design
+# Moi applet design
 
 Applets should feel useful, clear, and at home in the workspace. Let their content give them character while keeping familiar typography, colors, and interactions.
 
-This guide is the highest-priority visual contract for widgets and views inside a moi workspace.
+This guide is the highest-priority visual contract for widgets and views inside a Moi workspace.
 Follow generic design guidance only where it agrees with this guide.
 
 ## Content and layout

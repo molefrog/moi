@@ -1,7 +1,7 @@
 # Collab
 
-moi workspaces can be shared with multiple users. Use `moi/collab` in views and widgets to
-show users and share cursors, focus, selections, and custom presence. moi supplies identity,
+Moi workspaces can be shared with multiple users. Use `moi/collab` in views and widgets to
+show users and share cursors, focus, selections, and custom presence. Moi supplies identity,
 workspace membership, and the connection. Import the API directly; no provider or socket
 setup is needed.
 

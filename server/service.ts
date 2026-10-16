@@ -1,4 +1,4 @@
-// `moi service` mechanics: run the moi server as a user-level service that
+// `moi service` mechanics: run the Moi server as a user-level service that
 // starts on login, restarts on crash, and survives reboots — launchd on macOS,
 // a systemd user unit on Linux, no third-party process manager.
 //
@@ -255,7 +255,7 @@ export function systemdUnit(spec: ServiceSpec): string {
     .map(key => `Environment=${systemdQuote(`${key}=${spec.env[key]}`)}`)
     .join('\n')
   return `[Unit]
-Description=moi server
+Description=Moi server
 
 StartLimitIntervalSec=60
 StartLimitBurst=5

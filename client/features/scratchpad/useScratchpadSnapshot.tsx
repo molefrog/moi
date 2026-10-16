@@ -102,14 +102,14 @@ export function ScratchpadSkewNotice({ skew }: { skew: ScratchpadSkew }) {
         <div className="flex items-center gap-2">
           <IconVersions size={20} stroke={1.5} className="shrink-0 text-amber-600" />
           <h2 className="font-medium text-foreground">
-            {skew.newer ? 'This canvas needs a newer moi' : 'This canvas couldn’t be loaded'}
+            {skew.newer ? 'This canvas needs a newer Moi' : 'This canvas couldn’t be loaded'}
           </h2>
         </div>
         {skew.newer ? (
           <>
             <p className="text-sm text-pretty text-muted-foreground">
-              This scratchpad was saved by a newer version of moi
-              {skew.writer ? ` (v${skew.writer.moi})` : ''}.<br /> Please update moi and restart the
+              This scratchpad was saved by a newer version of Moi
+              {skew.writer ? ` (v${skew.writer.moi})` : ''}.<br /> Please update Moi and restart the
               server:
             </p>
             <code className="self-start rounded bg-muted px-2 py-1 font-mono text-xs text-foreground">

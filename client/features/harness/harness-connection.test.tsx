@@ -61,7 +61,7 @@ test('local Codex uses a browser link without code instructions', () => {
   })
   expect(html).not.toContain('Cancel sign-in')
   expect(html).toContain('Open browser')
-  expect(html).toContain('Sign in in your browser, then come back to moi.')
+  expect(html).toContain('Sign in in your browser, then come back to Moi.')
   expect(html).not.toContain('Having trouble signing in?')
   expect(html).not.toContain('ChatGPT security settings')
   expect(html).not.toContain('Authorization code')
@@ -109,8 +109,8 @@ test('connected, failed, and loading states do not offer a misleading login', ()
     availability: { status: 'unavailable', reason: 'Network failed' }
   })
   expect(failed).toContain('Could not check agent login status')
-  expect(failed).not.toContain('Log in')
-  expect(render('codex', 'local')).not.toContain('Log in')
+  expect(failed).not.toContain('Continue')
+  expect(render('codex', 'local')).not.toContain('Continue')
 })
 
 test('failed and expired login attempts still allow starting again', () => {
@@ -120,16 +120,16 @@ test('failed and expired login attempts still allow starting again', () => {
       login: { state: 'failed', reason }
     })
     expect(html).toContain(reason)
-    expect(html).toContain('Log in')
+    expect(html).toContain('Continue')
     expect(html).not.toContain('Cancel sign-in')
     expect(html).not.toContain('Sign in in your browser')
     expect(html).not.toContain('Open browser')
   }
 })
 
-test('cloud Codex shows only Log in before a login attempt starts', () => {
+test('cloud Codex shows only Continue before a login attempt starts', () => {
   const html = render('codex', 'cloud', { availability: signedOut })
-  expect(html).toContain('Log in')
+  expect(html).toContain('Continue')
   expect(html).not.toContain('Open settings')
   expect(html).not.toContain('device code sign-in')
   expect(html).not.toContain('Copy code')
@@ -142,7 +142,7 @@ test('starting login keeps the button until the browser link is ready', () => {
         availability: signedOut,
         login: { state: 'pending' }
       })
-      expect(html).toContain('Starting sign-in…')
+      expect(html).toContain('Continue')
       expect(html).toContain('disabled')
       expect(html).not.toContain('Sign in in your browser')
       expect(html).not.toContain('Open browser')

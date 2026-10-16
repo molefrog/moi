@@ -290,7 +290,7 @@ export type SessionSummary = {
   flavor?: 'chat' | 'cron' | 'subagent'
 }
 
-// Per-session agent settings, persisted server-side in one global file in moi's
+// Per-session agent settings, persisted server-side in one global file in Moi's
 // data dir (NOT in the workspace), exposed via GET/PUT
 // /api/workspaces/:id/sessions/:sessionId/config. A session reopens with the same
 // model/effort/Fast mode it last ran with; a brand-new session is seeded from the
@@ -340,7 +340,7 @@ export type WorkspaceSessionSelection = {
   pinned: string | null
 }
 
-// App-wide settings, persisted server-side as `settings.json` in moi's data
+// App-wide settings, persisted server-side as `settings.json` in Moi's data
 // dir and exposed via GET/PATCH /api/settings. Every key has a default, so
 // GET always returns a complete object.
 export type AppSettings = {
