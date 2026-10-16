@@ -333,7 +333,7 @@ export function HomeLogo({ className }: HomeLogoProps) {
   return (
     <div
       role="img"
-      aria-label="moi"
+      aria-label="Moi"
       className={cn('flex items-center gap-2 text-accent', className)}
     >
       {GLYPHS.map((geometry, index) => (

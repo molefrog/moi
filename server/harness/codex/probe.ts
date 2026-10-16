@@ -14,7 +14,7 @@
 // Logs raw frames, disables experimental fields, and uses simplified approval
 // replies. The chat probe runs with full access; it does not test moi's policy.
 
-export {} // top-level await needs module context under tsc
+import { harnessInstructionMessage } from '@/lib/harness-instructions'
 
 type Json = Record<string, unknown>
 
@@ -31,9 +31,7 @@ const timeoutSec = Number(flags.get('timeout') ?? 120)
 
 const bin = Bun.which('codex')
 if (!bin) {
-  console.error(
-    'Run curl -fsSL https://chatgpt.com/codex/install.sh | sh in your terminal to install Codex'
-  )
+  console.error(harnessInstructionMessage('codex'))
   process.exit(1)
 }
 
@@ -143,7 +141,7 @@ setTimeout(() => {
 }, timeoutSec * 1000)
 
 await rpc('initialize', {
-  clientInfo: { name: 'moi-codex-probe', title: 'moi codex probe', version: '0.1' },
+  clientInfo: { name: 'moi-codex-probe', title: 'Moi Codex probe', version: '0.1' },
   capabilities: { experimentalApi: false, requestAttestation: false }
 })
 send({ jsonrpc: '2.0', method: 'initialized', params: {} })

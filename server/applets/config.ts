@@ -21,7 +21,7 @@ type ParsedConfig = {
 // Static config analysis, shared by compilation and source editing. Never
 // evaluate workspace code to resolve variables, spreads, or function calls.
 // Parsed with @babel/parser: it handles TS + JSX with no peer dependencies, so
-// it always resolves from moi's own tree. A parser that peer-depends on
+// it always resolves from Moi's own tree. A parser that peer-depends on
 // `typescript` breaks under bun's shared global tree, where another globally
 // installed package controls which `typescript` sits at the hoisted root.
 function parseConfig(source: string, editing = false): ParsedConfig {

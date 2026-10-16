@@ -313,7 +313,7 @@ describe('buildApplet', () => {
   test('compiles the shadcn styling vocabulary (tw-animate-css + shadcn/tailwind.css)', async () => {
     // Installed ui components (.moi/ui/) use animation utilities and data-*
     // variants defined outside the plain tailwindcss import. The synthetic
-    // entry inlines both vocabulary files from moi's node_modules; without
+    // entry inlines both vocabulary files from Moi's node_modules; without
     // them Tailwind silently drops every one of these classes. Assert on the
     // extracted stylesheet, NOT result.js — the raw class strings also sit in
     // the bundled JSX source, which would mask dropped CSS.
@@ -367,13 +367,13 @@ describe('buildApplet', () => {
     expect(css).not.toContain('slide-in-from-bottom-2')
   })
 
-  test('rejects a server import that escapes the moi root', async () => {
+  test('rejects a server import that escapes the Moi root', async () => {
     await expect(
       buildApplet(join(FIXTURES, 'nested', 'escape.tsx'), join(FIXTURES, 'nested'))
-    ).rejects.toThrow('escapes the moi root')
+    ).rejects.toThrow('escapes the Moi root')
   })
 
-  test('keys correctly when the moi root sits behind a symlink', async () => {
+  test('keys correctly when the Moi root sits behind a symlink', async () => {
     // On macOS `/tmp` → `/private/tmp`: Bun's resolver canonicalizes server
     // file paths, so an un-canonicalized moiRoot must not read as an escape.
     const { mkdtempSync, symlinkSync, rmSync, mkdirSync, writeFileSync } = await import('node:fs')

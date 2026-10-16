@@ -93,7 +93,7 @@ describe('collab HTTP integration', () => {
   test('runtime flag does not install documents, profile or workspace configuration', async () => {
     const referencePath = collabSkillReferencePath(directory, workspace.type)
     const defaultSkillPath = join(dirname(dirname(referencePath)), 'SKILL.md')
-    const defaultSkill = '# moi workspace\nExisting workspace instructions.\n'
+    const defaultSkill = '# Moi workspace\nExisting workspace instructions.\n'
     await Bun.write(defaultSkillPath, defaultSkill)
     enable()
     expect(await Bun.file(join(directory, '.moi', '.workspace.json')).exists()).toBe(false)

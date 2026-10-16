@@ -277,7 +277,7 @@ export function toStreamEvents(
   const events: StreamEvent[] = []
   // Cold-path twin of the live model-change notice in session.ts: an
   // assistant row on a different model than the previous assistant row marks
-  // a mid-session switch (sessions.patch from moi's picker or any other
+  // a mid-session switch (sessions.patch from Moi's picker or any other
   // client) — interleave a notice before that turn instead of letting the
   // switch pass silently. `prev` tracks every assistant row's model, even
   // ones that render no turn.

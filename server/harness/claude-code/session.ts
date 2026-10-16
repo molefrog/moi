@@ -1,4 +1,4 @@
-// One long-lived SDK query per session, with follow-ups queued in moi.
+// One long-lived SDK query per session, with follow-ups queued in Moi.
 //
 // Dispatch waits for the preceding user turn to finish before applying the next
 // message's settings. Pending messages survive subprocess replacement; running
@@ -395,7 +395,7 @@ function renameSession(s: LiveSession, realId: string): string {
 }
 
 // Keep the active message reserved across async bookkeeping. Sends arriving
-// here join moi's queue; they cannot race a teardown or change the live model.
+// here join Moi's queue; they cannot race a teardown or change the live model.
 async function onSessionIdle(s: LiveSession) {
   const active = s.messages.active
   if (s.messages.dispatching || (active && !s.turnEnded)) return
@@ -662,7 +662,7 @@ function createLiveSession(input: {
   return session
 }
 
-// Accept immediately, but keep the prompt and its settings in moi until its
+// Accept immediately, but keep the prompt and its settings in Moi until its
 // turn starts. The returned promise settles when the message reaches the SDK.
 export async function sendCCMessage(input: SendMessageInput): Promise<void> {
   const prepared = prepareAttachmentMessage(input.workspaceId, input.content, input.attachments)

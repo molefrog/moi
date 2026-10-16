@@ -47,7 +47,7 @@ workspace/.env
 # test-workspace is gitignored entirely (local dev only, create with: moi init test-workspace)
 test-workspace/
 
-# stray .moi/ scaffolded at the repo root when moi runs here during dev
+# stray .moi/ scaffolded at the repo root when Moi runs here during dev
 /.moi/
 
 # moi workspace skill — generated per-workspace, local only

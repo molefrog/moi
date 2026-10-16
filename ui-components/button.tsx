@@ -11,7 +11,7 @@ const buttonVariants = cva(
         default:
           'bg-primary text-primary-foreground inset-shadow-[0_0_8px_color-mix(in_oklab,var(--color-white)_20%,transparent)] hover:bg-primary/90 disabled:bg-accent disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none',
         secondary:
-          'bg-accent text-accent-foreground hover:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_3%)]',
+          'bg-accent text-accent-foreground hover:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_3%)] disabled:text-muted-foreground disabled:opacity-100',
         outline:
           'border bg-background text-foreground hover:bg-[color-mix(in_oklch,var(--background),var(--foreground)_3%)]',
         ghost: 'hover:bg-accent hover:text-accent-foreground',

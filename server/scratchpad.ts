@@ -29,7 +29,7 @@ export type ScratchpadSnapshot = { document: ScratchpadDoc | null; writer?: Scra
 
 // This process's identity as a snapshot writer. The tldraw version is what
 // matters for compatibility (the snapshot embeds its schema); the moi version is
-// what a user can actually act on ("update moi"). Both resolve from this
+// what a user can actually act on ("update Moi"). Both resolve from this
 // install's own package.json files, so they're correct in the repo-source and
 // installed layouts alike.
 export const SCRATCHPAD_WRITER: ScratchpadWriter = {

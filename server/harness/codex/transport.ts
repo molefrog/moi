@@ -57,7 +57,7 @@ export function createCodexTransport(options: TransportOptions): CodexTransport 
   }
 
   function close(
-    error = new Error('Codex disconnected. Send another message to resume this chat.')
+    error = new Error('ChatGPT disconnected. Send another message to resume this chat.')
   ) {
     if (!alive) return
     alive = false
@@ -77,7 +77,7 @@ export function createCodexTransport(options: TransportOptions): CodexTransport 
   }
 
   function send(frame: Json) {
-    if (!alive) throw new Error('Codex app-server is not running')
+    if (!alive) throw new Error('ChatGPT app-server is not running')
     options.tap?.('send', frame)
     // Bun's flush can be asynchronous; observe failures instead of leaving an
     // unhandled rejection and waiting for every RPC to time out independently.
@@ -93,12 +93,12 @@ export function createCodexTransport(options: TransportOptions): CodexTransport 
   }
 
   function rpc<T>(method: string, params: Json = {}): Promise<T> {
-    if (!alive) return Promise.reject(new Error('Codex app-server is not running'))
+    if (!alive) return Promise.reject(new Error('ChatGPT app-server is not running'))
     const id = nextId++
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         pending.delete(id)
-        reject(new Error(`Codex request timed out: ${method}`))
+        reject(new Error(`ChatGPT request timed out: ${method}`))
       }, options.timeoutMs ?? 30_000)
       // Register before writing: a synchronous response must find its waiter.
       pending.set(id, { resolve: resolve as (value: unknown) => void, reject, timer })
@@ -137,7 +137,7 @@ export function createCodexTransport(options: TransportOptions): CodexTransport 
       const error = msg.error as Json
       request.reject(
         new CodexRpcError(
-          typeof error.message === 'string' ? error.message : 'Codex request failed',
+          typeof error.message === 'string' ? error.message : 'ChatGPT request failed',
           typeof error.code === 'number' ? error.code : -32603,
           error.data
         )

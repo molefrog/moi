@@ -2,7 +2,7 @@
 
 This is the canonical spec for how attachments work in moi: how Claude Code
 itself does it (verified empirically, CLI + desktop), the one constraint we can't
-design around, the target design for moi, and an honest gap analysis against
+design around, the target design for Moi, and an honest gap analysis against
 what's shipped today.
 
 ---
@@ -65,19 +65,19 @@ whatever blocks we send into the session `.jsonl`** — that transcript is
 SDK-owned, not moi-owned.
 
 So for any agent that runs through the SDK, **base64 in the transcript is
-unavoidable for vision** — exactly why both Claude Code clients do it. moi cannot
+unavoidable for vision** — exactly why both Claude Code clients do it. Moi cannot
 dedup or de-inline the _SDK transcript_ without intercepting SDK persistence
 (fragile, out of scope).
 
-The design lever moi _does_ control is **its own layers** — upload storage,
+The design lever Moi _does_ control is **its own layers** — upload storage,
 WebSocket transport, the React Query cache, and the rendered display. Those
 should never re-inline base64; that's where the bloat is fixable.
 
 ---
 
-## Part 3 — Target design for moi
+## Part 3 — Target design for Moi
 
-Three input pipelines, mirroring Claude Code's mental model but adapted to moi's
+Three input pipelines, mirroring Claude Code's mental model but adapted to Moi's
 WS + adapter architecture.
 
 ### Pipeline 1 — Image / binary attach (paste, drag, attach button)

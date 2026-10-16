@@ -228,7 +228,7 @@ function WorkspaceScratchpad({ workspaceId }: { workspaceId: string }) {
   // A remote save (another tab, or an agent draw landing in another tab) — pull
   // the new snapshot and load it into the live store. Skip our own echo. The
   // fetched document is pre-flighted like the initial load: if the server was
-  // swapped for a newer moi mid-session, `loadSnapshot` here would throw — flip
+  // swapped for a newer Moi mid-session, `loadSnapshot` here would throw — flip
   // the skew notice instead (unmounting the editor, which also stops the
   // autosave timer) so this stale tab can't save over the newer file.
   useWorkspaceEvent((e: WorkspaceEvent) => {

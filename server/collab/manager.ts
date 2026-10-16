@@ -69,7 +69,7 @@ function verifiedMessage(
   return message.profile.id === verifiedProfile.id ? { ...message, profile: verifiedProfile } : null
 }
 
-// One owner map per moi server. No LRU: active workspaces cannot be evicted.
+// One owner map per Moi server. No LRU: active workspaces cannot be evicted.
 export class CollabManager {
   private slots = new Map<string, Slot>()
   private bindings = new Map<ClientSocket, Binding>()
@@ -108,7 +108,7 @@ export class CollabManager {
     binding.workspacePaths.add(canonicalPath)
     if (binding.closed) throw new CollabRuntimeError('unavailable', 'Collab connection closed')
     if (!(await (this.options.enabled ?? isCollabEnabled)(canonicalPath))) {
-      throw new CollabRuntimeError('unavailable', 'Start moi with --experimental-collab')
+      throw new CollabRuntimeError('unavailable', 'Start Moi with --experimental-collab')
     }
     if (this.closed || binding.closed)
       throw new CollabRuntimeError('unavailable', 'Collab connection closed')
@@ -389,7 +389,7 @@ export class CollabManager {
     if (this.livenessTimer) clearInterval(this.livenessTimer)
     this.livenessTimer = null
     const slots = [...this.slots.values()]
-    for (const slot of slots) this.stopSlot(slot, 'moi is shutting down')
+    for (const slot of slots) this.stopSlot(slot, 'Moi is shutting down')
     await Promise.allSettled(slots.map(slot => slot.child.exited))
   }
 

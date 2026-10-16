@@ -156,10 +156,10 @@ const readSkill: ToolCall = {
   output: [
     '---',
     'name: moi-workspace',
-    'description: Operate the moi workspace — widgets, views, layout, and chat.',
+    'description: Operate the Moi workspace — widgets, views, layout, and chat.',
     '---',
     '',
-    '# moi workspace',
+    '# Moi workspace',
     '',
     'Use the `moi` CLI to inspect and modify the workspace this agent runs in.'
   ].join('\n')
@@ -443,7 +443,7 @@ const sourcesReply = turn('assistant', 7, 6, [
   {
     type: 'source-document',
     mediaType: 'application/pdf',
-    title: 'moi RFC 007 — workspace layout persistence',
+    title: 'Moi RFC 007 — workspace layout persistence',
     sourceId: 'src_rfc_007'
   }
 ])

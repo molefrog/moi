@@ -59,7 +59,7 @@ export function classifyGatewayError(err: unknown): GatewayFailure {
     return {
       kind: 'protocol-mismatch',
       message:
-        'OpenClaw gateway speaks an older protocol than this moi build. Update OpenClaw (2026.6 or newer) to reconnect.'
+        'OpenClaw gateway speaks an older protocol than this Moi build. Update OpenClaw (2026.6 or newer) to reconnect.'
     }
   }
   if (code === 'UNAUTHORIZED' || lower.includes('unauthorized')) {

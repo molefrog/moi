@@ -30,6 +30,6 @@ export function useUpdateStatus(restarting: boolean) {
 
 export function useUpdate() {
   return useMutation<UpdateResult, Error>({
-    mutationFn: () => requestJson('/api/update', { method: 'POST' }, 'Could not update moi')
+    mutationFn: () => requestJson('/api/update', { method: 'POST' }, 'Could not update Moi')
   })
 }

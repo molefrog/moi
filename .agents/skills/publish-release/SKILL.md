@@ -133,7 +133,7 @@ Recovery, if `verify` fails or the run is rejected:
    `latest` did **not**.
 2. `npm view moi-computer@<version> dist.attestations` — trusted publishing attaches provenance
    automatically; its absence means the publish did not go through OIDC.
-3. **Smoke the published package.** This needs the moi ports to itself: `CONTROL_PORT` defaults to
+3. **Smoke the published package.** This needs the Moi ports to itself: `CONTROL_PORT` defaults to
    `13059` (`server/constants.ts`) and `server/control.ts` binds it unconditionally, so `--port`
    does not let a second instance coexist. (`MOI_CONTROL_PORT` overrides it, but that is a test
    seam — smoke the real defaults.) Before installing:

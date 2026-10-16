@@ -22,6 +22,12 @@ import type {
 // sessions.patch) and stream (token previews), but has no Fast-mode setting so
 // it ignores fastMode; agentId is OpenClaw-only (the gateway agent that owns
 // the workspace).
+export type HarnessLoginAttempt = HarnessLogin & {
+  completed?: Promise<void>
+  cancel?: () => void | Promise<void>
+  submitCode?: (code: string) => void | Promise<void>
+}
+
 export type SendMessageInput = {
   workspaceId: string
   workspacePath: string
@@ -112,8 +118,9 @@ export type Harness = {
   // Without a workspace, only check whether the runtime is installed. With a
   // workspace, also check provider state such as authentication.
   availability?(ws?: HarnessWorkspace): Promise<HarnessAvailability>
-  // Optional recovery flow the host can start without a terminal.
-  startLogin?(ws: HarnessWorkspace): Promise<HarnessLogin>
+  // Global account authentication, independent of workspace configuration.
+  startLogin?(): Promise<HarnessLoginAttempt>
+  authStatus?(): Promise<HarnessAvailability>
 
   // -- host integration hooks -------------------------------------------------
   // Env is frozen at spawn everywhere; this reaps idle sessions/processes so

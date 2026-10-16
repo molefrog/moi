@@ -290,7 +290,7 @@ export type SessionSummary = {
   flavor?: 'chat' | 'cron' | 'subagent'
 }
 
-// Per-session agent settings, persisted server-side in one global file in moi's
+// Per-session agent settings, persisted server-side in one global file in Moi's
 // data dir (NOT in the workspace), exposed via GET/PUT
 // /api/workspaces/:id/sessions/:sessionId/config. A session reopens with the same
 // model/effort/Fast mode it last ran with; a brand-new session is seeded from the
@@ -340,7 +340,7 @@ export type WorkspaceSessionSelection = {
   pinned: string | null
 }
 
-// App-wide settings, persisted server-side as `settings.json` in moi's data
+// App-wide settings, persisted server-side as `settings.json` in Moi's data
 // dir and exposed via GET/PATCH /api/settings. Every key has a default, so
 // GET always returns a complete object.
 export type AppSettings = {
@@ -352,10 +352,13 @@ export type AppSettings = {
 // Client-safe startup config, served by GET /api/config. Deployment settings
 // come from config.json and MOI_* env overrides; experimental flags come from
 // explicit CLI options. See server/app-config.ts.
+export type AppEnvironment = 'local' | 'cloud'
+
 export type ClientAppConfig = {
-  // Cloud demo deployment: workspace creation is blocked; the UI offers the
+  environment: AppEnvironment
+  // Demo mode: workspace creation is blocked; the UI offers the
   // cloud-demo promo dialog instead.
-  cloudDemo: boolean
+  demo: boolean
   experimental: ExperimentalFeatures
   // Link target for the cloud-demo promo dialog.
   demoInstallUrl: string
@@ -484,22 +487,29 @@ export type WorkspaceSkillsUpdateFailure = WorkspaceSkillsStatus & {
   error: string
 }
 
+export type HarnessInstallations = Record<WorkspaceType, boolean>
+
 // Setup checks only runtime availability. Workspace checks may also report
 // that the provider needs a login the host can start.
 export type HarnessAvailability =
   | { status: 'available' }
   | { status: 'login-required'; reason: string }
-  | { status: 'unavailable'; reason: string }
+  | { status: 'unavailable'; reason: string; code?: 'not-installed' }
 
-// Codex returns a URL for the browser. Claude opens it from its own CLI.
-export type HarnessLogin = { url?: string }
+// Public instructions for an in-progress harness login. Credentials stay in the CLI.
+export type HarnessLogin = {
+  id: string
+  url: string
+  codeUrl?: string
+  userCode?: string
+  acceptsCode?: boolean
+}
 
-// The server-owned login ceremony for a workspace. `pending` means a watch loop
-// is re-probing the provider until the login lands or the deadline passes;
-// transitions arrive as `agent:updated` events, so every tab shows the same
-// ceremony without polling.
-export type AgentLoginState =
-  | { state: 'pending'; url?: string }
+// The global auth endpoint exposes startup separately from usable sign-in instructions.
+// The connection panel polls this state until sign-in completes or fails.
+export type HarnessLoginState =
+  | { state: 'starting' }
+  | ({ state: 'pending' } & HarnessLogin)
   | { state: 'failed'; reason: string }
 
 export type WorkspaceIcon =
@@ -758,15 +768,14 @@ export type Model = {
 }
 
 // GET /api/workspaces/:id/agent. Model changes arrive on refetch;
-// `agent:updated` events refresh availability and login state.
+// `harness:updated` events refresh availability.
 export type WorkspaceAgent = {
+  missingWorkspacePath?: string
   // The agent backend that produced this snapshot — matches the workspace
   // provider.
   provider: WorkspaceType
   // Runtime presence and provider auth state, from the server-side cache.
   availability: HarnessAvailability
-  // Present while a login ceremony is in flight or after one failed.
-  login?: AgentLoginState
   models: Model[]
   // Whether this provider supports live token-by-token streaming (the picker
   // shows the "Live typing" toggle only when true). Provider-wide, not per-model

@@ -35,10 +35,10 @@ export function LocalUserSettings() {
       </h2>
       <p className="text-sm text-muted-foreground">
         {experimental.collab ? (
-          'Couldn’t resolve your user identity. Reload moi to try again.'
+          'Couldn’t resolve your user identity. Reload Moi to try again.'
         ) : (
           <>
-            Start moi with <code className="font-mono">--experimental-collab</code> to create a
+            Start Moi with <code className="font-mono">--experimental-collab</code> to create a
             local user automatically. The playground below uses its own sample users.
           </>
         )}
@@ -61,7 +61,7 @@ function AccessUser({ profile }: AccessUserProps) {
         <p className="mt-1 text-sm text-muted-foreground">
           {profile
             ? 'This server uses your Cloudflare Access account. You appear by your email, with a color picked from your Access user ID.'
-            : 'This server uses Cloudflare Access, but this page wasn’t opened through it. Open moi at its Cloudflare Access address to appear in workspaces.'}
+            : 'This server uses Cloudflare Access, but this page wasn’t opened through it. Open Moi at its Cloudflare Access address to appear in workspaces.'}
         </p>
       </header>
       {profile && <User id={profile.id} />}
@@ -83,7 +83,7 @@ function LocalUserEditor({ profile }: LocalUserEditorProps) {
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Edit the local user for this browser tab. Changes save immediately. To test with two
-          users, open moi in another browser tab.
+          users, open Moi in another browser tab.
         </p>
       </header>
       <div className="flex flex-col gap-5">

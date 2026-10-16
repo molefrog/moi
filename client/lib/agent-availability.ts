@@ -5,11 +5,6 @@ export type AgentAvailability =
   | { status: 'checking' }
   | { status: 'disconnected' }
 
-export type AgentUnavailable = Exclude<
-  AgentAvailability,
-  { status: 'checking' } | { status: 'available' }
->
-
 export function resolveAgentAvailability(
   availability: HarnessAvailability | undefined,
   disconnected: boolean

@@ -183,6 +183,7 @@ export function ChatComposer({
 
       <ComposerTextarea
         textareaRef={composerRef}
+        disabled={availability.status !== 'available'}
         id="chat-input"
         name="message"
         value={value}

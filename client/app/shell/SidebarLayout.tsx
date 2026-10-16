@@ -14,8 +14,8 @@ import { useReorderWorkspaces, useWorkspaces } from '@/client/features/home/api'
 import { UpdateButton, useUpdateControl } from '@/client/features/update/UpdateControl'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
-import { CreateWorkspaceDialog } from '@/client/features/home/workspace-setup/CreateWorkspaceDialog'
-import { DemoDialog } from '@/client/features/home/workspace-setup/DemoDialog'
+import { CreateWorkspaceDialog } from '@/client/features/workspace/add/create-workspace-dialog'
+import { DemoDialog } from '@/client/features/demo/demo-dialog'
 import { ReorderableList } from '@/client/components/shared/ReorderableList'
 import type { ReorderableRenderState } from '@/client/components/shared/ReorderableList'
 import { WorkspaceIcon } from '@/client/components/shared/WorkspaceIcon'
@@ -26,7 +26,7 @@ import {
   TooltipProvider,
   TooltipTrigger
 } from '@/client/components/ui/tooltip'
-import { workspaceDisplayName } from '@/client/features/home/workspace-presentation'
+import { workspaceDisplayName } from '@/client/features/workspace/workspace-presentation'
 import { cn } from '@/client/lib/cn'
 import type { WorkspaceEntry } from '@/lib/types'
 
@@ -147,10 +147,10 @@ function Sidebar({ workspaces }: SidebarProps) {
 }
 
 function SidebarFooterAction() {
-  const { cloudDemo } = useAppConfig()
+  const { demo } = useAppConfig()
   const updateControl = useUpdateControl()
 
-  if (cloudDemo) {
+  if (demo) {
     return (
       <DemoDialog
         trigger={

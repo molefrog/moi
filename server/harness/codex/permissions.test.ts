@@ -71,7 +71,7 @@ describe('codexServerRequestResponse', () => {
   test('rejects non-approval requests as unsupported', () => {
     for (const method of ['item/tool/call', 'item/tool/requestUserInput']) {
       expect(codexServerRequestResponse(method)).toEqual({
-        error: { code: -32601, message: `moi does not handle ${method}` }
+        error: { code: -32601, message: `Moi does not handle ${method}` }
       })
     }
   })

@@ -21,7 +21,7 @@ import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayo
 import { SettingsPage, SettingsRow, SettingsSection } from './SettingsLayout'
 
 export function GeneralSettings() {
-  const { cloudDemo } = useAppConfig()
+  const { demo } = useAppConfig()
   const { name, cwd, workspaceId } = useWorkspaceLayoutCtx()
   const [, navigate] = useLocation()
   const removeWorkspace = useRemoveWorkspace()
@@ -48,11 +48,11 @@ export function GeneralSettings() {
         />
       </SettingsSection>
 
-      {!cloudDemo && (
+      {!demo && (
         <SettingsSection label="Danger zone">
           <SettingsRow
             title="Remove space"
-            description="Remove this space from moi. Its folder and sessions stay on disk."
+            description="Remove this space from Moi. Its folder and sessions stay on disk."
             control={
               <AlertDialog>
                 <AlertDialogTrigger

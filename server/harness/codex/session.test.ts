@@ -4,7 +4,8 @@ import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import type { BroadcastFrame, StreamEvent } from '@/lib/types'
 
 import { getClientFrameLog } from '../debug'
-import { agentStore } from '../../agent'
+import { createHarnessStore, harnessStore, type HarnessUpdatedEvent } from '../auth'
+import { getCodexAuthReadiness } from './auth'
 import { addUpload } from '../../uploads'
 import * as clients from './client'
 import {
@@ -64,7 +65,7 @@ function fixture() {
     }
   }
   const spy = spyOn(clients, 'getCodexClient').mockResolvedValue(client)
-  const availabilitySpy = spyOn(agentStore, 'refresh').mockResolvedValue({ status: 'available' })
+  const availabilitySpy = spyOn(harnessStore, 'refresh').mockResolvedValue({ status: 'available' })
   const emit = (method: string, params: Json = {}) => {
     for (const listener of [...listeners])
       listener(method, { threadId: input.sessionId, ...params })
@@ -79,6 +80,7 @@ function fixture() {
     client,
     calls,
     handlers,
+    availabilitySpy,
     emit,
     listeners,
     frames: () => getClientFrameLog(workspaceId).map(row => row.frame as BroadcastFrame),
@@ -98,6 +100,52 @@ function texts(events: StreamEvent[]) {
 }
 
 describe('Codex live session lifecycle', () => {
+  test.each(['error', 'turn/completed'])(
+    '%s auth failure publishes login-required despite cached account metadata',
+    async method => {
+      const f = fixture()
+      const published = deferred<HarnessUpdatedEvent>()
+      const store = createHarnessStore({
+        probe: () => getCodexAuthReadiness(f.input.workspacePath),
+        startLogin: async () => ({ id: 'attempt', url: 'https://example.com/login' }),
+        publish: event => published.resolve(event)
+      })
+      f.availabilitySpy.mockImplementation(context => store.refresh(context))
+      const workspace = {
+        id: f.input.workspaceId,
+        path: f.input.workspacePath,
+        type: 'codex' as const
+      }
+      expect((await store.getAvailability(workspace)).status).toBe('available')
+      await f.send()
+      f.handlers.set('account/rateLimits/read', () => {
+        throw new CodexRpcError('failed to fetch codex rate limits: HTTP 401 Unauthorized', -32603)
+      })
+      const error = {
+        message:
+          'Your access token could not be refreshed because you have since logged out or signed in to another account. Please sign in again.',
+        codexErrorInfo: 'unauthorized'
+      }
+      f.emit(
+        method,
+        method === 'error'
+          ? { error, willRetry: false, turnId: 'turn-1' }
+          : { turn: { id: 'turn-1', status: 'failed', error, items: [] } }
+      )
+      expect(await published.promise).toMatchObject({
+        type: 'harness:updated',
+        workspaceId: workspace.id,
+        availability: { status: 'login-required' }
+      })
+      expect((await store.getAvailability(workspace)).status).toBe('login-required')
+      expect((await store.refresh(workspace)).status).toBe('login-required')
+      // Verified access restores the same workspace without resending its message.
+      f.handlers.delete('account/rateLimits/read')
+      expect((await store.refresh(workspace)).status).toBe('available')
+      expect(f.calls.filter(call => call.method === 'turn/start')).toHaveLength(1)
+    }
+  )
+
   test('a rejected fresh start after no-active-turn clears the obsolete active turn', async () => {
     const f = fixture()
     await f.send()

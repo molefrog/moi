@@ -19,7 +19,7 @@ describe('moi context envelope', () => {
     expect(context).toContain('You are running in a `moi` workspace')
     expect(context).toContain('moi-workspace')
     expect(context).toContain('# Active tab\nThe user is on the "Scratchpad" tab.')
-    expect(context).toContain('IMPORTANT: This context comes from moi, not from the user')
+    expect(context).toContain('IMPORTANT: This context comes from Moi, not from the user')
   })
 
   test('describes tabs with their UI labels', () => {

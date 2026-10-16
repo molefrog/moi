@@ -208,7 +208,7 @@ describe('moi update (e2e)', () => {
     expect(code).toBe(0)
     expect(stdout).toContain(`latest is v${NEW_VERSION}`)
     expect(stdout).toContain('via bun: bun install -g moi-computer@99.0.0')
-    expect(stdout).toContain(`moi updated to v${NEW_VERSION}`)
+    expect(stdout).toContain(`Moi updated to v${NEW_VERSION}`)
     // The bin on PATH really is the new package now.
     const check = Bun.spawn([join(home, '.bun', 'bin', 'moi'), 'version'], {
       stdout: 'pipe',

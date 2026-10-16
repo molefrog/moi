@@ -3,7 +3,7 @@
 // `Bun.build` shares one process-wide resolver cache with the runtime module
 // loader: `node_modules` directory listings, `package.json` contents, and —
 // crucially — FAILED bare-specifier lookups are memoized for the life of the
-// process and never invalidated (still true in Bun 1.4). The moi server is
+// process and never invalidated (still true in Bun 1.4). The Moi server is
 // long-lived, so an in-process build that once failed with `Could not resolve
 // "pkg"` keeps failing for that specifier after the agent runs `bun add pkg`,
 // and a workspace that gains its own `node_modules` (or bumps a package's

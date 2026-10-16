@@ -41,7 +41,7 @@ import {
   CODEX_TURN_ACCESS
 } from './permissions'
 import { generateCodexSessionTitle, renameCodexSessionIfUnchanged } from './session-title'
-import { agentStore } from '../../agent'
+import { harnessStore } from '../auth'
 import { debug } from '../../debug'
 import { broadcast } from '../../state'
 import { hasSessionConfig, saveSessionConfig } from '../../session-config'
@@ -458,7 +458,7 @@ function applyCompletionMeta(
 
 // A failed send may reflect an external logout. Refresh the cached banner now.
 function refreshAvailability(workspaceId: string, workspacePath: string) {
-  void agentStore.refresh({ id: workspaceId, path: workspacePath, type: 'codex' })
+  void harnessStore.refresh({ id: workspaceId, path: workspacePath, type: 'codex' })
 }
 
 function handleNotification(rec: SessionRecord, method: string, params: Record<string, unknown>) {
@@ -472,9 +472,9 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
         content:
           typeof params.message === 'string'
             ? params.message
-            : 'Codex disconnected. Send another message to resume this chat.'
+            : 'ChatGPT disconnected. Send another message to resume this chat.'
       })
-    releaseSession(rec, 'Codex disconnected before this tool returned a result')
+    releaseSession(rec, 'ChatGPT disconnected before this tool returned a result')
     return
   }
   if (rec.bufferedNotifications) {
@@ -618,7 +618,7 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
         rec,
         turn?.status === 'interrupted'
           ? 'Stopped'
-          : 'Codex ended the turn before this tool returned a result'
+          : 'ChatGPT ended the turn before this tool returned a result'
       )
       clearPreviews(rec)
       applyCompletionMeta(rec, turn?.id, turn?.durationMs)
@@ -669,7 +669,7 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
       setProcessing(rec, false, null)
       clearPreviews(rec)
       flushCommandOutput(rec)
-      settleTools(rec, message || 'Codex ended the turn before this tool returned a result')
+      settleTools(rec, message || 'ChatGPT ended the turn before this tool returned a result')
       return
     }
     case 'thread/status/changed': {
@@ -677,7 +677,7 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
       rec.waiting = waitingOnInput(status)
       if (status?.type === 'active') setProcessing(rec, true, rec.activeTurnId)
       else if (status?.type === 'notLoaded') {
-        releaseSession(rec, 'Codex unloaded this chat')
+        releaseSession(rec, 'ChatGPT unloaded this chat')
         broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
       } else if (status?.type === 'idle' || status?.type === 'systemError') {
         flushCommandOutput(rec)
@@ -689,7 +689,7 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
     case 'thread/closed':
     case 'thread/archived':
     case 'thread/deleted': {
-      releaseSession(rec, 'Codex closed this chat')
+      releaseSession(rec, 'ChatGPT closed this chat')
       broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
       return
     }
@@ -849,7 +849,7 @@ async function resumeSession(input: ResumeInput): Promise<SessionRecord> {
       })
       const subagents = await readSubagentRecords(client, resumed.thread)
       rec.model = resumed.model
-      if (!client.isAlive()) throw new Error('Codex disconnected while resuming this chat')
+      if (!client.isAlive()) throw new Error('ChatGPT disconnected while resuming this chat')
       for (const [childId, sub] of subagents) rec.children.set(childId, sub)
       seedFromThread(rec, resumed.thread, subagents)
       const active = resumed.thread.turns?.findLast(turn => turn.status === 'inProgress')
@@ -862,7 +862,7 @@ async function resumeSession(input: ResumeInput): Promise<SessionRecord> {
       const buffered = rec.bufferedNotifications
       rec.bufferedNotifications = null
       for (const [method, params] of buffered) handleNotification(rec, method, params)
-      if (sessions.get(key) !== rec) throw new Error('Codex closed this chat while resuming it')
+      if (sessions.get(key) !== rec) throw new Error('ChatGPT closed this chat while resuming it')
       return rec
     } catch (error) {
       clearPreviews(rec)

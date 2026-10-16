@@ -4,7 +4,7 @@ import type { AppSettings } from '@/lib/types'
 
 import { DATA_DIR } from './data-dir'
 
-// App-wide user settings, stored as `settings.json` in moi's data dir next to
+// App-wide user settings, stored as `settings.json` in Moi's data dir next to
 // the workspace registry. Backed by `conf`: atomic writes, per-key JSON-schema
 // validation, and migrations when the settings shape evolves. Adding a key
 // means extending `AppSettings` (lib/types.ts) and the schema here — with a

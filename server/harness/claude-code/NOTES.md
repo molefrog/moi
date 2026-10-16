@@ -29,14 +29,14 @@ Evidence drawn from:
 The Agent SDK remains the transport layer, but every `query()` explicitly uses
 the `claude` executable through `pathToClaudeCodeExecutable`. Lookup goes
 through `../executable.ts`: the server's PATH merged with the user's
-login-shell PATH (`../shell-path.ts`, probed once at startup), so a moi server
+login-shell PATH (`../shell-path.ts`, probed once at startup), so a Moi server
 launched outside a terminal still finds CLIs from `~/.local/bin`, homebrew,
 and version-manager shims. There is no SDK bundled-executable fallback. If the
 command is missing, setup and existing workspaces report:
-`Run curl -fsSL https://claude.ai/install.sh | sh in your terminal to install Claude`.
+`Run in terminal to install Claude Code: curl -fsSL https://claude.ai/install.sh | sh`.
 
 **In-place updates.** Claude Code can replace its binary at the same path
-while moi keeps running, changing which models are available.
+while Moi keeps running, changing which models are available.
 
 - Every spawn resolves the executable afresh, so new sessions run the new
   binary. A live session keeps the subprocess it started with until it is torn
@@ -50,7 +50,7 @@ while moi keeps running, changing which models are available.
   jobs to finish, replaces the subprocess, and resumes the same session from
   disk. Replacement happens on demand.
 - Pending messages and their model, effort, fast-mode, and streaming settings
-  stay in moi's per-session queue. Only one user message enters the SDK per
+  stay in Moi's per-session queue. Only one user message enters the SDK per
   turn. Matching result IDs prevent an autonomous background turn from
   releasing a waiting user prompt. When the CLI emits lifecycle events,
   dispatch also waits for `idle`. The queue follows session ID renames and
@@ -60,7 +60,7 @@ while moi keeps running, changing which models are available.
   An absent effort or fast-mode value clears that flag with `null`, restoring
   provider defaults.
 - Background jobs retain their subprocess. Messages requiring a replacement
-  wait in moi until those jobs finish, including replacements for streaming
+  wait in Moi until those jobs finish, including replacements for streaming
   changes. `background_tasks_changed` replaces the complete task set, including
   backgrounded subagents and ambient watchers. Task start/update/completion
   events are a fallback only until the process emits its first snapshot; their

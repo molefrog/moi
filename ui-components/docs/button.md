@@ -1,6 +1,6 @@
 ---
 title: Button
-description: The shared button for moi and its views.
+description: The shared button for Moi and its views.
 ---
 
 ## Add

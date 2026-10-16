@@ -1,6 +1,6 @@
 # Hermes Agent — integration research
 
-Protocol notes behind moi's Hermes harness. The adapter **shipped** on the ACP
+Protocol notes behind Moi's Hermes harness. The adapter **shipped** on the ACP
 path recommended below: the protocol lives in `../acp/` (provider-agnostic) and
 this folder holds only Hermes specifics — see §11 for what the implementation
 confirmed and corrected. Everything here was probed empirically against Hermes
@@ -9,12 +9,12 @@ confirmed and corrected. Everything here was probed empirically against Hermes
 `bun scripts/probe-hermes-acp.ts` (see §10).
 
 **Verdict up front:** Hermes speaks **ACP** (Agent Client Protocol) over
-stdio JSON-RPC, and ACP maps onto moi's `Harness` contract more cleanly than
+stdio JSON-RPC, and ACP maps onto Moi's `Harness` contract more cleanly than
 either OpenClaw or Codex did. The adapter is a normal harness-sized job — a
-12/13-passing end-to-end run of the full moi flow is in §9. Real streaming,
+12/13-passing end-to-end run of the full Moi flow is in §9. Real streaming,
 vision, MCP, env injection and multi-agent profiles all work (§3.7–§4).
 
-What actually needs care: Hermes is **user-global by default** where moi is
+What actually needs care: Hermes is **user-global by default** where Moi is
 workspace-scoped (§5), it also ships a much richer **native gateway** whose
 features ACP does not expose (§6), and two live-stream bugs need client-side
 workarounds — file-tool completions are dropped (§3.4) and `set_model` silently
@@ -39,17 +39,17 @@ Scope is much wider than a coding CLI: ~70 tools across ~28 toolsets, a
 messaging gateway with 25+ platform adapters (Telegram/Discord/Slack/Signal/…),
 cron, a kanban board, voice mode, a skills marketplace, and 7 terminal
 backends (local, docker, ssh, modal, daytona, singularity, vercel sandbox).
-For moi, nearly all of that is out of scope — moi wants the agent loop and the
+For Moi, nearly all of that is out of scope — Moi wants the agent loop and the
 ACP surface, not the gateway.
 
 Entry points sharing one `AIAgent` core:
 
-| Surface        | Command               | Shape                                       | Fit for moi                                 |
+| Surface        | Command               | Shape                                       | Fit for Moi                                 |
 | -------------- | --------------------- | ------------------------------------------- | ------------------------------------------- |
 | CLI            | `hermes`, `hermes -z` | interactive TUI / one-shot                  | one-shot is scriptable, but no event stream |
 | **ACP**        | **`hermes acp`**      | **stdio JSON-RPC, one process, N sessions** | **✅ this is the one**                      |
 | Backend server | `hermes serve`        | HTTP + WebSocket JSON-RPC, port 9119        | ❌ machine-level singleton (§4)             |
-| Gateway        | `hermes gateway run`  | long-running messaging daemon               | ❌ not moi's model                          |
+| Gateway        | `hermes gateway run`  | long-running messaging daemon               | ❌ not Moi's model                          |
 
 ## 2. Provider configuration (and two traps)
 
@@ -109,14 +109,14 @@ stdout is reserved for JSON-RPC; logs go to stderr.
 }
 ```
 
-`authMethods` is directly usable by moi's `availability()` / `startLogin()`
+`authMethods` is directly usable by Moi's `availability()` / `startLogin()`
 recovery loop — note `hermes-setup` is `type: terminal`, i.e. it wants a TTY,
 not a browser OAuth URL like Codex.
 
 ### 3.2 Sessions
 
 `session/new { cwd, mcpServers }` → `{ sessionId, models, modes, _meta }`.
-Two things moi's other backends make you fetch separately arrive **inline**:
+Two things Moi's other backends make you fetch separately arrive **inline**:
 
 - `models.availableModels` — 52 entries in the probe, merged across every
   configured provider (`openai-api:gpt-5.4-mini`, `custom:kimi-k2.7-code`, …),
@@ -146,7 +146,7 @@ namespace. Not worth it.
 Three consequences, all handled in `./models.ts`:
 
 - **`description` is the provider, not a blurb** — the same string for all 34
-  models behind it, with a ` • current` suffix on `currentModelId`'s row. moi's
+  models behind it, with a ` • current` suffix on `currentModelId`'s row. Moi's
   picker labels rows from the description headline, so passed through as-is it
   renders dozens of identical rows. It becomes the group heading instead.
 - **`name` repeats the provider — but not always.** Most rows are
@@ -155,9 +155,9 @@ Three consequences, all handled in `./models.ts`:
   `description` and only stripped off `name` when it is actually there.
 - **Configured providers are listed twice**, under `<provider>:<model>` and
   again `custom:<provider>:<model>`, same endpoint and model. Both ids work;
-  moi keeps the first and drops the duplicate label.
+  Moi keeps the first and drops the duplicate label.
 
-moi also records `providerId` (`nous`, `xai-oauth`, `ollama-launch`) alongside
+Moi also records `providerId` (`nous`, `xai-oauth`, `ollama-launch`) alongside
 the display heading, because the heading is Hermes-authored prose and the id is
 not — anything that needs to pin, order or persist a provider should key on the
 id. It is recovered by peeling the model label off the end of `modelId`, not by
@@ -168,17 +168,17 @@ and `custom:` occupies the first slot as a namespace (`custom:ollama-launch:…`
 
 `_meta.hermes.sessionProvenance` carries `rootHermesSessionId`,
 `parentHermesSessionId`, `sessionKind` and `compressionDepth` — session
-lineage across compaction, which moi has no concept of today.
+lineage across compaction, which Moi has no concept of today.
 
 `session/list` returns `{ sessionId, title, cwd, updatedAt }[]` — including a
 **model-generated title** (e.g. "Create hello.txt and read back text").
-`cwd` on every record means moi filters by workspace path exactly the way the
+`cwd` on every record means Moi filters by workspace path exactly the way the
 Codex harness filters `thread/list`. This covers `listSessions()` and
 `workspacePreview()`.
 
 Session state is one **global** SQLite DB at `$HERMES_HOME/state.db` (20
 tables, FTS5 trigram index over messages). The `sessions` table is richer than
-what moi's current backends expose — it already carries `cwd`, `git_branch`,
+what Moi's current backends expose — it already carries `cwd`, `git_branch`,
 `git_repo_root`, `parent_session_id`, per-session token counts and
 `estimated_cost_usd`/`actual_cost_usd`.
 
@@ -193,11 +193,11 @@ Verified against v0.20.0 (`xai-oauth:grok-build-0.1`, 67 raw rows).
 
 The catalog only ever arrives on `session/new`, and every such call persists a
 zero-message row in `state.db` that `hermes sessions list` shows as a blank
-entry (moi's own list hides them). So the state is cached per workspace
+entry (Moi's own list hides them). So the state is cached per workspace
 (`../acp/model-state.ts`): the first picker snapshot opens one throwaway
 session, every real chat start refreshes the cache from its own `session/new`,
 and the cache is stamped with the mtimes of the profile's `config.yaml` and
-`.env` (`hermesConfigFingerprint`) so a default changed outside moi is
+`.env` (`hermesConfigFingerprint`) so a default changed outside Moi is
 rediscovered on the next snapshot instead of on every one.
 
 ### 3.3 The prompt stream
@@ -205,7 +205,7 @@ rediscovered on the next snapshot instead of on every one.
 `session/prompt` streams `session/update` notifications and resolves with
 `{ stopReason, usage }`. Observed update kinds:
 
-| `sessionUpdate`             | Carries                                               | moi display mapping               |
+| `sessionUpdate`             | Carries                                               | Moi display mapping               |
 | --------------------------- | ----------------------------------------------------- | --------------------------------- |
 | `agent_message_chunk`       | token deltas                                          | `preview` frames + assistant text |
 | `agent_thought_chunk`       | token deltas                                          | thinking parts                    |
@@ -217,7 +217,7 @@ rediscovered on the next snapshot instead of on every one.
 | `user_message_chunk`        | replayed user turns                                   | history only (§3.6)               |
 
 `kind` is semantic (`execute`, `edit`, `read`) with `locations: [{path}]`, so
-moi gets Codex-style semantic tool labels rather than Claude Code's raw
+Moi gets Codex-style semantic tool labels rather than Claude Code's raw
 `tool_use` pairs. Terminal calls arrive pre-titled (`terminal: echo step1`).
 
 Final result:
@@ -235,7 +235,7 @@ Final result:
 }
 ```
 
-Token streaming is **always on** — there is no opt-in flag, so moi gates
+Token streaming is **always on** — there is no opt-in flag, so Moi gates
 forwarding on its side exactly like it does for Codex.
 
 ### 3.4 ⚠️ Live file-tool completions are dropped
@@ -243,7 +243,7 @@ forwarding on its side exactly like it does for Codex.
 **Reproducible bug.** In the live stream, `terminal` tool calls always get
 their `tool_call_update` (3 starts → 3 completions), but `read_file` /
 `write_file` calls **never do** (4 starts → 0 completions, twice in a row).
-In moi's UI those tool cards would hang in `pending` forever.
+In Moi's UI those tool cards would hang in `pending` forever.
 
 Cause is the pairing strategy: live completions are matched by **tool name**
 through a FIFO queue (`acp_adapter/events.py`, `make_tool_progress_cb` /
@@ -255,18 +255,18 @@ The same session replayed through `session/load` is **complete and correct** —
 4 `tool_call` + 4 `tool_call_update` with results — because the replay path
 (`server.py`) pairs by real `tool_call_id` from message history instead.
 
-Consequences for a moi adapter:
+Consequences for a Moi adapter:
 
 - Tool-call ids are **not stable** between live and replay: live emits
   `tc-<hash>`, replay emits `functions.<tool>:<index>`. Never key persisted
   state on them across a reload.
 - Workaround without patching Hermes: on `stopReason`, mark any still-pending
-  tool call as completed (moi already owns turn accounting), or re-read
+  tool call as completed (Moi already owns turn accounting), or re-read
   history. Upstream fix would be to pair by `tool_call_id` live too.
 
 ### 3.5 Permissions — a real approval flow
 
-Unlike every harness moi ships today, Hermes has a **working interactive
+Unlike every harness Moi ships today, Hermes has a **working interactive
 approval flow**: `session/request_permission` arrives as an agent→client
 request with a proper diff payload and options
 (`allow_once` / `reject_once`), and a denial genuinely blocks the write.
@@ -278,9 +278,9 @@ A/B probe, denying every prompt:
 | `dont_ask` | 0             | ✅ yes              |
 | `default`  | 1             | ❌ no               |
 
-So `session/set_mode { modeId: 'dont_ask' }` reproduces moi's
+So `session/set_mode { modeId: 'dont_ask' }` reproduces Moi's
 bypass-permissions trust model in one call — that is the shipping path. But
-Hermes is also the first backend that would let moi build real approval UI
+Hermes is also the first backend that would let Moi build real approval UI
 (README's "permission requests as events" wish-list item) without fighting the
 provider.
 
@@ -292,7 +292,7 @@ provider.
   the live stream.
 - `session/cancel` → the in-flight `session/prompt` resolves with
   `stopReason: "cancelled"` immediately (8.0s prompt cancelled at t+8.0s).
-  Cleanly distinguishable from `end_turn`, which is what moi's contract needs
+  Cleanly distinguishable from `end_turn`, which is what Moi's contract needs
   to tell aborts from failures.
 - `session/set_model { modelId }` succeeds mid-session — **live model switch**,
   no teardown-and-resume dance (Claude Code's weak spot). ⚠️ but see §3.10.
@@ -314,7 +314,7 @@ shape, not a protocol limit, so an adapter should not assume ordering.
 
 The number to watch is **7.7s to first frame**. That is process spawn +
 `session/new` + prompt assembly, and Hermes assembles a very large prompt
-(~38k input tokens for a trivial task, ~24k on a warmed session). A moi
+(~38k input tokens for a trivial task, ~24k on a warmed session). A Moi
 harness must hold the process open per workspace — spawn-per-turn would put
 that latency in front of every message.
 
@@ -324,7 +324,7 @@ that latency in front of every message.
 array is accepted (`promptCapabilities.image: true`). Against
 `openai-api:gpt-5.4-mini` the agent described a generated test image
 correctly — "a large red circle … a dark blue rectangle … plain white
-background, circle on the left". So moi's `imagesInline: 'base64'` capability
+background, circle on the left". So Moi's `imagesInline: 'base64'` capability
 applies; no path-note fallback needed. Vision needs a vision-capable model —
 `kimi-k2.7-code` is not one, so this is a per-model capability the picker
 should reflect. Hermes also has an `auxiliary.vision` model slot that can
@@ -334,7 +334,7 @@ route image understanding to a _different_ model than the chat model.
 
 Env set on the `hermes acp` process reaches the agent's shell tools: a
 `MOI_TEST_ENV` set at spawn came back from `printenv` inside the agent's
-terminal tool. This is exactly moi's model — per-workspace env frozen at
+terminal tool. This is exactly Moi's model — per-workspace env frozen at
 spawn, `onEnvChanged()` reaping idle processes to pick up changes.
 
 ### 3.10 MCP: works per-session, but `set_model` silently drops it ⚠️
@@ -344,7 +344,7 @@ register servers **per session**. A throwaway stdio MCP server exposing one
 tool was picked up as `mcp__mini__moi_secret_number` (Claude Code's
 namespacing convention), the tool surface refreshed to 28 tools, and the agent
 called it and returned the secret value. Per-session scoping is exactly what
-moi needs to give each workspace its own connectors.
+Moi needs to give each workspace its own connectors.
 
 **But `session/set_model` destroys them.** Isolated A/B on the same MCP server:
 
@@ -360,7 +360,7 @@ Cause: `set_session_model` rebuilds the agent with
 (`acp_adapter/server.py`). The rebuilt agent comes back with no MCP tools and
 the model just reports it lacks them.
 
-This matters because moi offers a per-chat model picker. Workarounds: re-issue
+This matters because Moi offers a per-chat model picker. Workarounds: re-issue
 `session/load` after every `set_model` (it re-registers), or treat model
 switches as teardown-and-resume when connectors are attached. The one-line
 upstream fix is to call `_register_session_mcp_servers` from
@@ -377,15 +377,15 @@ user-global, so per-workspace connectors should go through the ACP
 `db.list_sessions_rich(source="acp", …)` in `acp_adapter/session.py`. The
 `sessions` table tags every row with `source` (observed: `acp`, `cli`; the
 gateway writes `telegram`, `discord`, …) plus `chat_id` / `chat_type` /
-`user_id`. So a Telegram conversation **never** appears in moi's session list,
-and moi can never accidentally hijack one.
+`user_id`. So a Telegram conversation **never** appears in Moi's session list,
+and Moi can never accidentally hijack one.
 
-That is the right default, and it also means moi cannot show them without
+That is the right default, and it also means Moi cannot show them without
 going around ACP: read `state.db` directly, or drive the gateway protocol
 (§5). Worth knowing that gateway sessions are keyed by
 `(platform, chat_id, user_id)` and run inside the long-lived gateway daemon
 with no meaningful `cwd` — they are not workspace-scoped at all, so they do
-not fit moi's workspace model even if surfaced.
+not fit Moi's workspace model even if surfaced.
 
 `session/list` does support server-side filtering and pagination:
 `{ cwd, cursor }`. Verified cold (fresh process, no in-memory sessions):
@@ -395,8 +395,8 @@ recover their cwd from the `model_config` JSON blob, not the (often empty)
 
 ## 4. Multiple agents = profiles
 
-Hermes profiles are close to OpenClaw agents, and moi can use them the same
-way — except moi can also **create** them, which it cannot do for OpenClaw.
+Hermes profiles are close to OpenClaw agents, and Moi can use them the same
+way — except Moi can also **create** them, which it cannot do for OpenClaw.
 
 ```
 $ hermes profile list
@@ -416,7 +416,7 @@ real — the `research` profile's `session/list` returned `[]` while `default`
 had 19. The `--description` field exists specifically so an orchestrator can
 route work by role.
 
-So a moi harness has three viable shapes, and this is a product decision:
+So a Moi harness has three viable shapes, and this is a product decision:
 
 1. **Import profiles as agents** (OpenClaw's model) — `hermes profile list`
    is the discovery call, `agentId` on `SendMessageInput` already exists for
@@ -432,7 +432,7 @@ So a moi harness has three viable shapes, and this is a product decision:
 
 This is the real integration cost, not the protocol.
 
-**moi is workspace-scoped.** Every workspace has its own settings in
+**Moi is workspace-scoped.** Every workspace has its own settings in
 `.moi/.workspace.json`, its own env, its own agent config, and a workspace is
 shareable via git.
 
@@ -459,7 +459,7 @@ sharing one `$HERMES_HOME` ran simultaneously with correct isolation and **no
 SQLite contention** (Hermes detects the SQLite 3.45.1 WAL-reset bug and falls
 back to `journal_mode=DELETE`).
 
-Process topology matches moi's held-open model: **one process per workspace,
+Process topology matches Moi's held-open model: **one process per workspace,
 N sessions inside it** — the same shape as `codex/client.ts`, so per-workspace
 env injection at spawn works unchanged.
 
@@ -507,36 +507,36 @@ Event vocabulary is richer too: `agent.token`, `agent.thinking`,
 
 **Recommendation: still ACP.** The gateway is an internal, undocumented,
 fast-moving protocol for Nous's own desktop app, and half its surface
-(billing, pets, messaging onboarding, cron) is irrelevant to moi. ACP gives
-moi ~90% of the chat plane against a stable public contract. The three
-gateway-only things moi would genuinely miss are **mid-turn steering**,
-**subagent lanes**, and **compaction visibility** — all of which moi renders
+(billing, pets, messaging onboarding, cron) is irrelevant to Moi. ACP gives
+Moi ~90% of the chat plane against a stable public contract. The three
+gateway-only things Moi would genuinely miss are **mid-turn steering**,
+**subagent lanes**, and **compaction visibility** — all of which Moi renders
 today for Codex/Claude Code, so expect a slightly flatter experience on
 Hermes. If those become blocking, the escape hatch is to run `hermes serve`
 alongside ACP and use it as a _control plane only_, keeping chat on ACP.
 
-## 7. What Hermes has that moi has no concept of
+## 7. What Hermes has that Moi has no concept of
 
 Worth knowing before deciding how deep to integrate — these are the reasons
-someone picks Hermes, and moi currently models none of them:
+someone picks Hermes, and Moi currently models none of them:
 
 - **Self-improving skills.** Hermes writes its own skills from experience and
-  maintains them with a background "curator". moi's skills are authored
+  maintains them with a background "curator". Moi's skills are authored
   artifacts synced into the workspace; there is no notion of the agent
   editing its own skill library. 14 bundled skill packs ship with the repo.
 - **Persistent cross-session memory** with pluggable providers
   (`plugins/memory/`), retrieved during prompt assembly.
 - **`SOUL.md`** — a user-level agent identity/persona file, orthogonal to
-  moi's per-workspace `AGENTS.md`.
+  Moi's per-workspace `AGENTS.md`.
 - **Context compression as a first-class lifecycle** with session lineage
   (`parentHermesSessionId`, `compressionDepth`) surviving compaction.
 - **Auxiliary model slots** — separate models for vision, compression and web
-  extraction, independent of the chat model. moi has one model per chat.
-- **Non-local terminal backends** (docker/ssh/modal/daytona/…). moi assumes
+  extraction, independent of the chat model. Moi has one model per chat.
+- **Non-local terminal backends** (docker/ssh/modal/daytona/…). Moi assumes
   the agent runs where the workspace is.
 
 None of these block an adapter; all of them are invisible through ACP unless
-moi chooses to surface them.
+Moi chooses to surface them.
 
 ## 8. Adapter shape and effort
 
@@ -580,7 +580,7 @@ server/harness/hermes/
 Touch points outside the folder are small and already enumerated by the Codex
 precedent: `lib/types.ts` (`WorkspaceType` union), `lib/workspace-types.ts`
 (ordering), `lib/format.ts` (`provider` union), `server/harness/registry.ts`,
-`server/harness/executable.ts` (PATH lookup), `server/api.ts`
+`server/harness/executable.ts` (PATH lookup), `server/api/index.ts`
 (`CREATABLE_TYPES`), and a handful of client files that branch on provider
 (`client/features/chat/messages/tool-group/format/index.ts`,
 `client/features/home/workspace-setup/WorkspaceAgentStep.tsx`,
@@ -662,7 +662,7 @@ interpreter).
 
 ## 11. Implementation notes (shipped)
 
-What driving the protocol through moi confirmed, beyond the probes:
+What driving the protocol through Moi confirmed, beyond the probes:
 
 - **The `acp/` split is the deliverable.** `acp/{wire,client,adapter,session,discovery}.ts`
   is provider-agnostic; `hermes/` supplies an `AcpProviderConfig` (spawn spec,
@@ -689,7 +689,7 @@ What driving the protocol through moi confirmed, beyond the probes:
 - **Model catalog caching.** `listModels()` has no session to read from, so the
   catalog is cached per workspace off a throwaway `session/new`. Zero-history
   sessions are invisible to `session/list`, so this leaves no debris.
-- **MCP is not wired yet.** moi passes `mcpServers: []`, which sidesteps the
+- **MCP is not wired yet.** Moi passes `mcpServers: []`, which sidesteps the
   §3.10 `set_model` regression. Per-workspace connectors are the next step and
   will need the re-register workaround.
 
@@ -697,7 +697,7 @@ Verified live against the running server: session rename, 130+ preview frames
 per turn, tool cards settling to success (including the file write Hermes never
 completes), `stopped` on interrupt with the partial answer preserved, cold
 `session/load` replay after a server restart, per-chat model switching, and
-image attachments through moi's upload pipeline.
+image attachments through Moi's upload pipeline.
 
 ## 12. The official SDK, and the version skew it exposed
 
@@ -715,7 +715,7 @@ The protocol now lives in a vendor-neutral org; JetBrains maintains a repo too.
 **Types only, dev-only.** `dist/schema/types.gen.js` has no runtime code, so
 `import type` costs nothing and ships nothing. Importing _values_ instead
 (`AGENT_METHODS`, `ClientSideConnection`, `ndJsonStream`) would pull zod in as
-a real dependency for the sake of a few string constants, so moi keeps its own
+a real dependency for the sake of a few string constants, so Moi keeps its own
 method strings — verified against the SDK's `AGENT_METHODS` at 1.3.0 — and its
 own transport, which already carries the `/dev/harness` wire tap, per-workspace
 process lifecycle and env injection at spawn.
@@ -731,12 +731,12 @@ _models_ are first-class. The current spec has **no model concept at all**:
 
 `session/set_model` and `models.availableModels` were replaced by
 `session/set_config_option` + `SessionConfigOption` (a select/boolean option
-list on `NewSessionResponse`). moi's per-chat model picker rides on the old
+list on `NewSessionResponse`). Moi's per-chat model picker rides on the old
 shape, so `wire.ts` keeps a small, clearly-labelled "pre-1.0 additions" block
 (`AcpModelInfo`, `AcpModelState`, `AcpNewSessionResult`). **Delete it when
 Hermes moves to config options** — that is the whole migration.
 
-Everything else moi consumes is current: `session_info_update` and
+Everything else Moi consumes is current: `session_info_update` and
 `usage_update` are both in the spec (`usage_update` requires `size`, which was
 optional in the hand-written version).
 
@@ -763,7 +763,7 @@ list in `config.yaml`. **There is no cwd-relative skill path.** Under
 `hermes -p <name>`, `$HERMES_HOME` is `<root>/profiles/<name>`, so the scanned
 directory is `<profile>/skills`.
 
-moi therefore installs its skills into the **profile home**, not the
+Moi therefore installs its skills into the **profile home**, not the
 workspace, even though the workspace is `<profile>/workspace`. Installing into
 the workspace (the OpenClaw shape, where the workspace _is_ the agent root)
 leaves them invisible: `skills list` omits them and `skill view moi-workspace`
@@ -772,7 +772,7 @@ cwd, which is what made the bug look like it worked.
 
 `skillsDir` climbs back with `profileHomeFromWorkspace()` — the exact inverse
 of `profileWorkspace()`, kept beside it in `discovery.ts`, returning null for
-any path moi did not lay out so callers fall back instead of writing into an
+any path Moi did not lay out so callers fall back instead of writing into an
 unrelated parent. `skillsDirFor` is the single resolver, so install, update and
 version-check all follow.
 
@@ -789,9 +789,9 @@ Verified against Hermes 0.20.0:
 
 **Consequences, accepted deliberately.** The skills are profile-global: every
 session on that profile sees them, including plain `hermes` runs and gateway
-(Telegram/Discord) chats — not just moi. Importing the _default_ profile puts
+(Telegram/Discord) chats — not just Moi. Importing the _default_ profile puts
 them in `~/.hermes/skills`, the root install's own directory. They also outlive
-the workspace: removing the moi workspace leaves the skill in the profile's
+the workspace: removing the Moi workspace leaves the skill in the profile's
 list. Nothing writes to `config.yaml`, `.env` or `SOUL.md` — this is the same
 directory `hermes skills install` targets.
 
@@ -815,19 +815,19 @@ table has an `archived` column, and `list_sessions_rich` takes
 archived session would drop out of `session/list` for free.
 
 The problem is reach: the only callers of `set_session_archived` are HTTP routes
-on `hermes serve` and the gateway API server, daemons moi deliberately does not
+on `hermes serve` and the gateway API server, daemons Moi deliberately does not
 run (§6). The `hermes sessions archive` CLI is filter-based (age, source, title,
 cwd — no session id), and `hermes sessions delete <id>` is a real delete.
 
-So moi hides the chat on its own side, which is what the **Claude Code harness
+So Moi hides the chat on its own side, which is what the **Claude Code harness
 already does** — it tags a session `moi:archived` and filters the list rather
 than deleting anything. `../acp/archived.ts` keeps a per-workspace id list in
-moi's data dir; `listAcpSessions` and the home-card preview filter against it,
+Moi's data dir; `listAcpSessions` and the home-card preview filter against it,
 and `forgetAcpSession` drops the live record. Because it lives in the ACP layer,
 any future ACP provider inherits archiving without implementing anything.
 
 Consequence, and the correct boundary: the chat stays in Hermes's own store and
-is still visible to `hermes sessions list` and the gateway. moi hides a chat
-from moi, not from the user's agent. Nothing is destroyed, and the store is a
+is still visible to `hermes sessions list` and the gateway. Moi hides a chat
+from Moi, not from the user's agent. Nothing is destroyed, and the store is a
 plain id list, so unarchiving is a one-liner (`unarchiveAcpSession`) if a route
 ever wants it.

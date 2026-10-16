@@ -117,7 +117,7 @@ describe('Codex JSON-RPC transport', () => {
       {
         jsonrpc: '2.0',
         id: 'unknown',
-        error: { code: -32601, message: 'moi does not handle unknown/requestApproval' }
+        error: { code: -32601, message: 'Moi does not handle unknown/requestApproval' }
       }
     ])
     f.transport.close()

@@ -112,7 +112,8 @@ export const claudeCodeHarness: Harness = {
     const runtime = await pathHarnessAvailability('claude-code')
     return runtime.status === 'available' && ws ? getClaudeAuthReadiness(ws.path) : runtime
   },
-  startLogin: ws => startClaudeLogin(ws.path),
+  startLogin: startClaudeLogin,
+  authStatus: getClaudeAuthReadiness,
 
   onEnvChanged: workspacePath => restartWorkspaceSessions(workspacePath),
   stopWorkspace: workspacePath => killWorkspaceSessions(workspacePath),

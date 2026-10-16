@@ -1,4 +1,4 @@
-# Browser-testing moi in Claude Code on the web
+# Browser-testing Moi in Claude Code on the web
 
 > Driving the app in a real Chromium inside the cloud sandbox, with Playwright
 > or agent-browser. React is vendored (served same-origin at `/vendor/react/*`),

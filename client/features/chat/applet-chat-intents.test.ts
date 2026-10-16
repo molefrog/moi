@@ -32,7 +32,7 @@ describe('appletSendBlockedReason', () => {
 
   test('reports disconnected and login-required workspaces precisely', () => {
     expect(appletSendBlockedReason({ status: 'disconnected' })).toBe(
-      'This workspace is disconnected from moi'
+      'This workspace is disconnected from Moi'
     )
     expect(
       appletSendBlockedReason({
@@ -307,7 +307,7 @@ describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope
     expect(send).not.toHaveBeenCalled()
     expect(notices.mock.calls.at(-1)?.[0]).toMatchObject({
       type: 'error',
-      description: 'This workspace is disconnected from moi'
+      description: 'This workspace is disconnected from Moi'
     })
   })
 

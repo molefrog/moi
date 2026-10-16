@@ -72,8 +72,8 @@ export async function resolveCwdWorkspace(): Promise<WorkspaceEntry> {
     console.error(
       '\n' +
         pc.red('✗') +
-        ` ${process.cwd()} is not inside a registered moi workspace.\n` +
-        pc.dim('  Open it in moi, or run from the workspace root.\n')
+        ` ${process.cwd()} is not inside a registered Moi workspace.\n` +
+        pc.dim('  Open it in Moi, or run from the workspace root.\n')
     )
     process.exit(1)
   }

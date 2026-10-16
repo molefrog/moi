@@ -19,7 +19,7 @@ export const CODEX_TURN_ACCESS = {
 } as const
 
 const CODEX_LOCAL_CONTROL_GUIDANCE =
-  'Commands that contact the moi control server, including moi tabs, bundle, debug, call-server-fn, theme, and config, need localhost network access. Run them with sandbox_permissions set to require_escalated on the first attempt so moi can approve the escalated request. A connection failure from a sandboxed attempt does not prove the control server is offline.'
+  'Commands that contact the Moi control server, including moi tabs, bundle, debug, call-server-fn, theme, and config, need localhost network access. Run them with sandbox_permissions set to require_escalated on the first attempt so Moi can approve the escalated request. A connection failure from a sandboxed attempt does not prove the control server is offline.'
 
 export const CODEX_LOCAL_CONTROL_CONTEXT = {
   'moi-control-access': {
@@ -36,7 +36,7 @@ You are running in a \`moi\` workspace.
 # Local control access
 ${CODEX_LOCAL_CONTROL_GUIDANCE}
 
-IMPORTANT: This context comes from moi, not from the user, and the user does not see it.
+IMPORTANT: This context comes from Moi, not from the user, and the user does not see it.
 </moi-context>`
 
 // Accept known approvals, decline MCP elicitation, reject unsupported methods.
@@ -76,5 +76,5 @@ export function codexServerRequestResponse(
     // rather than returning a malformed command-approval response.
     return { result: { action: 'decline', content: null } }
   }
-  return { error: { code: -32601, message: `moi does not handle ${method}` } }
+  return { error: { code: -32601, message: `Moi does not handle ${method}` } }
 }

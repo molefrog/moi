@@ -2,9 +2,9 @@
 
 The idea is to give the whole workspace one way to say “open this, showing this state.”
 
-moi links point to places in the current workspace:
+Moi links point to places in the current workspace:
 `moi:/views/events?eventId=123` becomes `/workspace/<id>/views/events?eventId=123`.
-moi fills in the workspace ID and server address. Use `moi:/` with one slash.
+Moi fills in the workspace ID and server address. Use `moi:/` with one slash.
 
 The browser URL sets the open tab and passes values to views. The app and `moi.resolveUrl`
 use the same resolver in `lib/navigation.ts` for workspace links, files, and web addresses.
@@ -59,7 +59,7 @@ export default function Events({ params = {} }: Props) {
 ```
 
 Widgets receive no `params`. Chat messages carry the active view's non-empty params to the
-agent as `activeTab.params` in the moi context.
+agent as `activeTab.params` in the Moi context.
 
 Workspace pages add browser history; files and web addresses open in the current browser tab.
 Modified clicks, downloads, and explicit link targets retain browser behavior.

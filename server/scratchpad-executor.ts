@@ -139,7 +139,7 @@ function buildStore(
     const ahead = sequencesAhead(doc?.schema, store.schema.serialize().sequences)
     if (ahead.length > 0) {
       throw new Error(
-        `Scratchpad was written by a newer moi (${describeNewerWriter(writer, ahead)}); ` +
+        `Scratchpad was written by a newer Moi (${describeNewerWriter(writer, ahead)}); ` +
           `this server has tldraw ${SCRATCHPAD_WRITER.tldraw}. Restart the newer server or ` +
           `update this install (bun install -g moi-computer@latest). ` +
           `The canvas file is intact — do not reset it.`

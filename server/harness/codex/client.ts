@@ -1,6 +1,8 @@
 // One app-server per workspace: environment is fixed at process spawn, while
 // threads share the connection. Framing lives in transport.ts; see NOTES.md
 // for lifecycle, configuration, and wire-type maintenance.
+import { homedir } from 'node:os'
+
 import type { McpServer, Model, SessionSummary, StreamEvent } from '@/lib/types'
 
 import {
@@ -99,7 +101,7 @@ type ClientRecord = {
   close: () => void
 }
 
-const clients = new Map<string, Promise<ClientRecord>>() // key: workspacePath
+const clients = new Map<string | undefined, Promise<ClientRecord>>() // undefined: default auth context
 const liveProcesses = new Map<
   string,
   {
@@ -120,13 +122,15 @@ export function getCodexProcessSnapshot(): CodexProcessSnapshot[] {
     }))
 }
 
-async function startClient(workspacePath: string): Promise<ClientRecord> {
+async function startClient(workspacePath?: string): Promise<ClientRecord> {
+  const scope = workspacePath ?? 'default-auth'
+  const cwd = workspacePath ?? homedir()
   const bin = requireHarnessExecutable('codex')
 
-  const workspaceEnv = await resolveWorkspaceEnv(workspacePath)
+  const workspaceEnv = workspacePath ? await resolveWorkspaceEnv(workspacePath) : {}
   const startedAt = Date.now()
   const proc = Bun.spawn(agentCommand([bin, 'app-server']), {
-    cwd: workspacePath,
+    cwd,
     stdin: 'pipe',
     stdout: 'pipe',
     stderr: 'pipe',
@@ -144,13 +148,13 @@ async function startClient(workspacePath: string): Promise<ClientRecord> {
     stop: () => {
       proc.kill()
     },
-    tap: (direction, frame) => tapWire(workspacePath, direction, frame)
+    tap: (direction, frame) => tapWire(scope, direction, frame)
   })
   transport.onNotification(method => {
     if (method === 'account/updated' || method === 'account/login/completed')
       codexModelCatalogs.delete(client)
     if (method !== '__exit') return
-    if (liveProcesses.get(workspacePath)?.proc === proc) liveProcesses.delete(workspacePath)
+    if (liveProcesses.get(scope)?.proc === proc) liveProcesses.delete(scope)
     debug(`codex app-server exited ws=${workspacePath}`)
   })
   async function drainStderr() {
@@ -168,12 +172,12 @@ async function startClient(workspacePath: string): Promise<ClientRecord> {
     rpc: transport.rpc,
     onNotification: transport.onNotification,
     isAlive: transport.isAlive,
-    workspacePath,
+    workspacePath: cwd,
     supportsAdditionalContext: false,
     cliVersion: undefined
   }
   const record: ClientRecord = { client, proc, close: transport.close }
-  liveProcesses.set(workspacePath, {
+  liveProcesses.set(scope, {
     proc,
     startedAt,
     isAlive: client.isAlive,
@@ -186,7 +190,7 @@ async function startClient(workspacePath: string): Promise<ClientRecord> {
   // Native context fields require experimentalApi on this connection.
   try {
     const init = await client.rpc<{ userAgent?: string }>('initialize', {
-      clientInfo: { name: 'moi', title: 'moi', version: '0.1' },
+      clientInfo: { name: 'moi', title: 'Moi', version: '0.1' },
       capabilities: { experimentalApi: true, requestAttestation: false }
     })
     client.supportsAdditionalContext = codexSupportsAdditionalContext(init?.userAgent)
@@ -202,7 +206,7 @@ async function startClient(workspacePath: string): Promise<ClientRecord> {
   }
 }
 
-export async function getCodexClient(workspacePath: string): Promise<CodexClient> {
+export async function getCodexClient(workspacePath?: string): Promise<CodexClient> {
   const existing = clients.get(workspacePath)
   if (existing) {
     const rec = await existing
@@ -217,7 +221,7 @@ export async function getCodexClient(workspacePath: string): Promise<CodexClient
     const rec = await started
     if (clients.get(workspacePath) !== started || !rec.client.isAlive()) {
       rec.close()
-      throw new Error('Codex startup was cancelled')
+      throw new Error('ChatGPT startup was cancelled')
     }
     rec.client.onNotification(method => {
       if (method === '__exit' && clients.get(workspacePath) === started)
@@ -427,6 +431,6 @@ export async function getCodexThreadEvents(
     threadId,
     includeTurns: true
   })
-  if (!res.thread) throw new Error('Codex did not return this chat')
+  if (!res.thread) throw new Error('ChatGPT did not return this chat')
   return codexThreadToEvents(res.thread, await readSubagentRecords(client, res.thread))
 }

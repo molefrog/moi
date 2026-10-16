@@ -9,6 +9,7 @@ import { dirname, join, resolve } from 'path'
 import pc from './cli-pc'
 
 import { isAgentCaller } from './agent-caller'
+import { openBrowser } from './open-browser'
 import { getAppConfig, initializeAppConfig } from './app-config'
 
 import { appletSelectorMatches, parseAppletSelector } from '@/lib/applet-selector'
@@ -149,13 +150,6 @@ async function registerViaControl(absPath: string): Promise<string> {
     }
     ws.onerror = () => void probeControlServer().then(p => rej(new Error(controlFailureMessage(p))))
   })
-}
-
-async function openBrowser(url: string) {
-  try {
-    if (process.platform === 'darwin') await Bun.$`open ${url}`.quiet()
-    else if (process.platform === 'linux') await Bun.$`xdg-open ${url}`.quiet()
-  } catch {}
 }
 
 // Spawn the server as a child. MOI_SERVER=1 tells the child it is the actual
@@ -504,7 +498,7 @@ const experimentalArgs = Object.fromEntries(
 )
 
 const start = defineCommand({
-  meta: { name: 'start', description: 'Start the moi web server' },
+  meta: { name: 'start', description: 'Start the Moi web server' },
   args: {
     port: {
       type: 'string',
@@ -546,7 +540,7 @@ const start = defineCommand({
           console.log(
             '\n' +
               pc.yellow('◆') +
-              ' The moi service is already running on ' +
+              ' The Moi service is already running on ' +
               webAddress(info) +
               pc.dim(` (v${info.version})`) +
               '\n' +
@@ -603,7 +597,7 @@ const start = defineCommand({
       if (code === 'EADDRINUSE') {
         console.error(
           `\n${pc.red('✗')} Port already in use (http :${PORT} / control :${CONTROL_PORT}) — ` +
-            'is another moi server running?'
+            'is another Moi server running?'
         )
       } else {
         console.error(`\n${pc.red('✗')} Server failed to start: ${String(err)}`)
@@ -762,7 +756,7 @@ const check = defineCommand({
     const only = readAppletSelector(args.only)
     const { root } = await resolveWorkspace(resolve(args.dir))
     if (!existsSync(join(root, '.moi'))) {
-      console.error('\n' + pc.red('✗') + ` No moi workspace found at ${root}\n`)
+      console.error('\n' + pc.red('✗') + ` No Moi workspace found at ${root}\n`)
       process.exit(1)
     }
     const { formatAppletTypecheckDiagnostics, typecheckApplets } =
@@ -1333,7 +1327,7 @@ function printProviderCommands(provider: string, argHint: string) {
       [
         [
           pc.bold(`moi ${provider} init`) + ' ' + pc.dim(argHint),
-          'Install moi skills and register the workspace'
+          'Install Moi skills and register the workspace'
         ]
       ],
       '    '
@@ -1376,7 +1370,7 @@ const openclawInit = defineCommand({
   meta: {
     name: 'init',
     description:
-      'Install moi skills into an OpenClaw agent workspace. Run without args to list discovered agents.'
+      'Install Moi skills into an OpenClaw agent workspace. Run without args to list discovered agents.'
   },
   args: {
     agent: {
@@ -1526,7 +1520,7 @@ const hermesInit = defineCommand({
   meta: {
     name: 'init',
     description:
-      'Install moi skills into a Hermes profile workspace. Run without args to list discovered profiles.'
+      'Install Moi skills into a Hermes profile workspace. Run without args to list discovered profiles.'
   },
   args: {
     profile: {
@@ -2596,7 +2590,7 @@ const skillSubCommands = {
 }
 
 const skill = defineCommand({
-  meta: { name: 'skill', description: 'Show or update the workspace skills shipped with moi' },
+  meta: { name: 'skill', description: 'Show or update the workspace skills shipped with Moi' },
   subCommands: skillSubCommands,
   args: { dir: dirArg },
   async run({ args, rawArgs }) {
@@ -2819,7 +2813,7 @@ async function runServiceStatus() {
     if (!s.installed) {
       console.log('  ' + pc.dim('○') + ' Not installed')
       console.log(
-        pc.dim('    Run `moi service install` to start moi on login and keep it running.')
+        pc.dim('    Run `moi service install` to start Moi on login and keep it running.')
       )
       console.log()
       process.exit(0)
@@ -2860,7 +2854,7 @@ async function runServiceStatus() {
     if (s.binMissing && s.bin) {
       console.log(
         pc.yellow(`  ⚠ The service execs ${s.bin}, which no longer exists`) +
-          pc.dim(' (moi moved or was reinstalled elsewhere).') +
+          pc.dim(' (Moi moved or was reinstalled elsewhere).') +
           '\n' +
           pc.dim('    Rerun `moi service install` to re-capture paths.')
       )
@@ -2897,7 +2891,7 @@ const serviceSubCommands = {
 const service = defineCommand({
   meta: {
     name: 'service',
-    description: 'Run moi as a user service: `moi service install|uninstall|restart|logs`'
+    description: 'Run Moi as a user service: `moi service install|uninstall|restart|logs`'
   },
   subCommands: serviceSubCommands,
   async run({ rawArgs }) {
@@ -2914,7 +2908,7 @@ const service = defineCommand({
 const update = defineCommand({
   meta: {
     name: 'update',
-    description: 'Update moi to the latest published version'
+    description: 'Update Moi to the latest published version'
   },
   args: {
     check: {
@@ -2931,7 +2925,7 @@ const update = defineCommand({
       console.log(
         '\n' +
           pc.yellow('◆') +
-          ` This moi runs from a source tree (${analysis.reason}) — update it with git instead.\n`
+          ` This Moi runs from a source tree (${analysis.reason}) — update it with git instead.\n`
       )
       process.exit(0)
     }
@@ -2984,7 +2978,7 @@ const update = defineCommand({
           pc.red('✗') +
           ' Could not tell which package manager owns this install' +
           pc.dim(` (${analysis.root})`) +
-          '.\n  Update it yourself with the one you installed moi with:\n' +
+          '.\n  Update it yourself with the one you installed Moi with:\n' +
           manualUpdateLines(latest)
             .map(l => pc.dim('    ' + l))
             .join('\n') +
@@ -3014,7 +3008,7 @@ const update = defineCommand({
     // A stale answer means the update landed somewhere PATH does not point.
     const binVersion = analysis.kind === 'global' ? await installedBinVersion(analysis.bin) : null
     if (binVersion === latest) {
-      console.log('\n' + pc.green('✓') + ` moi updated to ${pc.bold('v' + latest)}`)
+      console.log('\n' + pc.green('✓') + ` Moi updated to ${pc.bold('v' + latest)}`)
     } else if (binVersion) {
       console.log(
         '\n' +
@@ -3090,7 +3084,7 @@ async function reportServerFreshness(expected?: string) {
 }
 
 const version = defineCommand({
-  meta: { name: 'version', description: 'Print the moi version' },
+  meta: { name: 'version', description: 'Print the Moi version' },
   run() {
     console.log(versionWithCommit())
   }
@@ -3112,7 +3106,7 @@ const uiComponents = defineCommand({
 
 // The root help splits the surface by audience: workspace commands are the
 // agent's day-to-day toolkit (skills tell it to run them); system commands
-// manage moi itself and are for the human at the keyboard.
+// manage Moi itself and are for the human at the keyboard.
 const workspaceCommands = {
   bundle,
   check,
@@ -3146,13 +3140,13 @@ const main = defineCommand({
   // every command. citty resolves a function meta (used for --version + usage).
   meta: () => ({
     name: 'moi',
-    description: 'moi — local AI workspace',
+    description: 'Moi — local AI workspace',
     version: versionWithCommit()
   }),
   subCommands: { ...workspaceCommands, ...systemCommands }
 })
 
-// Cloud demo: system commands manage moi itself (service, updates, agent
+// Cloud demo: system commands manage Moi itself (service, updates, agent
 // runtimes) — in a demo container the instance is provisioned, not managed,
 // so they print a pointer to the real thing instead of running. Two stay:
 // `start`, because it is how the demo (container or a local test run) boots
@@ -3165,12 +3159,12 @@ function exitIfDemoBlocked(): void {
   // The agent on a managed machine can't read the config (see below).
   if (!canUseDataDir()) return
   const config = getAppConfig()
-  if (!config.cloudDemo) return
+  if (!config.demo) return
   console.log(
     '\n' +
       pc.yellow('◆') +
       ` moi ${invoked} is not available in the demo.\n` +
-      pc.dim('  Get moi on your computer: ') +
+      pc.dim('  Get Moi on your computer: ') +
       pc.bold(config.demoInstallUrl) +
       '\n'
   )
@@ -3212,7 +3206,7 @@ async function printMainHelp() {
     '  ' + pc.cyan(name.padEnd(pad)) + pc.dim(await commandDescription(cmd))
   console.log()
   console.log(
-    pc.bold('moi') + pc.dim(' — local AI workspace  ') + pc.dim(`v${versionWithCommit()}`)
+    pc.bold('Moi') + pc.dim(' — local AI workspace  ') + pc.dim(`v${versionWithCommit()}`)
   )
   console.log()
   console.log(pc.dim('USAGE  ') + 'moi <command> [options]')
@@ -3223,7 +3217,7 @@ async function printMainHelp() {
   console.log()
   if (!isAgentCaller()) {
     console.log(
-      pc.bold('System commands:') + pc.dim(' manage moi itself (server, service, updates)')
+      pc.bold('System commands:') + pc.dim(' manage Moi itself (server, service, updates)')
     )
     console.log(pc.yellow('  AGENTS: do not run these unless explicitly asked!'))
     console.log()

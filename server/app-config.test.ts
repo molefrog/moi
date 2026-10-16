@@ -17,7 +17,8 @@ async function configFile(contents: string): Promise<string> {
 test('defaults apply when no config file exists', () => {
   const config = loadAppConfig('/nonexistent/config.json', NO_ENV)
   expect(config).toEqual({
-    cloudDemo: false,
+    environment: 'local',
+    demo: false,
     experimental: { collab: false },
     demoInstallUrl: 'https://moi.computer',
     cloudflareAccess: null,
@@ -30,28 +31,28 @@ test('defaults apply when no config file exists', () => {
 test('config file values override defaults', async () => {
   const file = await configFile(
     JSON.stringify({
-      cloudDemo: true,
+      demo: true,
       experimental: { collab: true },
       demoInstallUrl: 'https://moi.computer/download'
     })
   )
   const config = loadAppConfig(file, NO_ENV)
-  expect(config.cloudDemo).toBe(true)
+  expect(config.demo).toBe(true)
   expect(config.experimental.collab).toBe(false)
   expect(config.demoInstallUrl).toBe('https://moi.computer/download')
 })
 
 test('env vars override the config file', async () => {
-  const file = await configFile(JSON.stringify({ cloudDemo: true, experimental: { collab: true } }))
+  const file = await configFile(JSON.stringify({ demo: true, experimental: { collab: true } }))
   const config = loadAppConfig(file, {
-    MOI_CLOUD_DEMO: '0'
+    MOI_DEMO: '0'
   })
-  expect(config.cloudDemo).toBe(false)
+  expect(config.demo).toBe(false)
   expect(config.experimental.collab).toBe(false)
 })
 
 test('boolean env accepts 1/true/0/false and ignores anything else', () => {
-  const on = (value: string) => loadAppConfig('/nonexistent', { MOI_CLOUD_DEMO: value }).cloudDemo
+  const on = (value: string) => loadAppConfig('/nonexistent', { MOI_DEMO: value }).demo
   expect(on('1')).toBe(true)
   expect(on('TRUE')).toBe(true)
   expect(on('0')).toBe(false)
@@ -79,7 +80,7 @@ test('only an explicit CLI flag enables collaboration', async () => {
 test('invalid JSON falls back to defaults without throwing', async () => {
   const file = await configFile('{ not json')
   const config = loadAppConfig(file, NO_ENV)
-  expect(config.cloudDemo).toBe(false)
+  expect(config.demo).toBe(false)
 })
 
 test('a read failure other than a missing file warns instead of staying silent', async () => {
@@ -92,7 +93,7 @@ test('a read failure other than a missing file warns instead of staying silent',
     // non-ENOENT failure (permissions, mount errors).
     const dir = await mkdtemp(join(tmpdir(), 'moi-app-config-'))
     const config = loadAppConfig(dir, NO_ENV)
-    expect(config.cloudDemo).toBe(false)
+    expect(config.demo).toBe(false)
     expect(errors.join('\n')).toContain('could not read')
   } finally {
     spy.mockRestore()
@@ -101,10 +102,10 @@ test('a read failure other than a missing file warns instead of staying silent',
 
 test('wrong-typed keys are dropped individually, valid keys survive', async () => {
   const file = await configFile(
-    JSON.stringify({ cloudDemo: 'yes', experimental: { collab: true }, demoInstallUrl: 42 })
+    JSON.stringify({ demo: 'yes', experimental: { collab: true }, demoInstallUrl: 42 })
   )
   const config = loadAppConfig(file, NO_ENV)
-  expect(config.cloudDemo).toBe(false)
+  expect(config.demo).toBe(false)
   expect(config.experimental.collab).toBe(false)
   expect(config.demoInstallUrl).toBe('https://moi.computer')
 })
@@ -170,4 +171,33 @@ test('an invalid or partial Cloudflare Access config trusts no proxy and warns',
   } finally {
     warn.mockRestore()
   }
+})
+
+test('environment uses file settings and env overrides independently of demo', async () => {
+  const file = await configFile(JSON.stringify({ environment: 'cloud', demo: false }))
+  expect(loadAppConfig(file, NO_ENV).environment).toBe('cloud')
+  const localDemo = loadAppConfig(file, { MOI_ENVIRONMENT: 'local', MOI_DEMO: '1' })
+  expect(localDemo.environment).toBe('local')
+  expect(localDemo.demo).toBe(true)
+  expect(loadAppConfig('/nonexistent', { MOI_ENVIRONMENT: 'cloud' }).environment).toBe('cloud')
+})
+
+test('invalid environments warn and preserve the lower-precedence setting', async () => {
+  const warning = spyOn(console, 'error').mockImplementation(() => {})
+  try {
+    const file = await configFile(JSON.stringify({ environment: 'cloud' }))
+    expect(loadAppConfig(file, { MOI_ENVIRONMENT: 'desktop' }).environment).toBe('cloud')
+    const invalidFile = await configFile(JSON.stringify({ environment: 42 }))
+    expect(loadAppConfig(invalidFile, NO_ENV).environment).toBe('local')
+    expect(warning.mock.calls.length).toBe(2)
+  } finally {
+    warning.mockRestore()
+  }
+})
+
+test('demo alone keeps the default local environment', () => {
+  expect(loadAppConfig('/nonexistent', { MOI_DEMO: '1' })).toMatchObject({
+    demo: true,
+    environment: 'local'
+  })
 })

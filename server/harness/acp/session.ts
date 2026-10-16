@@ -49,7 +49,7 @@ import {
   type ToolCallUpdate,
   isTextBlock
 } from './wire'
-import { agentStore } from '../../agent'
+import { harnessStore } from '../auth'
 import { debug } from '../../debug'
 import { broadcast } from '../../state'
 import { hasSessionConfig, saveSessionConfig } from '../../session-config'
@@ -365,7 +365,7 @@ function refreshAvailability(
   rec: Pick<SessionRecord, 'workspaceId' | 'workspacePath'>,
   id: WorkspaceType
 ) {
-  void agentStore.refresh({ id: rec.workspaceId, path: rec.workspacePath, type: id })
+  void harnessStore.refresh({ id: rec.workspaceId, path: rec.workspacePath, type: id })
 }
 
 function createRecord(input: {

@@ -11,7 +11,7 @@
 An extendable visual workspace where your AI agents build their own UI.
 See [moi.computer](https://moi.computer) for what it is and how it works.
 
-moi gives your agent of choice a UI it can reshape on the fly and grow into your
+Moi gives your agent of choice a UI it can reshape on the fly and grow into your
 personal software. Under the hood, the agent writes and embeds live components
 wired to real data: APIs, local files and commands, MCP servers.
 
@@ -28,7 +28,7 @@ Works with the harness you already use:
 
 - **Bring your own agent**. Connect the agent you already use.
 - **Workspace**. The folder where your agent (e.g. Claude Code) runs and keeps
-  its data. It gets a special skill that teaches it how to communicate with moi.
+  its data. It gets a special skill that teaches it how to communicate with Moi.
 - **Theme**. The agent can modify the appearance of the workspace for you:
   fonts, color scheme and more.
 - **Scratchpad**. A shared canvas where you ideate together with the agent: ask
@@ -59,7 +59,7 @@ Works with the harness you already use:
 
 # Quick start
 
-Make sure [Bun](https://bun.sh) 1.3 or newer is installed. moi uses it to run the web server and bundle the dynamic UI.
+Make sure [Bun](https://bun.sh) 1.3 or newer is installed. Moi uses it to run the web server and bundle the dynamic UI.
 
 Install the `moi-computer` package from npm and start the web UI:
 
@@ -73,12 +73,12 @@ Then connect your agent: [Claude Code and Codex](#claude-code-and-codex),
 
 Learn how to:
 
-- [Run moi as a service](#run-moi-as-a-service)
-- [Update moi](#update-moi)
+- [Run Moi as a service](#run-moi-as-a-service)
+- [Update Moi](#update-moi)
 
 # How it works
 
-moi runs locally as a CLI and web UI connected to your agent. The workspace
+Moi runs locally as a CLI and web UI connected to your agent. The workspace
 skill teaches the agent how to call the CLI, which updates the UI using your
 files, commands, APIs, and MCP servers.
 
@@ -95,21 +95,21 @@ flowchart LR
 Moi also stores the all widgets and views as code to keep the workspace filesystem
 as a source of truth.
 
-Updates installed from the UI restart moi and reload the browser automatically.
+Updates installed from the UI restart Moi and reload the browser automatically.
 The app checks npm at most once an hour while it is open, retrying in five
 minutes if the registry could not be reached; a closed app makes no network
 calls of its own.
 
 # Connect an agent
 
-A workspace is the folder where your agent runs and stores its data. moi adds
+A workspace is the folder where your agent runs and stores its data. Moi adds
 a `.moi/` folder and the skills the agent needs to work with the UI.
 
 You can connect a workspace in either of these ways:
 
 - Open [http://localhost:13337](http://localhost:13337) and create a workspace
-  or import one that moi found on your computer.
-- Run `moi init` in a folder. moi detects the harness from the folder's Hermes
+  or import one that Moi found on your computer.
+- Run `moi init` in a folder. Moi detects the harness from the folder's Hermes
   profile, OpenClaw agent, or Claude Code or Codex history. If detection is
   ambiguous, it asks you to choose a harness.
 
@@ -118,14 +118,14 @@ You can connect a workspace in either of these ways:
 Open Claude Code or Codex in your project folder and paste this prompt:
 
 ```
-Set up the moi workspace for this project. Fetch https://moi.computer/INSTALL.md, and follow the steps.
+Set up the Moi workspace for this project. Fetch https://moi.computer/INSTALL.md, and follow the steps.
 ```
 
 To set it up manually, run:
 
 ```sh
 moi init --harness=claude-code   # or --harness=codex
-moi start                       # or run moi as a service
+moi start                       # or run Moi as a service
 ```
 
 The project folder becomes the workspace. You can create as many workspaces as
@@ -137,17 +137,17 @@ you need.
 more always-on agents. Its channels connect agents to Slack and other
 messaging services.
 
-moi connects each OpenClaw agent to one workspace. See the
+Moi connects each OpenClaw agent to one workspace. See the
 [OpenClaw documentation](https://docs.openclaw.ai/cli/agents) to add or manage
 agents.
 
-Run `moi openclaw init` to connect your agent. If moi finds more than one, it
+Run `moi openclaw init` to connect your agent. If Moi finds more than one, it
 lists them so you can rerun the command with the agent you want:
 
 ```sh
 moi openclaw init
 moi openclaw init <agent>       # only needed when you have multiple agents
-moi start                       # or run moi as a service
+moi start                       # or run Moi as a service
 ```
 
 Your agent's workspace will show up at `http://localhost:13337`.
@@ -157,31 +157,31 @@ Your agent's workspace will show up at `http://localhost:13337`.
 [Hermes](https://hermes-agent.nousresearch.com/) is a self-hosted personal
 agent from Nous Research.
 
-moi connects each Hermes profile to one workspace. A profile is a separate
+Moi connects each Hermes profile to one workspace. A profile is a separate
 agent identity with its own model, keys, persona, skills, and memories.
 
-Run `moi hermes init` to connect your profile. If moi finds more than one, it
+Run `moi hermes init` to connect your profile. If Moi finds more than one, it
 lists them so you can rerun the command with the profile you want:
 
 ```sh
 moi hermes init
 moi hermes init <profile>       # only needed when you have multiple profiles
-moi start                       # or run moi as a service
+moi start                       # or run Moi as a service
 ```
 
 The profile's workspace appears at `http://localhost:13337`. To add another,
 create it with `hermes profile create <name>`, then run `moi hermes init` again.
 
-moi connects to Hermes through its built-in
+Moi connects to Hermes through its built-in
 [Agent Client Protocol](https://agentclientprotocol.com/) server. It starts a
 `hermes -p <profile> acp` process and communicates over stdio, so there is no
 gateway, port, or additional API key to configure.
 
-# Manage moi
+# Manage Moi
 
-## Run moi as a service
+## Run Moi as a service
 
-Instead of keeping `moi start` in a terminal, install moi as a user-level
+Instead of keeping `moi start` in a terminal, install Moi as a user-level
 service. It starts on login, restarts on crash, and survives reboots
 (launchd on macOS, a systemd user unit on Linux; no root needed):
 
@@ -198,10 +198,10 @@ Anything your agents need belongs in the workspace env (`moi env set` or
 `moi service install --env MY_TOKEN,OTHER`.
 Rerun `moi service install` after changing captured vars (or moving bun). On
 macOS the first install may show a "background item added" notification for
-"moi"; that is the moi service. On headless Linux, lingering is enabled
+"moi"; that is the Moi service. On headless Linux, lingering is enabled
 automatically when possible so the service outlives your SSH session.
 
-## Update moi
+## Update Moi
 
 ```sh
 moi update            # update to the latest release
@@ -218,8 +218,8 @@ the update happened.
 
 # No crypto token
 
-moi has **no** cryptocurrency, token, coin, or NFT, official or otherwise, on
-any chain, and never will. Any token using the moi name, logo, or the
+Moi has **no** cryptocurrency, token, coin, or NFT, official or otherwise, on
+any chain, and never will. Any token using the Moi name, logo, or the
 maintainer's name (on pump.fun, Solana, or anywhere else) is an unauthorized
 scam with no affiliation to, endorsement from, or benefit to this project.
 The maintainer will never announce, endorse, or accept proceeds from a token.

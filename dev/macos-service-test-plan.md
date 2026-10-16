@@ -14,7 +14,7 @@ flow against a mock registry, SIGTERM shutdown, EADDRINUSE exit codes —
 ## Ground rules
 
 - macOS only. Abort with a clear message on any other OS.
-- You will modify this machine: a global moi install and a LaunchAgent.
+- You will modify this machine: a global Moi install and a LaunchAgent.
   Record what exists before you touch it; restore it at the end.
 - Never use sudo. Nothing in this plan needs it.
 - If a step's outcome does not match EXPECT, do not improvise a fix —
@@ -32,7 +32,7 @@ launchctl print "gui/$(id -u)/computer.moi.server" 2>/dev/null | head -5
 curl -s --max-time 2 http://localhost:13337/status | head -3   # running server?
 ```
 
-Save all of it. If a moi service is already installed, copy the plist aside:
+Save all of it. If a Moi service is already installed, copy the plist aside:
 `cp ~/Library/LaunchAgents/computer.moi.server.plist /tmp/moi-plist-backup`.
 If a foreground server is running, ask the user before stopping it.
 
@@ -79,7 +79,7 @@ moi service                                         # EXPECT: ● running (pid N
 ```
 
 Inspect the plist (`plutil -p`): ProgramArguments is `<moi-bin> start`
-(argv[0] is the moi bin — its basename is the login-item display name); env
+(argv[0] is the `moi` bin — its basename is the login-item display name); env
 contains `PATH` (starting with the bun dir), `MOI_SERVER=1`, `MOI_SERVICE=1`,
 `HOME`; env does NOT contain `TERM`, `PWD`, `HOST`, `HOSTNAME`, `PORT`,
 `SSH_AUTH_SOCK`, or any `CLAUDE_*` session vars (even when installing from

@@ -127,7 +127,7 @@ export async function staleSkillNotice(cwd: string): Promise<string | null> {
     )
     if (stale.length === 0) return null
     const parts = stale.map(s => `${s.name} (${s.installed ?? 'none'} → ${s.bundled})`)
-    return `⚠ moi skill outdated: ${parts.join(', ')} — run \`moi skill update\` to refresh.`
+    return `⚠ Moi skill outdated: ${parts.join(', ')} — run \`moi skill update\` to refresh.`
   } catch {
     return null
   }

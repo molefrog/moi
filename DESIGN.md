@@ -1,4 +1,4 @@
-# moi main app design
+# Main app design
 
 This is the visual contract for the host app and its chrome. Workspace widget/view internals and generated applets use their workspace-local design guidance instead.
 
@@ -8,11 +8,11 @@ Generic design skills may help with usability and polish. They cannot introduce 
 
 ## Visual Direction
 
-moi is a local AI space. The host app should feel calm, precise, compact, and a little quirky. It is a serious tool, not a marketing page or visual showcase.
+Moi is a local AI space. The host app should feel calm, precise, compact, and a little quirky. It is a serious tool, not a marketing page or visual showcase.
 
 Prefer density with breathing room. Use readable logs, compact controls, quiet panel chrome, and clear interaction states. Personality should come from product-specific copy, icons, and small interaction moments. Avoid gradients, decorative blobs, oversized type, dramatic shadows, large empty hero layouts, and one-off visual systems.
 
-Never use purple gradients anywhere. They read as generic AI-generated styling and are outside moi's visual language.
+Never use purple gradients anywhere. They read as generic AI-generated styling and are outside Moi's visual language.
 
 Keep shapes tight and utilitarian. Use component-defined radii, with softer panels and dialogs. Reserve full rounding for pills and circular controls. Do not mix several radius families in one surface.
 
@@ -57,7 +57,7 @@ Start with no outline or shadow. Add an edge when a boundary needs to be visible
 - **Floating surface:** use `shadow-md` for a local overlay, `shadow-lg` for a higher overlay layer, and `shadow-xl` for a modal layer. Follow the installed overlay primitive's level. Size or importance alone does not justify a stronger shadow.
 - **Keyboard focus:** preserve the component's focus treatment. For custom controls, use `focus-visible:ring-3 focus-visible:ring-ring/50`. `ring-border` is a quiet resting outline; `ring-ring` uses the focus color. A resting outline does not replace a visible focus state.
 
-moi's `shadow-*` tokens already include a thin edge as well as blur and offset. Adding a shadow therefore adds elevation even at `shadow-xs`. Do not use shadows just to make an outline visible, or stack a border and resting ring on the same edge. A raised surface normally needs only its shadow; retain combinations already defined by installed primitives.
+Moi's `shadow-*` tokens already include a thin edge as well as blur and offset. Adding a shadow therefore adds elevation even at `shadow-xs`. Do not use shadows just to make an outline visible, or stack a border and resting ring on the same edge. A raised surface normally needs only its shadow; retain combinations already defined by installed primitives.
 
 Use the same edge treatment for elements with the same role. Isolated existing usages, custom shadows, and decorative inset effects are exceptions, not defaults for new UI. Keep token values in the theme and avoid custom shadow formulas in feature code.
 

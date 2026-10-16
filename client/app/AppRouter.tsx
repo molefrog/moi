@@ -39,8 +39,8 @@ export function AppRouter() {
 
   return (
     <Switch>
-      <Route path="/" component={HomeRoute} />
       <Route path="/dev/*?" component={DevLazy} />
+      <Route path="/" component={HomeRoute} />
       {/* The wildcard is the destination path (`views/orders`, `overview`, …) —
           the URL is the tab address, read downstream with `useParams`. This
           pattern is its only definition. Keyed by workspace id only, so tab

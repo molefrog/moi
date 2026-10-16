@@ -1,12 +1,12 @@
 # OpenClaw — integration notes
 
-Everything we learned wiring moi to OpenClaw's local gateway. Covers on-disk
+Everything we learned wiring Moi to OpenClaw's local gateway. Covers on-disk
 layout, the WebSocket protocol, auth, the RPC surface, the live event stream,
 per-version drift, the things that bit us, and how to use it from Bun.
 
-Pinned dep: **`openclaw@2026.7.1`**. Compatibility: moi speaks gateway **wire
+Pinned dep: **`openclaw@2026.7.1`**. Compatibility: Moi speaks gateway **wire
 protocol 4**, the protocol of both the 2026.7.x and 2026.6.x lines — verified
-identical for everything moi uses against live 2026.7.1 and 2026.6.33
+identical for everything Moi uses against live 2026.7.1 and 2026.6.33
 gateways. Protocol-3 gateways (≤ 2026.5.x) reject the handshake with
 `protocol mismatch` (verified live against 2026.4.22, WS close 1002); those
 are detect-and-surface only (`compat.ts` → `classifyGatewayError`), never
@@ -37,7 +37,7 @@ Control UI SPA and a tiny `/health` endpoint. Everything else is WebSocket.
 
 ## 2. On-disk layout
 
-State root: `~/.openclaw/` by default. moi resolves the config the way the
+State root: `~/.openclaw/` by default. Moi resolves the config the way the
 CLI does: `OPENCLAW_CONFIG_PATH` wins, then `OPENCLAW_STATE_DIR/openclaw.json`
 (profile runs), then `~/.openclaw/openclaw.json` (`gateway.ts →
 openClawConfigPath`).
@@ -84,7 +84,7 @@ Three auth concepts stack on the gateway:
    `operator.approvals`, `operator.pairing`, `operator.talk.secrets`).
 
 A loopback `gateway-client` in `backend` mode holding a valid gateway token
-skips pairing entirely — this is moi's path, and on a fresh install it gets
+skips pairing entirely — this is Moi's path, and on a fresh install it gets
 full operator scopes immediately (verified in the cloud sandbox,
 `docs/openclaw-sandbox.md`). The pairing dance below bites shared/remote
 setups where devices start with **`operator.read` only**. When the CLI
@@ -154,7 +154,7 @@ first frame must be a `connect` request. On success the response payload is
 `advertise:false` (`sessions.get`, `sessions.resolve`, `sessions.usage*`) are
 omitted yet fully callable — both live gateways omit `sessions.get` from
 `features.methods` and still answer it (verified live against 2026.7.1 /
-2026.6.33). Absence proves nothing, so nothing in moi gates on the list; it is
+2026.6.33). Absence proves nothing, so nothing in Moi gates on the list; it is
 carried for `/status` and for diagnosing a version mismatch.
 
 Rule for params in the other direction: gateways validate with
@@ -165,7 +165,7 @@ param that only newer schemas know without gating on the announced version
 
 ## 5. RPC surface
 
-Methods moi uses, all present and shape-identical on both supported lines:
+Methods Moi uses, all present and shape-identical on both supported lines:
 `agents.list` · `agents.files.get` · `models.list` · `sessions.list` ·
 `sessions.get` · `sessions.resolve` · `sessions.create` · `sessions.send` ·
 `sessions.steer` · `sessions.abort` · `sessions.patch` ·
@@ -204,7 +204,7 @@ Params (`additionalProperties: false`): `key` (+`agentId`) plus any of
 `sendPolicy`, `groupActivation`. Write scope covers the organizational fields
 (`label`, `category`, `pinned`, `archived`, `unread`); the rest needs admin.
 
-`{ model, thinkingLevel }` is how moi applies the picker before each send
+`{ model, thinkingLevel }` is how Moi applies the picker before each send
 (both lines, verified live). The config's `agents.defaults.models` map is a
 **model allowlist**: patching to a model outside it is rejected with
 `INVALID_REQUEST` `model not allowed: <provider>/<model>` (verified live
@@ -234,7 +234,7 @@ The resend works because the model is already applied, so there is no second
 config write. That is the whole shape of the bug: **first message of a new
 chat fails, second always works.**
 
-So moi carries the model **in `sessions.create`** instead (`session.ts →
+So Moi carries the model **in `sessions.create`** instead (`session.ts →
 sendOpenClawMessageImpl`) and marks it applied on the record so
 `applySessionSettings` skips the model patch. Note the asymmetry that decides
 what may ride along on create:
@@ -250,13 +250,13 @@ no config, and so cannot supersede a run.
 **Scope of the race.** Re-tested on the pinned 2026.7.1: `sessions.patch
 { model }` immediately followed by `sessions.send` completed normally, no
 `chat.dispatch-error`. So this is a 2026.7.2-beta.x regression, not a property
-of every line. moi keeps carrying the model in `sessions.create` anyway — it
+of every line. Moi keeps carrying the model in `sessions.create` anyway — it
 costs nothing, the model belongs to the session from the start, and it is one
 round-trip fewer on a new chat — but the workaround is for the NEXT line, not
 this one.
 
 **Thinking levels are per model, not gateway-global** (an earlier version of
-this doc claimed otherwise and moi shipped one static list because of it).
+this doc claimed otherwise and Moi shipped one static list because of it).
 The gateway resolves the menu from per-provider policies in the dist
 (`provider-claude-thinking`, `moonshot-thinking`, …) and validates
 `thinkingLevel` against the session's _resolved_ model, rejecting by name:
@@ -337,7 +337,7 @@ abortedRunId, status: 'aborted' | 'no-active-run' }`. `sessions.steer` is
 
 One WebSocket connection: `sessions.subscribe({})` for the agent-wide
 firehose, `sessions.messages.subscribe({ key })` per session. Events arrive
-as `{ type: 'event', event, payload, seq? }` frames. moi refcounts the
+as `{ type: 'event', event, payload, seq? }` frames. Moi refcounts the
 per-session subscriptions (`gateway.ts`): the first live record subscribes a
 key, later records reuse it, and the last one to tear down (idle eviction or
 shutdown) `sessions.messages.unsubscribe({ key })`s it — best-effort, since a
@@ -379,7 +379,7 @@ is the only ordering authority: the gateway serializes its broadcasts behind a
 promise queue (`server-session-events.ts` → `createTranscriptUpdateBroadcastHandler`,
 "Preserve transcript update order even when counting messages requires an async
 read"), but a frame can still be lost to a dropped socket and arrive later via
-the reconcile. moi carries `seq` onto `Turn.seq`, and `lib/format.ts`
+the reconcile. Moi carries `seq` onto `Turn.seq`, and `lib/format.ts`
 `applyEvent` places a new turn by it, so a late row lands where it belongs
 rather than after the reply it preceded.
 
@@ -418,7 +418,7 @@ sender  : agent/tool:start, agent/tool:update, agent/tool:result
 observer: session.tool:start, session.tool:update, session.tool:result
 ```
 
-So moi sees `agent`/`tool` for runs it starts and `session.tool` for everything
+So Moi sees `agent`/`tool` for runs it starts and `session.tool` for everything
 else — a channel message, a cron firing, another client, or a run already in
 flight when it attached. `session.ts` routes both into one `handleToolFrame`.
 Frame shape (`data.phase` `start`/`update`/`result`, full output inline):
@@ -493,10 +493,10 @@ on both providers.
 (`data.error`), and as a bare `sessions.changed phase:'error'` with no text at
 all — with three wordings (the raw reason, then a wrapped "⚠️ Agent failed
 before reply: … Logs: openclaw logs --follow"). `reportRunError` takes the
-first with text. The error rides on `chat`, which moi otherwise ignores when
+first with text. The error rides on `chat`, which Moi otherwise ignores when
 token streaming is off, so failures are surfaced regardless of that toggle.
 
-**Thinking blocks: who actually emits them.** The wire shape exists and moi
+**Thinking blocks: who actually emits them.** The wire shape exists and Moi
 renders it — durable rows carry `{ type: 'thinking', thinking,
 thinkingSignature }` and `adapter.ts` maps it to a `reasoning` part. What varies
 is whether a model produces one at all, and this varies by MODEL and by the
@@ -578,7 +578,7 @@ Claude Code vocabulary for the `claude-cli` case.
 and no `args`** (`AgentItemEventData` in `src/infra/agent-activity-events.ts`,
 confirmed on the wire: every `command`/`patch` item frame arrives with
 `toolCallId` absent). Every one of them is paired with a `tool` frame that has
-both, a few milliseconds apart. moi renders from the `tool` frames and reads
+both, a few milliseconds apart. Moi renders from the `tool` frames and reads
 item frames only for the textless `analysis` reasoning span.
 
 ### `sessions.changed`
@@ -682,7 +682,7 @@ const result = await client.request('sessions.list', { includeGlobal: true })
 client.stop()
 ```
 
-moi builds these shared options once in `gateway.ts → gatewayClientBaseOptions`
+Moi builds these shared options once in `gateway.ts → gatewayClientBaseOptions`
 and spreads them into both the persistent streaming client and the one-shot
 discovery client, so both advertise `caps: ['tool-events']`.
 
@@ -712,7 +712,7 @@ subpath import wins over rolling a minimal client.
 - `session.ts` — live session records: `sessions.get` seed, `session.message`
   ingest, `chat` → StreamPreview, tool frames → tool cards, `sessions.patch`
   before sends, echo rendezvous, run-end reconcile, run-error reporting.
-- `adapter.ts` — gateway rows/messages → moi turns; `strip.ts` — mirror of
+- `adapter.ts` — gateway rows/messages → Moi turns; `strip.ts` — mirror of
   upstream `strip-inbound-meta` (re-diff on every bump, see its header).
 - `wire-replay.test.ts` — the frame orders a live gateway produces, replayed
   through the real session code. **Record a run before changing how frames are

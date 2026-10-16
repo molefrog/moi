@@ -1,9 +1,8 @@
-import { startWorkspaceLogin, useWorkspaceAgent } from '@/client/features/workspace/api'
+import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import { resolveAgentAvailability, type AgentAvailability } from '@/client/lib/agent-availability'
 
 import { ErrorBanner } from './banners/ErrorBanner'
-import { resolveComposerBanner, type ComposerBanner } from './banners/ComposerBanner'
-import { AgentAvailabilityBanner } from './banners/AgentAvailabilityBanner'
+import type { ComposerBanner } from './banners/ComposerBanner'
 import { SkillUpdateBanner } from './banners/SkillUpdateBanner'
 import { useWorkspaceSkillUpdates } from './useWorkspaceSkillUpdates'
 
@@ -24,24 +23,16 @@ export function useWorkspaceComposerState(
   workspaceId: string,
   { chatError, onDismissChatError, chatLoadError, onRetryChatLoad }: WorkspaceComposerStateOptions
 ): WorkspaceComposerState {
-  const { data: agent, error } = useWorkspaceAgent(workspaceId)
+  const { data: agent, error, refetch } = useWorkspaceAgent(workspaceId)
   const availability = agent?.availability
   const { bannerProps: skillUpdateBanner } = useWorkspaceSkillUpdates(workspaceId)
   const agentAvailability = resolveAgentAvailability(availability, Boolean(error))
-  const unavailable =
-    agentAvailability.status === 'checking' || agentAvailability.status === 'available'
-      ? undefined
-      : agentAvailability
-
-  const agentUnavailableBanner: ComposerBanner | undefined = unavailable
+  // Recovery hides chat. Only checks that leave the workspace visible need a banner.
+  const statusBanner: ComposerBanner | undefined = error
     ? {
-        tone: 'default',
+        tone: 'error',
         content: (
-          <AgentAvailabilityBanner
-            availability={unavailable}
-            login={agent?.login}
-            onStartLogin={() => startWorkspaceLogin(workspaceId)}
-          />
+          <ErrorBanner error="Could not check agent availability" onRetry={() => void refetch()} />
         )
       }
     : undefined
@@ -63,15 +54,8 @@ export function useWorkspaceComposerState(
         content: <SkillUpdateBanner {...skillUpdateBanner} />
       }
     : undefined
-  const composerBanner = resolveComposerBanner({
-    agentUnavailable: agentUnavailableBanner,
-    chatError: chatErrorBanner,
-    skillUpdate
-  })
-  const viewDraftComposerBanner = resolveComposerBanner({
-    agentUnavailable: agentUnavailableBanner,
-    skillUpdate
-  })
+  const composerBanner = statusBanner ?? chatErrorBanner ?? skillUpdate
+  const viewDraftComposerBanner = statusBanner ?? skillUpdate
 
   return { agentAvailability, composerBanner, viewDraftComposerBanner }
 }

@@ -1,4 +1,4 @@
-# moi ui-components
+# Moi ui-components
 
 `moi ui-components` copies ready-to-use component source into `.moi/ui/`.
 Workspaces do not need `components.json` or path aliases.
@@ -36,7 +36,7 @@ Files under `ui-components/` are already install-ready:
 - Drawer portals into its view container instead of the page.
 
 Docs live in `ui-components/docs/`. The standard docs are the matching 4.21
-snapshot with Tabler icons and moi installation commands. Button and Drawer
+snapshot with Tabler icons and Moi installation commands. Button and Drawer
 have concise local docs.
 
 Components shared with the host are re-exported from `client/components/ui/`.
@@ -60,7 +60,7 @@ the same files available from packed or published installs.
 
 ## Build integration
 
-Every applet build starts from a CSS entry moi generates
+Every applet build starts from a CSS entry Moi generates
 (`writeSyntheticTailwindCss` → `.moi/.build/<kind>-tailwind.css`):
 `@import 'tailwindcss'`, followed by the shared theme, `tw-animate-css`,
 `shadcn/tailwind.css`, the applet variants, and `@source`. Moi inlines these

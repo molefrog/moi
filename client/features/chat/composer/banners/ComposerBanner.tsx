@@ -9,20 +9,6 @@ export type ComposerBanner = {
   content: ReactNode
 }
 
-type ComposerBannerCandidates = {
-  agentUnavailable?: ComposerBanner
-  chatError?: ComposerBanner
-  skillUpdate?: ComposerBanner
-}
-
-export function resolveComposerBanner({
-  agentUnavailable,
-  chatError,
-  skillUpdate
-}: ComposerBannerCandidates): ComposerBanner | undefined {
-  return agentUnavailable ?? chatError ?? skillUpdate
-}
-
 type ComposerBannerShellProps = ComponentProps<'div'>
 
 export function ComposerBannerShell({ className, ...props }: ComposerBannerShellProps) {
