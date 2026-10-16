@@ -107,7 +107,7 @@ describe('Codex live session lifecycle', () => {
       const published = deferred<HarnessUpdatedEvent>()
       const store = createHarnessStore({
         probe: () => getCodexAuthReadiness(f.input.workspacePath),
-        startLogin: async () => ({}),
+        startLogin: async () => ({ id: 'attempt', url: 'https://example.com/login' }),
         publish: event => published.resolve(event)
       })
       f.availabilitySpy.mockImplementation(context => store.refresh(context))

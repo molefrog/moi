@@ -14,7 +14,7 @@ import { cn } from '@/client/lib/cn'
 
 type DeviceLoginStepsProps = {
   code: string
-  url?: string
+  url: string
 }
 
 export function DeviceLoginSteps({ code, url }: DeviceLoginStepsProps) {
@@ -87,11 +87,9 @@ export function DeviceLoginSteps({ code, url }: DeviceLoginStepsProps) {
         <IconCircleNumber3 size={24} stroke={1.5} className="shrink-0" />
         <div className="flex min-w-0 flex-col items-start gap-3 lg:items-center">
           <p>Sign-in in browser, paste the code, and then come back to Moi</p>
-          {url && (
-            <a href={url} target="_blank" rel="noopener noreferrer" className={buttonVariants()}>
-              Open browser
-            </a>
-          )}
+          <a href={url} target="_blank" rel="noopener noreferrer" className={buttonVariants()}>
+            Open browser
+          </a>
         </div>
       </li>
     </ol>

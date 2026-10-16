@@ -210,7 +210,7 @@ for module ownership, ordering rules, runtime diagnostics, and boundaries.
 
 Workspace availability also checks provider authentication when a workspace is
 given. Claude Code is probed with `claude auth status` under the effective
-workspace env; `claude auth login` launches its browser sign-in from the composer. Codex
+workspace env; `claude auth login` launches its browser sign-in from workspace setup. Codex
 uses app-server `account/read` and returns a browser OAuth URL through
 `account/login/start`. The server owns the recovery loop (`server/harness/auth.ts`):
 `GET /api/workspaces/:id/agent` serves a cached availability snapshot alongside
@@ -220,8 +220,9 @@ Codex uses browser OAuth locally and `chatgptDeviceCode` in cloud. Claude Code
 runs `auth login`: locally it opens its callback URL, and its printed manual-code
 link is available as a fallback; cloud uses that link and pipes the returned
 `code#state` into the CLI. Credentials are stored by the harness, never by Moi.
-`POST .../auth/login/:id/code` submits a code; `DELETE .../auth/login/:id` cancels
-that attempt. IDs prevent an old browser tab from changing a newer attempt.
+`POST .../auth/login/:id/code` submits a code. IDs prevent an old browser tab
+from changing a newer attempt. Startup is reported as `starting`; `pending`
+always includes an attempt ID and sign-in URL.
 Provider failures and a ten-minute deadline stop the attempt. Server shutdown
 also cleans up active login processes.
 

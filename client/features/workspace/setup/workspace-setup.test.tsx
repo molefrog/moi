@@ -13,6 +13,7 @@ import * as events from '@/client/runtime/useWorkspaceEvents'
 import type { WorkspaceAgent, HarnessAvailability } from '@/lib/types'
 import { ScopedPortal } from '@/ui-components/scoped-portal'
 import { useWorkspaceSetup, WorkspaceActivity } from './workspace-setup'
+import { WorkspaceSetupPanel } from './workspace-setup-panel'
 import { welcomeNewWorkspace } from './workspace-welcome-state'
 
 type SetupFixtureProps = {
@@ -28,9 +29,9 @@ function SetupFixture({ workspaceId, contentPending, children }: SetupFixturePro
   )
   return (
     <>
-      <div data-chat-hidden={chatHidden} data-settings-available={showSettings} />
+      <div data-chat-hidden={chatHidden} />
       <WorkspaceActivity ready={ready}>{children}</WorkspaceActivity>
-      {!ready && <section aria-label="Workspace setup">{content}</section>}
+      {!ready && <WorkspaceSetupPanel showSettings={showSettings}>{content}</WorkspaceSetupPanel>}
     </>
   )
 }
@@ -519,10 +520,12 @@ test('unavailable agent replaces welcome and keeps chat hidden', async () => {
 test('workspace settings stay accessible during auth recovery and disappear when ready', async () => {
   const { document, update } = await mount()
   const settingsAvailable = () =>
-    document.querySelector('[data-settings-available]')?.getAttribute('data-settings-available')
-  expect(settingsAvailable()).toBe('true')
+    [...document.querySelectorAll('button')].some(
+      button => button.textContent === 'Workspace settings'
+    )
+  expect(settingsAvailable()).toBe(true)
   await update({ status: 'available' })
-  expect(settingsAvailable()).toBe('false')
+  expect(settingsAvailable()).toBe(false)
   await update({ status: 'unavailable', reason: 'Invalid workspace credentials' })
-  expect(settingsAvailable()).toBe('true')
+  expect(settingsAvailable()).toBe(true)
 })

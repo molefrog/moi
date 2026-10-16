@@ -46,7 +46,7 @@ test('checks and starts default authentication without creating a workspace', as
   let starts = 0
   codexHarness.startLogin = async () => {
     starts++
-    return { url: 'https://example.com/login' }
+    return { id: 'attempt', url: 'https://example.com/login' }
   }
   const status = await api.request('/api/harnesses/codex/auth')
   expect(status.status).toBe(200)
@@ -57,12 +57,13 @@ test('checks and starts default authentication without creating a workspace', as
   for (let i = 0; i < 2; i++) {
     const response = await api.request('/api/harnesses/codex/auth/login', { method: 'POST' })
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ url: 'https://example.com/login' })
+    expect(await response.json()).toEqual({ id: 'attempt', url: 'https://example.com/login' })
   }
   expect(starts).toBe(1)
   const pending = await api.request('/api/harnesses/codex/auth')
   expect((await pending.json()).login).toEqual({
     state: 'pending',
+    id: 'attempt',
     url: 'https://example.com/login'
   })
   expect(await listWorkspaces()).toEqual([])
@@ -84,18 +85,14 @@ test('rejects unknown agents and unsupported login', async () => {
   )
 })
 
-test('code and cancel endpoints validate input and attempt identity', async () => {
+test('code endpoint validates input and attempt identity', async () => {
   let submitted = ''
-  let cancelled = false
   codexHarness.startLogin = async () => ({
     id: 'test-attempt',
     url: 'https://example.com',
     acceptsCode: true,
     submitCode: code => {
       submitted = code
-    },
-    cancel: () => {
-      cancelled = true
     }
   })
   await api.request('/api/harnesses/codex/auth/login', { method: 'POST' })
@@ -110,11 +107,6 @@ test('code and cancel endpoints validate input and attempt identity', async () =
   expect((await submit('old-attempt', 'code')).status).toBe(400)
   expect((await submit('test-attempt', 'code#state')).status).toBe(200)
   expect(submitted).toBe('code#state')
-  expect(
-    (await api.request('/api/harnesses/codex/auth/login/test-attempt', { method: 'DELETE' })).status
-  ).toBe(200)
-  expect(cancelled).toBe(true)
-  expect((await submit('test-attempt', 'code')).status).toBe(400)
 })
 
 test('workspace recovery refreshes PATH and bypasses cached readiness', async () => {

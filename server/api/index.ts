@@ -669,10 +669,8 @@ one.post('/skills/update', async c => {
 })
 
 // The workspace's agent backend in one snapshot: provider, availability
-// (runtime presence + auth, from the server-side cache), any in-flight login
-// ceremony, the model catalog, and capabilities. One request at workspace
-// open; the volatile parts stay fresh afterwards via `harness:updated` events,
-// not refetches.
+// (runtime presence + auth), the model catalog, and capabilities.
+// Workspace readiness stays fresh via `harness:updated` events and refetches.
 one.get('/agent', async c => {
   const ws = c.get('ws')
   const harness = harnessFor(ws)
@@ -693,7 +691,7 @@ one.get('/agent', async c => {
   if (refresh) await loginShellPath({ refresh: true })
   // A backend that can't answer (codex CLI missing, gateway down) degrades to
   // an empty catalog — the picker hides and chat surfaces the real problem via
-  // the availability banner, instead of this endpoint 500ing on page load.
+  // workspace setup, instead of this endpoint failing on page load.
   const [availability, models] = await Promise.all([
     refresh ? harnessStore.refresh(ws) : harnessStore.getAvailability(ws),
     harness.listModels(ws).catch(err => {
@@ -701,11 +699,9 @@ one.get('/agent', async c => {
       return []
     })
   ])
-  const login = harnessStore.getLogin(harness.id)
   return c.json({
     ...capabilities,
     availability,
-    ...(login ? { login } : {}),
     models
   } satisfies WorkspaceAgent)
 })

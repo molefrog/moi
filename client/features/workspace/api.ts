@@ -31,8 +31,8 @@ export function useWorkspaceLayout(workspaceId: string) {
 }
 
 // The workspace's agent backend in one snapshot: availability (runtime
-// presence + auth), any in-flight login ceremony, the model catalog, and
-// capabilities. `harness:updated` events refresh availability and login state;
+// presence + auth), the model catalog, and capabilities.
+// `harness:updated` events refresh availability;
 // focus refetches pick up model changes after a CLI update.
 export function useWorkspaceAgent(workspaceId: string) {
   const queryClient = useQueryClient()
@@ -46,7 +46,7 @@ export function useWorkspaceAgent(workspaceId: string) {
   useWorkspaceEvent(event => {
     if (event.type === 'harness:updated' && event.workspaceId === workspaceId) {
       queryClient.setQueryData<WorkspaceAgent>(workspaceKeys.agent(workspaceId), prev =>
-        prev ? { ...prev, availability: event.availability, login: event.login } : prev
+        prev ? { ...prev, availability: event.availability } : prev
       )
     }
     // Env can swap credentials; the server dropped its cache — refetch.
@@ -66,7 +66,7 @@ export function useWorkspaceAgent(workspaceId: string) {
       // A live auth event received during this request is newer than its snapshot.
       const current = queryClient.getQueryData<WorkspaceAgent>(key)
       return current && current !== previous
-        ? { ...result, availability: current.availability, login: current.login }
+        ? { ...result, availability: current.availability }
         : result
     },
     staleTime: 30_000,

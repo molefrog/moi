@@ -29,8 +29,8 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
   const inputId = useId()
   const name = workspaceTypeLabel[type]
   const login = auth.data?.login
-  const pending = login?.state === 'pending' && login.url ? login : undefined
-  const starting = login?.state === 'pending' && !login.url
+  const pending = login?.state === 'pending' ? login : undefined
+  const starting = login?.state === 'starting'
   const waitingForBrowser = environment === 'local' && !manualLogin
   const connected = !starting && !pending && auth.data?.availability.status === 'available'
   useEffect(() => {
@@ -43,7 +43,7 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
         setCode('')
         await startHarnessLogin(type)
       }
-      if (kind === 'submit' && pending?.id) {
+      if (kind === 'submit' && pending) {
         await submitHarnessLoginCode(type, pending.id, code)
         setCode('')
       }
@@ -88,16 +88,14 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
                   ? 'Sign in to get the authorization code.'
                   : 'Sign in in your browser, then come back to Moi. Your workspace will open once you’re connected.'}
               </p>
-              {pending.url && (
-                <a
-                  className={buttonVariants({ variant: 'secondary' })}
-                  href={manualLogin ? (pending.codeUrl ?? pending.url) : pending.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Open browser
-                </a>
-              )}
+              <a
+                className={buttonVariants({ variant: 'secondary' })}
+                href={manualLogin ? (pending.codeUrl ?? pending.url) : pending.url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open browser
+              </a>
               {waitingForBrowser && pending.acceptsCode && (
                 <Button variant="ghost" onClick={() => setManualLogin(true)}>
                   Having trouble signing in?

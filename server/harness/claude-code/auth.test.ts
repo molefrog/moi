@@ -69,12 +69,14 @@ read code
         'https://claude.com/oauth/authorize?response_type=code&state=test-state'
       )
       if (environment === 'local') {
-        expect(new URL(login.url!).searchParams.get('redirect_uri')).toBe(
+        expect(new URL(login.url).searchParams.get('redirect_uri')).toBe(
           'http://localhost:1234/callback'
         )
         expect(open).toHaveBeenCalledWith(login.url)
       } else {
-        expect(login.url).toBe(login.codeUrl)
+        expect(login.url).toBe(
+          'https://claude.com/oauth/authorize?response_type=code&state=test-state'
+        )
       }
       expect(login.id).toBeDefined()
       await expect(login.submitCode?.('wrong-state#old')).rejects.toThrow('full code')

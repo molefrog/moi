@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import type { WorkspaceAgent, WorkspaceEntry } from '@/lib/types'
 
 import { api } from './index'
+import { harnessStore } from '../harness/auth'
 import { claudeCodeHarness } from '../harness/claude-code'
 import { codexHarness } from '../harness/codex'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../registry'
@@ -13,6 +14,7 @@ import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../re
 let tempDir: string
 const originalClaudeAvailability = claudeCodeHarness.availability
 const originalCodexAvailability = codexHarness.availability
+const originalCodexAuthStatus = codexHarness.authStatus
 const originalCodexStartLogin = codexHarness.startLogin
 const originalClaudeListModels = claudeCodeHarness.listModels
 const originalCodexListModels = codexHarness.listModels
@@ -22,6 +24,8 @@ beforeEach(async () => {
   setRegistryPath(join(tempDir, 'workspaces.json'))
   claudeCodeHarness.availability = async () => ({ status: 'available' })
   codexHarness.availability = async () => ({ status: 'available' })
+  codexHarness.authStatus = async () => ({ status: 'login-required', reason: 'Signed out' })
+  harnessStore.invalidate('codex')
   // /agent bundles the model catalog; keep the probe out of these tests.
   claudeCodeHarness.listModels = async () => []
   codexHarness.listModels = async () => []
@@ -30,6 +34,8 @@ beforeEach(async () => {
 afterEach(async () => {
   claudeCodeHarness.availability = originalClaudeAvailability
   codexHarness.availability = originalCodexAvailability
+  harnessStore.invalidate('codex')
+  codexHarness.authStatus = originalCodexAuthStatus
   codexHarness.startLogin = originalCodexStartLogin
   claudeCodeHarness.listModels = originalClaudeListModels
   codexHarness.listModels = originalCodexListModels
@@ -109,6 +115,7 @@ describe('workspace import provider', () => {
     }
   ])('reports unavailable $type for a registered workspace', async ({ type, harness, reason }) => {
     harness.availability = async () => ({ status: 'unavailable', reason })
+    await mkdir(join(tempDir, type))
     const entry = await registerWorkspace(join(tempDir, type), { type })
 
     const response = await api.request(`/api/workspaces/${entry.id}/agent`)
@@ -127,7 +134,8 @@ describe('workspace import provider', () => {
             reason: 'Codex is signed out. Sign in to send messages'
           }
         : { status: 'available' }
-    codexHarness.startLogin = async () => ({ url: 'https://example.com/login' })
+    codexHarness.startLogin = async () => ({ id: 'attempt', url: 'https://example.com/login' })
+    await mkdir(join(tempDir, 'codex-login'))
     const entry = await registerWorkspace(join(tempDir, 'codex-login'), { type: 'codex' })
 
     const response = await api.request(`/api/workspaces/${entry.id}/agent`)
@@ -139,17 +147,19 @@ describe('workspace import provider', () => {
     const login = await api.request(`/api/harnesses/codex/auth/login`, {
       method: 'POST'
     })
-    expect(await login.json()).toEqual({ url: 'https://example.com/login' })
+    expect(await login.json()).toEqual({ id: 'attempt', url: 'https://example.com/login' })
 
-    // A second start reuses the pending browser URL, and the agent snapshot
-    // reports the ceremony.
+    // A second start reuses the instructions. Only global auth reports the ceremony.
     const rejoin = await api.request(`/api/harnesses/codex/auth/login`, {
       method: 'POST'
     })
-    expect(await rejoin.json()).toEqual({ url: 'https://example.com/login' })
+    expect(await rejoin.json()).toEqual({ id: 'attempt', url: 'https://example.com/login' })
     const pending = await api.request(`/api/workspaces/${entry.id}/agent`)
-    expect(((await pending.json()) as WorkspaceAgent).login).toEqual({
+    expect(await pending.json()).not.toHaveProperty('login')
+    const auth = await api.request('/api/harnesses/codex/auth')
+    expect((await auth.json()).login).toEqual({
       state: 'pending',
+      id: 'attempt',
       url: 'https://example.com/login'
     })
   })

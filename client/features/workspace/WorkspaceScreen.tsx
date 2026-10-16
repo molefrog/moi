@@ -69,10 +69,7 @@ import type {
 import { viewIdFromTab, viewTabId } from '@/lib/workspace-tabs'
 
 import { WorkspaceSplitLayout } from './WorkspaceSplitLayout'
-import {
-  WorkspaceSettingsDialog,
-  WorkspaceSettingsDialogTrigger
-} from '@/client/features/settings/WorkspaceSettingsDialog'
+import { WorkspaceSetupPanel } from './setup/workspace-setup-panel'
 import { useWorkspaceSetup, WorkspaceActivity } from './setup/workspace-setup'
 import { UnavailablePage } from './UnavailablePage'
 
@@ -494,21 +491,7 @@ export function WorkspaceScreen({
       )}
     >
       {!ready && (
-        <section
-          aria-label="Workspace setup"
-          className="flex min-h-0 flex-1 flex-col overflow-y-auto"
-        >
-          {setupContent}
-          {showSettings && (
-            <div className="flex justify-center p-4">
-              <WorkspaceSettingsDialog>
-                <WorkspaceSettingsDialogTrigger render={<Button variant="ghost" />}>
-                  Workspace settings
-                </WorkspaceSettingsDialogTrigger>
-              </WorkspaceSettingsDialog>
-            </div>
-          )}
-        </section>
+        <WorkspaceSetupPanel showSettings={showSettings}>{setupContent}</WorkspaceSetupPanel>
       )}
       <WorkspaceActivity ready={ready}>
         <div className="relative flex min-h-0 flex-1">

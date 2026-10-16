@@ -16,7 +16,6 @@ export type HarnessUpdatedEvent = {
   type: 'harness:updated'
   workspaceId: string
   availability: HarnessAvailability
-  login?: HarnessLoginState
 }
 
 // Readiness can target a harness account or an individual workspace.
@@ -85,12 +84,10 @@ export function createHarnessStore(options: HarnessStoreOptions) {
 
   async function publish(context: HarnessTarget, availability: HarnessAvailability) {
     if (typeof context === 'string') return options.onAuthChanged?.(context)
-    const login = getLogin(context.type ?? 'claude-code')
     options.publish({
       type: 'harness:updated',
       workspaceId: context.id,
-      availability,
-      ...(login ? { login } : {})
+      availability
     })
   }
 
@@ -156,7 +153,7 @@ export function createHarnessStore(options: HarnessStoreOptions) {
         return
       }
       if (Date.now() >= deadline) {
-        // Keep the failed state so the composer can show it; the next
+        // Keep the failed state so the connection panel can show it; the next
         // startLogin replaces it.
         stopLogin(login)
         login.state = { state: 'failed', reason: 'Sign-in did not complete. Try again' }
@@ -177,11 +174,10 @@ export function createHarnessStore(options: HarnessStoreOptions) {
 
   async function startLogin(type: WorkspaceType): Promise<HarnessLogin> {
     const entry = entryFor(type)
-    // Concurrent starts share the provider call. Once started, browser-based
-    // flows reuse their URL; URL-less flows can be launched again on demand.
+    // Concurrent starts share the provider call; active attempts reuse their instructions.
     const current = entry.login
     if (current?.starting) return current.starting
-    if (current?.state.state === 'pending' && current.state.url) {
+    if (current?.state.state === 'pending') {
       const { state: _state, ...instructions } = current.state
       return instructions
     }
@@ -206,13 +202,13 @@ export function createHarnessStore(options: HarnessStoreOptions) {
       )
       return instructions
     })
-    const login: LoginCeremony = { state: { state: 'pending' }, starting, stop: () => {} }
+    const login: LoginCeremony = { state: { state: 'starting' }, starting, stop: () => {} }
     entry.login = login
     try {
       const result = await starting
       if (entry.login !== login) return result
       login.starting = undefined
-      if (login.state.state === 'pending') login.state = { state: 'pending', ...result }
+      if (login.state.state === 'starting') login.state = { state: 'pending', ...result }
       const availability = entry.cached?.value ?? {
         status: 'login-required',
         reason: 'Waiting for sign-in'
@@ -257,14 +253,6 @@ export function createHarnessStore(options: HarnessStoreOptions) {
     await login.attempt.submitCode(code)
   }
 
-  async function cancelLogin(type: WorkspaceType, id: string) {
-    const login = activeLogin(type, id)
-    entryFor(type).login = undefined
-    login.stop()
-    await login.attempt?.cancel?.()
-    await refresh(type)
-  }
-
   function shutdown() {
     for (const entry of entries.values()) {
       if (entry.login) stopLogin(entry.login)
@@ -278,7 +266,6 @@ export function createHarnessStore(options: HarnessStoreOptions) {
     getLogin,
     startLogin,
     submitCode,
-    cancelLogin,
     invalidate,
     shutdown
   }

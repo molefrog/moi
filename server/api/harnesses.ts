@@ -54,12 +54,3 @@ harnesses.post('/:type/auth/login/:id/code', async c => {
     return c.text(error instanceof Error ? error.message : 'Could not submit code', 400)
   }
 })
-
-harnesses.delete('/:type/auth/login/:id', async c => {
-  try {
-    await harnessStore.cancelLogin(c.get('harnessType'), c.req.param('id'))
-    return c.json({ ok: true })
-  } catch (error) {
-    return c.text(error instanceof Error ? error.message : 'Could not cancel sign-in', 400)
-  }
-})

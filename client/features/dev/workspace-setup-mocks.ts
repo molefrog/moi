@@ -2,8 +2,11 @@ import type {
   AppEnvironment,
   HarnessAvailability,
   HarnessLoginState,
-  WorkspaceAgent
+  WorkspaceAgent,
+  WorkspaceEnvView
 } from '@/lib/types'
+import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
+import type { EnvPatch } from '@/client/features/settings/api'
 import type { LoginHarness } from '@/client/features/harness/harness-connection'
 
 export const PREVIEW_WORKSPACE_ID = 'setup-preview'
@@ -32,6 +35,13 @@ export function createSetupMocks(
         }
       : { status: 'login-required', reason: 'Sign in to continue.' }
   let login: HarnessLoginState | undefined
+  let env: WorkspaceEnvView = {
+    vars: [],
+    files: [],
+    inheritDotenv: true,
+    backend: 'keychain',
+    required: []
+  }
   const missingFolder = scenario === 'missing-folder'
 
   function complete() {
@@ -56,13 +66,36 @@ export function createSetupMocks(
         demoInstallUrl: ''
       })
     }
+    if (path === `/api/workspaces/${PREVIEW_WORKSPACE_ID}` && method === 'GET') {
+      return Response.json({
+        ...createDefaultWorkspaceLayout(),
+        name: 'My workspace',
+        cwd: '/mock/workspace',
+        provider: harness
+      })
+    }
+    if (path === `/api/workspaces/${PREVIEW_WORKSPACE_ID}/mcp` && method === 'GET')
+      return Response.json([])
+    if (path === `/api/workspaces/${PREVIEW_WORKSPACE_ID}/env`) {
+      if (method === 'PUT') {
+        const patch = JSON.parse(String(init?.body)) as EnvPatch
+        const keys = new Set(env.vars.map(variable => variable.key))
+        for (const key of patch.remove ?? []) keys.delete(key)
+        for (const key of Object.keys(patch.set ?? {})) keys.add(key)
+        env = {
+          ...env,
+          inheritDotenv: patch.inheritDotenv ?? env.inheritDotenv,
+          vars: [...keys].map(key => ({ key, source: 'custom' }))
+        }
+      }
+      if (method === 'GET' || method === 'PUT') return Response.json(env)
+    }
     if (path === `/api/workspaces/${PREVIEW_WORKSPACE_ID}` && method === 'DELETE')
       return new Response(null, { status: 204 })
     if (path === `/api/workspaces/${PREVIEW_WORKSPACE_ID}/agent` && method === 'GET') {
       return Response.json({
         provider: harness,
         availability,
-        login,
         models: [],
         supportsStreaming: true,
         supportsArchiving: true,
@@ -72,7 +105,7 @@ export function createSetupMocks(
     const authPath = `/api/harnesses/${harness}/auth`
     if (path === authPath && method === 'GET') return Response.json({ availability, login })
     if (path === `${authPath}/login` && method === 'POST') {
-      login = { state: 'pending' }
+      login = { state: 'starting' }
       await new Promise(resolve => setTimeout(resolve, 500))
       login = {
         state: 'pending',

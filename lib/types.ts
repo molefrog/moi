@@ -498,18 +498,17 @@ export type HarnessAvailability =
 
 // Public instructions for an in-progress harness login. Credentials stay in the CLI.
 export type HarnessLogin = {
-  id?: string
-  url?: string
+  id: string
+  url: string
   codeUrl?: string
   userCode?: string
   acceptsCode?: boolean
 }
 
-// The server-owned login ceremony for a harness. `pending` means a watch loop
-// is re-probing the provider until the login lands or the deadline passes;
-// transitions arrive as `harness:updated` events, so every tab shows the same
-// ceremony without polling.
+// The global auth endpoint exposes startup separately from usable sign-in instructions.
+// The connection panel polls this state until sign-in completes or fails.
 export type HarnessLoginState =
+  | { state: 'starting' }
   | ({ state: 'pending' } & HarnessLogin)
   | { state: 'failed'; reason: string }
 
@@ -769,7 +768,7 @@ export type Model = {
 }
 
 // GET /api/workspaces/:id/agent. Model changes arrive on refetch;
-// `harness:updated` events refresh availability and login state.
+// `harness:updated` events refresh availability.
 export type WorkspaceAgent = {
   missingWorkspacePath?: string
   // The agent backend that produced this snapshot — matches the workspace
@@ -777,8 +776,6 @@ export type WorkspaceAgent = {
   provider: WorkspaceType
   // Runtime presence and provider auth state, from the server-side cache.
   availability: HarnessAvailability
-  // Present while a login ceremony is in flight or after one failed.
-  login?: HarnessLoginState
   models: Model[]
   // Whether this provider supports live token-by-token streaming (the picker
   // shows the "Live typing" toggle only when true). Provider-wide, not per-model

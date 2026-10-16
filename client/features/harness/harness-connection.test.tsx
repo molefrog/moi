@@ -140,7 +140,7 @@ test('starting login keeps the button until the browser link is ready', () => {
     for (const environment of ['local', 'cloud'] as const) {
       const html = render(type, environment, {
         availability: signedOut,
-        login: { state: 'pending' }
+        login: { state: 'starting' }
       })
       expect(html).toContain('Continue')
       expect(html).toContain('disabled')
