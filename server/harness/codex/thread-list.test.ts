@@ -86,17 +86,20 @@ test('keeps threads whose source could not be read and retries them', async () =
   expect(calls.map(c => c.method)).toEqual(['thread/list', 'thread/read'])
 })
 
-test('reads a single page when asked', async () => {
-  const calls: Call[] = []
+test('keeps paging past a page of agent-created tasks', async () => {
   const client = {
     rpc: async <T>(method: string, params?: Record<string, unknown>) => {
-      calls.push({ method, params })
-      if (method === 'thread/read') return { thread: { id: params?.threadId } } as T
-      return { data: [{ id: 'e1' }], nextCursor: 'more' } as T
+      const id = params?.threadId as string
+      if (method === 'thread/read')
+        return {
+          thread: { id, threadSource: id.startsWith('task') ? 'agent_created_thread' : 'user' }
+        } as T
+      return (
+        params?.cursor
+          ? { data: [{ id: 'chat-1' }], nextCursor: null }
+          : { data: [{ id: 'task-1' }, { id: 'task-2' }], nextCursor: 'page-2' }
+      ) as T
     }
   }
-  expect(
-    (await listCodexThreads(client, { limit: 50 }, { allPages: false })).map(t => t.id)
-  ).toEqual(['e1'])
-  expect(calls.filter(c => c.method === 'thread/list')).toHaveLength(1)
+  expect((await listCodexThreads(client, { limit: 2 })).map(t => t.id)).toEqual(['chat-1'])
 })

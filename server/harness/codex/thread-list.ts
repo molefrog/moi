@@ -18,14 +18,10 @@ const threadSources = new Map<string, string | undefined>()
 // RPC error, which falls back to the scan; CLIs without the field ignore it.
 export async function listCodexThreads(
   client: RpcClient,
-  params: Record<string, unknown>,
-  { allPages = true }: { allPages?: boolean } = {}
+  params: Record<string, unknown>
 ): Promise<CodexThread[]> {
-  const list = async (extra: Record<string, unknown>) =>
-    allPages
-      ? readCodexPages<CodexThread>(client, 'thread/list', { ...params, ...extra })
-      : ((await client.rpc<{ data?: CodexThread[] }>('thread/list', { ...params, ...extra }))
-          .data ?? [])
+  const list = (extra: Record<string, unknown>) =>
+    readCodexPages<CodexThread>(client, 'thread/list', { ...params, ...extra })
   let threads: CodexThread[]
   try {
     threads = await list({ useStateDbOnly: true })

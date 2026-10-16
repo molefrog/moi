@@ -309,11 +309,13 @@ export async function getCodexWorkspacePreview(
   const client = await peekCodexClient(workspacePath)
   if (!client) return {}
   try {
-    const threads = await listCodexThreads(
-      client,
-      { cwd: workspacePath, limit: 50, sortKey: 'updated_at' },
-      { allPages: false }
-    )
+    // Every page: agent-created tasks are filtered after listing and could
+    // fill a single page.
+    const threads = await listCodexThreads(client, {
+      cwd: workspacePath,
+      limit: 100,
+      sortKey: 'updated_at'
+    })
     return selectCodexWorkspacePreview(threads, includeFirstUserMessage)
   } catch {
     return {}

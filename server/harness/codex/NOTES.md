@@ -95,8 +95,8 @@ hides them. `thread/list` returns `threadSource` as null (CLI 0.162), so each
 thread is read once with `thread/read` and its source is cached by id.
 
 Child-history loading is limited to four concurrent reads. Home-card previews
-reuse an existing app-server and read up to 50 recent sessions; rendering the
-home page does not spawn one per card.
+reuse an existing app-server and read the same listing; rendering the home page
+does not spawn one per card.
 Workspace import discovery separately reads up to 400 recent rollout heads
 under the server's `$CODEX_HOME/sessions`, without requiring a CLI executable.
 
