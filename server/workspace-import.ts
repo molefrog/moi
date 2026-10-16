@@ -2,8 +2,7 @@ import { resolve } from 'node:path'
 
 import type { WorkspaceType } from '@/lib/types'
 
-import { discoverHermesProfiles } from './harness/hermes/discovery'
-import type { HermesProfile } from './harness/hermes/discovery'
+import { resolveHermesProfile } from './harness/hermes/discovery'
 import { discoverOpenClawAgents } from './harness/openclaw/discovery'
 import type { OpenClawAgent } from './harness/openclaw/discovery'
 
@@ -15,7 +14,6 @@ export type WorkspaceImportMetadata = {
 }
 
 type DiscoverOpenClawAgents = () => Promise<OpenClawAgent[]>
-type DiscoverHermesProfiles = () => Promise<HermesProfile[]>
 
 function compareOpenClawAgents(a: OpenClawAgent, b: OpenClawAgent): number {
   if (a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1
@@ -29,12 +27,9 @@ function compareOpenClawAgents(a: OpenClawAgent, b: OpenClawAgent): number {
 // to matching by path at spawn time.
 async function resolveHermesImportMetadata(
   path: string,
-  discoverProfiles: DiscoverHermesProfiles
+  resolveProfile: typeof resolveHermesProfile
 ): Promise<WorkspaceImportMetadata> {
-  const normalizedPath = resolve(path)
-  const profile = (await discoverProfiles()).find(
-    candidate => resolve(candidate.path) === normalizedPath
-  )
+  const profile = await resolveProfile(resolve(path))
 
   if (!profile) {
     throw new Error('No Hermes profile owns this folder')
@@ -51,9 +46,9 @@ export async function resolveWorkspaceImportMetadata(
   path: string,
   type: WorkspaceType,
   discoverAgents: DiscoverOpenClawAgents = discoverOpenClawAgents,
-  discoverProfiles: DiscoverHermesProfiles = discoverHermesProfiles
+  resolveProfile: typeof resolveHermesProfile = resolveHermesProfile
 ): Promise<WorkspaceImportMetadata> {
-  if (type === 'hermes') return resolveHermesImportMetadata(path, discoverProfiles)
+  if (type === 'hermes') return resolveHermesImportMetadata(path, resolveProfile)
   if (type !== 'openclaw') return {}
 
   const normalizedPath = resolve(path)
