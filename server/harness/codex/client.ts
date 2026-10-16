@@ -264,15 +264,8 @@ export function killAllCodexClients(): void {
 
 // Threads whose recorded cwd is exactly the workspace path, newest first.
 export async function getCodexSessions(workspacePath: string): Promise<SessionSummary[]> {
-  let client: CodexClient
-  try {
-    client = await getCodexClient(workspacePath)
-  } catch (err) {
-    // Without an app-server there is no history to list; availability reports why.
-    console.error('[codex] app-server unavailable', err)
-    return []
-  }
-  // A failed lookup propagates: an empty list would read as lost history.
+  // Startup and listing failures must both preserve the client's cached history.
+  const client = await getCodexClient(workspacePath)
   const threads = await listCodexThreads(client, {
     cwd: workspacePath,
     limit: 100,

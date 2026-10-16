@@ -1,6 +1,7 @@
 import type { CodexThread } from './adapter'
 import type { CodexClient } from './client'
 import { readCodexPages } from './pagination'
+import { CodexRpcError } from './transport'
 
 type RpcClient = Pick<CodexClient, 'rpc'>
 
@@ -14,8 +15,8 @@ const threadSources = new Map<string, string | undefined>()
 
 // The default listing scans every rollout under $CODEX_HOME/sessions, so its
 // cost grows with history from all workspaces and can exceed the RPC deadline.
-// The state DB answers the same query in milliseconds. An unavailable DB is an
-// RPC error, which falls back to the scan; CLIs without the field ignore it.
+// Only Codex's known database-listing error falls back to the scan. Older CLIs
+// ignore useStateDbOnly; transport failures must not trigger another slow lookup.
 export async function listCodexThreads(
   client: RpcClient,
   params: Record<string, unknown>
@@ -26,6 +27,14 @@ export async function listCodexThreads(
   try {
     threads = await list({ useStateDbOnly: true })
   } catch (err) {
+    // CLI 0.162 wraps the rollout error with thread-store context, but supplies
+    // no distinct error code for an unavailable DB. Match its specific suffix.
+    if (
+      !(err instanceof CodexRpcError) ||
+      err.code !== -32603 ||
+      !err.message.endsWith('failed to list threads from state database')
+    )
+      throw err
     console.error('[codex] state DB thread/list failed; scanning rollouts', err)
     threads = await list({})
   }

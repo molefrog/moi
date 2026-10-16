@@ -2,6 +2,7 @@ import { expect, spyOn, test } from 'bun:test'
 
 import type { CodexThread } from './adapter'
 import { listCodexThreads } from './thread-list'
+import { CodexRpcError } from './transport'
 
 type Call = { method: string; params?: Record<string, unknown> }
 
@@ -9,15 +10,14 @@ type Call = { method: string; params?: Record<string, unknown> }
 function fakeClient(
   rows: CodexThread[],
   sources: Record<string, string>,
-  options: { dbOnlyFails?: boolean; failReads?: Set<string> } = {}
+  options: { dbOnlyError?: Error; failReads?: Set<string> } = {}
 ) {
   const calls: Call[] = []
   const client = {
     rpc: async <T>(method: string, params?: Record<string, unknown>) => {
       calls.push({ method, params })
       if (method === 'thread/list') {
-        if (params?.useStateDbOnly && options.dbOnlyFails)
-          throw new Error('failed to list threads from state database')
+        if (params?.useStateDbOnly && options.dbOnlyError) throw options.dbOnlyError
         return { data: rows, nextCursor: null } as T
       }
       const id = params?.threadId as string
@@ -58,9 +58,20 @@ test('uses threadSource from the listing when Codex provides it', async () => {
   expect(calls.map(c => c.method)).toEqual(['thread/list'])
 })
 
-test('falls back to the rollout scan when the state DB listing fails', async () => {
+// CLI 0.162's rollout error is wrapped by the thread store and app-server.
+const databaseError = () =>
+  new CodexRpcError(
+    'failed to list threads: thread-store internal error: failed to list threads: failed to list threads from state database',
+    -32603
+  )
+
+test('falls back to the rollout scan for the known state DB listing error', async () => {
   const logged = spyOn(console, 'error').mockImplementation(() => {})
-  const { client, calls } = fakeClient([{ id: 'c1' }], { c1: 'user' }, { dbOnlyFails: true })
+  const { client, calls } = fakeClient(
+    [{ id: 'c1' }],
+    { c1: 'user' },
+    { dbOnlyError: databaseError() }
+  )
   try {
     expect((await listCodexThreads(client, { cwd: '/w' })).map(t => t.id)).toEqual(['c1'])
   } finally {
@@ -70,6 +81,53 @@ test('falls back to the rollout scan when the state DB listing fails', async () 
     true,
     undefined
   ])
+})
+
+test.each([
+  new Error('Codex request timed out: thread/list'),
+  new Error('Codex disconnected'),
+  new CodexRpcError('unrelated server failure', -32603),
+  new CodexRpcError('invalid cwd', -32602),
+  new Error('failed to list threads from state database')
+])('does not scan rollouts after %s', async error => {
+  const { client, calls } = fakeClient([], {}, { dbOnlyError: error })
+  await expect(listCodexThreads(client, { cwd: '/w' })).rejects.toBe(error)
+  expect(calls).toEqual([{ method: 'thread/list', params: { cwd: '/w', useStateDbOnly: true } }])
+})
+
+test('a timeout on a later page propagates without restarting or returning partial history', async () => {
+  const calls: Call[] = []
+  const error = new Error('Codex request timed out: thread/list')
+  const client = {
+    rpc: async <T>(method: string, params?: Record<string, unknown>) => {
+      calls.push({ method, params })
+      if (params?.cursor) throw error
+      return { data: [{ id: 'first-page-chat' }], nextCursor: 'page-2' } as T
+    }
+  }
+  await expect(listCodexThreads(client, {})).rejects.toBe(error)
+  expect(calls).toEqual([
+    { method: 'thread/list', params: { useStateDbOnly: true } },
+    { method: 'thread/list', params: { useStateDbOnly: true, cursor: 'page-2' } }
+  ])
+})
+
+test('a failed compatibility scan propagates instead of returning empty history', async () => {
+  const calls: Call[] = []
+  const error = new Error('Codex request timed out: thread/list')
+  const client = {
+    rpc: async <T>(method: string, params?: Record<string, unknown>): Promise<T> => {
+      calls.push({ method, params })
+      throw params?.useStateDbOnly ? databaseError() : error
+    }
+  }
+  const logged = spyOn(console, 'error').mockImplementation(() => {})
+  try {
+    await expect(listCodexThreads(client, {})).rejects.toBe(error)
+    expect(calls).toHaveLength(2)
+  } finally {
+    logged.mockRestore()
+  }
 })
 
 test('keeps threads whose source could not be read and retries them', async () => {

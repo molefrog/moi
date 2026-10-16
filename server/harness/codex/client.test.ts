@@ -1,12 +1,27 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, spyOn, test } from 'bun:test'
+
+import * as executable from '../executable'
 
 import {
   archiveCodexThread,
   codexCliOutdated,
   codexSupportsAdditionalContext,
+  getCodexSessions,
   interruptCodexTurn,
   parseCodexCliVersion
 } from './client'
+
+test('session listing propagates startup failures instead of returning empty history', async () => {
+  const error = new Error('Codex unavailable during restart')
+  const lookup = spyOn(executable, 'requireHarnessExecutable').mockImplementation(() => {
+    throw error
+  })
+  try {
+    await expect(getCodexSessions('/codex-startup-failure-test')).rejects.toBe(error)
+  } finally {
+    lookup.mockRestore()
+  }
+})
 
 describe('codexSupportsAdditionalContext', () => {
   test('accepts versions at and above 0.135.0', () => {

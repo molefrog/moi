@@ -84,9 +84,11 @@ reach the harness's 30-second RPC timeout before Bun closes the connection.
 Repeated cursors fail instead of looping. Listings pass `useStateDbOnly`: the
 default mode decodes rollout heads from every workspace under
 `$CODEX_HOME/sessions` (up to 10,000 files), which can exceed the RPC deadline
-on large histories. An RPC error falls back to that scan; older CLIs ignore the
-field. A failed listing propagates instead of returning an empty list, which
-would read as lost history.
+on large histories. Only the known state-database listing error falls back to
+that scan; older CLIs ignore the field. CLI 0.162 reports code `-32603` with a
+message ending in `failed to list threads from state database` (wrapped by the
+thread store and app-server). Timeouts, disconnects, other RPC errors, and
+app-server startup failures propagate so a failed refresh preserves cached chats.
 
 The state DB also returns Codex Desktop tasks that an agent started through
 `create_thread` (`threadSource: agent_created_thread`); the rollout scan drops
