@@ -236,8 +236,9 @@ filesystem budget. Pending filesystem operations finish normally.
   traversal limited to its year/month/day layout. Newer names are preferred
   within the bounded directory sample.
 - Hermes loads profiles sequentially, with 128 named-profile entries and
-  capped config/description reads. Explicit profile-id lookup bypasses the
-  discovery sample, including for already imported agents.
+  capped config/description reads. CLI imports by profile id, UI imports by
+  workspace path, and already imported agents use direct profile lookup,
+  outside the discovery sample.
 - OpenClaw requests `agents.list` only, returning at most 128 workspace paths
   under the gateway client's existing two-second connect/RPC timeouts.
 

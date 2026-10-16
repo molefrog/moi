@@ -3,6 +3,8 @@ import { mkdir, mkdtemp, rm, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import { resolveWorkspaceImportMetadata } from '../../workspace-import'
+
 import {
   discoverHermesProfiles,
   findHermesProfile,
@@ -106,6 +108,9 @@ describe('discoverHermesProfiles', () => {
     expect(
       (await resolveHermesProfile(join(home, 'profiles', omitted, 'workspace')))?.agentId
     ).toBe(omitted)
+    expect(
+      await resolveWorkspaceImportMetadata(join(home, 'profiles', omitted, 'workspace'), 'hermes')
+    ).toEqual({ agentId: omitted })
   })
 
   test('reads only the head of profile metadata', async () => {

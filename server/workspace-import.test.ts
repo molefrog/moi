@@ -16,21 +16,22 @@ describe('resolveWorkspaceImportMetadata', () => {
   // agentId and every profile renders as a generic "Hermes agent".
   test('resolves Hermes profile metadata by normalized path', async () => {
     const metadata = await resolveWorkspaceImportMetadata(
-      '/home/u/.hermes/profiles/research/workspace',
+      '/home/u/.hermes/profiles/research/nested/../workspace',
       'hermes',
       async () => {
         throw new Error('OpenClaw discovery should not be called')
       },
-      async () => [
-        {
+      async path => {
+        expect(path).toBe('/home/u/.hermes/profiles/research/workspace')
+        return {
           agentId: 'research',
           home: '/home/u/.hermes/profiles/research',
-          path: '/home/u/.hermes/profiles/research/nested/../workspace',
+          path,
           name: 'Research agent',
           isDefault: false,
           model: 'kimi-k2.7-code'
         }
-      ]
+      }
     )
 
     expect(metadata).toEqual({ agentId: 'research', name: 'Research agent' })
@@ -41,14 +42,12 @@ describe('resolveWorkspaceImportMetadata', () => {
       '/home/u/.hermes/workspace',
       'hermes',
       async () => [],
-      async () => [
-        {
-          agentId: 'default',
-          home: '/home/u/.hermes',
-          path: '/home/u/.hermes/workspace',
-          isDefault: true
-        }
-      ]
+      async () => ({
+        agentId: 'default',
+        home: '/home/u/.hermes',
+        path: '/home/u/.hermes/workspace',
+        isDefault: true
+      })
     )
 
     expect(metadata).toEqual({ agentId: 'default', isDefault: true })
@@ -60,7 +59,7 @@ describe('resolveWorkspaceImportMetadata', () => {
         '/somewhere/else',
         'hermes',
         async () => [],
-        async () => []
+        async () => null
       )
     ).rejects.toThrow('No Hermes profile owns this folder')
   })
