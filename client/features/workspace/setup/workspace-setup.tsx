@@ -1,4 +1,4 @@
-import { Activity, useCallback, useState, type ReactNode } from 'react'
+import { useCallback } from 'react'
 
 import { useWorkspaceAgent } from '../api'
 import {
@@ -76,16 +76,4 @@ export function useWorkspaceSetup(
     ready: ready && !welcoming,
     chatHidden: Boolean(recovery) || entering
   }
-}
-
-type WorkspaceActivityProps = {
-  ready: boolean
-  children: ReactNode
-}
-
-// Defer the first mount, then preserve drafts, tabs and portals during recovery.
-export function WorkspaceActivity({ ready, children }: WorkspaceActivityProps) {
-  const [opened, setOpened] = useState(false)
-  if (ready && !opened) setOpened(true)
-  return opened ? <Activity mode={ready ? 'visible' : 'hidden'}>{children}</Activity> : null
 }

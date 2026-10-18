@@ -11,8 +11,9 @@ import * as config from '@/client/api/app-config'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import * as events from '@/client/runtime/useWorkspaceEvents'
 import type { WorkspaceAgent, HarnessAvailability } from '@/lib/types'
-import { ScopedPortal } from '@/ui-components/scoped-portal'
-import { useWorkspaceSetup, WorkspaceActivity } from './workspace-setup'
+import { createUiStore } from '@/client/store/ui'
+import { attachmentKey, liveStore, useLive } from '@/client/features/chat/chat-store'
+import { useWorkspaceSetup } from './workspace-setup'
 import { WorkspaceSetupPanel } from './workspace-setup-panel'
 import { welcomeNewWorkspace } from './workspace-welcome-state'
 
@@ -30,7 +31,7 @@ function SetupFixture({ workspaceId, contentPending, children }: SetupFixturePro
   return (
     <>
       <div data-chat-hidden={chatHidden} />
-      <WorkspaceActivity ready={ready}>{children}</WorkspaceActivity>
+      {ready && children}
       {!ready && <WorkspaceSetupPanel showSettings={showSettings}>{content}</WorkspaceSetupPanel>}
     </>
   )
@@ -113,14 +114,48 @@ async function mount(
   function Portal(props: ComponentProps<'div'>) {
     return createPortal(<div {...props} />, document.body)
   }
+  const storedValues = new Map<string, string>()
+  const useUiStore = createUiStore({
+    getItem: key => storedValues.get(key) ?? null,
+    setItem: (key, value) => {
+      storedValues.set(key, value)
+    },
+    removeItem: key => {
+      storedValues.delete(key)
+    }
+  })
+  useUiStore.getState().setComposerDraft('test', 'Draft')
+  const originalAttachments = liveStore.getState().attachments
   function Content() {
-    const [draft, setDraft] = useState('Draft and attachments')
+    const draft = useUiStore(state => state.composerDrafts.test)
+    const attachments = useLive(state => state.attachments[attachmentKey('test', null)])
+    const [open, setOpen] = useState(false)
     return (
       <div data-content>
-        <button onClick={() => setDraft('Edited draft and attachments')}>{draft}</button>
-        <ScopedPortal portal={Portal}>
-          <button id="floating-chat">Floating chat</button>
-        </ScopedPortal>
+        <button onClick={() => useUiStore.getState().setComposerDraft('test', 'Edited draft')}>
+          {draft}
+        </button>
+        <button
+          onClick={() =>
+            liveStore.getState().addAttachments('test', null, [
+              {
+                localId: 'setup-attachment',
+                kind: 'text',
+                label: 'Attached text',
+                text: 'Keep me'
+              }
+            ])
+          }
+        >
+          Attach text
+        </button>
+        <span>{attachments?.map(item => item.label).join(', ')}</span>
+        <button onClick={() => setOpen(true)}>Open popup</button>
+        {open && (
+          <Portal>
+            <button id="floating-chat">Floating chat</button>
+          </Portal>
+        )}
       </div>
     )
   }
@@ -131,6 +166,7 @@ async function mount(
       client.clear()
       await Bun.sleep(0)
     })
+    liveStore.setState({ attachments: originalAttachments })
     fetchSpy.mockRestore()
     configSpy.mockRestore()
     locationSpy.mockRestore()
@@ -252,20 +288,23 @@ test('a cold entry shows only a loading spinner until readiness is known', async
   expect(html).not.toContain('Workspace content')
 })
 
-test('expiry hides content and portals, then restores the same local state', async () => {
+test('expiry unmounts content and portals, then restores stored drafts and attachments', async () => {
   const { document, update, click } = await mount({ status: 'available' })
-  await click('Draft and attachments')
+  await click('Draft')
+  await click('Attach text')
+  await click('Open popup')
+  const previousContent = document.querySelector('[data-content]')
+  expect(document.querySelector('#floating-chat')).not.toBeNull()
   await update({ status: 'login-required', reason: 'Expired' })
-  expect(document.querySelector<HTMLElement>('[data-content]')?.style.display).toBe('none')
-  expect(document.querySelector('#floating-chat')?.closest('[hidden]') !== null).toBe(true)
-  expect(
-    document.querySelector<HTMLElement>('#floating-chat')?.parentElement?.parentElement?.inert
-  ).toBe(true)
+  expect(document.querySelector('[data-content]')).toBeNull()
+  expect(document.querySelector('#floating-chat')).toBeNull()
   expect(document.body.textContent).toContain('Log in to ChatGPT')
   await update({ status: 'available' })
-  expect(document.querySelector<HTMLElement>('[data-content]')?.style.display).not.toBe('none')
-  expect(document.querySelector('#floating-chat')?.closest('[hidden]')).toBeNull()
-  expect(document.body.textContent).toContain('Edited draft and attachments')
+  expect(document.querySelector('[data-content]')).not.toBeNull()
+  expect(document.querySelector('[data-content]')).not.toBe(previousContent)
+  expect(document.querySelector('#floating-chat')).toBeNull()
+  expect(document.body.textContent).toContain('Edited draft')
+  expect(document.body.textContent).toContain('Attached text')
   expect(document.querySelector('[aria-label="Workspace setup"]')).toBeNull()
 })
 
@@ -385,7 +424,7 @@ test('background checks and network failures preserve a ready workspace', async 
     await Bun.sleep(20)
   })
   expect(document.querySelector('[aria-label="Workspace setup"]')).toBeNull()
-  expect(document.querySelector<HTMLElement>('[data-content]')?.style.display).not.toBe('none')
+  expect(document.querySelector('[data-content]')).not.toBeNull()
   await act(async () => {
     check.resolve({ status: 'available' })
     await Bun.sleep(20)
@@ -396,7 +435,7 @@ test('background checks and network failures preserve a ready workspace', async 
     await Bun.sleep(20)
   })
   expect(document.querySelector('[aria-label="Workspace setup"]')).toBeNull()
-  expect(document.querySelector<HTMLElement>('[data-content]')?.style.display).not.toBe('none')
+  expect(document.querySelector('[data-content]')).not.toBeNull()
 })
 
 test('an older response cannot overwrite a newer auth event and reopen login', async () => {
@@ -409,7 +448,7 @@ test('an older response cannot overwrite a newer auth event and reopen login', a
     await Bun.sleep(20)
   })
   expect(document.querySelector('[aria-label="Workspace setup"]')).toBeNull()
-  expect(document.querySelector<HTMLElement>('[data-content]')?.style.display).not.toBe('none')
+  expect(document.querySelector('[data-content]')).not.toBeNull()
 })
 
 async function finishWelcome() {

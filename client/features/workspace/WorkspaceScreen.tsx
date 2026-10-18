@@ -70,7 +70,7 @@ import { viewIdFromTab, viewTabId } from '@/lib/workspace-tabs'
 
 import { WorkspaceSplitLayout } from './WorkspaceSplitLayout'
 import { WorkspaceSetupPanel } from './setup/workspace-setup-panel'
-import { useWorkspaceSetup, WorkspaceActivity } from './setup/workspace-setup'
+import { useWorkspaceSetup } from './setup/workspace-setup'
 import { UnavailablePage } from './UnavailablePage'
 
 const Scratchpad = lazy(() =>
@@ -493,130 +493,132 @@ export function WorkspaceScreen({
       {!ready && (
         <WorkspaceSetupPanel showSettings={showSettings}>{setupContent}</WorkspaceSetupPanel>
       )}
-      <WorkspaceActivity ready={ready}>
-        <div className="relative flex min-h-0 flex-1">
-          <div
-            ref={annotationTargetRef}
-            inert={annotationControls.active || undefined}
-            aria-hidden={annotationControls.active || undefined}
-            className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background transition-colors duration-100 ease-out motion-reduce:transition-none"
-          >
-            {isUnavailable ? (
-              <UnavailablePage onOpenOverview={() => openTab('overview')} />
-            ) : activeTab === 'overview' ? (
-              <Overview
-                customizing={widgetMode === 'customizing'}
-                theming={widgetMode === 'theming'}
-                onThemingChange={theming => setWidgetMode(theming ? 'theming' : 'idle')}
-                onCustomizingChange={customizing =>
-                  setWidgetMode(customizing ? 'customizing' : 'idle')
-                }
-                widgets={widgets}
-                views={views}
-                onOpenView={viewId => openTab(viewTabId(viewId))}
-                onCreateView={createView}
-                onCreateWidget={() => {
-                  selectSession(null)
-                  openChat('Create widget')
-                }}
-              />
-            ) : activeTab === 'scratchpad' ? (
-              <Suspense fallback={null}>
-                <Scratchpad />
-              </Suspense>
-            ) : null}
+      {ready && (
+        <>
+          <div className="relative flex min-h-0 flex-1">
+            <div
+              ref={annotationTargetRef}
+              inert={annotationControls.active || undefined}
+              aria-hidden={annotationControls.active || undefined}
+              className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background transition-colors duration-100 ease-out motion-reduce:transition-none"
+            >
+              {isUnavailable ? (
+                <UnavailablePage onOpenOverview={() => openTab('overview')} />
+              ) : activeTab === 'overview' ? (
+                <Overview
+                  customizing={widgetMode === 'customizing'}
+                  theming={widgetMode === 'theming'}
+                  onThemingChange={theming => setWidgetMode(theming ? 'theming' : 'idle')}
+                  onCustomizingChange={customizing =>
+                    setWidgetMode(customizing ? 'customizing' : 'idle')
+                  }
+                  widgets={widgets}
+                  views={views}
+                  onOpenView={viewId => openTab(viewTabId(viewId))}
+                  onCreateView={createView}
+                  onCreateWidget={() => {
+                    selectSession(null)
+                    openChat('Create widget')
+                  }}
+                />
+              ) : activeTab === 'scratchpad' ? (
+                <Suspense fallback={null}>
+                  <Scratchpad />
+                </Suspense>
+              ) : null}
 
-            {pendingViews.map(pendingView => (
-              <PendingViewScreen
-                key={pendingView.id}
-                ref={handle => {
-                  if (handle) pendingViewRefs.current.set(pendingView.id, handle)
-                  else pendingViewRefs.current.delete(pendingView.id)
-                }}
-                active={!isUnavailable && activePendingView?.id === pendingView.id}
-                pendingView={pendingView}
-                running={
-                  !!pendingView.executionSessionId &&
-                  isSessionRunning(sessionActivity, workspaceId, pendingView.executionSessionId)
-                }
-                sketchSessionId={
-                  pendingView.status === 'draft'
-                    ? (pinnedSessionId ?? draftSessionId(viewTabId(pendingView.id)))
-                    : undefined
-                }
-                chatDocked={mode === 'split'}
-                workspaceId={workspaceId}
-                onEditingStart={() => {
-                  if (mode === 'fullscreen') setFloatingChatOpen(false)
-                }}
-                onContinueInChat={openChat}
-                onOpenChat={() => openChat()}
-                onDiscard={() => discardPendingView(pendingView)}
-              />
-            ))}
+              {pendingViews.map(pendingView => (
+                <PendingViewScreen
+                  key={pendingView.id}
+                  ref={handle => {
+                    if (handle) pendingViewRefs.current.set(pendingView.id, handle)
+                    else pendingViewRefs.current.delete(pendingView.id)
+                  }}
+                  active={!isUnavailable && activePendingView?.id === pendingView.id}
+                  pendingView={pendingView}
+                  running={
+                    !!pendingView.executionSessionId &&
+                    isSessionRunning(sessionActivity, workspaceId, pendingView.executionSessionId)
+                  }
+                  sketchSessionId={
+                    pendingView.status === 'draft'
+                      ? (pinnedSessionId ?? draftSessionId(viewTabId(pendingView.id)))
+                      : undefined
+                  }
+                  chatDocked={mode === 'split'}
+                  workspaceId={workspaceId}
+                  onEditingStart={() => {
+                    if (mode === 'fullscreen') setFloatingChatOpen(false)
+                  }}
+                  onContinueInChat={openChat}
+                  onOpenChat={() => openChat()}
+                  onDiscard={() => discardPendingView(pendingView)}
+                />
+              ))}
 
-            {/* Views are not part of the chain above: ViewManager keeps them
+              {/* Views are not part of the chain above: ViewManager keeps them
                 mounted across tab switches (and collapses to nothing while
                 another tab is on screen), which is what makes a switch back
                 instant. */}
-            <ViewManager
-              views={views}
-              activeViewId={isUnavailable ? null : (activeView?.id ?? null)}
-              params={appletParams}
-            />
-          </div>
-
-          <DrawingLayer {...annotationLayerProps}>
-            <DrawingToolbar
-              controls={annotationControls}
-              title="Draw annotation"
-              busy={annotationControls.finishing}
-              onComplete={() => void annotationControls.finish()}
-            />
-          </DrawingLayer>
-        </div>
-
-        <AnimatePresence>
-          {widgetMode === 'theming' && <ThemePanel onClose={() => setWidgetMode('idle')} />}
-        </AnimatePresence>
-
-        <PanelHeader>
-          <div className="flex min-w-0 flex-1 items-center gap-4">
-            <WorkspaceMenu onOpenTheme={() => setWidgetMode('theming')} />
-            <WorkspaceTabs
-              tabs={tabItems}
-              active={activeTab}
-              createItems={createItems}
-              onSelect={openTab}
-              onClose={closeTab}
-              onReorder={reorderTabs}
-            />
-          </div>
-          <WorkspaceUsersMenu
-            workspaceId={workspaceId}
-            describeTab={tab => tabItemFor(tab, allViews, false, () => false)}
-            onOpenTab={openTab}
-          />
-          {canUseSplit && mode === 'fullscreen' && (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => setMode('split')}
-                    aria-label="Dock chat"
-                    className="text-muted-foreground"
-                  >
-                    <IconLayoutSidebarRight stroke={1.75} />
-                  </Button>
-                }
+              <ViewManager
+                views={views}
+                activeViewId={isUnavailable ? null : (activeView?.id ?? null)}
+                params={appletParams}
               />
-              <TooltipContent>Dock chat</TooltipContent>
-            </Tooltip>
-          )}
-        </PanelHeader>
-      </WorkspaceActivity>
+            </div>
+
+            <DrawingLayer {...annotationLayerProps}>
+              <DrawingToolbar
+                controls={annotationControls}
+                title="Draw annotation"
+                busy={annotationControls.finishing}
+                onComplete={() => void annotationControls.finish()}
+              />
+            </DrawingLayer>
+          </div>
+
+          <AnimatePresence>
+            {widgetMode === 'theming' && <ThemePanel onClose={() => setWidgetMode('idle')} />}
+          </AnimatePresence>
+
+          <PanelHeader>
+            <div className="flex min-w-0 flex-1 items-center gap-4">
+              <WorkspaceMenu onOpenTheme={() => setWidgetMode('theming')} />
+              <WorkspaceTabs
+                tabs={tabItems}
+                active={activeTab}
+                createItems={createItems}
+                onSelect={openTab}
+                onClose={closeTab}
+                onReorder={reorderTabs}
+              />
+            </div>
+            <WorkspaceUsersMenu
+              workspaceId={workspaceId}
+              describeTab={tab => tabItemFor(tab, allViews, false, () => false)}
+              onOpenTab={openTab}
+            />
+            {canUseSplit && mode === 'fullscreen' && (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => setMode('split')}
+                      aria-label="Dock chat"
+                      className="text-muted-foreground"
+                    >
+                      <IconLayoutSidebarRight stroke={1.75} />
+                    </Button>
+                  }
+                />
+                <TooltipContent>Dock chat</TooltipContent>
+              </Tooltip>
+            )}
+          </PanelHeader>
+        </>
+      )}
     </div>
   )
 
@@ -630,11 +632,7 @@ export function WorkspaceScreen({
           <WorkspaceSplitLayout
             {...splitLayoutConstraints}
             workspace={workspacePanel}
-            chat={
-              <WorkspaceActivity ready={!contentPending && !chatHidden}>
-                {dockedChat}
-              </WorkspaceActivity>
-            }
+            chat={!contentPending && !chatHidden ? dockedChat : null}
             open={mode === 'split' && !chatHidden}
             chatWidth={dockedChatWidth}
             onCollapse={() => setMode('fullscreen')}
@@ -645,30 +643,28 @@ export function WorkspaceScreen({
         )}
       </div>
 
-      <WorkspaceActivity ready={ready}>
-        {mode === 'fullscreen' && (
-          <ChatPopup
-            agent={theme.agent}
-            loading={hasRunningSession}
-            open={floatingChatOpen}
-            onOpenChange={setFloatingChatOpen}
-            onOpenChangeComplete={open => {
-              if (open) {
-                setChatFocusRequest(request => request + 1)
-              }
-            }}
-          >
-            {onClose => (
-              <ChatPanel
-                {...chatPanelProps}
-                active={floatingChatOpen}
-                onClose={onClose}
-                annotation={popupAnnotation}
-              />
-            )}
-          </ChatPopup>
-        )}
-      </WorkspaceActivity>
+      {ready && mode === 'fullscreen' && (
+        <ChatPopup
+          agent={theme.agent}
+          loading={hasRunningSession}
+          open={floatingChatOpen}
+          onOpenChange={setFloatingChatOpen}
+          onOpenChangeComplete={open => {
+            if (open) {
+              setChatFocusRequest(request => request + 1)
+            }
+          }}
+        >
+          {onClose => (
+            <ChatPanel
+              {...chatPanelProps}
+              active={floatingChatOpen}
+              onClose={onClose}
+              annotation={popupAnnotation}
+            />
+          )}
+        </ChatPopup>
+      )}
     </div>
   )
 }

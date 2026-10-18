@@ -16,22 +16,10 @@ function ScopedPortal({ portal: Portal, children, ...props }: ScopedPortalProps)
     }
   }, [])
 
-  // Activity disconnects refs while hidden, but portal DOM lives outside its
-  // hidden subtree. Hide the portal root too, and restore it on reconnection.
-  const portalRef = React.useCallback((node: HTMLDivElement | null) => {
-    if (!node) return
-    node.hidden = false
-    node.inert = false
-    return () => {
-      node.hidden = true
-      node.inert = true
-    }
-  }, [])
-
   return (
     <>
       <span hidden ref={marker} />
-      <Portal {...props} ref={portalRef}>
+      <Portal {...props}>
         <div data-applet={scope} className="contents">
           {children}
         </div>
