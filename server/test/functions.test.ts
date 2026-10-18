@@ -14,8 +14,17 @@ import {
 
 const FIXTURES = join(import.meta.dir, '__fixtures__')
 
-// Override the MEI_FUNCTIONS_DIR so the worker loads from test fixtures
-process.env.MEI_FUNCTIONS_DIR = FIXTURES
+let previousFunctionsDir: string | undefined
+beforeAll(() => {
+  previousFunctionsDir = process.env.MEI_FUNCTIONS_DIR
+  process.env.MEI_FUNCTIONS_DIR = FIXTURES
+})
+
+afterAll(() => {
+  restartWorker(FIXTURES)
+  if (previousFunctionsDir === undefined) delete process.env.MEI_FUNCTIONS_DIR
+  else process.env.MEI_FUNCTIONS_DIR = previousFunctionsDir
+})
 
 describe('callFunction (via worker)', () => {
   test('calls a function and returns result', async () => {

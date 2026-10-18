@@ -31,8 +31,7 @@ beforeEach(() => {
   // Inside the repo, not tmpdir: the applet build resolves `tailwindcss` from
   // node_modules up the tree.
   WS = mkdtempSync(join(import.meta.dir, 'moi-srvdep-'))
-  // functions.test.ts pins MEI_FUNCTIONS_DIR at its fixtures dir process-wide;
-  // point the worker at this workspace regardless of file order.
+  // Point the worker at this workspace for this test only.
   prevFunctionsDir = process.env.MEI_FUNCTIONS_DIR
   process.env.MEI_FUNCTIONS_DIR = join(WS, '.moi')
 })
