@@ -76,3 +76,12 @@ describe('create agent step states', () => {
     ).toBe(true)
   })
 })
+
+test('locks agent choices while pending and enables them again when idle', () => {
+  const installed = { ...missing, 'claude-code': true, codex: true }
+  const pending = renderStep(installed, true)
+  expect(pending.querySelector('fieldset[aria-label="Agent"]')?.hasAttribute('disabled')).toBe(true)
+  expect(pending.querySelector('[aria-pressed="true"]')?.textContent).toBe('ClaudeAnthropic')
+  const idle = renderStep(installed)
+  expect(idle.querySelector('fieldset[aria-label="Agent"]')?.hasAttribute('disabled')).toBe(false)
+})

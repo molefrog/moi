@@ -50,8 +50,7 @@ import {
   listWorkspaces,
   registerWorkspace,
   removeWorkspace,
-  reorderWorkspaces,
-  tildify
+  reorderWorkspaces
 } from '../registry'
 import { loadScratchpadDoc, saveScratchpadDoc } from '../scratchpad'
 import { MAX_ASSET_BYTES, scratchpadAssetFile, storeScratchpadAsset } from '../scratchpad-assets'
@@ -998,28 +997,10 @@ async function workspaceTypeAvailability(type: WorkspaceType): Promise<HarnessAv
   return (await harnessFor(type).availability?.()) ?? { status: 'available' }
 }
 
-// Per-backend runtime availability, keyed by workspace type. Harnesses without
-// the hook are always available.
-async function harnessAvailability(): Promise<Record<string, HarnessAvailability>> {
-  const out: Record<string, HarnessAvailability> = {}
-  for (const h of allHarnesses()) {
-    out[h.id] = await workspaceTypeAvailability(h.id)
-  }
-  return out
-}
-
-// Where `/workspace/create` places new folders — the client shows the resolved
-// location while the user types a name. `availability` lets the dialog disable
-// backends whose runtime is missing.
+// Both workspace dialogs only need installation facts to offer agent choices.
 workspaces.get('/create', async c => {
   c.header('Cache-Control', 'no-store')
-  const installed = await detectInstalledHarnesses()
-  return c.json({
-    root: createdWorkspacesRoot(),
-    displayRoot: tildify(createdWorkspacesRoot()),
-    installed,
-    availability: await harnessAvailability()
-  })
+  return c.json({ installed: await detectInstalledHarnesses() })
 })
 
 // Create a brand-new workspace: a fresh folder under createdWorkspacesRoot(),

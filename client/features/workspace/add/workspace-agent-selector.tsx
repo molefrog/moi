@@ -80,6 +80,7 @@ export function WorkspaceAgentSelector({
           </div>
         ) : (
           <WorkspaceAgentCards
+            disabled={isPending}
             options={options}
             selectedType={selectedUnavailable ? undefined : selectedType}
             onTypeChange={onTypeChange}
@@ -111,14 +112,24 @@ export function WorkspaceAgentSelector({
 }
 
 type WorkspaceAgentCardsProps = {
+  disabled: boolean
   options: WorkspaceAgentOption[]
   selectedType?: WorkspaceType
   onTypeChange: (type: WorkspaceType) => void
 }
 
-function WorkspaceAgentCards({ options, selectedType, onTypeChange }: WorkspaceAgentCardsProps) {
+function WorkspaceAgentCards({
+  disabled,
+  options,
+  selectedType,
+  onTypeChange
+}: WorkspaceAgentCardsProps) {
   return (
-    <div role="group" aria-label="Agent" className="flex flex-wrap justify-center gap-2">
+    <fieldset
+      disabled={disabled}
+      aria-label="Agent"
+      className="flex min-w-0 flex-wrap justify-center gap-2"
+    >
       {options.map(option => (
         <WorkspaceAgentOptionButton
           key={option.type}
@@ -127,7 +138,7 @@ function WorkspaceAgentCards({ options, selectedType, onTypeChange }: WorkspaceA
           onSelect={onTypeChange}
         />
       ))}
-    </div>
+    </fieldset>
   )
 }
 

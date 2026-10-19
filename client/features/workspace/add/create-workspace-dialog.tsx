@@ -87,6 +87,7 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
     <Dialog
       open={open}
       onOpenChange={nextOpen => {
+        if (!nextOpen && isCreating) return
         setOpen(nextOpen)
         if (nextOpen) void info.refetch({ cancelRefetch: false })
       }}
@@ -95,7 +96,7 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
       }}
     >
       <DialogTrigger render={trigger} />
-      <WorkspaceDialogContent>
+      <WorkspaceDialogContent showCloseButton={!isCreating}>
         {step === 'name' ? (
           <WorkspaceNameStep
             name={name}

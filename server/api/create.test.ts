@@ -4,7 +4,6 @@ import { api } from './index'
 import { claudeCodeHarness } from '../harness/claude-code'
 import { codexHarness } from '../harness/codex'
 import * as executables from '../harness/executable'
-import type { HarnessInstallations } from '@/lib/types'
 
 const originalClaudeAvailability = claudeCodeHarness.availability
 const originalCodexAvailability = codexHarness.availability
@@ -62,37 +61,19 @@ test('creating a workspace rejects a provider that only supports discovery', asy
   )
 })
 
-test('setup info reports Claude and Codex availability from their harnesses', async () => {
-  claudeCodeHarness.availability = async () => ({
-    status: 'unavailable',
-    reason: 'Install Claude'
-  })
-  codexHarness.availability = async () => ({
-    status: 'unavailable',
-    reason: 'Install Codex'
-  })
-
-  const response = await api.request('/api/workspaces/create')
-  const body = (await response.json()) as {
-    availability: Record<string, { status: string; reason?: string }>
-    installed: HarnessInstallations
+test('setup info returns only installation facts without checking runtime availability', async () => {
+  claudeCodeHarness.availability = async () => {
+    throw new Error('Must not probe availability')
+  }
+  codexHarness.availability = async () => {
+    throw new Error('Must not probe availability')
   }
 
+  const response = await api.request('/api/workspaces/create')
   expect(response.status).toBe(200)
   expect(response.headers.get('cache-control')).toBe('no-store')
-  expect(body.installed).toEqual({
-    'claude-code': true,
-    codex: true,
-    openclaw: false,
-    hermes: false
-  })
-  expect(body.availability['claude-code']).toEqual({
-    status: 'unavailable',
-    reason: 'Install Claude'
-  })
-  expect(body.availability.codex).toEqual({
-    status: 'unavailable',
-    reason: 'Install Codex'
+  expect(await response.json()).toEqual({
+    installed: { 'claude-code': true, codex: true, openclaw: false, hermes: false }
   })
 })
 

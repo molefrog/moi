@@ -5,7 +5,6 @@ import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useUiStore } from '@/client/store/ui'
 import type {
   DiscoveredWorkspace,
-  HarnessAvailability,
   HarnessInstallations,
   WorkspaceEntry,
   WorkspaceType
@@ -44,18 +43,13 @@ export type ImportWorkspaceInput = {
 }
 
 export type WorkspaceCreationInfo = {
-  root: string
-  displayRoot: string
   installed: HarnessInstallations
-  // Per-backend runtime availability (are the Claude/Codex CLIs installed?),
-  // keyed by workspace type. Missing entries mean available.
-  availability?: Partial<Record<WorkspaceType, HarnessAvailability>>
 }
 
 export function useWorkspaceCreationInfo() {
   return useQuery<WorkspaceCreationInfo>({
     queryKey: workspaceKeys.creationInfo,
-    // Availability can change while the app is open (the user installs the
+    // Installations can change while the app is open (the user installs the
     // agent CLI) — refetch on mount instead of caching forever.
     queryFn: () => requestJson('/api/workspaces/create'),
     staleTime: 30_000,
