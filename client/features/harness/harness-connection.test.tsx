@@ -110,7 +110,10 @@ test('connected, failed, and loading states do not offer a misleading login', ()
   })
   expect(failed).toContain('Could not check agent login status')
   expect(failed).not.toContain('Continue')
-  expect(render('codex', 'local')).not.toContain('Continue')
+  const loading = render('codex', 'local')
+  expect(loading).not.toContain('Continue')
+  expect(loading).toContain('aria-label="Loading"')
+  expect(loading).not.toContain('data-slot="skeleton"')
 })
 
 test('failed and expired login attempts still allow starting again', () => {

@@ -6,7 +6,7 @@ import { useAppConfig } from '@/client/api/app-config'
 import { Button, buttonVariants } from '@/client/components/ui/button'
 import { Textarea } from '@/client/components/ui/textarea'
 import { workspaceTypeLabel } from '@/client/features/workspace/workspace-presentation'
-import { Skeleton } from '@/client/components/ui/skeleton'
+import { Spinner } from '@/client/components/ui/spinner'
 import { startHarnessLogin, submitHarnessLoginCode, useHarnessConnection } from './api'
 
 import { DeviceLoginSteps } from './device-login-steps'
@@ -59,7 +59,7 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
       aria-label={name}
     >
       {auth.isPending ? (
-        <Skeleton className="h-10 w-full" />
+        <Spinner className="size-6 self-center text-muted-foreground" stroke={1.5} />
       ) : checkError ? (
         <div role="alert" className="flex flex-col items-start gap-2">
           <p>Could not check agent login status.</p>
