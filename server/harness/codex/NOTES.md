@@ -99,7 +99,7 @@ thread is read once with `thread/read` and its source is cached by id.
 Child-history loading is limited to four concurrent reads. Home-card previews
 reuse an existing app-server and read the same listing; rendering the home page
 does not spawn one per card.
-Workspace import discovery separately reads up to 400 recent rollout heads
+Workspace import discovery separately reads up to 400 rollout heads
 under the server's `$CODEX_HOME/sessions`, without requiring a CLI executable.
 
 ## Models, effort, and fast mode

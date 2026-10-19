@@ -64,7 +64,7 @@ import {
 import {
   type HermesProfile,
   discoverHermesProfiles,
-  matchHermesProfile
+  findHermesProfile
 } from './harness/hermes/discovery'
 import { type OpenClawAgent, discoverOpenClawAgents } from './harness/openclaw/discovery'
 import {
@@ -1530,7 +1530,8 @@ const hermesInit = defineCommand({
     }
   },
   async run({ args }) {
-    const profiles = await discoverHermesProfiles()
+    const requested = args.profile ? await findHermesProfile(args.profile) : undefined
+    const profiles = requested ? [requested] : await discoverHermesProfiles()
     if (profiles.length === 0) {
       console.error(
         '\n' +
@@ -1551,7 +1552,7 @@ const hermesInit = defineCommand({
       process.exit(0)
     }
 
-    const target = args.profile ? matchHermesProfile(profiles, args.profile) : profiles[0]
+    const target = args.profile ? requested : profiles[0]
     if (!target) {
       console.error('\n' + pc.red('✗') + ' Profile not found: ' + pc.bold(args.profile) + '\n')
       console.log('  Available:\n')

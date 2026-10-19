@@ -131,6 +131,17 @@ async function withGatewayClient<T>(fn: (rpc: Rpc) => Promise<T>): Promise<T | n
   return withOneShotGateway(fn)
 }
 
+// Discovery needs paths only. Keep session history and per-agent identity RPCs
+// in the richer catalog used by CLI import, outside the startup discovery path.
+export async function discoverOpenClawWorkspacePaths(): Promise<string[]> {
+  return (
+    (await withGatewayClient(async rpc => {
+      const agents = await rpc<AgentsList>('agents.list')
+      return agents.agents.slice(0, 128).map(a => resolve(a.workspace))
+    })) ?? []
+  )
+}
+
 export async function discoverOpenClawAgents(): Promise<OpenClawAgent[]> {
   const out = await withGatewayClient(async rpc => {
     const [agents, sessions] = await Promise.all([
