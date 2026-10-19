@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <title>Dev sandbox · Moi</title>
+    <link rel="icon" type="image/png" href="../assets/favicon.png" />
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "/vendor/react/react.js",
+          "react/jsx-runtime": "/vendor/react/react-jsx-runtime.js",
+          "react/jsx-dev-runtime": "/vendor/react/react-jsx-dev-runtime.js",
+          "react-dom": "/vendor/react/react-dom.js",
+          "react-dom/client": "/vendor/react/react-dom-client.js"
+        }
+      }
+    </script>
+    <link rel="stylesheet" href="../index.css" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./index.ts"></script>
+    <script type="module">
+      const [react, jsxRuntime, jsxDevRuntime, reactDom, reactDomClient] = await Promise.all([
+        import('react'),
+        import('react/jsx-runtime'),
+        import('react/jsx-dev-runtime'),
+        import('react-dom'),
+        import('react-dom/client')
+      ])
+      globalThis.__esm = {
+        react,
+        'react/jsx-runtime': jsxRuntime,
+        'react/jsx-dev-runtime': jsxDevRuntime,
+        'react-dom': reactDom,
+        'react-dom/client': reactDomClient
+      }
+      globalThis.__init(document.getElementById('root'))
+    </script>
+  </body>
+</html>
