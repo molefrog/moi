@@ -4,7 +4,7 @@ import type {
   HarnessLoginState,
   WorkspaceAgent
 } from '@/lib/types'
-import type { LoginHarness } from '@/client/features/harness/harness-connection'
+import type { LoginHarness } from '@/client/features/harness/api'
 
 export const PREVIEW_WORKSPACE_ID = 'setup-preview'
 export const MOCK_CODE_SIGN_IN_URL = 'https://example.invalid/moi-code-sign-in'

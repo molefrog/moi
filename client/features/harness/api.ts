@@ -15,12 +15,14 @@ export function startHarnessLogin(type: WorkspaceType): Promise<HarnessLogin> {
   )
 }
 
+export type LoginHarness = 'claude-code' | 'codex'
+
 export type HarnessAuth = {
   availability: HarnessAvailability
   login?: HarnessLoginState
 }
 
-export function useHarnessConnection(type: WorkspaceType) {
+export function useHarnessAuth(type: WorkspaceType) {
   return useQuery({
     queryKey: ['harness-auth', type],
     queryFn: () => requestJson<HarnessAuth>(`/api/harnesses/${type}/auth`),

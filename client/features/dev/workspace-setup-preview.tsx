@@ -20,9 +20,8 @@ import { useWorkspaceSetup } from '@/client/features/workspace/setup/workspace-s
 import { WorkspaceWelcomeState } from '@/client/features/workspace/setup/workspace-welcome-state'
 import { WorkspaceLoadingState } from '@/client/features/workspace/setup/workspace-recovery-states'
 import type { AppEnvironment } from '@/lib/types'
-import type { LoginHarness } from '@/client/features/harness/harness-connection'
 import { workspaceTypeLabel } from '@/client/features/workspace/workspace-presentation'
-import { useHarnessConnection } from '@/client/features/harness/api'
+import { useHarnessAuth, type LoginHarness } from '@/client/features/harness/api'
 import {
   createSetupMocks,
   MOCK_SIGN_IN_URL,
@@ -51,7 +50,7 @@ type SetupPreviewProps = {
 function SetupPreview({ mocks, client, environment, harness, scenario }: SetupPreviewProps) {
   const [provider, setProvider] = useState<'browser' | 'code' | 'closed'>()
   const [deviceCode, setDeviceCode] = useState('')
-  const auth = useHarnessConnection(harness)
+  const auth = useHarnessAuth(harness)
   const pendingId = auth.data?.login?.state === 'pending' ? auth.data.login.id : undefined
   // Both local harnesses open the browser automatically.
   const providerPage = provider ?? (environment === 'local' && pendingId ? 'browser' : 'closed')
