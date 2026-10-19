@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/client/lib/cn'
 import { useAppConfig } from '@/client/api/app-config'
 import { Button, buttonVariants } from '@/client/components/ui/button'
-import { Input } from '@/client/components/ui/input'
+import { Textarea } from '@/client/components/ui/textarea'
 import { workspaceTypeLabel } from '@/client/features/workspace/workspace-presentation'
 import { Skeleton } from '@/client/components/ui/skeleton'
 import { startHarnessLogin, submitHarnessLoginCode, useHarnessConnection } from './api'
@@ -112,9 +112,11 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
                   <label htmlFor={inputId} className="text-sm text-muted-foreground">
                     Paste the code here:
                   </label>
-                  <Input
+                  <Textarea
                     id={inputId}
                     aria-label="Authorization code"
+                    rows={3}
+                    className="field-sizing-fixed resize-none"
                     value={code}
                     onChange={event => setCode(event.target.value)}
                     autoComplete="off"
