@@ -90,7 +90,7 @@ test('code endpoint validates input and attempt identity', async () => {
   codexHarness.startLogin = async () => ({
     id: 'test-attempt',
     url: 'https://example.com',
-    acceptsCode: true,
+    codeUrl: 'https://example.com/manual',
     submitCode: code => {
       submitted = code
     }

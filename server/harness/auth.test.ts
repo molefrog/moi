@@ -379,7 +379,7 @@ test('keeps device instructions, rejects stale codes, and cancels on invalidatio
       id: 'attempt-1',
       url: 'https://example.com/device',
       userCode: 'ABCD',
-      acceptsCode: true,
+      codeUrl: 'https://example.com/manual',
       cancel: () => {
         cancelled++
       },
@@ -396,7 +396,7 @@ test('keeps device instructions, rejects stale codes, and cancels on invalidatio
       id: 'attempt-1',
       url: 'https://example.com/device',
       userCode: 'ABCD',
-      acceptsCode: true
+      codeUrl: 'https://example.com/manual'
     })
     await expect(store.submitCode('codex', 'old-attempt', 'secret')).rejects.toThrow('ended')
     expect(cancelled).toBe(0)

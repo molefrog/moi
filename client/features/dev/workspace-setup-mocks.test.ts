@@ -20,7 +20,6 @@ for (const environment of ['local', 'cloud'] as const) {
           : MOCK_SIGN_IN_URL
       )
       expect(login.codeUrl).toBe(harness === 'claude-code' ? MOCK_CODE_SIGN_IN_URL : undefined)
-      expect(login.acceptsCode).toBe(harness === 'claude-code' ? true : undefined)
       expect(login.userCode).toBe(
         harness === 'codex' && environment === 'cloud' ? 'MOCK-1234' : undefined
       )

@@ -74,8 +74,7 @@ test('local Claude waits for the browser callback with the code fallback hidden'
       state: 'pending',
       id: 'test',
       url: 'https://claude.com/oauth/authorize?redirect_uri=http%3A%2F%2Flocalhost%3A1234%2Fcallback',
-      codeUrl: 'https://claude.com/oauth/manual',
-      acceptsCode: true
+      codeUrl: 'https://claude.com/oauth/manual'
     }
   })
   expect(html).toContain('Your workspace will open once you’re connected.')
@@ -94,7 +93,7 @@ test('cloud Claude asks for the full code from the sign-in page', () => {
       state: 'pending',
       id: 'test',
       url: 'https://claude.com/oauth/authorize',
-      acceptsCode: true
+      codeUrl: 'https://claude.com/oauth/authorize'
     }
   })
   expect(html).toContain('Paste the code here:')

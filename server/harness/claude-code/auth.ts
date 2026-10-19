@@ -136,7 +136,6 @@ export async function startClaudeLogin(): Promise<HarnessLoginAttempt> {
         id: crypto.randomUUID(),
         url,
         codeUrl,
-        acceptsCode: true,
         completed,
         cancel: () => {
           proc.kill()

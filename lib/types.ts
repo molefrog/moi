@@ -502,7 +502,6 @@ export type HarnessLogin = {
   url: string
   codeUrl?: string
   userCode?: string
-  acceptsCode?: boolean
 }
 
 // The global auth endpoint exposes startup separately from usable sign-in instructions.

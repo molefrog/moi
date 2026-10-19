@@ -64,7 +64,6 @@ read code
       )
       await chmod(path, 0o755)
       const login = await startClaudeLogin()
-      expect(login.acceptsCode).toBe(true)
       expect(login.codeUrl).toBe(
         'https://claude.com/oauth/authorize?response_type=code&state=test-state'
       )

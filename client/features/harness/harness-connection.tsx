@@ -84,7 +84,7 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
           ) : pending ? (
             <>
               <p role="status" className="text-sm text-muted-foreground">
-                {pending.acceptsCode && !waitingForBrowser
+                {pending.codeUrl && !waitingForBrowser
                   ? 'Sign in to get the authorization code.'
                   : 'Sign in in your browser, then come back to Moi. Your workspace will open once you’re connected.'}
               </p>
@@ -96,12 +96,12 @@ export function HarnessConnection({ type, onConnected, connectedContent }: Harne
               >
                 Open browser
               </a>
-              {waitingForBrowser && pending.acceptsCode && (
+              {waitingForBrowser && pending.codeUrl && (
                 <Button variant="ghost" onClick={() => setManualLogin(true)}>
                   Having trouble signing in?
                 </Button>
               )}
-              {!waitingForBrowser && pending.acceptsCode && (
+              {!waitingForBrowser && pending.codeUrl && (
                 <form
                   className="mt-3 flex flex-col gap-3"
                   onSubmit={event => {

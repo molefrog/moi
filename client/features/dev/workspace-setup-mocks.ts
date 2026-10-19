@@ -81,7 +81,7 @@ export function createSetupMocks(
             ? MOCK_CODE_SIGN_IN_URL
             : MOCK_SIGN_IN_URL,
         ...(harness === 'claude-code'
-          ? { acceptsCode: true, codeUrl: MOCK_CODE_SIGN_IN_URL }
+          ? { codeUrl: MOCK_CODE_SIGN_IN_URL }
           : environment === 'cloud'
             ? { userCode: 'MOCK-1234' }
             : {})
