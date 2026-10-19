@@ -82,11 +82,23 @@ export async function startClaudeLogin(): Promise<HarnessLoginAttempt> {
   const captureDir = local ? await mkdtemp(join(tmpdir(), 'moi-claude-login-')) : undefined
   try {
     const capturePath = captureDir ? join(captureDir, 'url') : undefined
-    const browser = captureDir ? join(captureDir, 'browser') : 'true'
+    const windows = process.platform === 'win32'
+    const browser = captureDir ? join(captureDir, windows ? 'browser.cmd' : 'browser') : 'true'
     if (captureDir) {
       // Capture the exact callback URL the CLI opens; its printed URL is code-only.
-      await Bun.write(browser, `#!/bin/sh\nprintf '%s\\n' "$1" > "$MOI_LOGIN_URL_FILE"\n`)
-      await chmod(browser, 0o700)
+      await Bun.write(
+        browser,
+        windows
+          ? [
+              '@echo off',
+              'setlocal DisableDelayedExpansion',
+              'set "MOI_LOGIN_URL=%~1"',
+              'powershell.exe -NoProfile -NonInteractive -Command "[IO.File]::WriteAllText($env:MOI_LOGIN_URL_FILE, $env:MOI_LOGIN_URL + [Environment]::NewLine)"',
+              ''
+            ].join('\r\n')
+          : `#!/bin/sh\nprintf '%s\\n' "$1" > "$MOI_LOGIN_URL_FILE"\n`
+      )
+      if (!windows) await chmod(browser, 0o700)
     }
     const proc = Bun.spawn(agentCommand([executable, 'auth', 'login']), {
       cwd: homedir(),

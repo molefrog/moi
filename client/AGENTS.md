@@ -27,6 +27,7 @@ React is not bundled into the app. It ships as locally-vendored ESM in `vendor/r
 ## Frontend boundaries
 
 - `app/` owns routes and the app shell. Route files load data and compose features; keep feature UI out of them.
+- `dev/` is the separate entrypoint for isolated sandboxes. `dev/index.ts` selects the sandbox by pathname; each sandbox installs its own mocks before loading config or mounting. Register its HTML route in `server/web.ts` and keep mocks out of normal app startup.
 - `features/<name>/` owns that feature's components, hooks, state, API hooks, and nearby tests.
 - `components/ui/` contains host facades for shared UI primitives. `components/shared/` contains reusable app components with no feature knowledge.
 - `api/` contains shared request helpers, query keys, and query policies. Feature endpoints stay in the feature's `api.ts`.

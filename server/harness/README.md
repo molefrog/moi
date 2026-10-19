@@ -208,36 +208,36 @@ supported permission requests. Command-approval UI, native question forms, and
 MCP elicitation are not implemented. See [Codex harness notes](codex/NOTES.md)
 for module ownership, ordering rules, runtime diagnostics, and boundaries.
 
-Workspace availability also checks provider authentication when a workspace is
-given. Claude Code is probed with `claude auth status` under the effective
-workspace env; `claude auth login` launches its browser sign-in from workspace setup. Codex
-uses app-server `account/read` and returns a browser OAuth URL through
-`account/login/start`. The server owns the recovery loop (`server/harness/auth.ts`):
-`GET /api/workspaces/:id/agent` serves a cached availability snapshot alongside
-the model catalog. `GET /api/harnesses/:type/auth` checks global authentication;
-`POST /api/harnesses/:type/auth/login` starts or resumes one login per harness.
-Codex uses browser OAuth locally and `chatgptDeviceCode` in cloud. Claude Code
-runs `auth login`: locally it opens its callback URL, and its printed manual-code
-link is available as a fallback; cloud uses that link and pipes the returned
-`code#state` into the CLI. Credentials are stored by the harness, never by Moi.
-`POST .../auth/login/:id/code` submits a code. IDs prevent an old browser tab
-from changing a newer attempt. Startup is reported as `starting`; `pending`
-always includes an attempt ID and sign-in URL.
-Provider failures and a ten-minute deadline stop the attempt. Server shutdown
-also cleans up active login processes.
+### Authentication and readiness
 
-Workspace setup embeds the reusable connection panel. Home and workspace
-creation do not require login. The panel polls global status while open;
-workspace availability still arrives through
-`harness:updated` events. Login uses the process environment, without workspace
-overrides. Each workspace is rechecked independently when login state changes.
-`GET /api/workspaces/:id/agent?refresh=true` refreshes the shell PATH and bypasses
-the readiness cache for entry, recovery retry, and post-login verification.
+`auth.ts` owns cached readiness checks and one active login per harness.
+Login uses the server process environment; workspace readiness checks use each
+workspace's environment. Login credentials remain owned by the provider CLI.
 
-Verified against Claude Code 2.1.289 (CLI stdout/stdin probe) and Codex 0.160.0
-(generated app-server schema), plus the official
-[Claude login docs](https://code.claude.com/docs/en/troubleshoot-install) and
-[Codex auth protocol](https://developers.openai.com/codex/app-server).
+- **Claude Code:** `claude auth status` checks readiness. `claude auth login`
+  opens the browser callback URL locally, with a separate manual-code URL as a
+  fallback. Cloud uses the manual-code URL and writes the returned `code#state`
+  to the CLI's stdin.
+- **Codex:** `account/read` checks readiness; ChatGPT accounts also require a
+  successful `account/rateLimits/read` to detect expired credentials.
+  `account/login/start` uses browser OAuth locally and `chatgptDeviceCode` in
+  cloud. Local login opens the browser; cloud returns a URL and device code.
+
+`GET /api/harnesses/:type/auth` returns cached global readiness and login state.
+`POST /api/harnesses/:type/auth/login` starts or reuses an attempt;
+`POST /api/harnesses/:type/auth/login/:id/code` submits a manual authorization
+code. The attempt ID rejects submissions from an older login. Startup reports
+`starting`; `pending` includes an attempt ID and sign-in URL.
+
+During login, the server rechecks readiness until the provider confirms
+completion and readiness succeeds, or the attempt fails or reaches its
+ten-minute deadline. Shutdown cancels active attempts. Auth changes trigger
+independent readiness checks for registered workspaces using that harness,
+published as `harness:updated` events.
+
+`GET /api/workspaces/:id/agent` returns workspace readiness and the model
+catalog. Adding `?refresh=true` refreshes the shell PATH and bypasses the
+readiness cache.
 
 ## What a harness adapter must support
 
@@ -322,9 +322,9 @@ doubles as the evaluation rubric for new harnesses.
 - Compaction trigger/observe.
 - Queued-message semantics: does the backend queue natively or must the
   server?
-- Push health/auth status events from the backend itself (the server watch
-  loop still discovers login completion by re-probing; a provider callback
-  would let `harness:updated` fire without polling anywhere).
+- Push unsolicited health/auth changes from providers, such as an external
+  sign-out. Login completion is already tracked; readiness checks are still
+  needed to detect changes outside an active login.
 
 ## Capability comparison
 

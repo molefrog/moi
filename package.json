@@ -90,6 +90,7 @@
     "motion": "^12.43.0",
     "nanoevents": "^10.0.0",
     "nanoid": "^6.0.1",
+    "open": "^11.0.0",
     "pathe": "^2.0.3",
     "picocolors": "^1.1.1",
     "postcss": "^8.5.28",
