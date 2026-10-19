@@ -15,7 +15,6 @@ import {
 } from '@/client/components/ui/dialog'
 import { TooltipProvider } from '@/client/components/ui/tooltip'
 import { Toaster } from '@/client/components/ui/toast'
-import { WorkspaceLayoutProvider } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { WorkspaceSetupPanel } from '@/client/features/workspace/setup/workspace-setup-panel'
 import { useWorkspaceSetup } from '@/client/features/workspace/setup/workspace-setup'
 import { WorkspaceWelcomeState } from '@/client/features/workspace/setup/workspace-welcome-state'
@@ -174,7 +173,7 @@ function SetupPreview({ mocks, client, environment, harness, scenario }: SetupPr
 
 function SetupScreen() {
   const [path] = useLocation()
-  const { content, ready, showSettings } = useWorkspaceSetup(PREVIEW_WORKSPACE_ID)
+  const { content, ready } = useWorkspaceSetup(PREVIEW_WORKSPACE_ID)
   if (ready) return null
   return path === '/' ? (
     <div
@@ -184,7 +183,7 @@ function SetupScreen() {
       Workspace removed
     </div>
   ) : (
-    <WorkspaceSetupPanel showSettings={showSettings}>{content}</WorkspaceSetupPanel>
+    <WorkspaceSetupPanel>{content}</WorkspaceSetupPanel>
   )
 }
 
@@ -213,15 +212,13 @@ export async function mountSetupPreview(element: HTMLElement) {
     <QueryClientProvider client={client}>
       <TooltipProvider>
         <Router hook={locationHook.hook}>
-          <WorkspaceLayoutProvider id={PREVIEW_WORKSPACE_ID}>
-            <SetupPreview
-              mocks={mocks}
-              client={client}
-              environment={environment}
-              harness={harness}
-              scenario={scenario}
-            />
-          </WorkspaceLayoutProvider>
+          <SetupPreview
+            mocks={mocks}
+            client={client}
+            environment={environment}
+            harness={harness}
+            scenario={scenario}
+          />
         </Router>
         <Toaster />
       </TooltipProvider>

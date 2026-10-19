@@ -134,7 +134,6 @@ export function WorkspaceScreen({
   const { layout, setLayout, workspaceId, name, provider } = useWorkspaceLayoutCtx()
   const {
     content: setupContent,
-    showSettings,
     ready,
     chatHidden
   } = useWorkspaceSetup(workspaceId, contentPending, {
@@ -490,9 +489,7 @@ export function WorkspaceScreen({
         mode === 'split' && !chatHidden && 'rounded-xl'
       )}
     >
-      {!ready && (
-        <WorkspaceSetupPanel showSettings={showSettings}>{setupContent}</WorkspaceSetupPanel>
-      )}
+      {!ready && <WorkspaceSetupPanel>{setupContent}</WorkspaceSetupPanel>}
       {ready && (
         <>
           <div className="relative flex min-h-0 flex-1">

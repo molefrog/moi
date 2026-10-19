@@ -24,15 +24,12 @@ type SetupFixtureProps = {
 }
 
 function SetupFixture({ workspaceId, contentPending, children }: SetupFixtureProps) {
-  const { ready, content, chatHidden, showSettings } = useWorkspaceSetup(
-    workspaceId,
-    contentPending
-  )
+  const { ready, content, chatHidden } = useWorkspaceSetup(workspaceId, contentPending)
   return (
     <>
       <div data-chat-hidden={chatHidden} />
       {ready && children}
-      {!ready && <WorkspaceSetupPanel showSettings={showSettings}>{content}</WorkspaceSetupPanel>}
+      {!ready && <WorkspaceSetupPanel>{content}</WorkspaceSetupPanel>}
     </>
   )
 }
@@ -240,6 +237,7 @@ test('signed-out workspace shows only its own login and no workspace content', a
   const { document } = await mount()
   expect(document.body.textContent).toContain('Log in to ChatGPT')
   expect(document.body.textContent).not.toContain('Claude Code')
+  expect(document.body.textContent).not.toContain('Workspace settings')
   expect(document.querySelector('[data-content]')).toBeNull()
 })
 
@@ -554,17 +552,4 @@ test('unavailable agent replaces welcome and keeps chat hidden', async () => {
   expect(document.body.textContent).toContain('Agent is missing')
   expect(chatHidden(document)).toBe(true)
   expect(document.querySelector('[data-content]')).toBeNull()
-})
-
-test('workspace settings stay accessible during auth recovery and disappear when ready', async () => {
-  const { document, update } = await mount()
-  const settingsAvailable = () =>
-    [...document.querySelectorAll('button')].some(
-      button => button.textContent === 'Workspace settings'
-    )
-  expect(settingsAvailable()).toBe(true)
-  await update({ status: 'available' })
-  expect(settingsAvailable()).toBe(false)
-  await update({ status: 'unavailable', reason: 'Invalid workspace credentials' })
-  expect(settingsAvailable()).toBe(true)
 })
