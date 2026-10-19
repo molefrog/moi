@@ -682,7 +682,7 @@ one.get('/agent', async c => {
   if (!existsSync(ws.path)) {
     return c.json({
       ...capabilities,
-      missingWorkspacePath: ws.path,
+      workspaceFolderMissing: true,
       availability: { status: 'unavailable', reason: 'Workspace folder not found' },
       models: []
     } satisfies WorkspaceAgent)

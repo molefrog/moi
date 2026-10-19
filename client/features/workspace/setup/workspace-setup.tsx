@@ -35,7 +35,7 @@ export function useWorkspaceSetup(
     if (isError || !data) {
       return <WorkspaceCheckFailedState retrying={isFetching} onRetry={recheck} />
     }
-    if (data.missingWorkspacePath) {
+    if (data.workspaceFolderMissing) {
       return <WorkspaceMissingState workspaceId={workspaceId} />
     }
     const { provider, availability } = data

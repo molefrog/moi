@@ -139,7 +139,7 @@ test('missing workspace folder is reported before starting the harness', async (
     const response = await api.request(`/api/workspaces/${workspace.id}/agent?refresh=true`)
     expect(response.status).toBe(200)
     expect(await response.json()).toMatchObject({
-      missingWorkspacePath: path,
+      workspaceFolderMissing: true,
       availability: { status: 'unavailable', reason: 'Workspace folder not found' },
       models: []
     })

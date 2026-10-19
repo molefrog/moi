@@ -356,7 +356,7 @@ test('missing folder offers deletion and returns home after removing the workspa
   await act(async () => {
     client.setQueryData<WorkspaceAgent>(key, previous => ({
       ...previous!,
-      missingWorkspacePath: '/tmp/missing-workspace'
+      workspaceFolderMissing: true
     }))
     await Bun.sleep(20)
   })

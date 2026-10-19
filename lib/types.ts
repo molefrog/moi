@@ -770,7 +770,7 @@ export type Model = {
 // GET /api/workspaces/:id/agent. Model changes arrive on refetch;
 // `harness:updated` events refresh availability.
 export type WorkspaceAgent = {
-  missingWorkspacePath?: string
+  workspaceFolderMissing?: boolean
   // The agent backend that produced this snapshot — matches the workspace
   // provider.
   provider: WorkspaceType

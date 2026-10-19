@@ -65,7 +65,7 @@ export function createSetupMocks(
         models: [],
         supportsStreaming: true,
         supportsArchiving: true,
-        ...(missingFolder ? { missingWorkspacePath: '/mock/missing-workspace' } : {})
+        workspaceFolderMissing: missingFolder
       } satisfies WorkspaceAgent)
     }
     const authPath = `/api/harnesses/${harness}/auth`
