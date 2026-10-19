@@ -1,5 +1,5 @@
 import { afterEach, expect, spyOn, test } from 'bun:test'
-import { act, useLayoutEffect } from 'react'
+import { act, useEffect, useLayoutEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { parseHTML } from 'linkedom'
 
@@ -19,8 +19,23 @@ async function mount() {
   for (const [key, value] of Object.entries(globals))
     Object.defineProperty(globalThis, key, { configurable: true, value })
   let options: Parameters<typeof drawing.useDrawingLayer>[0]
+  let exported: Blob | null = null
+  let pendingExport: Promise<Blob | null> | undefined
+  let mounted = true
+  const flush = async () => (mounted ? (pendingExport ?? exported) : null)
+  const cancel = async () => {
+    await pendingExport
+  }
   const layerSpy = spyOn(drawing, 'useDrawingLayer').mockImplementation(input => {
     options = input
+    // Match the real layer: passive teardown discards the session, so flush
+    // must capture its export before this runs.
+    useEffect(
+      () => () => {
+        mounted = false
+      },
+      []
+    )
     return {
       targetRef: { current: null },
       controls: {
@@ -32,10 +47,10 @@ async function mount() {
         undo: () => {},
         redo: () => {},
         clear: () => {},
-        flush: async () => null,
+        flush,
         deactivate: async () => null,
         finish: async () => null,
-        cancel: async () => {},
+        cancel,
         subscribeHistory: () => () => {},
         getHistoryState: () => ({ canUndo: false, canRedo: false, hasStrokes: false })
       },
@@ -58,13 +73,14 @@ async function mount() {
   const stageSpy = spyOn(attachments, 'stageDrawingDraft').mockReturnValue(true)
   const uploadSpy = spyOn(attachments, 'stageDrawing').mockResolvedValue()
   let annotation!: ChatAnnotationController
-  function Content() {
+  type ContentProps = { available?: boolean }
+  function Content({ available = true }: ContentProps) {
     const controller = useChatAnnotation({
       workspaceId: 'test',
       sessionId: null,
       activeTab: 'overview',
       mode: 'split',
-      available: true,
+      available,
       closePopup: () => {},
       openPopup: () => {}
     })
@@ -86,9 +102,20 @@ async function mount() {
   }
   await act(async () => root.render(<Content />))
   await act(async () => annotation.docked?.onToggle())
+  const remove = annotation.docked!.onRemove
   return {
     uploadSpy,
-    change: (blob: Blob | null) => options?.onChange?.(blob),
+    change: (blob: Blob | null) => {
+      exported = blob
+      options?.onChange?.(blob)
+    },
+    pendingExport: () => {
+      const deferred = Promise.withResolvers<Blob | null>()
+      pendingExport = deferred.promise
+      return deferred
+    },
+    remove: () => remove(stageSpy.mock.calls[0]![0].localId),
+    cancel: () => act(async () => root.render(<Content available={false} />)),
     finish: (blob: Blob) => options?.onFinish?.(blob),
     unmount: () => act(async () => root.render(null))
   }
@@ -126,5 +153,70 @@ test('recovery does not upload an empty annotation', async () => {
   change(new Blob(['erased']))
   change(null)
   await unmount()
+  expect(uploadSpy).not.toHaveBeenCalled()
+})
+
+for (const hasPreview of [false, true]) {
+  test(`recovery waits for a pending export ${hasPreview ? 'with' : 'without'} an earlier preview`, async () => {
+    const { change, pendingExport, uploadSpy, unmount } = await mount()
+    if (hasPreview) change(new Blob(['earlier stroke']))
+    const pending = pendingExport()
+    await unmount()
+    expect(uploadSpy).not.toHaveBeenCalled()
+    const blob = new Blob(['latest strokes'])
+    await act(async () => pending.resolve(blob))
+    expect(uploadSpy).toHaveBeenCalledTimes(1)
+    expect(uploadSpy.mock.calls[0]![0].blob).toBe(blob)
+  })
+}
+
+test('cancel and recovery share one pending export and upload', async () => {
+  const { change, cancel, pendingExport, uploadSpy, unmount } = await mount()
+  change(new Blob(['earlier stroke']))
+  const pending = pendingExport()
+  await cancel()
+  await unmount()
+  expect(uploadSpy).not.toHaveBeenCalled()
+  const blob = new Blob(['latest strokes'])
+  await act(async () => pending.resolve(blob))
+  expect(uploadSpy).toHaveBeenCalledTimes(1)
+  expect(uploadSpy.mock.calls[0]![0].blob).toBe(blob)
+})
+
+test('finish during a pending recovery export does not upload twice', async () => {
+  const { finish, pendingExport, uploadSpy, unmount } = await mount()
+  const pending = pendingExport()
+  await unmount()
+  const blob = new Blob(['latest strokes'])
+  await act(async () => {
+    pending.resolve(blob)
+    await finish(blob)
+  })
+  expect(uploadSpy).toHaveBeenCalledTimes(1)
+})
+
+test('recovery does not repeat an upload already started by finish', async () => {
+  const { change, finish, uploadSpy, unmount } = await mount()
+  const upload = Promise.withResolvers<void>()
+  uploadSpy.mockReturnValue(upload.promise)
+  const blob = new Blob(['finished'])
+  change(blob)
+  const finishing = finish(blob)
+  await unmount()
+  expect(uploadSpy).toHaveBeenCalledTimes(1)
+  await act(async () => {
+    upload.resolve()
+    await finishing
+  })
+  expect(uploadSpy).toHaveBeenCalledTimes(1)
+})
+
+test('removing an annotation while cancel awaits export prevents its upload', async () => {
+  const { change, cancel, remove, pendingExport, uploadSpy } = await mount()
+  change(new Blob(['earlier stroke']))
+  const pending = pendingExport()
+  await cancel()
+  remove()
+  await act(async () => pending.resolve(new Blob(['latest strokes'])))
   expect(uploadSpy).not.toHaveBeenCalled()
 })

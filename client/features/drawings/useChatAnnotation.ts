@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 
 import { toast } from '@/client/components/ui/toast'
 import {
@@ -47,7 +47,6 @@ export function useChatAnnotation({
   openPopup
 }: UseChatAnnotationOptions): ChatAnnotationController {
   const draftRef = useRef<ChatAnnotationDraft | null>(null)
-  const latestBlobRef = useRef<Blob | null>(null)
   const uploadRevisionsRef = useRef(new Map<string, number>())
   const closePopupRef = useLatestRef(closePopup)
   const openPopupRef = useLatestRef(openPopup)
@@ -59,7 +58,6 @@ export function useChatAnnotation({
     const draft = draftRef.current
     if (!draft) return
 
-    latestBlobRef.current = blob
     if (!blob) {
       liveStore.getState().removeAttachment(draft.workspaceId, draft.attachmentId)
       return
@@ -75,48 +73,51 @@ export function useChatAnnotation({
     })
   }, [])
 
-  const upload = useCallback((draft: ChatAnnotationDraft, blob: Blob): Promise<void> => {
+  const save = useCallback(async (result: Blob | null | Promise<Blob | null>) => {
+    const draft = draftRef.current
+    if (!draft) return
+    // Claim the draft before awaiting export so finish, cancel, and unmount
+    // cannot upload it twice.
+    draftRef.current = null
     const revision = (uploadRevisionsRef.current.get(draft.attachmentId) ?? 0) + 1
     uploadRevisionsRef.current.set(draft.attachmentId, revision)
-    return stageDrawing({
+    const isCurrent = () => uploadRevisionsRef.current.get(draft.attachmentId) === revision
+    const blob = await result
+    if (!blob || !isCurrent()) return
+    await stageDrawing({
       workspaceId: draft.workspaceId,
       sessionId: draft.sourceSessionId,
       localId: draft.attachmentId,
       purpose: 'annotation',
       source: draft.source,
       blob,
-      isCurrent: () => uploadRevisionsRef.current.get(draft.attachmentId) === revision
+      isCurrent
     })
   }, [])
-
-  useEffect(
-    () => () => {
-      const draft = draftRef.current
-      const blob = latestBlobRef.current
-      draftRef.current = null
-      latestBlobRef.current = null
-      // Keep the drawn-so-far attachment when recovery unmounts the workspace.
-      if (draft && blob) void upload(draft, blob)
-    },
-    [upload]
-  )
 
   const complete = useCallback(
     async (blob: Blob | null) => {
       const draft = draftRef.current
-      draftRef.current = null
-      latestBlobRef.current = null
       // Awaited so a send that finishes the drawing only dispatches once the
       // attachment is uploaded and ready.
-      if (draft && blob) await upload(draft, blob)
+      await save(blob)
       if (draft?.origin === 'popup') openPopupRef.current()
     },
-    [openPopupRef, upload]
+    [openPopupRef, save]
   )
 
   const annotation = useDrawingLayer({ onChange: change, onFinish: complete })
   const { controls } = annotation
-  const { active, starting, open, finish, cancel: cancelLayer } = controls
+  const { active, starting, open, finish, flush, cancel: cancelLayer } = controls
+
+  useLayoutEffect(
+    () => () => {
+      // Capture committed strokes before the drawing layer's passive cleanup
+      // clears its session. flush() also waits for an export already in progress.
+      if (draftRef.current) void save(flush())
+    },
+    [flush, save]
+  )
 
   const start = useCallback(
     async (origin: AnnotationOrigin) => {
@@ -147,16 +148,10 @@ export function useChatAnnotation({
   )
 
   const cancel = useCallback(async () => {
-    const draft = draftRef.current
+    const pendingSave = draftRef.current ? save(flush()) : undefined
     await cancelLayer()
-    if (draftRef.current !== draft) return
-    draftRef.current = null
-    const blob = latestBlobRef.current
-    latestBlobRef.current = null
-    // An implicit cancel (tab/session switch) keeps the drawn-so-far
-    // annotation as an attachment, so it gets its one deferred upload here.
-    if (draft && blob) void upload(draft, blob)
-  }, [cancelLayer, upload])
+    await pendingSave
+  }, [cancelLayer, flush, save])
 
   const remove = useCallback(
     (localId: string) => {
@@ -165,7 +160,6 @@ export function useChatAnnotation({
       liveStore.getState().removeAttachment(workspaceId, localId)
       if (draftRef.current?.attachmentId === localId) {
         draftRef.current = null
-        latestBlobRef.current = null
         void cancelLayer()
       }
     },
