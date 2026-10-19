@@ -26,6 +26,10 @@ export async function listCodexThreads(
       cwd: workspacePath,
       limit: 100,
       sortKey: 'updated_at',
+      // Codex lists only the current provider's chats unless asked for all.
+      // Switching between a ChatGPT sign-in and a provider in config.toml (the
+      // cloud demo's AI Gateway, an API key) must not hide earlier chats.
+      modelProviders: [],
       useStateDbOnly
     })
   let threads: CodexThread[]

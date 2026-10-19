@@ -7,7 +7,7 @@ import { CodexRpcError } from './transport'
 type Call = { method: string; params?: Record<string, unknown> }
 
 const workspacePath = '/workspace'
-const listParams = { cwd: workspacePath, limit: 100, sortKey: 'updated_at' }
+const listParams = { cwd: workspacePath, limit: 100, sortKey: 'updated_at', modelProviders: [] }
 
 // thread/list rows carry no threadSource; thread/read reveals it per id.
 function fakeClient(
