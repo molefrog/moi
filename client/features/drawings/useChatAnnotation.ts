@@ -89,6 +89,18 @@ export function useChatAnnotation({
     })
   }, [])
 
+  useEffect(
+    () => () => {
+      const draft = draftRef.current
+      const blob = latestBlobRef.current
+      draftRef.current = null
+      latestBlobRef.current = null
+      // Keep the drawn-so-far attachment when recovery unmounts the workspace.
+      if (draft && blob) void upload(draft, blob)
+    },
+    [upload]
+  )
+
   const complete = useCallback(
     async (blob: Blob | null) => {
       const draft = draftRef.current

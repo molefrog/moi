@@ -1,5 +1,5 @@
 import { afterEach, expect, spyOn, test } from 'bun:test'
-import { act, useState, type ComponentProps, type ReactNode } from 'react'
+import { act, useState, type ComponentProps } from 'react'
 import { createRoot } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
 import * as router from 'wouter'
@@ -13,24 +13,32 @@ import * as events from '@/client/runtime/useWorkspaceEvents'
 import type { WorkspaceAgent, HarnessAvailability } from '@/lib/types'
 import { createUiStore } from '@/client/store/ui'
 import { attachmentKey, liveStore, useLive } from '@/client/features/chat/chat-store'
-import { useWorkspaceSetup } from './workspace-setup'
-import { WorkspaceSetupPanel } from './workspace-setup-panel'
+import { WorkspaceScreen } from '../WorkspaceScreen'
+import * as workspaceContent from '../workspace-content'
+import { WorkspaceLayoutContext } from '../WorkspaceLayoutContext'
+import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import { welcomeNewWorkspace } from './workspace-welcome-state'
 
-type SetupFixtureProps = {
-  workspaceId: string
+type ScreenFixtureProps = {
+  workspaceId?: string
   contentPending?: boolean
-  children: ReactNode
 }
 
-function SetupFixture({ workspaceId, contentPending, children }: SetupFixtureProps) {
-  const { ready, content, chatHidden } = useWorkspaceSetup(workspaceId, contentPending)
+function ScreenFixture({ workspaceId = 'test', contentPending = false }: ScreenFixtureProps) {
   return (
-    <>
-      <div data-chat-hidden={chatHidden} />
-      {ready && children}
-      {!ready && <WorkspaceSetupPanel>{content}</WorkspaceSetupPanel>}
-    </>
+    <WorkspaceLayoutContext
+      value={{
+        workspaceId,
+        layout: createDefaultWorkspaceLayout(),
+        setLayout: () => {},
+        name: 'Test workspace',
+        cwd: null,
+        provider: 'codex',
+        isLoading: false
+      }}
+    >
+      <WorkspaceScreen contentPending={contentPending} widgets={[]} views={[]} />
+    </WorkspaceLayoutContext>
   )
 }
 
@@ -156,6 +164,7 @@ async function mount(
       </div>
     )
   }
+  const contentSpy = spyOn(workspaceContent, 'WorkspaceContent').mockImplementation(Content)
   const root = createRoot(document.getElementById('root')!)
   cleanup = async () => {
     await act(async () => {
@@ -164,6 +173,7 @@ async function mount(
       await Bun.sleep(0)
     })
     liveStore.setState({ attachments: originalAttachments })
+    contentSpy.mockRestore()
     fetchSpy.mockRestore()
     configSpy.mockRestore()
     locationSpy.mockRestore()
@@ -178,9 +188,7 @@ async function mount(
   const render = () => {
     root.render(
       <QueryClientProvider client={client}>
-        <SetupFixture workspaceId="test" contentPending={contentPending}>
-          <Content />
-        </SetupFixture>
+        <ScreenFixture contentPending={contentPending} />
       </QueryClientProvider>
     )
   }
@@ -219,6 +227,7 @@ async function mount(
     destinations,
     configSpy,
     document,
+    contentSpy,
     update,
     click,
     requests,
@@ -234,7 +243,8 @@ async function mount(
 }
 
 test('signed-out workspace shows only its own login and no workspace content', async () => {
-  const { document } = await mount()
+  const { document, contentSpy } = await mount()
+  expect(contentSpy).not.toHaveBeenCalled()
   expect(document.body.textContent).toContain('Log in to ChatGPT')
   expect(document.body.textContent).not.toContain('Claude Code')
   expect(document.body.textContent).not.toContain('Workspace settings')
@@ -274,9 +284,7 @@ test('a cold entry shows only a loading spinner until readiness is known', async
   const client = new QueryClient()
   const html = renderToStaticMarkup(
     <QueryClientProvider client={client}>
-      <SetupFixture workspaceId="cold">
-        <div>Workspace content</div>
-      </SetupFixture>
+      <ScreenFixture workspaceId="cold" />
     </QueryClientProvider>
   )
   client.clear()
@@ -415,6 +423,7 @@ test('confirmed sign-out shows login and keeps it visible while retrying', async
 
 test('background checks and network failures preserve a ready workspace', async () => {
   const { document, client, key, setCheck, setFail } = await mount({ status: 'available' })
+  const previousContent = document.querySelector('[data-content]')
   const check = Promise.withResolvers<HarnessAvailability>()
   setCheck(check.promise)
   await act(async () => {
@@ -422,7 +431,7 @@ test('background checks and network failures preserve a ready workspace', async 
     await Bun.sleep(20)
   })
   expect(document.querySelector('[aria-label="Workspace setup"]')).toBeNull()
-  expect(document.querySelector('[data-content]')).not.toBeNull()
+  expect(document.querySelector('[data-content]')).toBe(previousContent)
   await act(async () => {
     check.resolve({ status: 'available' })
     await Bun.sleep(20)
@@ -433,7 +442,7 @@ test('background checks and network failures preserve a ready workspace', async 
     await Bun.sleep(20)
   })
   expect(document.querySelector('[aria-label="Workspace setup"]')).toBeNull()
-  expect(document.querySelector('[data-content]')).not.toBeNull()
+  expect(document.querySelector('[data-content]')).toBe(previousContent)
 })
 
 test('an older response cannot overwrite a newer auth event and reopen login', async () => {
@@ -456,7 +465,7 @@ async function finishWelcome() {
 }
 
 function chatHidden(document: Document) {
-  return document.querySelector('[data-chat-hidden]')?.getAttribute('data-chat-hidden') === 'true'
+  return document.querySelector('[data-content]') === null
 }
 
 test('creation shows welcome for three seconds before revealing a ready workspace and chat', async () => {
@@ -493,7 +502,7 @@ test('welcome precedes login and chat stays hidden until login is verified', asy
   expect(chatHidden(document)).toBe(false)
 })
 
-test('slow content keeps chat collapsed after welcome, then normal loading behavior resumes', async () => {
+test('slow content keeps workspace content unmounted until ready', async () => {
   welcomeNewWorkspace('test')
   const { document, setContentPending } = await mount({ status: 'available' }, false, false, true)
   await finishWelcome()
@@ -504,7 +513,7 @@ test('slow content keeps chat collapsed after welcome, then normal loading behav
   expect(chatHidden(document)).toBe(false)
   expect(document.querySelector('[data-content]')).not.toBeNull()
   await setContentPending(true)
-  expect(chatHidden(document)).toBe(false)
+  expect(chatHidden(document)).toBe(true)
 })
 
 test('leaving during welcome consumes the handoff and cancels its timer', async () => {

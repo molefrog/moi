@@ -25,7 +25,6 @@ import { WorkspaceLayoutContext } from './WorkspaceLayoutContext'
 import { useWorkspaceNavigation } from './useWorkspaceNavigation'
 
 type ReadNavigationOptions = {
-  enabled?: boolean
   base?: string
   navigate?: (path: string, options?: { replace?: boolean }) => void
   queryClient?: QueryClient
@@ -40,7 +39,6 @@ function readNavigation(
   views: ViewInfo[],
   {
     base = '',
-    enabled = true,
     navigate,
     queryClient = new QueryClient(),
     onOpenChat = () => {},
@@ -56,7 +54,6 @@ function readNavigation(
   function Probe() {
     const { activeTab, appletParams, isUnavailable } = useWorkspaceNavigation({
       views,
-      enabled,
       onOpenChat
     })
     return (
@@ -264,30 +261,6 @@ test.each(['', '/', '/prefix'])(
     }
   }
 )
-
-test('navigation waits for workspace readiness before changing the destination', async () => {
-  let navigate: ((href: string) => void | Promise<void>) | undefined
-  const routedPaths: string[] = []
-  const registration = spyOn(workspaceEvents, 'useNavigationClient').mockImplementation(
-    (_workspaceId, callback) => {
-      navigate = callback
-    }
-  )
-  try {
-    readNavigation('scratchpad', '', [], {
-      enabled: false,
-      navigate: path => {
-        routedPaths.push(path)
-      }
-    })
-    await expect(Promise.resolve().then(() => navigate?.('moi:/overview'))).rejects.toThrow(
-      'Workspace is not ready'
-    )
-    expect(routedPaths).toEqual([])
-  } finally {
-    registration.mockRestore()
-  }
-})
 
 function createChatNavigationFixture(collab: boolean) {
   const views: ViewInfo[] = [

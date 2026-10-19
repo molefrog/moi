@@ -65,14 +65,13 @@ export function useWorkspaceSetup(
 
   const recovery = renderRecovery()
   const ready = !recovery && !contentPending && !checking
-  const { welcoming, entering } = useWorkspaceWelcome(workspaceId, ready)
+  const welcoming = useWorkspaceWelcome(workspaceId)
   return {
     content: welcoming ? (
       <WorkspaceWelcomeState {...welcome} />
     ) : (
       (recovery ?? <WorkspaceLoadingState />)
     ),
-    ready: ready && !welcoming,
-    chatHidden: Boolean(recovery) || entering
+    ready: ready && !welcoming
   }
 }

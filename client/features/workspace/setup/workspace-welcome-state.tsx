@@ -23,21 +23,17 @@ export function welcomeNewWorkspace(workspaceId: string) {
   newlyCreatedWorkspaceId = workspaceId
 }
 
-export function useWorkspaceWelcome(workspaceId: string, ready: boolean) {
-  const [phase, setPhase] = useState<'welcome' | 'waiting' | 'done'>(() =>
-    newlyCreatedWorkspaceId === workspaceId ? 'welcome' : 'done'
-  )
+export function useWorkspaceWelcome(workspaceId: string) {
+  const [welcoming, setWelcoming] = useState(() => newlyCreatedWorkspaceId === workspaceId)
 
   useEffect(() => {
     if (newlyCreatedWorkspaceId === workspaceId) newlyCreatedWorkspaceId = undefined
-    if (phase !== 'welcome') return
-    const timer = setTimeout(() => setPhase('waiting'), 3000)
+    if (!welcoming) return
+    const timer = setTimeout(() => setWelcoming(false), 3000)
     return () => clearTimeout(timer)
-  }, [workspaceId, phase])
+  }, [workspaceId, welcoming])
 
-  if (phase === 'waiting' && ready) setPhase('done')
-
-  return { welcoming: phase === 'welcome', entering: phase !== 'done' }
+  return welcoming
 }
 
 export function WorkspaceWelcomeState({

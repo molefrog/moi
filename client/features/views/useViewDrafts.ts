@@ -46,6 +46,15 @@ export function useViewDrafts({ workspaceId, pendingViews, onSave }: UseViewDraf
 
   useEffect(() => {
     const timers = timersRef.current
+    const saveDraft = (viewId: string) => {
+      if (pendingViewsRef.current.find(view => view.id === viewId)?.status !== 'draft') return
+      const key = composerDraftKey(workspaceId, draftSessionId(viewTabId(viewId)))
+      const value = useUiStore.getState().composerDrafts[key]
+      if (value === undefined) return
+      void onSaveRef.current(viewId, value).catch(() => {
+        toast.add({ title: 'Couldn’t save view description', type: 'error' })
+      })
+    }
     const unsubscribe = useUiStore.subscribe((state, previous) => {
       for (const view of pendingViewsRef.current) {
         if (view.status !== 'draft') continue
@@ -59,18 +68,18 @@ export function useViewDrafts({ workspaceId, pendingViews, onSave }: UseViewDraf
           view.id,
           setTimeout(() => {
             timers.delete(view.id)
-            if (pendingViewsRef.current.find(item => item.id === view.id)?.status !== 'draft')
-              return
-            void onSaveRef.current(view.id, value).catch(() => {
-              toast.add({ title: 'Couldn’t save view description', type: 'error' })
-            })
+            saveDraft(view.id)
           }, 500)
         )
       }
     })
     return () => {
       unsubscribe()
-      for (const timer of timers.values()) clearTimeout(timer)
+      // Recovery unmounts the workspace. Flush edits still in the debounce window.
+      for (const [viewId, timer] of timers) {
+        clearTimeout(timer)
+        saveDraft(viewId)
+      }
       timers.clear()
     }
   }, [workspaceId, pendingViewsRef, onSaveRef])
