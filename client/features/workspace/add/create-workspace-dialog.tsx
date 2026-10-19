@@ -165,7 +165,7 @@ function WorkspaceNameStep({
           id="workspace-name"
           value={name}
           onChange={event => onNameChange(event.target.value)}
-          placeholder="my-workspace"
+          placeholder="Workspace name"
           autoFocus
           aria-invalid={Boolean(validationError)}
           aria-describedby={validationError ? 'workspace-name-error' : undefined}
