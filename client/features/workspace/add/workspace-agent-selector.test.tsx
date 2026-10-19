@@ -29,7 +29,7 @@ function renderStep(installed?: HarnessInstallations, isChecking = false, errorM
         selectedType: 'claude-code',
         isPending: isChecking || Boolean(errorMessage),
         secondaryAction: null,
-        primaryLabel: 'Next',
+        primaryLabel: 'Create workspace',
         onTypeChange: () => {},
         onSubmit: () => {}
       })
@@ -48,7 +48,7 @@ describe('create agent step states', () => {
     expect(cards.every(card => !card.hasAttribute('disabled'))).toBe(true)
     expect(
       [...document.querySelectorAll('button')]
-        .find(button => button.textContent === 'Next')
+        .find(button => button.textContent === 'Create workspace')
         ?.hasAttribute('disabled')
     ).toBe(true)
     expect(document.body.textContent).toContain('Install Claude or ChatGPT')
@@ -60,19 +60,19 @@ describe('create agent step states', () => {
     expect(document.querySelectorAll('[aria-label="Agent"] button').length).toBe(0)
     expect(
       [...document.querySelectorAll('button')]
-        .find(button => button.textContent === 'Next')
+        .find(button => button.textContent === 'Create workspace')
         ?.hasAttribute('disabled')
     ).toBe(true)
   })
 
-  test('shows failed detection without enabling Next', () => {
+  test('shows failed detection without enabling creation', () => {
     const document = renderStep(undefined, false, 'Could not check installed agents.')
     expect(document.querySelector('[role="alert"]')?.textContent).toBe(
       'Could not check installed agents.'
     )
     const buttons = [...document.querySelectorAll('button')]
-    expect(buttons.find(button => button.textContent === 'Next')?.hasAttribute('disabled')).toBe(
-      true
-    )
+    expect(
+      buttons.find(button => button.textContent === 'Create workspace')?.hasAttribute('disabled')
+    ).toBe(true)
   })
 })
