@@ -1,10 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import {
-  getCreateWorkspaceAgentOptions,
-  getImportWorkspaceAgentOptions,
-  resolveWorkspaceAgentSelection
-} from './workspace-agent-options'
+import { getWorkspaceAgentOptions, resolveWorkspaceAgentSelection } from './workspace-agent-options'
 import type { HarnessInstallations } from '@/lib/types'
 
 describe('create workspace agent options', () => {
@@ -16,7 +12,7 @@ describe('create workspace agent options', () => {
       hermes: Boolean(mask & 8)
     }
     test(`handles installation combination ${mask}`, () => {
-      const options = getCreateWorkspaceAgentOptions(installed)
+      const options = getWorkspaceAgentOptions(installed)
       expect(options.map(option => option.type)).toEqual([
         'claude-code',
         'codex',
@@ -41,7 +37,7 @@ describe('create workspace agent options', () => {
   }
 
   test('provides install instructions for missing primary agents', () => {
-    const options = getCreateWorkspaceAgentOptions({
+    const options = getWorkspaceAgentOptions({
       'claude-code': false,
       codex: false,
       openclaw: false,
@@ -58,7 +54,7 @@ describe('create workspace agent options', () => {
   })
 
   test('uses only installation flags to enable primary agents', () => {
-    const options = getCreateWorkspaceAgentOptions({
+    const options = getWorkspaceAgentOptions({
       'claude-code': true,
       codex: true,
       openclaw: true,
@@ -68,119 +64,80 @@ describe('create workspace agent options', () => {
   })
 
   test('waits for installation data before showing cards', () => {
-    expect(getCreateWorkspaceAgentOptions()).toEqual([])
+    expect(getWorkspaceAgentOptions()).toEqual([])
   })
 })
 
-describe('getImportWorkspaceAgentOptions', () => {
-  test('returns every agent in canonical order', () => {
-    const options = getImportWorkspaceAgentOptions({
-      detectedTypes: ['openclaw', 'hermes']
-    })
-
-    expect(options.map(option => option.type)).toEqual([
-      'claude-code',
-      'codex',
-      'openclaw',
-      'hermes'
-    ])
-    expect(options.every(option => !option.disabled)).toBe(true)
-  })
-
-  test.each([
-    {
-      type: 'claude-code' as const,
-      description: 'Anthropic',
-      reason: 'Run in terminal to install Claude: curl -fsSL https://claude.ai/install.sh | sh'
-    },
-    {
-      type: 'codex' as const,
-      description: 'OpenAI',
-      reason:
-        'Run in terminal to install ChatGPT: curl -fsSL https://chatgpt.com/codex/install.sh | sh'
+describe('import workspace agent options', () => {
+  for (let mask = 0; mask < 16; mask++) {
+    const installed: HarnessInstallations = {
+      'claude-code': Boolean(mask & 1),
+      codex: Boolean(mask & 2),
+      openclaw: Boolean(mask & 4),
+      hermes: Boolean(mask & 8)
     }
-  ])('keeps the vendor description and exposes the disabled reason for $type', input => {
-    const options = getImportWorkspaceAgentOptions({
-      availability: { [input.type]: { status: 'unavailable', reason: input.reason } },
-      detectedTypes: ['openclaw']
-    })
-
-    expect(options.find(option => option.type === input.type)).toMatchObject({
-      description: input.description,
-      disabled: true,
-      disabledReason: `Run in terminal to install ${input.type === 'claude-code' ? 'Claude' : 'ChatGPT'}:`,
-      disabledCommand:
-        input.type === 'claude-code'
-          ? 'curl -fsSL https://claude.ai/install.sh | sh'
-          : 'curl -fsSL https://chatgpt.com/codex/install.sh | sh'
-    })
-  })
-
-  test('locks OpenClaw when it was not detected', () => {
-    const options = getImportWorkspaceAgentOptions({})
-
-    expect(options.find(option => option.type === 'openclaw')).toMatchObject({
-      disabled: true,
-      disabledReason: 'Run in terminal to connect OpenClaw:',
-      disabledCommand: 'moi openclaw init'
-    })
-  })
-
-  test('enables OpenClaw when it was detected', () => {
-    const options = getImportWorkspaceAgentOptions({ detectedTypes: ['openclaw'] })
-
-    expect(options.find(option => option.type === 'openclaw')).toMatchObject({
-      type: 'openclaw',
-      description: 'Open-source',
-      disabled: false
-    })
-  })
-
-  test('locks Hermes when it was not detected', () => {
-    const options = getImportWorkspaceAgentOptions({})
-
-    expect(options.find(option => option.type === 'hermes')).toMatchObject({
-      disabled: true,
-      disabledReason: 'Run in terminal to connect Hermes:',
-      disabledCommand: 'moi hermes init'
-    })
-  })
-
-  test('enables Hermes when it was detected', () => {
-    const options = getImportWorkspaceAgentOptions({ detectedTypes: ['hermes'] })
-
-    expect(options.find(option => option.type === 'hermes')).toMatchObject({
-      type: 'hermes',
-      description: 'Nous Research',
-      disabled: false
-    })
-  })
-
-  test('falls back to the first unlocked agent when the selection is locked', () => {
-    const options = getImportWorkspaceAgentOptions({
-      availability: {
-        'claude-code': { status: 'unavailable', reason: 'Install Claude' },
-        codex: { status: 'available' }
+    test(`shares create visibility and installation rules for combination ${mask}`, () => {
+      const createOptions = getWorkspaceAgentOptions(installed)
+      // A detected folder never makes a missing installation selectable.
+      const importOptions = getWorkspaceAgentOptions(installed, [
+        'claude-code',
+        'codex',
+        'openclaw',
+        'hermes'
+      ])
+      expect(importOptions.map(option => option.type)).toEqual(
+        createOptions.map(option => option.type)
+      )
+      expect(
+        importOptions.filter(option => option.type === 'claude-code' || option.type === 'codex')
+      ).toEqual(
+        createOptions.filter(option => option.type === 'claude-code' || option.type === 'codex')
+      )
+      for (const option of importOptions) {
+        expect(option.disabled).toBe(!installed[option.type])
       }
     })
+  }
 
-    expect(resolveWorkspaceAgentSelection(options, 'claude-code')).toBe('codex')
+  test.each(['openclaw', 'hermes'] as const)('only enables %s for folders it owns', type => {
+    const installed: HarnessInstallations = {
+      'claude-code': true,
+      codex: true,
+      openclaw: true,
+      hermes: true
+    }
+    expect(getWorkspaceAgentOptions(installed).find(option => option.type === type)).toMatchObject({
+      disabled: true,
+      disabledCommand: `moi ${type} init`
+    })
+    const options = getWorkspaceAgentOptions(installed, [type])
+    expect(options.find(option => option.type === type)).toMatchObject({
+      disabled: false,
+      disabledReason: undefined,
+      disabledCommand: undefined
+    })
+    expect(resolveWorkspaceAgentSelection(options, type)).toBe(type)
   })
 
-  test('keeps an unlocked selection and returns nothing when every agent is locked', () => {
-    const options = getImportWorkspaceAgentOptions({
-      availability: {
-        'claude-code': { status: 'unavailable', reason: 'Install Claude' },
-        codex: { status: 'unavailable', reason: 'Install Codex' }
-      }
-    })
+  test('waits for installation data even when a folder has a detected agent', () => {
+    expect(getWorkspaceAgentOptions(undefined, ['codex', 'openclaw'])).toEqual([])
+  })
 
-    expect(resolveWorkspaceAgentSelection(options, 'codex')).toBeUndefined()
+  test('preserves a detected selection or falls back when it is no longer installed', () => {
+    const installed: HarnessInstallations = {
+      'claude-code': true,
+      codex: true,
+      openclaw: false,
+      hermes: false
+    }
+    expect(
+      resolveWorkspaceAgentSelection(getWorkspaceAgentOptions(installed, ['codex']), 'codex')
+    ).toBe('codex')
     expect(
       resolveWorkspaceAgentSelection(
-        getImportWorkspaceAgentOptions({ detectedTypes: ['openclaw'] }),
-        'openclaw'
+        getWorkspaceAgentOptions({ ...installed, codex: false }, ['codex']),
+        'codex'
       )
-    ).toBe('openclaw')
+    ).toBe('claude-code')
   })
 })

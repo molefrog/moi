@@ -20,7 +20,7 @@ import type { WorkspaceType } from '@/lib/types'
 import { DemoDialog } from '@/client/features/demo/demo-dialog'
 import { welcomeNewWorkspace } from '../setup/workspace-welcome-state'
 import { WorkspaceAgentSelector } from './workspace-agent-selector'
-import { getCreateWorkspaceAgentOptions } from './workspace-agent-options'
+import { getWorkspaceAgentOptions } from './workspace-agent-options'
 import { WorkspaceDialogContent } from './workspace-dialog-content'
 
 type CreateWorkspaceDialogProps = {
@@ -47,7 +47,7 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
   const isCreating = createMutation.isPending
   const isChecking = info.isPending || info.isFetching
   const installed = info.isError ? undefined : info.data?.installed
-  const options = getCreateWorkspaceAgentOptions(installed)
+  const options = getWorkspaceAgentOptions(installed)
   const selectedAvailable = options.some(option => option.type === type && !option.disabled)
   const detectionError = !isChecking && !installed ? 'Could not check installed agents.' : undefined
   const canUseAgent = !isChecking && !detectionError && selectedAvailable

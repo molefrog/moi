@@ -4,7 +4,6 @@ import { IconChevronRight, IconEggCracked, IconLoader2, IconPlus } from '@tabler
 import { Link, useLocation } from 'wouter'
 
 import { useDiscoveredWorkspaces, useWorkspacePreview, useWorkspaces } from './api'
-import { useWorkspaceCreationInfo } from '@/client/features/workspace/add/api'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import { CreateWorkspaceDialog } from '@/client/features/workspace/add/create-workspace-dialog'
 import { ImportWorkspaceDialog } from '@/client/features/workspace/add/import-workspace-dialog'
@@ -40,7 +39,6 @@ export function HomePage() {
   const [, navigate] = useLocation()
   const workspacesQuery = useWorkspaces()
   const discoveredQuery = useDiscoveredWorkspaces()
-  const creationInfo = useWorkspaceCreationInfo()
   const importFlow = useWorkspaceImport({
     onSuccess: entry => navigate(`/workspace/${entry.id}`)
   })
@@ -154,7 +152,6 @@ export function HomePage() {
       {importFlow.choice && (
         <ImportWorkspaceDialog
           choice={importFlow.choice}
-          availability={creationInfo.data?.availability}
           isPending={importFlow.isPending}
           errorMessage={importFlow.error?.message}
           onTypeChange={importFlow.selectType}

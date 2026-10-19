@@ -6,7 +6,7 @@ import { parseHTML } from 'linkedom'
 import { Dialog } from '@/client/components/ui/dialog'
 import type { HarnessInstallations } from '@/lib/types'
 import { WorkspaceAgentSelector } from './workspace-agent-selector'
-import { getCreateWorkspaceAgentOptions } from './workspace-agent-options'
+import { getWorkspaceAgentOptions } from './workspace-agent-options'
 
 const missing: HarnessInstallations = {
   'claude-code': false,
@@ -22,7 +22,7 @@ function renderStep(installed?: HarnessInstallations, isChecking = false, errorM
       { open: true },
       createElement(WorkspaceAgentSelector, {
         title: 'Create new workspace',
-        options: getCreateWorkspaceAgentOptions(installed),
+        options: getWorkspaceAgentOptions(installed),
         isLoading: isChecking && !installed,
         errorMessage,
         emptyMessage: 'Install Claude or ChatGPT to create a new workspace.',
