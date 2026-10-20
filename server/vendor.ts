@@ -3,10 +3,10 @@
 // URLs the importmap in client/index.html points at. This is what makes moi run
 // offline — no esm.sh fetch.
 //
-// The version in the URL makes the files safe to cache forever in production:
-// a React bump moves the URL. The URLs carry no dev/prod distinction; we pick
-// the build here so developers get React's warnings (invalid hook calls, key
-// warnings) while production gets the smaller build. `client/` ships in the
+// The version in the URL makes the files safe to cache forever: a React bump
+// moves the URL. The URLs carry no dev/prod distinction; we pick the build here
+// so developers get React's warnings (invalid hook calls, key warnings) while
+// production gets the smaller build. `client/` ships in the
 // published package (see package.json `files`), so this resolves in a global
 // install too.
 import { join } from 'node:path'
@@ -32,25 +32,16 @@ export async function serveVendorReact(req: Request): Promise<Response> {
   if (!(await file.exists())) {
     return new Response('Not found', { status: 404 })
   }
-  const headers: Record<string, string> = { 'Content-Type': 'text/javascript; charset=utf-8' }
-  if (prebuilt) {
-    // Production: the URL names the React version, so the bytes behind it only
-    // change with a release, which is a new URL. Browsers and proxies
-    // (Cloudflare) may keep them for good.
-    headers['Cache-Control'] = 'public, max-age=31536000, immutable'
-    return new Response(file, { headers })
-  }
-  // Dev: revalidate on every load. The same URL serves different bytes after a
-  // `vendor:react` regen at the same version, and when `bun run dev` follows a
-  // prebuilt `moi` on the same port the browser may still hold the production
-  // build (its jsx-dev-runtime has no `jsxDEV`) — a hard reload clears that.
-  const etag = `"${MODE}-${file.lastModified}-${file.size}"`
-  headers['Cache-Control'] = 'no-cache'
-  headers.ETag = etag
-  if (req.headers.get('if-none-match') === etag) {
-    return new Response(null, { status: 304, headers })
-  }
-  return new Response(file, { headers })
+  // The URL names the React version, so the bytes behind it only change with
+  // a release, which is a new URL. Browsers and proxies (Cloudflare) keep them
+  // for good — in dev too; a `vendor:react` regen at the same version or a
+  // dev/prod flip on one port is rare enough to be a hard reload.
+  return new Response(file, {
+    headers: {
+      'Content-Type': 'text/javascript; charset=utf-8',
+      'Cache-Control': 'public, max-age=31536000, immutable'
+    }
+  })
 }
 
 // `<locale>/<file>.json` only — mirrors the emojibase-data package layout the

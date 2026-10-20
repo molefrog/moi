@@ -70,11 +70,9 @@ describe('serveVendorReact route', () => {
     expect(res.status).toBe(200)
   })
 
-  test('sets a cache policy: immutable in production, revalidate in dev', async () => {
+  test('is cached for good: the version in the URL changes with the bytes', async () => {
     const res = await get(`/vendor/react/${VERSION}/react.js`)
-    expect(res.headers.get('Cache-Control')).toMatch(
-      /^(public, max-age=31536000, immutable|no-cache)$/
-    )
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable')
   })
 
   test('rejects path traversal', async () => {
