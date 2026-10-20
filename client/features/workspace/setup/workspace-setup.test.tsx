@@ -106,7 +106,7 @@ async function mount(
         if (path === '/api/workspaces/test' && init?.method === 'DELETE') {
           return new Response(null, { status: 204 })
         }
-        if (path === '/api/workspaces/test/agent?refresh=true') {
+        if (path.startsWith('/api/workspaces/test/agent')) {
           if (fail) throw new Error('Offline')
           return Response.json(check ? { ...data, availability: await check } : data)
         }
@@ -348,6 +348,21 @@ test('demo uses the same login recovery and readiness checks', async () => {
   expect(document.querySelector('[data-content]')).toBeNull()
   expect(document.body.textContent).toContain('Log in to ChatGPT')
   expect(requests).toContain('/api/workspaces/test/agent?refresh=true')
+})
+
+test('a working agent is reconfirmed from the server cache, a failed one re-probed', async () => {
+  const ready = await mount({ status: 'available' })
+  // A fresh snapshot is reused as is; a refetch of a working agent asks the
+  // server's cached answer, never the slow re-probe.
+  expect(ready.requests.filter(path => path.includes('/agent'))).toEqual([])
+  await act(async () => {
+    await ready.client.invalidateQueries({ queryKey: workspaceKeys.agent('test') })
+  })
+  expect(ready.requests).toContain('/api/workspaces/test/agent')
+  expect(ready.requests).not.toContain('/api/workspaces/test/agent?refresh=true')
+  await cleanup()
+  const failed = await mount({ status: 'login-required', reason: 'Sign in' })
+  expect(failed.requests).toContain('/api/workspaces/test/agent?refresh=true')
 })
 
 test('a ready demo opens the workspace normally', async () => {

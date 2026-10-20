@@ -86,7 +86,8 @@ function ensureConnection() {
   socket.onclose = () => {
     ws = null
     connecting = false
-    // Reconnect with backoff if there are still listeners
+    // Reconnect with backoff while anything is listening; otherwise the next
+    // subscriber reopens it.
     if (listeners.size > 0) {
       scheduleReconnect()
     }
@@ -97,9 +98,8 @@ function ensureConnection() {
   }
 }
 
-// Subscribe to reconnects; returns the unsubscribe. Only fires while some
-// component holds the events socket open via useWorkspaceEvent (the app shell
-// always does).
+// Subscribe to reconnects; returns the unsubscribe. Fires when the socket comes
+// back after a real drop (server restart, network), never on a route switch.
 export function onWorkspaceEventsReconnect(handler: () => void): () => void {
   reconnectListeners.add(handler)
   return () => {
@@ -115,13 +115,14 @@ export function useWorkspaceEvent(handler: WorkspaceEventHandler) {
     listeners.add(wrapped)
     ensureConnection()
 
+    // The socket outlives its listeners: it stays open for the page's lifetime
+    // once anything has asked for it. Closing when the count hits zero turned
+    // every route switch into a reconnect — React tears the old route's
+    // listeners down before the new route's come up, so the count touched
+    // zero in between, the socket closed and reopened, and the reconnect
+    // handlers refetched startup state and the agent snapshot each time.
     return () => {
       listeners.delete(wrapped)
-      // Close WS if no more listeners
-      if (listeners.size === 0 && ws) {
-        ws.close()
-        ws = null
-      }
     }
   }, [handlerRef])
 }

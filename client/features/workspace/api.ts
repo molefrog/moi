@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
@@ -33,19 +33,30 @@ export function useWorkspaceLayout(workspaceId: string) {
   })
 }
 
+// After a real socket drop the server may have restarted or credentials may
+// have changed: refetch every agent snapshot that is on screen. Registered once
+// per query client, not once per hook — half a dozen components read this
+// query at a time, and one invalidation each would cancel and restart the same
+// fetch that many times.
+const reconnectRegistered = new WeakSet<QueryClient>()
+function registerAgentReconnect(queryClient: QueryClient) {
+  if (reconnectRegistered.has(queryClient)) return
+  reconnectRegistered.add(queryClient)
+  onWorkspaceEventsReconnect(() => {
+    void queryClient.invalidateQueries(
+      { queryKey: workspaceKeys.agentAll },
+      { cancelRefetch: false }
+    )
+  })
+}
+
 // The workspace's agent backend in one snapshot: availability (runtime
 // presence + auth), the model catalog, and capabilities.
 // `harness:updated` events refresh availability;
 // focus refetches pick up model changes after a CLI update.
 export function useWorkspaceAgent(workspaceId: string) {
   const queryClient = useQueryClient()
-  useEffect(
-    () =>
-      onWorkspaceEventsReconnect(() => {
-        void queryClient.invalidateQueries({ queryKey: workspaceKeys.agent(workspaceId) })
-      }),
-    [queryClient, workspaceId]
-  )
+  useEffect(() => registerAgentReconnect(queryClient), [queryClient])
   useWorkspaceEvent(event => {
     if (event.type === 'harness:updated' && event.workspaceId === workspaceId) {
       queryClient.setQueryData<WorkspaceAgent>(workspaceKeys.agent(workspaceId), prev =>
@@ -62,8 +73,15 @@ export function useWorkspaceAgent(workspaceId: string) {
     queryFn: async ({ signal }) => {
       const key = workspaceKeys.agent(workspaceId)
       const previous = queryClient.getQueryData<WorkspaceAgent>(key)
+      // `refresh=true` makes the server re-probe the CLI (three child
+      // processes, seconds) instead of answering from its 30s cache. Only
+      // worth it when the last snapshot was a failure: the user may have
+      // signed in or installed the agent since, and that is also the only
+      // state with a "check again" button. A working agent is reconfirmed
+      // from the cache.
+      const refresh = previous !== undefined && previous.availability.status !== 'available'
       const result = await requestJson<WorkspaceAgent>(
-        `/api/workspaces/${workspaceId}/agent?refresh=true`,
+        `/api/workspaces/${workspaceId}/agent${refresh ? '?refresh=true' : ''}`,
         { signal }
       )
       // A live auth event received during this request is newer than its snapshot.
