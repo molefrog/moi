@@ -6,6 +6,7 @@ import { Toaster } from '@/client/components/ui/toast'
 import { TooltipProvider } from '@/client/components/ui/tooltip'
 import { installAppletErrorHook } from '@/client/features/applets/applet-log'
 import { initConnection } from '@/client/features/chat/connection/chat-connection'
+import { AppProvider } from './app/app-provider'
 import { AppRouter } from './app/app-router'
 
 const queryClient = new QueryClient()
@@ -23,12 +24,14 @@ export function mount(el: HTMLElement) {
   function Root() {
     return (
       <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Router>
-            <AppRouter />
-          </Router>
-          <Toaster />
-        </TooltipProvider>
+        <AppProvider>
+          <TooltipProvider>
+            <Router>
+              <AppRouter />
+            </Router>
+            <Toaster />
+          </TooltipProvider>
+        </AppProvider>
       </QueryClientProvider>
     )
   }

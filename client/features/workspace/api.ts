@@ -1,14 +1,9 @@
-import { useEffect } from 'react'
-
-import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import {
-  onWorkspaceEventsReconnect,
-  useWorkspaceEvent
-} from '@/client/runtime/use-workspace-events'
+import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
 import type {
   WorkspaceAgent,
   WorkspaceLayout,
@@ -33,30 +28,12 @@ export function useWorkspaceLayout(workspaceId: string) {
   })
 }
 
-// After a real socket drop the server may have restarted or credentials may
-// have changed: refetch every agent snapshot that is on screen. Registered once
-// per query client, not once per hook — half a dozen components read this
-// query at a time, and one invalidation each would cancel and restart the same
-// fetch that many times.
-const reconnectRegistered = new WeakSet<QueryClient>()
-function registerAgentReconnect(queryClient: QueryClient) {
-  if (reconnectRegistered.has(queryClient)) return
-  reconnectRegistered.add(queryClient)
-  onWorkspaceEventsReconnect(() => {
-    void queryClient.invalidateQueries(
-      { queryKey: workspaceKeys.agentAll },
-      { cancelRefetch: false }
-    )
-  })
-}
-
 // The workspace's agent backend in one snapshot: availability (runtime
 // presence + auth), the model catalog, and capabilities.
 // `harness:updated` events refresh availability;
 // focus refetches pick up model changes after a CLI update.
 export function useWorkspaceAgent(workspaceId: string) {
   const queryClient = useQueryClient()
-  useEffect(() => registerAgentReconnect(queryClient), [queryClient])
   useWorkspaceEvent(event => {
     if (event.type === 'harness:updated' && event.workspaceId === workspaceId) {
       queryClient.setQueryData<WorkspaceAgent>(workspaceKeys.agent(workspaceId), prev =>

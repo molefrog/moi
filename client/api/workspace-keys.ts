@@ -11,7 +11,6 @@ export const workspaceKeys = {
   events: (id: string, sessionId: string) => ['workspaces', 'events', id, sessionId] as const,
   session: (id: string, sessionId: string) => ['workspaces', 'session', id, sessionId] as const,
   mcp: (id: string) => ['workspaces', 'mcp', id] as const,
-  agentAll: ['workspaces', 'agent'] as const,
   agent: (id: string) => ['workspaces', 'agent', id] as const,
   skills: (id: string) => ['workspaces', 'skills', id] as const,
   env: (id: string) => ['workspaces', 'env', id] as const

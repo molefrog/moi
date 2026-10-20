@@ -79,7 +79,6 @@ async function mount(
     }
   ])
   const eventsSpy = spyOn(events, 'useWorkspaceEvent').mockImplementation(() => {})
-  const reconnectSpy = spyOn(events, 'onWorkspaceEventsReconnect').mockReturnValue(() => {})
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const key = workspaceKeys.agent('test')
   let data: WorkspaceAgent = {
@@ -178,7 +177,6 @@ async function mount(
     configSpy.mockRestore()
     locationSpy.mockRestore()
     eventsSpy.mockRestore()
-    reconnectSpy.mockRestore()
     notifyManager.setNotifyFunction(callback => callback())
     for (const [key, value] of descriptors) {
       if (value) Object.defineProperty(globalThis, key, value)

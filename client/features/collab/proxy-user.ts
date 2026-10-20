@@ -1,7 +1,6 @@
 import type { ProxyUserState } from '@/lib/collab/types'
 
 import { requestJson } from '@/client/api/http'
-import { onWorkspaceEventsReconnect } from '@/client/runtime/use-workspace-events'
 
 import { setProxyUserState } from './host-state'
 
@@ -23,13 +22,9 @@ async function fetchProxyUser(): Promise<ProxyUserState | undefined> {
   } catch {}
 }
 
-// Loaded before the app mounts, like startup config, so workspaces choose
-// between shared and browser-tab navigation with the inherited user already
-// in place. A server restart can change the proxy config, so reconnects refetch.
+// Loaded once before the app mounts, like startup config, so workspaces
+// choose between shared and browser-tab navigation with the inherited user
+// already in place.
 export async function loadProxyUser(): Promise<ProxyUserState | undefined> {
-  const state = await fetchProxyUser()
-  onWorkspaceEventsReconnect(() => {
-    void fetchProxyUser()
-  })
-  return state
+  return fetchProxyUser()
 }

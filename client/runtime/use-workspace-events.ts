@@ -1,143 +1,19 @@
 import { useEffect } from 'react'
-import type { NavigationRequest } from '@/lib/navigation'
 
 import { useLatestRef } from '@/client/lib/use-latest-ref'
-import { wsUrl } from '@/client/lib/ws-url'
-import type { AppSettings, HarnessAvailability, ViewInfo, WidgetInfo } from '@/lib/types'
 
-export type WorkspaceEvent =
-  | { type: 'widget:updated'; name: string }
-  | { type: 'widget-layout:updated'; widgets: WidgetInfo[] }
-  // `moi refresh` — cache-bust and re-fetch applets without a rebuild. `only`
-  // narrows to one kind; absent means both widgets and views.
-  | { type: 'applets:refresh'; only?: 'widgets' | 'views' }
-  | { type: 'view:updated'; name: string }
-  | { type: 'view-layout:updated'; views: ViewInfo[] }
-  | { type: 'view:deleted'; workspaceId: string; name: string }
-  | { type: 'views:changed'; workspaceId: string }
-  | { type: 'selected-session:updated'; workspaceId: string; sessionId: string | null }
-  | { type: 'theme:updated' }
-  | { type: 'workspace:updated' }
-  // The registry list changed (reorder, create) without touching any open
-  // workspace's layout — clients refetch just the sidebar list.
-  | { type: 'workspaces-list:updated' }
-  // A workspace's env changed outside the UI — refetch the env view.
-  | { type: 'env:updated'; workspaceId: string }
-  // Workspace readiness changed. Patch its cache without a refetch.
-  | {
-      type: 'harness:updated'
-      workspaceId: string
-      availability: HarnessAvailability
-    }
-  // The Scratchpad canvas for `workspaceId` was saved — open tabs reload from
-  // disk. `origin` is the tab that wrote it, so that tab can skip its own echo.
-  | { type: 'scratchpad:updated'; workspaceId: string; origin?: string }
-  // App settings changed (PATCH /api/settings from any client) — carries the
-  // new value so caches update without a refetch.
-  | { type: 'settings:updated'; settings: AppSettings }
-  | NavigationRequest
+import { useAppContext } from './app-context'
+import type { WorkspaceEventHandler } from './workspace-events'
 
-type WorkspaceEventHandler = (event: WorkspaceEvent) => void
+export type { WorkspaceEvent, WorkspaceEventHandler } from './workspace-events'
 
-const listeners = new Set<WorkspaceEventHandler>()
-// Fired when the socket comes back after a drop — for the SPA that means the
-// server restarted (it holds the connection for its whole lifetime), so
-// restart-scoped state such as the startup config can refetch.
-const reconnectListeners = new Set<() => void>()
-let everConnected = false
-let ws: WebSocket | null = null
-let connecting = false
-
-// Reconnect delay grows exponentially on repeated drops so a downed server
-// doesn't get hammered with a request every 2s; resets once a connection
-// actually opens.
-const RECONNECT_BASE_DELAY_MS = 1000
-const RECONNECT_MAX_DELAY_MS = 30_000
-let reconnectAttempt = 0
-
-function scheduleReconnect() {
-  const delay = Math.min(RECONNECT_BASE_DELAY_MS * 2 ** reconnectAttempt, RECONNECT_MAX_DELAY_MS)
-  reconnectAttempt++
-  setTimeout(ensureConnection, delay)
-}
-
-function ensureConnection() {
-  if (ws || connecting) return
-  connecting = true
-
-  const socket = new WebSocket(wsUrl('/api/workspaces/ws'))
-
-  socket.onopen = () => {
-    ws = socket
-    connecting = false
-    reconnectAttempt = 0
-    sendNavigationPresence()
-    if (everConnected) for (const handler of reconnectListeners) handler()
-    everConnected = true
-  }
-
-  socket.onmessage = event => {
-    try {
-      const data = JSON.parse(event.data) as WorkspaceEvent
-      for (const handler of listeners) handler(data)
-    } catch {}
-  }
-
-  socket.onclose = () => {
-    ws = null
-    connecting = false
-    // Reconnect with backoff while anything is listening; otherwise the next
-    // subscriber reopens it.
-    if (listeners.size > 0) {
-      scheduleReconnect()
-    }
-  }
-
-  socket.onerror = () => {
-    socket.close()
-  }
-}
-
-// Subscribe to reconnects; returns the unsubscribe. Fires when the socket comes
-// back after a real drop (server restart, network), never on a route switch.
-export function onWorkspaceEventsReconnect(handler: () => void): () => void {
-  reconnectListeners.add(handler)
-  return () => {
-    reconnectListeners.delete(handler)
-  }
-}
-
+// Listen to the app's workspace events. Subscribing never opens or closes the
+// socket — `AppProvider` owns that — so a route switch that briefly leaves
+// nothing subscribed costs nothing. A no-op outside `AppProvider`.
 export function useWorkspaceEvent(handler: WorkspaceEventHandler) {
+  const events = useAppContext()?.events
   const handlerRef = useLatestRef(handler)
-
-  useEffect(() => {
-    const wrapped: WorkspaceEventHandler = e => handlerRef.current(e)
-    listeners.add(wrapped)
-    ensureConnection()
-
-    // The socket outlives its listeners: it stays open for the page's lifetime
-    // once anything has asked for it. Closing when the count hits zero turned
-    // every route switch into a reconnect — React tears the old route's
-    // listeners down before the new route's come up, so the count touched
-    // zero in between, the socket closed and reopened, and the reconnect
-    // handlers refetched startup state and the agent snapshot each time.
-    return () => {
-      listeners.delete(wrapped)
-    }
-  }, [handlerRef])
-}
-
-let navigationWorkspace: string | null = null
-
-function sendNavigationPresence() {
-  if (ws?.readyState !== WebSocket.OPEN) return
-  ws.send(
-    JSON.stringify({
-      type: 'navigation:presence',
-      workspaceId: navigationWorkspace,
-      focused: document.visibilityState === 'visible' && document.hasFocus()
-    })
-  )
+  useEffect(() => events?.subscribe(event => handlerRef.current(event)), [events, handlerRef])
 }
 
 // This hook owns presence for the displayed workspace, including reconnects.
@@ -146,36 +22,35 @@ export function useNavigationClient(
   workspaceId: string,
   navigate: (href: string) => void | Promise<void>
 ) {
+  const events = useAppContext()?.events
+
   useEffect(() => {
-    navigationWorkspace = workspaceId
-    sendNavigationPresence()
-    window.addEventListener('focus', sendNavigationPresence)
-    document.addEventListener('visibilitychange', sendNavigationPresence)
+    if (!events) return
+    events.setNavigationWorkspace(workspaceId)
+    const sendPresence = () => events.sendNavigationPresence()
+    window.addEventListener('focus', sendPresence)
+    document.addEventListener('visibilitychange', sendPresence)
     return () => {
-      navigationWorkspace = null
-      sendNavigationPresence()
-      window.removeEventListener('focus', sendNavigationPresence)
-      document.removeEventListener('visibilitychange', sendNavigationPresence)
+      events.setNavigationWorkspace(undefined)
+      window.removeEventListener('focus', sendPresence)
+      document.removeEventListener('visibilitychange', sendPresence)
     }
-  }, [workspaceId])
+  }, [events, workspaceId])
 
   useWorkspaceEvent(async event => {
-    if (event.type !== 'navigation:request' || event.workspaceId !== workspaceId) return
-    const socket = ws
+    if (!events || event.type !== 'navigation:request' || event.workspaceId !== workspaceId) return
     try {
-      if (navigationWorkspace !== workspaceId) throw new Error('The browser switched workspaces.')
+      if (events.navigationWorkspace !== workspaceId) {
+        throw new Error('The browser switched workspaces.')
+      }
       await navigate(event.href)
-      socket?.send(
-        JSON.stringify({ type: 'navigation:result', requestId: event.requestId, ok: true })
-      )
+      events.send({ type: 'navigation:result', requestId: event.requestId, ok: true })
     } catch (error) {
-      socket?.send(
-        JSON.stringify({
-          type: 'navigation:result',
-          requestId: event.requestId,
-          error: error instanceof Error ? error.message : 'Navigation failed'
-        })
-      )
+      events.send({
+        type: 'navigation:result',
+        requestId: event.requestId,
+        error: error instanceof Error ? error.message : 'Navigation failed'
+      })
     }
   })
 }

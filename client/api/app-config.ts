@@ -3,15 +3,13 @@ import { useSyncExternalStore } from 'react'
 import type { ClientAppConfig } from '@/lib/types'
 import { EXPERIMENTAL_DEFAULTS } from '@/lib/experimental'
 
-import { onWorkspaceEventsReconnect } from '@/client/runtime/use-workspace-events'
-
 import { requestJson } from './http'
 
 // Startup config (GET /api/config): frozen for the server process lifetime,
 // so it is fetched once before the app mounts (see init() in index.tsx) and
 // read synchronously everywhere after that — no query, no loading states.
-// The one thing that can change it is a server restart; the events socket
-// reconnecting is that signal, so the store re-fetches there.
+// Only a server restart can change it, and a restart is picked up on the next
+// page load.
 
 const DEFAULTS: ClientAppConfig = {
   environment: 'local',
@@ -43,11 +41,7 @@ async function fetchAppConfig(): Promise<ClientAppConfig | undefined> {
 // Called once from init() before the app mounts; never rejects, so a config
 // hiccup cannot block the app from starting.
 export async function loadAppConfig(): Promise<ClientAppConfig | undefined> {
-  const config = await fetchAppConfig()
-  onWorkspaceEventsReconnect(() => {
-    void fetchAppConfig()
-  })
-  return config
+  return fetchAppConfig()
 }
 
 export function useAppConfig(): ClientAppConfig {
