@@ -17,7 +17,9 @@ const DIST_INDEX = join(DIST_DIR, 'index.html')
 export const prebuilt = !process.env.MOI_DEV && existsSync(DIST_INDEX)
 
 // The prebuilt SPA shell, served for client-side routes in production. In dev,
-// web.ts uses the live-bundled HTML import instead (for HMR).
+// web.ts uses the live-bundled HTML import instead (for HMR). `no-cache`: the
+// shell is the one unhashed document — it names the hashed chunks and the
+// versioned React, which are cached for good, so it must be revalidated itself.
 export function distShell(): Response {
-  return new Response(Bun.file(DIST_INDEX))
+  return new Response(Bun.file(DIST_INDEX), { headers: { 'Cache-Control': 'no-cache' } })
 }

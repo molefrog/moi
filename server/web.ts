@@ -140,8 +140,9 @@ export const app = Bun.serve<WsData>({
         headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }
       }),
 
-    // Locally-vendored React ESM (offline; no CDN). The importmap in
-    // client/index.html points here; the handler picks dev/prod per env.
+    // Locally-vendored React ESM (offline; no CDN), under a versioned path so
+    // production can cache it for good. The importmap in client/index.html
+    // points here; the handler picks dev/prod per env.
     '/vendor/react/*': (req: Request) => serveVendorReact(req),
 
     // Vendored emojibase-data for the settings emoji picker (offline; no CDN).

@@ -1,7 +1,7 @@
 # Browser-testing Moi in Claude Code on the web
 
 > Driving the app in a real Chromium inside the cloud sandbox, with Playwright
-> or agent-browser. React is vendored (served same-origin at `/vendor/react/*`),
+> or agent-browser. React is vendored (served same-origin at `/vendor/react/<version>/*`),
 > so the browser needs no external network — vanilla launches work.
 
 The environment preinstalls everything (deps, agent-browser CLI, the

@@ -7,7 +7,8 @@ import reactPkg from 'react/package.json'
 import pkg from '../../package.json'
 import { serveVendorEmojibase, serveVendorReact } from '../vendor'
 
-const VENDOR = join(import.meta.dir, '..', '..', 'client', 'vendor', 'react')
+const VERSION = pkg.dependencies.react
+const VENDOR = join(import.meta.dir, '..', '..', 'client', 'vendor', 'react', VERSION)
 const ENTRIES = [
   'react.js',
   'react-jsx-runtime.js',
@@ -20,6 +21,21 @@ const ENTRIES = [
 // (and offline claims are false) if the committed artifacts are missing,
 // truncated, or still reference a CDN. Regenerate with `bun run vendor:react`.
 describe('vendored React artifacts', () => {
+  test('live under the pinned version folder, and nothing else does', async () => {
+    const root = join(VENDOR, '..')
+    const entries = [...new Bun.Glob('*').scanSync({ cwd: root, onlyFiles: false })]
+    expect(entries).toEqual([VERSION])
+  })
+
+  for (const html of ['client/index.html', 'client/dev/index.html']) {
+    test(`${html} importmap points at the pinned version`, async () => {
+      const text = await Bun.file(join(import.meta.dir, '..', '..', html)).text()
+      const urls = text.match(/"\/vendor\/react\/[^"]+"/g) ?? []
+      expect(urls.length).toBe(ENTRIES.length)
+      for (const url of urls) expect(url).toStartWith(`"/vendor/react/${VERSION}/`)
+    })
+  }
+
   for (const mode of ['production', 'development'] as const) {
     for (const name of ENTRIES) {
       test(`${mode}/${name} exists and is non-trivial`, async () => {
@@ -43,26 +59,35 @@ describe('serveVendorReact route', () => {
   const get = (path: string) => serveVendorReact(new Request(`http://localhost${path}`))
 
   test('serves the react entry as JavaScript', async () => {
-    const res = await get('/vendor/react/react.js')
+    const res = await get(`/vendor/react/${VERSION}/react.js`)
     expect(res.status).toBe(200)
     expect(res.headers.get('Content-Type')).toContain('javascript')
     expect(await res.text()).toContain('export default')
   })
 
   test('serves nested _impl files', async () => {
-    const res = await get('/vendor/react/_impl/react.js')
+    const res = await get(`/vendor/react/${VERSION}/_impl/react.js`)
     expect(res.status).toBe(200)
+  })
+
+  test('sets a cache policy: immutable in production, revalidate in dev', async () => {
+    const res = await get(`/vendor/react/${VERSION}/react.js`)
+    expect(res.headers.get('Cache-Control')).toMatch(
+      /^(public, max-age=31536000, immutable|no-cache)$/
+    )
   })
 
   test('rejects path traversal', async () => {
     // URL normalizes `..`, so the tail no longer starts with the vendor prefix.
     expect((await get('/vendor/react/../../server/vendor.ts')).status).toBe(404)
-    expect((await get('/vendor/react/%2e%2e/secret.js')).status).toBe(404)
+    expect((await get(`/vendor/react/${VERSION}/%2e%2e/secret.js`)).status).toBe(404)
   })
 
-  test('rejects non-js and unknown files', async () => {
-    expect((await get('/vendor/react/react.txt')).status).toBe(404)
-    expect((await get('/vendor/react/does-not-exist.js')).status).toBe(404)
+  test('rejects other versions, non-js and unknown files', async () => {
+    expect((await get('/vendor/react/react.js')).status).toBe(404)
+    expect((await get('/vendor/react/0.0.0/react.js')).status).toBe(404)
+    expect((await get(`/vendor/react/${VERSION}/react.txt`)).status).toBe(404)
+    expect((await get(`/vendor/react/${VERSION}/does-not-exist.js`)).status).toBe(404)
   })
 })
 

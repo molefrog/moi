@@ -5,8 +5,12 @@
 // `process.env.NODE_ENV` branches) — a browser can't `import` them directly,
 // which is why the importmap used to point at esm.sh. This script does the
 // CJS→ESM conversion ourselves and writes the result under
-// `client/vendor/react/`, which the server serves and the importmap in
-// `client/index.html` points at. Regenerate after bumping React:
+// `client/vendor/react/<version>/`, which the server serves at
+// `/vendor/react/<version>/*` and the importmaps in `client/index.html` and
+// `client/dev/index.html` point at (this script rewrites them). The version in
+// the URL is what lets production cache the files as immutable: a React bump
+// moves the URL, so nothing stale can survive in a browser or proxy cache.
+// Regenerate after bumping React:
 //   bun run vendor:react
 //
 // The recipe (mirrors what esm.sh does), per entry × {production, development}:
@@ -25,10 +29,17 @@ import { join } from 'node:path'
 
 const require = createRequire(import.meta.url)
 const root = join(import.meta.dir, '..')
-const OUT = join(root, 'client', 'vendor', 'react')
+const VENDOR_ROOT = join(root, 'client', 'vendor', 'react')
 
 const reactVersion = require('react/package.json').version as string
 const reactDomVersion = require('react-dom/package.json').version as string
+const OUT = join(VENDOR_ROOT, reactVersion)
+
+// The importmaps that resolve `react` to the versioned URL.
+const IMPORTMAP_HTML = [
+  join(root, 'client', 'index.html'),
+  join(root, 'client', 'dev', 'index.html')
+]
 
 // entry specifier → output name → siblings kept external (importmap-resolved).
 const ENTRIES = [
@@ -72,7 +83,8 @@ function fixReassignedExternalImports(code: string): string {
 }
 
 async function main() {
-  await rm(OUT, { recursive: true, force: true })
+  // Wipe the whole root so a bump leaves no previous version behind.
+  await rm(VENDOR_ROOT, { recursive: true, force: true })
 
   for (const mode of ['production', 'development'] as const) {
     for (const e of ENTRIES) {
@@ -108,8 +120,16 @@ async function main() {
     }
   }
 
+  for (const file of IMPORTMAP_HTML) {
+    const html = await Bun.file(file).text()
+    await Bun.write(
+      file,
+      html.replaceAll(/"\/vendor\/react\/[^/"]+\//g, `"/vendor/react/${reactVersion}/`)
+    )
+  }
+
   console.log(
-    `Vendored react@${reactVersion} / react-dom@${reactDomVersion} → client/vendor/react/`
+    `Vendored react@${reactVersion} / react-dom@${reactDomVersion} → client/vendor/react/${reactVersion}/`
   )
 }
 
