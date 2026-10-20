@@ -36,6 +36,20 @@
         }
       }
     </script>
+    <!-- Fetch React (the wrappers and the _impl files they import) as soon as
+         the HTML is parsed, instead of two round trips later when the preload
+         script below gets to run. Must stay after the importmap: a module
+         fetch that starts before the map is parsed disables the map. -->
+    <link rel="modulepreload" href="/vendor/react/19.2.4/react.js" />
+    <link rel="modulepreload" href="/vendor/react/19.2.4/_impl/react.js" />
+    <link rel="modulepreload" href="/vendor/react/19.2.4/react-jsx-runtime.js" />
+    <link rel="modulepreload" href="/vendor/react/19.2.4/_impl/react-jsx-runtime.js" />
+    <link rel="modulepreload" href="/vendor/react/19.2.4/react-jsx-dev-runtime.js" />
+    <link rel="modulepreload" href="/vendor/react/19.2.4/_impl/react-jsx-dev-runtime.js" />
+    <link rel="modulepreload" href="/vendor/react/19.2.4/react-dom.js" />
+    <link rel="modulepreload" href="/vendor/react/19.2.4/_impl/react-dom.js" />
+    <link rel="modulepreload" href="/vendor/react/19.2.4/react-dom-client.js" />
+    <link rel="modulepreload" href="/vendor/react/19.2.4/_impl/react-dom-client.js" />
     <link rel="stylesheet" href="./index.css" />
   </head>
   <body>

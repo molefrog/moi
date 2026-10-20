@@ -31,7 +31,8 @@ describe('vendored React artifacts', () => {
     test(`${html} importmap points at the pinned version`, async () => {
       const text = await Bun.file(join(import.meta.dir, '..', '..', html)).text()
       const urls = text.match(/"\/vendor\/react\/[^"]+"/g) ?? []
-      expect(urls.length).toBe(ENTRIES.length)
+      // Five importmap entries, plus the modulepreload links in the app shell.
+      expect(urls.length).toBeGreaterThanOrEqual(ENTRIES.length)
       for (const url of urls) expect(url).toStartWith(`"/vendor/react/${VERSION}/`)
     })
   }

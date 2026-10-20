@@ -6,7 +6,7 @@
 // shell there. Building here, on a normal machine where plugins run, emits a
 // plain compiled bundle (Tailwind already expanded) that production serves as
 // static files. Dev still uses the live Bun.serve bundler (see server/web.ts).
-import { rm } from 'node:fs/promises'
+import { readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import externalizeReact from '../client/externalize-react'
@@ -45,4 +45,45 @@ if (!result.success) {
   process.exit(1)
 }
 
-console.log(`Built client → dist/ (${result.outputs.length} files)`)
+// Preload the chunks a cold load needs before the app renders: the entry's own
+// imports (the browser only learns of them once the entry has downloaded) and
+// everything they statically pull in. Without the hints each level of the
+// import graph costs a serial round trip. Chunks reached only through deeper
+// dynamic imports (the scratchpad, …) are left for their own time. React is
+// preloaded by static links in client/index.html, since its URLs are fixed.
+const STATIC_IMPORT = /\bfrom\s*"(\/[\w.-]+\.js)"/g
+const DYNAMIC_IMPORT = /\bimport\(\s*"(\/[\w.-]+\.js)"\s*\)/g
+const ENTRY_SCRIPT = /<script\b[^>]*\btype="module"[^>]*\bsrc="(\/[\w.-]+\.js)"/
+
+async function startupChunks(html: string): Promise<string[]> {
+  const entry = html.match(ENTRY_SCRIPT)?.[1]
+  if (!entry) return []
+  const read = (url: string) => readFile(join(outdir, url), 'utf8')
+  const entryCode = await read(entry)
+  const imports = (code: string, pattern: RegExp) => [...code.matchAll(pattern)].map(m => m[1]!)
+  const seen = new Set([entry])
+  const found: string[] = []
+  const queue = [...imports(entryCode, STATIC_IMPORT), ...imports(entryCode, DYNAMIC_IMPORT)]
+  while (queue.length) {
+    const url = queue.shift()!
+    if (seen.has(url)) continue
+    seen.add(url)
+    found.push(url)
+    queue.push(...imports(await read(url), STATIC_IMPORT))
+  }
+  return found
+}
+
+const indexPath = join(outdir, 'index.html')
+const html = await readFile(indexPath, 'utf8')
+const chunks = await startupChunks(html)
+// `crossorigin` matches the attribute Bun puts on the entry script, so the
+// preloaded response is the one the module loader reuses. After `</head>`'s
+// predecessors, i.e. after the importmap — a module fetch that starts before
+// the map is parsed disables the map.
+const links = chunks.map(href => `<link rel="modulepreload" crossorigin href="${href}">`)
+await writeFile(indexPath, html.replace('</head>', `${links.join('')}</head>`))
+
+console.log(
+  `Built client → dist/ (${result.outputs.length} files, ${chunks.length} startup chunks preloaded)`
+)
