@@ -5,11 +5,12 @@
 // `process.env.NODE_ENV` branches) — a browser can't `import` them directly,
 // which is why the importmap used to point at esm.sh. This script does the
 // CJS→ESM conversion ourselves and writes the result under
-// `client/vendor/react/<version>/`, which the server serves at
-// `/vendor/react/<version>/*` and the importmaps in `client/index.html` and
-// `client/dev/index.html` point at (this script rewrites them). The version in
-// the URL is what lets production cache the files as immutable: a React bump
-// moves the URL, so nothing stale can survive in a browser or proxy cache.
+// `client/vendor/react/<version>/<mode>/`, which the server serves at
+// `/vendor/react/<version>/<mode>/*` and the importmaps in `client/index.html`
+// and `client/dev/index.html` point at (this script rewrites the version). The
+// version and mode in the URL are what let the files be cached as immutable: a
+// React bump moves the URL, so nothing stale can survive in a browser or proxy
+// cache.
 // Regenerate after bumping React:
 //   bun run vendor:react
 //

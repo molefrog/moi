@@ -33,7 +33,8 @@ describe('vendored React artifacts', () => {
       const urls = text.match(/"\/vendor\/react\/[^"]+"/g) ?? []
       // Five importmap entries, plus the modulepreload links in the app shell.
       expect(urls.length).toBeGreaterThanOrEqual(ENTRIES.length)
-      for (const url of urls) expect(url).toStartWith(`"/vendor/react/${VERSION}/`)
+      // The source names the development build; the production build swaps it.
+      for (const url of urls) expect(url).toStartWith(`"/vendor/react/${VERSION}/development/`)
     })
   }
 
@@ -59,34 +60,38 @@ describe('vendored React artifacts', () => {
 describe('serveVendorReact route', () => {
   const get = (path: string) => serveVendorReact(new Request(`http://localhost${path}`))
 
-  test('serves the react entry as JavaScript', async () => {
-    const res = await get(`/vendor/react/${VERSION}/react.js`)
-    expect(res.status).toBe(200)
-    expect(res.headers.get('Content-Type')).toContain('javascript')
-    expect(await res.text()).toContain('export default')
-  })
+  for (const mode of ['development', 'production'] as const) {
+    test(`serves the ${mode} react entry as JavaScript`, async () => {
+      const res = await get(`/vendor/react/${VERSION}/${mode}/react.js`)
+      expect(res.status).toBe(200)
+      expect(res.headers.get('Content-Type')).toContain('javascript')
+      expect(await res.text()).toContain(`(${mode})`)
+    })
+  }
 
   test('serves nested _impl files', async () => {
-    const res = await get(`/vendor/react/${VERSION}/_impl/react.js`)
+    const res = await get(`/vendor/react/${VERSION}/production/_impl/react.js`)
     expect(res.status).toBe(200)
   })
 
-  test('is cached for good: the version in the URL changes with the bytes', async () => {
-    const res = await get(`/vendor/react/${VERSION}/react.js`)
+  test('is cached for good: version and mode in the URL change with the bytes', async () => {
+    const res = await get(`/vendor/react/${VERSION}/development/react.js`)
     expect(res.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable')
   })
 
   test('rejects path traversal', async () => {
     // URL normalizes `..`, so the tail no longer starts with the vendor prefix.
     expect((await get('/vendor/react/../../server/vendor.ts')).status).toBe(404)
-    expect((await get(`/vendor/react/${VERSION}/%2e%2e/secret.js`)).status).toBe(404)
+    expect((await get(`/vendor/react/${VERSION}/production/%2e%2e/secret.js`)).status).toBe(404)
   })
 
-  test('rejects other versions, non-js and unknown files', async () => {
+  test('rejects other versions, unknown modes, non-js and unknown files', async () => {
     expect((await get('/vendor/react/react.js')).status).toBe(404)
-    expect((await get('/vendor/react/0.0.0/react.js')).status).toBe(404)
-    expect((await get(`/vendor/react/${VERSION}/react.txt`)).status).toBe(404)
-    expect((await get(`/vendor/react/${VERSION}/does-not-exist.js`)).status).toBe(404)
+    expect((await get(`/vendor/react/${VERSION}/react.js`)).status).toBe(404)
+    expect((await get('/vendor/react/0.0.0/production/react.js')).status).toBe(404)
+    expect((await get(`/vendor/react/${VERSION}/staging/react.js`)).status).toBe(404)
+    expect((await get(`/vendor/react/${VERSION}/production/react.txt`)).status).toBe(404)
+    expect((await get(`/vendor/react/${VERSION}/production/does-not-exist.js`)).status).toBe(404)
   })
 })
 
