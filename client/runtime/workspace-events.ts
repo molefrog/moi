@@ -12,11 +12,14 @@ export type WorkspaceEvent =
   | { type: 'view:deleted'; workspaceId: string; name: string }
   | { type: 'views:changed'; workspaceId: string }
   | { type: 'selected-session:updated'; workspaceId: string; sessionId: string | null }
-  | { type: 'theme:updated' }
-  | { type: 'workspace:updated' }
+  // `origin` on an event is the browser tab whose write caused it (absent for
+  // CLI and agent changes), so that tab can skip its own echo. See
+  // client/lib/browser-tab-id.ts.
+  | { type: 'theme:updated'; origin?: string }
+  | { type: 'workspace:updated'; origin?: string }
   // The registry list changed (reorder, create) without touching any open
   // workspace's layout — clients refetch just the sidebar list.
-  | { type: 'workspaces-list:updated' }
+  | { type: 'workspaces-list:updated'; origin?: string }
   // A workspace's env changed outside the UI — refetch the env view.
   | { type: 'env:updated'; workspaceId: string }
   // Workspace readiness changed. Patch its cache without a refetch.

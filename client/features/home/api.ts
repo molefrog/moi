@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { workspaceKeys } from '@/client/api/workspace-keys'
+import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspacePreview } from '@/lib/types'
 
 export function useWorkspaces() {
@@ -28,11 +29,18 @@ export function useDiscoveredWorkspaces() {
   })
 }
 
+const REORDER_KEY = ['workspaces-reorder']
+
 export function useReorderWorkspaces() {
   const queryClient = useQueryClient()
   return useMutation<WorkspaceEntry[], Error, string[], { previous?: WorkspaceEntry[] }>({
+    mutationKey: REORDER_KEY,
     mutationFn: ids =>
-      requestJson('/api/workspaces/order', jsonRequest('PUT', { ids }), 'Failed to reorder spaces'),
+      requestJson(
+        '/api/workspaces/order',
+        jsonRequest('PUT', { ids, origin: BROWSER_TAB_ID }),
+        'Failed to reorder spaces'
+      ),
     onMutate: async ids => {
       // Exact: only pause the workspace list itself — a prefix cancel would
       // abort unrelated in-flight fetches (transcripts, widgets) that never
@@ -55,6 +63,8 @@ export function useReorderWorkspaces() {
       queryClient.invalidateQueries({ queryKey: workspaceKeys.all, exact: true })
     },
     onSuccess: entries => {
+      // An earlier drag's response must not land over a newer optimistic order.
+      if (queryClient.isMutating({ mutationKey: REORDER_KEY }) > 1) return
       queryClient.setQueryData(workspaceKeys.all, entries)
     }
   })

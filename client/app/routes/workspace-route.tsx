@@ -16,6 +16,7 @@ import { WorkspaceScreen } from '@/client/features/workspace/workspace-screen'
 import { useViews } from '@/client/features/views/api'
 import { useWidgets } from '@/client/features/overview/api'
 import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
+import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
 
 type WorkspaceRouteProps = {
   id: string
@@ -49,6 +50,9 @@ function WorkspaceContent({ id }: WorkspaceRouteProps) {
 
   useWorkspaceEvent(event => {
     if (event.type === 'theme:updated' || event.type === 'workspace:updated') {
+      // Skip our own save: the cache already holds it, and the refetch could
+      // land an older value over a newer optimistic change.
+      if (event.origin === BROWSER_TAB_ID) return
       queryClient.invalidateQueries({ queryKey: workspaceKeys.layout(id) })
     } else if (event.type === 'widget-layout:updated' || event.type === 'widget:updated') {
       // widget:updated too: a rebundle bumps the widget's content revision, and

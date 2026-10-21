@@ -4,6 +4,7 @@ import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import type { WorkspaceLayoutResponse } from '@/client/features/workspace/api'
+import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
 import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
 import type { AppSettings, WorkspaceEntry, WorkspaceEnvView, WorkspaceIcon } from '@/lib/types'
 
@@ -86,13 +87,15 @@ type WorkspaceIconMutation =
 
 export function useUpdateWorkspaceIcon(workspaceId: string) {
   const queryClient = useQueryClient()
+  const mutationKey = ['workspace-icon', workspaceId]
   return useMutation<void, Error, WorkspaceIconMutation>({
+    mutationKey,
     scope: { id: `workspace-icon:${workspaceId}` },
     mutationFn: async update => {
       if (update.kind === 'set') {
         await requestVoid(
           `/api/workspaces/${workspaceId}/config`,
-          jsonRequest('PUT', { icon: update.icon }),
+          jsonRequest('PUT', { icon: update.icon, origin: BROWSER_TAB_ID }),
           'Failed to save icon'
         )
         return
@@ -111,8 +114,13 @@ export function useUpdateWorkspaceIcon(workspaceId: string) {
         body: update.file
       })
     },
-    onMutate: update => {
+    onMutate: async update => {
       if (update.kind !== 'set') return
+      // Exact on the list: a prefix cancel would abort every workspace query.
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: workspaceKeys.layout(workspaceId) }),
+        queryClient.cancelQueries({ queryKey: workspaceKeys.all, exact: true })
+      ])
       const presentation = { icon: update.icon }
       queryClient.setQueryData<WorkspaceLayoutResponse>(
         workspaceKeys.layout(workspaceId),
@@ -124,14 +132,12 @@ export function useUpdateWorkspaceIcon(workspaceId: string) {
         )
       )
     },
-    onError: (_error, update) => {
-      if (update.kind !== 'set') return
+    // Sync once the last queued change settles: refetching after an earlier
+    // one would land its icon over a newer optimistic pick.
+    onSettled: () => {
+      if (queryClient.isMutating({ mutationKey }) > 1) return
       queryClient.invalidateQueries({ queryKey: workspaceKeys.layout(workspaceId) })
       queryClient.invalidateQueries({ queryKey: workspaceKeys.all, exact: true })
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: workspaceKeys.layout(workspaceId) })
-      queryClient.invalidateQueries({ queryKey: workspaceKeys.all })
     }
   })
 }

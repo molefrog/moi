@@ -82,6 +82,8 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
       const key = workspaceKeys.layout(id)
       const prev = qc.getQueryData<WorkspaceLayoutResponse>(key)
       if (!prev) return
+      // A GET already in flight would land the pre-change layout over this edit.
+      void qc.cancelQueries({ queryKey: key })
       // Optimistic: the grid/theme reflects the change before the PUT lands.
       const next = { ...prev, ...update }
       qc.setQueryData<WorkspaceLayoutResponse>(key, next)

@@ -22,6 +22,7 @@ import 'tldraw/tldraw.css'
 import { useWorkspaceId } from '@/client/features/workspace/workspace-context'
 import { setScratchExecutor } from '@/client/features/scratchpad/scratch-executor'
 import { persistScratchSession } from '@/client/features/scratchpad/scratch-session'
+import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
 import { type WorkspaceEvent, useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
 import type { ScratchOp, ScratchOpResult } from '@/lib/types'
 import {
@@ -31,10 +32,6 @@ import {
   useScratchpadSnapshot
 } from './use-scratchpad-snapshot'
 import { ScratchStyleBar, ScratchToolbar } from './scratchpad-controls'
-
-// Identifies this tab's writes so it can ignore the `scratchpad:updated` echo of
-// its own save (see the MEI reload below). Per page load.
-const ORIGIN_ID = Math.random().toString(36).slice(2)
 
 const AUTOSAVE_MS = 500
 
@@ -221,7 +218,7 @@ function WorkspaceScratchpad({ workspaceId }: { workspaceId: string }) {
     void fetch(`/api/workspaces/${workspaceId}/scratchpad`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ document, origin: ORIGIN_ID })
+      body: JSON.stringify({ document, origin: BROWSER_TAB_ID })
     }).catch(() => {})
   }, [workspaceId])
 
@@ -233,7 +230,7 @@ function WorkspaceScratchpad({ workspaceId }: { workspaceId: string }) {
   // autosave timer) so this stale tab can't save over the newer file.
   useWorkspaceEvent((e: WorkspaceEvent) => {
     if (e.type !== 'scratchpad:updated' || e.workspaceId !== workspaceId) return
-    if (e.origin && e.origin === ORIGIN_ID) return
+    if (e.origin && e.origin === BROWSER_TAB_ID) return
     if (!editorRef.current) return
     fetch(`/api/workspaces/${workspaceId}/scratchpad`)
       .then(r => r.json())

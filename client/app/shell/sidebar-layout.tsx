@@ -11,6 +11,7 @@ import { Link, useLocation } from 'wouter'
 
 import { useAppConfig } from '@/client/api/app-config'
 import { useReorderWorkspaces, useWorkspaces } from '@/client/features/home/api'
+import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
 import { UpdateButton, useUpdateControl } from '@/client/features/update/update-control'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
@@ -63,6 +64,9 @@ export function SidebarLayout({ children, showWorkspaces = true }: SidebarLayout
       e.type === 'theme:updated' ||
       e.type === 'workspaces-list:updated'
     ) {
+      // Our own icon and order changes are already in the list cache. Own theme
+      // saves still refetch: only the layout cache holds those optimistically.
+      if (e.type !== 'theme:updated' && e.origin === BROWSER_TAB_ID) return
       qc.invalidateQueries({ queryKey: workspaceKeys.all, exact: true })
     }
   })

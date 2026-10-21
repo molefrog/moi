@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
+import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
 import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
 import type {
   WorkspaceAgent,
@@ -131,7 +132,7 @@ export function useSaveLayout(workspaceId: string) {
     mutationFn: layout =>
       requestVoid(
         `/api/workspaces/${workspaceId}`,
-        jsonRequest('PUT', layout),
+        jsonRequest('PUT', { ...layout, origin: BROWSER_TAB_ID }),
         'Failed to save layout'
       ),
     onSuccess: () => {

@@ -115,6 +115,12 @@ import {
 // `/api/workspaces/:id/*` handler can read it without re-querying the registry.
 type ApiEnv = { Variables: { ws: WorkspaceEntry } }
 
+// The writing browser tab's id from a request body, echoed on the resulting
+// event so that tab can skip it. See client/lib/browser-tab-id.ts.
+function eventOrigin(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined
+}
+
 function publishSelectedSession(workspaceId: string, update: SelectedSessionUpdate): void {
   if (!update.changed) return
   publishEvent({
@@ -734,7 +740,7 @@ one.put('/config', async c => {
     return c.text('Expected a workspace config field', 400)
   }
   await setWorkspaceConfig(ws.path, { name, icon })
-  publishEvent({ type: 'workspace:updated' })
+  publishEvent({ type: 'workspace:updated', origin: eventOrigin(body.origin) })
   return c.json(await getWorkspaceConfig(ws.path))
 })
 
@@ -758,7 +764,7 @@ one.put('/scratchpad', async c => {
   publishEvent({
     type: 'scratchpad:updated',
     workspaceId: ws.id,
-    origin: typeof body.origin === 'string' ? body.origin : undefined
+    origin: eventOrigin(body.origin)
   })
   return c.body(null, 204)
 })
@@ -888,16 +894,18 @@ one.put('/', async c => {
   const ws = c.get('ws')
   const body = await c.req.json()
   if (!body || body.version !== 1) return c.text('Bad request', 400)
+  // `origin` is the writing tab's id, echoed so that tab skips its own event.
+  const { origin, ...layout } = body
   // Preserve server-owned identity (name/icon) across a grid/theme save so the
   // client's PUT can't erase a `moi config`-set name. See mergeLayoutForSave.
   const existing = await loadLayout(ws.path)
-  const next = mergeLayoutForSave(existing, body)
+  const next = mergeLayoutForSave(existing, layout)
   await saveLayout(next, ws.path)
   if (
     JSON.stringify(resolveWorkspaceTheme(existing.theme)) !==
     JSON.stringify(resolveWorkspaceTheme(next.theme))
   ) {
-    publishEvent({ type: 'theme:updated' })
+    publishEvent({ type: 'theme:updated', origin: eventOrigin(origin) })
   }
   return c.body(null, 204)
 })
@@ -945,7 +953,7 @@ workspaces.put('/order', async c => {
     // List-only change: a narrow event so clients refetch just the sidebar
     // list, not every per-workspace query (`workspace:updated` also triggers
     // layout refetches in open workspaces).
-    publishEvent({ type: 'workspaces-list:updated' })
+    publishEvent({ type: 'workspaces-list:updated', origin: eventOrigin(body.origin) })
     return c.json(await mergeWorkspaceList(entries))
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
