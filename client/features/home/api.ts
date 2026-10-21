@@ -9,8 +9,10 @@ export function useWorkspaces() {
   return useQuery<WorkspaceEntry[]>({
     queryKey: workspaceKeys.all,
     queryFn: () => requestJson('/api/workspaces'),
-    staleTime: Infinity,
-    refetchOnMount: 'always'
+    // Live events invalidate the list on every change. This only bounds how
+    // long a missed event (socket down) can leave it wrong; route switches
+    // within the window reuse the cache.
+    staleTime: 5 * 60_000
   })
 }
 
