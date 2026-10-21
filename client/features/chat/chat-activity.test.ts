@@ -296,15 +296,15 @@ describe('session list changes', () => {
     expect(queryClient.getQueryState(sessionsKey)?.isInvalidated).toBe(true)
   })
 
-  test('invalidates the affected workspace session list and preview', () => {
+  test('invalidates the affected workspace session list and the previews', () => {
     const queryClient = new QueryClient()
     __setQueryClientForTests(queryClient)
     queryClient.setQueryData(workspaceKeys.sessions(WS), [])
-    queryClient.setQueryData(workspaceKeys.preview(WS), {})
+    queryClient.setQueryData(workspaceKeys.previews, {})
 
     handleFrame({ type: 'sessions_changed', workspaceId: WS, sessionId: SID })
 
     expect(queryClient.getQueryState(workspaceKeys.sessions(WS))?.isInvalidated).toBe(true)
-    expect(queryClient.getQueryState(workspaceKeys.preview(WS))?.isInvalidated).toBe(true)
+    expect(queryClient.getQueryState(workspaceKeys.previews)?.isInvalidated).toBe(true)
   })
 })

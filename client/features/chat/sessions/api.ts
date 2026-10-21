@@ -129,7 +129,7 @@ export function useArchiveWorkspaceSession(workspaceId: string) {
       ),
     onSuccess: (_, sessionId) => {
       applyArchivedSession(queryClient, workspaceId, sessionId)
-      queryClient.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.previews })
     }
   })
 }

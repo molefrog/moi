@@ -100,7 +100,8 @@ export type WorkspacePreviewOptions = {
   viewIds?: readonly string[]
   // Maps a captured applet to the image URL the home card should render —
   // the API layer owns the route shape (GET .../applet-thumbnails/:kind/:id).
-  thumbnailUrl: (kind: AppletKind, id: string) => string
+  // `version` changes with every capture, so the URL can be cached forever.
+  thumbnailUrl: (kind: AppletKind, id: string, version: string) => string
 }
 
 export async function getWorkspacePreview(
@@ -111,17 +112,21 @@ export async function getWorkspacePreview(
     const layout = await loadLayout(workspacePath)
     const captured = await getCapturedThumbnails(workspacePath)
     const validViewIds = new Set(viewIds)
-    const capturedWidgets = new Set(
-      captured.filter(record => record.kind === 'widget').map(record => record.id)
+    const capturedWidgets = new Map(
+      captured
+        .filter(record => record.kind === 'widget')
+        .map(record => [record.id, record.capturedAt])
     )
     const widgetImages = [...layout.widgetGrid]
       .sort((a, b) => a.y - b.y || a.x - b.x)
-      .filter(item => capturedWidgets.has(item.i))
-      .map(item => thumbnailUrl('widget', item.i))
+      .flatMap(item => {
+        const version = capturedWidgets.get(item.i)
+        return version === undefined ? [] : [thumbnailUrl('widget', item.i, version)]
+      })
     const viewImages = captured
       .filter(record => record.kind === 'view' && validViewIds.has(record.id))
       .sort((a, b) => Date.parse(b.viewedAt) - Date.parse(a.viewedAt))
-      .map(record => thumbnailUrl('view', record.id))
+      .map(record => thumbnailUrl('view', record.id, record.capturedAt))
     const thumbnails = [...widgetImages, ...viewImages].slice(0, PREVIEW_LIMIT)
     // The message bubble is the card's fallback for "nothing to show": gate on
     // captured thumbnails, not grid emptiness — a workspace with widgets that

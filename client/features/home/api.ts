@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { workspaceKeys } from '@/client/api/workspace-keys'
@@ -14,12 +14,20 @@ export function useWorkspaces() {
   })
 }
 
+const workspacePreviewsOptions = queryOptions({
+  queryKey: workspaceKeys.previews,
+  queryFn: () => requestJson<Record<string, WorkspacePreview>>('/api/workspaces/previews'),
+  staleTime: 60_000
+})
+
+// Every card's preview in one request. The home page starts it beside the
+// workspace list so it doesn't wait for the cards to mount.
+export function useWorkspacePreviews() {
+  return useQuery(workspacePreviewsOptions)
+}
+
 export function useWorkspacePreview(workspaceId: string) {
-  return useQuery<WorkspacePreview>({
-    queryKey: workspaceKeys.preview(workspaceId),
-    queryFn: () => requestJson(`/api/workspaces/${workspaceId}/preview`),
-    staleTime: 60_000
-  })
+  return useQuery({ ...workspacePreviewsOptions, select: previews => previews[workspaceId] })
 }
 
 export function useDiscoveredWorkspaces() {

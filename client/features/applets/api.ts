@@ -32,7 +32,7 @@ export function useSaveAppletThumbnails(workspaceId: string) {
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: workspaceKeys.appletThumbnails(workspaceId) })
-      queryClient.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.previews })
     }
   })
 }

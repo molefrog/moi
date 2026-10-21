@@ -3,8 +3,12 @@ import { useState } from 'react'
 import { IconChevronRight, IconEggCracked, IconLoader2, IconPlus } from '@tabler/icons-react'
 import { Link, useLocation } from 'wouter'
 
-import { useDiscoveredWorkspaces, useWorkspacePreview, useWorkspaces } from './api'
-import { useWorkspaceAgent } from '@/client/features/workspace/api'
+import {
+  useDiscoveredWorkspaces,
+  useWorkspacePreview,
+  useWorkspacePreviews,
+  useWorkspaces
+} from './api'
 import { CreateWorkspaceDialog } from '@/client/features/workspace/add/create-workspace-dialog'
 import { ImportWorkspaceDialog } from '@/client/features/workspace/add/import-workspace-dialog'
 import { DemoDialog } from '@/client/features/demo/demo-dialog'
@@ -38,6 +42,7 @@ export function HomePage() {
   usePreloadWorkspaceFonts()
   const [, navigate] = useLocation()
   const workspacesQuery = useWorkspaces()
+  useWorkspacePreviews()
   const discoveredQuery = useDiscoveredWorkspaces()
   const importFlow = useWorkspaceImport({
     onSuccess: entry => navigate(`/workspace/${entry.id}`)
@@ -170,8 +175,6 @@ type WorkspaceCardProps = {
 }
 
 function WorkspaceCard({ workspace }: WorkspaceCardProps) {
-  // Warm the shared readiness cache before the user enters this workspace.
-  useWorkspaceAgent(workspace.id)
   const name = workspaceDisplayName(workspace)
   const previewQuery = useWorkspacePreview(workspace.id)
   const theme = workspace.theme ?? previewQuery.data?.theme

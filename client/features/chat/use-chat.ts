@@ -187,7 +187,7 @@ export function useChat(address: WorkspaceTabAddress) {
       })
       finishComposerSend(workspaceId, ready)
       if (isNew) {
-        qc.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })
+        qc.invalidateQueries({ queryKey: workspaceKeys.previews })
       }
     },
     [

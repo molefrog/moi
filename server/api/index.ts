@@ -184,20 +184,6 @@ const withWorkspace = createMiddleware<ApiEnv>(async (c, next) => {
 const one = new Hono<ApiEnv>()
 one.use('*', withWorkspace)
 
-one.get('/preview', async c => {
-  const ws = c.get('ws')
-  const views = await listCompiledViews(ws.path)
-  return c.json(
-    await getWorkspacePreview(ws.path, {
-      getProviderPreview: includeFirstUserMessage =>
-        harnessFor(ws).workspacePreview(ws, includeFirstUserMessage),
-      viewIds: views.map(view => view.id),
-      thumbnailUrl: (kind, id) =>
-        `/api/workspaces/${ws.id}/applet-thumbnails/${kind}/${encodeURIComponent(id)}`
-    })
-  )
-})
-
 one.get('/widgets', c => listWidgets(c.get('ws').path))
 
 // Widget bundle: the compiled ESM for one widget, dynamically imported by the
@@ -856,11 +842,15 @@ one.get('/applet-thumbnails', async c =>
 one.get('/applet-thumbnails/:kind/:name', c => {
   const kind = c.req.param('kind')
   if (kind !== 'widget' && kind !== 'view') return c.text('Not found', 404)
+  // `<id>` or `<id>:<version>`. Applet ids never contain `:`, and the version
+  // lives in the path rather than a query string so every CDN keys on it.
+  const [id, version] = c.req.param('name').split(':')
   return serveAppletThumbnail(
     c.get('ws').path,
     kind,
-    c.req.param('name'),
-    c.req.header('if-none-match')
+    id!,
+    c.req.header('if-none-match'),
+    version !== undefined
   )
 })
 
@@ -1001,6 +991,27 @@ workspaces.post('/', async c => {
 })
 
 workspaces.get('/discover', async c => c.json(await discoverWorkspaces()))
+
+// Home-card previews for every workspace in one request, keyed by id, so the
+// home page fetches them beside the list instead of one per card after it.
+workspaces.get('/previews', async c => {
+  const entries = await listWorkspaces()
+  const previews = await Promise.all(
+    entries.map(async ws => {
+      const views = await listCompiledViews(ws.path).catch(() => [])
+      const preview = await getWorkspacePreview(ws.path, {
+        getProviderPreview: includeFirstUserMessage =>
+          harnessFor(ws).workspacePreview(ws, includeFirstUserMessage),
+        viewIds: views.map(view => view.id),
+        // Capture time in base36 keeps the versioned segment short and URL-safe.
+        thumbnailUrl: (kind, id, capturedAt) =>
+          `/api/workspaces/${ws.id}/applet-thumbnails/${kind}/${id}:${Date.parse(capturedAt).toString(36)}`
+      })
+      return [ws.id, preview] as const
+    })
+  )
+  return c.json(Object.fromEntries(previews))
+})
 
 // Backends the create dialog can provision from scratch. OpenClaw workspaces
 // belong to their agents and arrive via discovery.

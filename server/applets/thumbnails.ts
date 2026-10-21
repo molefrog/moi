@@ -162,21 +162,24 @@ export function pruneAppletThumbnails(
 // Records that actually have an image on disk, for the home-card preview.
 export async function getCapturedThumbnails(
   workspacePath: string
-): Promise<{ kind: AppletKind; id: string; viewedAt: string }[]> {
+): Promise<{ kind: AppletKind; id: string; capturedAt: string; viewedAt: string }[]> {
   const records = await loadIndex(getThumbnailsDir(workspacePath))
   return records
     .filter(record => record.file !== undefined)
-    .map(({ kind, id, viewedAt }) => ({ kind, id, viewedAt }))
+    .map(({ kind, id, capturedAt, viewedAt }) => ({ kind, id, capturedAt, viewedAt }))
 }
 
 // One thumbnail image. Same caching story as applet bundles: strong ETag from
 // size+mtime with `private, no-cache`, so an unchanged file costs a bodyless
-// 304 and a re-capture busts every consumer on the next revalidation.
+// 304 and a re-capture busts every consumer on the next revalidation. A
+// `versioned` URL (the home preview's `<id>:<version>`) changes with every
+// capture instead, so the browser keeps it without revalidating.
 export async function serveAppletThumbnail(
   workspacePath: string,
   kind: AppletKind,
   id: string,
-  ifNoneMatch?: string | null
+  ifNoneMatch?: string | null,
+  versioned = false
 ): Promise<Response> {
   if (!isValidAppletId(id)) return new Response('Invalid id', { status: 400 })
   const dir = getThumbnailsDir(workspacePath)
@@ -189,7 +192,7 @@ export async function serveAppletThumbnail(
   const etag = `"${file.size}-${Math.trunc(file.lastModified)}"`
   const headers = {
     ETag: etag,
-    'Cache-Control': 'private, no-cache',
+    'Cache-Control': versioned ? 'private, max-age=604800, immutable' : 'private, no-cache',
     'Content-Type': MIME_BY_EXT[record.file.split('.').pop() ?? ''] ?? 'application/octet-stream'
   }
   if (ifNoneMatch === etag) return new Response(null, { status: 304, headers })

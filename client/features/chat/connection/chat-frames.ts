@@ -99,7 +99,7 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
     if (!cachedSession) {
       queryClient?.invalidateQueries({ queryKey: sessionsKey })
     }
-    queryClient?.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })
+    queryClient?.invalidateQueries({ queryKey: workspaceKeys.previews })
     return
   }
   if (data.type === 'sessions_changed' || data.type === 'session_archived') {
@@ -108,7 +108,7 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
       applyArchivedSession(queryClient, workspaceId, data.sessionId)
     const sessionsKey = workspaceKeys.sessions(workspaceId)
     queryClient?.invalidateQueries({ queryKey: sessionsKey })
-    queryClient?.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })
+    queryClient?.invalidateQueries({ queryKey: workspaceKeys.previews })
     if (typeof data.sessionId === 'string')
       queryClient?.invalidateQueries({
         queryKey: workspaceKeys.session(workspaceId, data.sessionId)

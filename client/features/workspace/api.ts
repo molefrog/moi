@@ -136,7 +136,7 @@ export function useSaveLayout(workspaceId: string) {
         'Failed to save layout'
       ),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.previews })
     }
   })
 }
