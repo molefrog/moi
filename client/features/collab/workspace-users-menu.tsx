@@ -16,8 +16,8 @@ import { cn } from '@/client/lib/cn'
 import type { WorkspaceTabId } from '@/lib/types'
 import { tabFromPath } from '@/lib/workspace-tabs'
 
-import { User } from './components/user'
-import { UserAvatarGroup } from './components/user-avatar-group'
+import { UserContainer } from './components/user'
+import { UserAvatarGroupContainer as UserAvatarGroup } from './components/user-avatar-group'
 import { pageFromPath, useCollabEnabled, useCollabEngine } from './provider'
 import { useConnectionState, useWorkspaceUsers } from './hooks'
 import { summarizeWorkspaceUsers } from './users'
@@ -153,7 +153,7 @@ function UserRow({ user, page, describeTab, onOpenTab }: UserRowProps) {
         : labels || 'Another tab'
   const Icon = user.status === 'offline' ? undefined : tabs[0]?.info?.Icon
   const content = (
-    <User
+    <UserContainer
       id={user.profile.id}
       className="flex-1"
       size="sm"

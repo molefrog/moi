@@ -1,17 +1,24 @@
-import type { CursorsProps } from 'moi/collab'
+import type { CursorsProps as CursorsContainerProps } from 'moi/collab'
+import type { UserProfile } from '@/lib/collab/types'
 import type { JsonValue } from 'moi'
 import { useLayoutEffect, useRef } from 'react'
-import type { PointerEvent, Ref, RefObject } from 'react'
+import type { PointerEvent, ReactNode, Ref, RefObject } from 'react'
 import { IconPointer2 } from '@tabler/icons-react'
 
 import { cn } from '@/client/lib/cn'
 import { Badge } from '@/ui-components/badge'
 
-import { presenceChannels, usePresenceChannel, usePresencePublisher, useUser } from '../hooks'
-import { userDisplayName } from '../users'
+import { presenceChannels, usePresenceChannel, usePresencePublisher, useUsers } from '../hooks'
+import { userDisplayName } from '@/client/lib/user-display-name'
 import { hasPresence } from './presence-helpers'
 
-type PointerPosition = { x: number; y: number; target?: string; targetX?: number; targetY?: number }
+export type PointerPosition = {
+  x: number
+  y: number
+  target?: string
+  targetX?: number
+  targetY?: number
+}
 function pointerPosition(value: JsonValue): PointerPosition | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   if (typeof value.x !== 'number' || typeof value.y !== 'number') return null
@@ -29,7 +36,46 @@ function pointerPosition(value: JsonValue): PointerPosition | null {
   }
 }
 
-export function Cursors({ id = 'default', children, className }: CursorsProps) {
+export function CursorsContainer({ id = 'default', ...props }: CursorsContainerProps) {
+  const channel = presenceChannels.cursor(id)
+  const cursors = usePresenceChannel<JsonValue>(channel)
+  const publish = usePresencePublisher<JsonValue>(channel, null, hasPresence)
+  const byConnection = new Map<string, { id: string; point: PointerPosition }>()
+  for (const { connectionId, userId, value } of cursors) {
+    const point = pointerPosition(value)
+    if (point) byConnection.set(connectionId, { id: userId, point })
+  }
+  const entries = [...byConnection]
+  const profiles = useUsers(entries.map(([, cursor]) => cursor.id))
+  return (
+    <Cursors
+      {...props}
+      id={id}
+      onPositionChange={publish}
+      cursors={entries.map(([connectionId, { point }], index) => ({
+        connectionId,
+        point,
+        profile: profiles[index]
+      }))}
+    />
+  )
+}
+
+export type CursorsProps = {
+  id?: string
+  children: ReactNode
+  className?: string
+  cursors: readonly { connectionId: string; point: PointerPosition; profile?: UserProfile }[]
+  onPositionChange?: (point: PointerPosition | null) => void
+}
+
+export function Cursors({
+  id = 'default',
+  children,
+  className,
+  cursors,
+  onPositionChange
+}: CursorsProps) {
   const root = useRef<HTMLDivElement>(null)
   const layer = useRef<HTMLDivElement>(null)
   // Keep the overlay in the visible viewport when the cursor area itself scrolls.
@@ -44,14 +90,6 @@ export function Cursors({ id = 'default', children, className }: CursorsProps) {
     element.addEventListener('scroll', position)
     return () => element.removeEventListener('scroll', position)
   }, [])
-  const channel = presenceChannels.cursor(id)
-  const cursors = usePresenceChannel<JsonValue>(channel)
-  const publish = usePresencePublisher<JsonValue>(channel, null, hasPresence)
-  const byConnection = new Map<string, { id: string; point: PointerPosition }>()
-  for (const { connectionId, userId, value } of cursors) {
-    const point = pointerPosition(value)
-    if (point) byConnection.set(connectionId, { id: userId, point })
-  }
   const move = (event: PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'touch') return
     const element = root.current
@@ -68,7 +106,7 @@ export function Cursors({ id = 'default', children, className }: CursorsProps) {
         : null
     const anchor = target && element.contains(target) ? target : null
     const rect = anchor?.getBoundingClientRect()
-    publish({
+    onPositionChange?.({
       x: event.clientX - bounds.left - element.clientLeft + element.scrollLeft,
       y: event.clientY - bounds.top - element.clientTop + element.scrollTop,
       ...(anchor && rect
@@ -92,7 +130,7 @@ export function Cursors({ id = 'default', children, className }: CursorsProps) {
           event.target instanceof Element &&
           event.target.closest('[data-collab-cursors]') === event.currentTarget
         )
-          publish(null)
+          onPositionChange?.(null)
       }}
     >
       {children}
@@ -101,8 +139,8 @@ export function Cursors({ id = 'default', children, className }: CursorsProps) {
         className="pointer-events-none absolute inset-0 overflow-hidden"
         aria-hidden="true"
       >
-        {[...byConnection].map(([connectionId, { id, point }]) => (
-          <RemoteCursor key={connectionId} root={root} point={point} id={id} />
+        {cursors.map(({ connectionId, point, profile }) => (
+          <RemoteCursor key={connectionId} root={root} point={point} profile={profile} />
         ))}
       </div>
     </div>
@@ -112,11 +150,11 @@ export function Cursors({ id = 'default', children, className }: CursorsProps) {
 type RemoteCursorProps = {
   root: RefObject<HTMLDivElement | null>
   point: PointerPosition
-  id: string
+  profile?: UserProfile
 }
 // Semantic anchors follow their own data through scrolling and reordering.
 // A cursor on a different record's modal has no matching anchor and stays hidden.
-function RemoteCursor({ root, point, id }: RemoteCursorProps) {
+function RemoteCursor({ root, point, profile }: RemoteCursorProps) {
   const marker = useRef<HTMLSpanElement>(null)
   useLayoutEffect(() => {
     const element = root.current
@@ -166,15 +204,14 @@ function RemoteCursor({ root, point, id }: RemoteCursorProps) {
       window.removeEventListener('resize', reposition)
     }
   }, [root, point])
-  return <Cursor ref={marker} id={id} />
+  return <Cursor ref={marker} profile={profile} />
 }
 
 type CursorProps = {
-  id: string
+  profile?: UserProfile
   ref?: Ref<HTMLSpanElement>
 }
-function Cursor({ id, ref }: CursorProps) {
-  const user = useUser(id)
+function Cursor({ profile: user, ref }: CursorProps) {
   return (
     <span
       ref={ref}

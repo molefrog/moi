@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test'
 import type { JsonValue } from 'moi'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-import { Cursors } from './cursors'
+import { CursorsContainer as Cursors, Cursors as PlainCursors } from './cursors'
 import { presenceChannels } from '../hooks'
 import { createRoom, namelessUsers, renderCollab } from '../testing/component-fixtures'
 
@@ -45,4 +45,22 @@ test('remote cursors ignore invalid coordinates and presence for another area', 
     expect(html.includes('>Ada<')).toBe(visible)
     expect(html).toContain('Board')
   }
+})
+
+test('cursors render supplied positions and profiles without a collaboration provider', () => {
+  const html = renderToStaticMarkup(
+    <PlainCursors
+      cursors={[
+        {
+          connectionId: 'peer-tab',
+          profile: { id: 'ada', name: 'Ada', color: 'cyan' },
+          point: { x: 10, y: 20 }
+        }
+      ]}
+    >
+      Board
+    </PlainCursors>
+  )
+  expect(html).toContain('>Ada<')
+  expect(html).toContain('Board')
 })

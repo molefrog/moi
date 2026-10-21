@@ -13,11 +13,6 @@ export type UsersSource = {
   users: readonly UserProfile[]
 }
 
-// Presentation only: keep the supplied profile unchanged in applet APIs.
-export function userDisplayName(user: UserProfile): string {
-  return user.name?.trim() || user.email?.trim() || user.id
-}
-
 export function userStatus(connections: readonly Connection[], id: string): UserStatus {
   const userConnections = connections.filter(connection => connection.userId === id)
   return userConnections.some(connection => connection.location?.status === 'active')
