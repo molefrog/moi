@@ -552,7 +552,7 @@ export type WorkspaceEntry = {
 export type DiscoveredWorkspace = {
   path: string
   displayPath?: string
-  // Deduplicated in canonical provider order by the discovery API.
+  // Deduplicated in canonical provider order; empty for folders without agent history.
   types: WorkspaceType[]
 }
 

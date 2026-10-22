@@ -6,9 +6,10 @@ import { join } from 'path'
 
 import {
   assertWorkspaceIdAvailable,
+  discoverWorkspaceFolders,
   findWorkspaceForPath,
   getWorkspace,
-  groupDiscoveredWorkspaces,
+  mergeWorkspaceCandidates,
   liftToWorkspaceRoot,
   listWorkspaces,
   registerWorkspace,
@@ -174,7 +175,7 @@ describe('registerWorkspace with a chosen id', () => {
 describe('workspace discovery grouping', () => {
   test('groups providers by normalized path in display order', () => {
     const path = '/Users/foo/project'
-    const grouped = groupDiscoveredWorkspaces([
+    const grouped = mergeWorkspaceCandidates([
       { path, type: 'openclaw' },
       { path: '/Users/foo/project/../project', type: 'codex' },
       { path, type: 'claude-code' },
@@ -190,12 +191,61 @@ describe('workspace discovery grouping', () => {
   })
 
   test('filters registered paths after normalization', () => {
-    const grouped = groupDiscoveredWorkspaces(
+    const grouped = mergeWorkspaceCandidates(
       [{ path: '/Users/foo/project/../project', type: 'codex' }],
       new Set(['/Users/foo/project'])
     )
 
     expect(grouped).toEqual([])
+  })
+})
+
+describe('discoverWorkspaceFolders', () => {
+  test('finds immediate workspace folders without requiring chat history', async () => {
+    const workspace = join(tmpDir, 'firma')
+    await mkdir(join(workspace, '.moi'), { recursive: true })
+    await mkdir(join(tmpDir, 'plain'), { recursive: true })
+    await mkdir(join(tmpDir, 'nested', 'project', '.moi'), { recursive: true })
+    await mkdir(join(tmpDir, 'invalid'), { recursive: true })
+    await Bun.write(join(tmpDir, 'invalid', '.moi'), 'not a directory')
+    await Bun.write(join(tmpDir, 'file'), 'not a workspace')
+
+    expect(await discoverWorkspaceFolders(tmpDir)).toEqual([{ path: workspace }])
+  })
+
+  test('merges folder and history discoveries and excludes registered workspaces', async () => {
+    const workspace = join(tmpDir, 'firma')
+    const withoutHistory = join(tmpDir, 'fresh')
+    await mkdir(join(workspace, '.moi'), { recursive: true })
+    await mkdir(join(withoutHistory, '.moi'), { recursive: true })
+    const folders = await discoverWorkspaceFolders(tmpDir)
+    const history = [{ path: workspace, type: 'codex' as const }]
+
+    expect(mergeWorkspaceCandidates([...history, ...folders])).toEqual([
+      { path: workspace, types: ['codex'] },
+      { path: withoutHistory, types: [] }
+    ])
+    expect(mergeWorkspaceCandidates([...history, ...folders], new Set([workspace]))).toEqual([
+      { path: withoutHistory, types: [] }
+    ])
+  })
+
+  test('supports linked workspace folders and skips broken links', async () => {
+    const root = join(tmpDir, 'workspaces')
+    const target = join(tmpDir, 'project')
+    await mkdir(root)
+    await mkdir(join(target, '.moi'), { recursive: true })
+    await symlink(target, join(root, 'linked'), 'dir')
+    await symlink(join(tmpDir, 'missing'), join(root, 'broken'), 'dir')
+
+    expect(await discoverWorkspaceFolders(root)).toEqual([{ path: join(root, 'linked') }])
+  })
+
+  test('returns no folders when the workspace root is missing or not a directory', async () => {
+    expect(await discoverWorkspaceFolders(join(tmpDir, 'missing'))).toEqual([])
+    const file = join(tmpDir, 'file')
+    await Bun.write(file, '')
+    expect(await discoverWorkspaceFolders(file)).toEqual([])
   })
 })
 

@@ -1,5 +1,5 @@
 import { existsSync, realpathSync } from 'node:fs'
-import { rename, rm } from 'node:fs/promises'
+import { readdir, rename, rm, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'path'
 
@@ -10,6 +10,7 @@ import { orderWorkspaceTypes } from '@/lib/workspace-types'
 import { DATA_DIR } from '../data-dir'
 import { allHarnesses } from '../harness/registry'
 import type { DiscoveredWorkspaceCandidate } from '../harness/types'
+import { createdWorkspacesRoot } from '../app-config'
 
 // Replace the home-dir prefix with `~` for display. Keeps the original
 // absolute path in place; callers should put the result in `displayPath`.
@@ -216,7 +217,7 @@ export function liftToWorkspaceRoot(p: string): string {
   return segments.slice(0, i).join(sep) || sep
 }
 
-async function collectDiscoveredWorkspaces(
+async function discoverHarnessWorkspaces(
   registeredPaths: Set<string>
 ): Promise<DiscoveredWorkspaceCandidate[]> {
   const perHarness = await Promise.all(
@@ -227,8 +228,25 @@ async function collectDiscoveredWorkspaces(
   return perHarness.flat()
 }
 
-export function groupDiscoveredWorkspaces(
-  candidates: DiscoveredWorkspaceCandidate[],
+// Only inspect immediate children of the workspace root, never the whole disk.
+export async function discoverWorkspaceFolders(
+  root = createdWorkspacesRoot()
+): Promise<{ path: string }[]> {
+  const entries = await readdir(root, { withFileTypes: true }).catch(() => [])
+  const candidates = await Promise.all(
+    entries
+      .filter(entry => entry.isDirectory() || entry.isSymbolicLink())
+      .map(async entry => {
+        const path = resolve(root, entry.name)
+        const moi = await stat(join(path, '.moi')).catch(() => undefined)
+        return moi?.isDirectory() ? { path } : undefined
+      })
+  )
+  return candidates.filter(candidate => candidate !== undefined)
+}
+
+export function mergeWorkspaceCandidates(
+  candidates: { path: string; type?: WorkspaceType }[],
   registeredPaths: Set<string> = new Set()
 ): DiscoveredWorkspace[] {
   const normalizedRegisteredPaths = new Set([...registeredPaths].map(path => resolve(path)))
@@ -238,7 +256,7 @@ export function groupDiscoveredWorkspaces(
     const path = resolve(candidate.path)
     if (normalizedRegisteredPaths.has(path)) continue
     const types = byPath.get(path) ?? new Set<WorkspaceType>()
-    types.add(candidate.type)
+    if (candidate.type) types.add(candidate.type)
     byPath.set(path, types)
   }
 
@@ -248,10 +266,14 @@ export function groupDiscoveredWorkspaces(
   }))
 }
 
-// Ask every harness for workspaces it knows about that aren't registered yet,
-// then combine providers that claim the same normalized folder.
+// Combine agent history with Moi folders that may not have any chats yet.
 export async function discoverWorkspaces(): Promise<DiscoveredWorkspace[]> {
   const registeredPaths = new Set((await readRegistry()).map(e => e.path))
-  const found = await collectDiscoveredWorkspaces(registeredPaths)
-  return groupDiscoveredWorkspaces(found, registeredPaths).map(withDisplayPath)
+  const [harnessWorkspaces, workspaceFolders] = await Promise.all([
+    discoverHarnessWorkspaces(registeredPaths),
+    discoverWorkspaceFolders()
+  ])
+  return mergeWorkspaceCandidates([...harnessWorkspaces, ...workspaceFolders], registeredPaths).map(
+    withDisplayPath
+  )
 }

@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { isAbsolute, join } from 'path'
 
 import type { AppEnvironment, ClientAppConfig, ExperimentalFeatures } from '@/lib/types'
@@ -252,6 +253,12 @@ export function initializeAppConfig(experimental: Partial<ExperimentalFeatures> 
 export function getAppConfig(): AppConfig {
   _config ??= loadAppConfig()
   return _config
+}
+
+// Folder for workspaces created from the UI. Managed machines override it
+// with workspacesDir in config.json.
+export function createdWorkspacesRoot(): string {
+  return getAppConfig().workspacesDir ?? join(homedir(), 'moi')
 }
 
 // Test seam: drop the cached config so the next getAppConfig() re-resolves

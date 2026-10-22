@@ -4,13 +4,11 @@
 // create) all provision through here, so a workspace set up from the UI is
 // indistinguishable from one set up via the CLI.
 import { mkdir } from 'node:fs/promises'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 import type { WorkspaceType } from '@/lib/types'
 export { validateWorkspaceFolderName } from '@/lib/workspace-name'
 
-import { getAppConfig } from '../app-config'
 import { harnessFor } from '../harness/registry'
 import { createDependencyInstallLogPath, scaffoldMoiDir } from './scaffold'
 import { installBundledSkills } from '../skills/template'
@@ -21,14 +19,6 @@ import { installBundledSkills } from '../skills/template'
 // Claude Code.
 export function skillsDirFor(workspaceRoot: string, type?: WorkspaceType): string {
   return harnessFor(type).skillsDir?.(workspaceRoot) ?? join(workspaceRoot, '.claude', 'skills')
-}
-
-// Folder that holds workspaces created from the UI (`/workspace/create`) — a
-// visible home-dir folder, mirroring how Cowork keeps its session folders under
-// the user's home rather than an app-data dir. Managed machines set their own
-// (`workspacesDir` in config.json).
-export function createdWorkspacesRoot(): string {
-  return getAppConfig().workspacesDir ?? join(homedir(), 'moi')
 }
 
 export type ProvisionResult = {

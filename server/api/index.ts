@@ -26,7 +26,7 @@ import { proxyUserState } from '../collab/cloudflare-access'
 import { collabManager } from '../collab/manager'
 import { harnessStore } from '../harness/auth'
 import { harnesses } from './harnesses'
-import { clientAppConfig, getAppConfig } from '../app-config'
+import { clientAppConfig, createdWorkspacesRoot, getAppConfig } from '../app-config'
 import { getAppSettings, pickAppSettingsPatch, saveAppSettings } from '../app-settings'
 import { appletForModule, recordAppletError } from '../applets/log'
 import { apiBaseFor, parseAppletTail, serveWorkspaceFile } from '../applets'
@@ -94,11 +94,7 @@ import {
 import { submitView, ViewStartupError } from '../sessions/view-sessions'
 import { listWidgets, serveWidget } from '../applets/widgets'
 import { getWorkspaceConfig, setWorkspaceConfig } from '../workspaces/config'
-import {
-  createdWorkspacesRoot,
-  provisionWorkspace,
-  validateWorkspaceFolderName
-} from '../workspaces/init'
+import { provisionWorkspace, validateWorkspaceFolderName } from '../workspaces/init'
 import { resolveWorkspaceImportMetadata } from '../workspaces/import'
 import type { WorkspaceImportMetadata } from '../workspaces/import'
 import { getWorkspaceEnvView, parseEnvUpdate, updateWorkspaceEnv } from '../workspaces/env'
