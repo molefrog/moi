@@ -21,7 +21,7 @@ import { STREAM_RESPONSES } from '@/client/lib/flags'
 import { formatChatTitle } from '@/lib/chat-title'
 import { applyEvent, emptyViewState } from '@/lib/format'
 import { messageAttachmentLimitError } from '@/lib/message-attachments'
-import type { Part, SessionInfo, ViewState, WorkspaceAgent } from '@/lib/types'
+import type { Part, SessionInfo, SessionRecord, ViewState, WorkspaceAgent } from '@/lib/types'
 
 // Explicit attachments belong to this send, independently of the user's draft.
 export type PreparedAttachments = {
@@ -179,6 +179,15 @@ export function startOptimisticSession({
   text,
   filenames = []
 }: StartOptimisticSessionInput): void {
+  // The chat renders only once its record loads. A brand-new session has no
+  // server record yet, so seed the empty one the server would return; otherwise
+  // the optimistic turn stays hidden for two round trips (temp id, then the
+  // harness's renamed id) and the chat looks blank on a slow connection.
+  const recordKey = workspaceKeys.session(workspaceId, sessionId)
+  if (queryClient.getQueryData(recordKey) === undefined)
+    queryClient.setQueryData<SessionRecord>(recordKey, {
+      ...(tabId && tabId !== 'overview' ? { tabId } : {})
+    })
   const summary = formatChatTitle(text, filenames)
   if (!summary) return
   queryClient.setQueryData<SessionInfo[]>(workspaceKeys.sessions(workspaceId), current => [
