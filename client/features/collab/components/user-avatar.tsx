@@ -3,6 +3,7 @@ import type { UserProfile } from '@/lib/collab/types'
 import { IconUser } from '@tabler/icons-react'
 import { Blobatar } from '@blobatar/react'
 import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from '@/ui-components/avatar'
+import { cn } from '@/client/lib/cn'
 import { userDisplayName } from '@/client/lib/user-display-name'
 import { useUser } from '../hooks'
 
@@ -43,16 +44,17 @@ export function UserAvatar({
       size={size}
       aria-label={name}
       data-collab-color={user?.color ?? 'unknown'}
-      className={className}
+      className={cn('after:border-0', className)}
     >
       {user?.avatar && <AvatarImage src={user.avatar} alt="" />}
       <AvatarFallback>
         {user ? (
           <Blobatar
+            className="scale-125"
             name={user.id}
             animate="hover"
             background="circle"
-            traits={{ shape: 0, 'body.r': 1 }}
+            traits={{ 'eye.rx': 1 }}
             palette={{
               bg: 'var(--collab)',
               head: 'var(--collab)',

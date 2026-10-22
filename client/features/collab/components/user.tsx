@@ -39,7 +39,7 @@ export function User({
   const name = user ? userDisplayName(user) : 'Unknown user'
 
   return (
-    <span className={cn('inline-flex min-w-0 items-center gap-2', className)}>
+    <span className={cn('flex min-w-0 items-center gap-2', className)}>
       <UserAvatar profile={user} size={size} active={active} />
       <span
         className={cn('flex min-w-0 flex-1 text-sm', size === 'xs' ? 'items-baseline' : 'flex-col')}

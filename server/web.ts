@@ -157,6 +157,7 @@ export const app = Bun.serve<WsData>({
       ? new Response('Not found', { status: 404 })
       : devSandbox,
     '/workspace/*': shell,
+    '/settings': shell,
 
     // Chat websocket — app-wide (one per client, not per workspace). Each chat
     // frame carries its own workspaceId.

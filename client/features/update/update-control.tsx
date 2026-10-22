@@ -83,7 +83,7 @@ export function UpdateButton({ busy, blocked, label, errorMessage, onClick }: Up
           <div>
             <Button
               type="button"
-              size="icon"
+              size="icon-sm"
               variant={busy ? 'ghost' : 'default'}
               aria-label={label}
               disabled={blocked || busy}

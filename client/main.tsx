@@ -6,6 +6,7 @@ import { Toaster } from '@/client/components/ui/toast'
 import { TooltipProvider } from '@/client/components/ui/tooltip'
 import { installAppletErrorHook } from '@/client/features/applets/applet-log'
 import { initConnection } from '@/client/features/chat/connection/chat-connection'
+import { AccountProvider } from '@/client/features/account/account-provider'
 import { AppProvider } from './app/app-provider'
 import { AppRouter } from './app/app-router'
 
@@ -27,7 +28,9 @@ export function mount(el: HTMLElement) {
         <AppProvider>
           <TooltipProvider>
             <Router>
-              <AppRouter />
+              <AccountProvider>
+                <AppRouter />
+              </AccountProvider>
             </Router>
             <Toaster />
           </TooltipProvider>
