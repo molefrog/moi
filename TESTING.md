@@ -1,5 +1,6 @@
 # Testing
 
+- Name tests `*.test.ts` or `*.test.tsx`, without extra `.dom` or `.render` suffixes.
 - Add a test when you can name a plausible regression worth catching. Check existing coverage first and extend it where useful. Copy, styling, and straightforward re-export changes usually need only existing checks and visual review where relevant.
 - Assert observable results. Avoid freezing CSS classes, decorative markup, entire paragraphs, or configuration catalogs. Exact values are useful when they define a required contract, such as accessible names, wire formats, or generated CSS scoping.
 - Choose expected results independently of the implementation. Copying its logic, calling the same helper to calculate the expectation, or checking a mock's own setup can leave a broken feature passing.
