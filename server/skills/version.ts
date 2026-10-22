@@ -1,14 +1,14 @@
 // Skill versioning for a workspace's installed skill copy drifting behind the
 // version this moi installation ships. The marker in each skill's `SKILL.md`
 // drives both the CLI status and the frontend's automatic update check.
-import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import type { WorkspaceSkillStatus, WorkspaceType } from '@/lib/types'
 
 import { findWorkspaceForPath, liftToWorkspaceRoot, listWorkspaces } from '../workspaces/registry'
 import { BUNDLED_SKILLS_DIR } from './template'
-import { skillsDirFor } from '../workspaces/init'
+import { displaySkillPath, resolveSkillLocations } from './locations'
+import type { SkillLocation } from './locations'
 
 // The version is stamped as a self-contained marker in SKILL.md, e.g.
 // `<moi-skill version="0.1.0" />`, rather than in YAML frontmatter. SKILL.md
@@ -71,30 +71,23 @@ export const isMinorBehind = (installed: string | null, bundled: string | null):
 export const isBehind = (installed: string | null, bundled: string | null): boolean =>
   compare(installed, bundled).behind
 
-// Skills shipped with this CLI — directory names under the bundled skills dir.
-export async function bundledSkillNames(): Promise<string[]> {
-  try {
-    const entries = await readdir(BUNDLED_SKILLS_DIR, { withFileTypes: true })
-    return entries.filter(e => e.isDirectory()).map(e => e.name)
-  } catch {
-    return []
-  }
-}
-
-// Per-skill installed-vs-bundled versions for a workspace root. `type` picks
-// the installed-skills location (OpenClaw keeps them in `skills/`, not
-// `.claude/skills/`) — pass the registry entry's type when known.
+// Report every installed copy, plus the required primary harness destination.
 export async function skillStatuses(
   workspaceRoot: string,
   type?: WorkspaceType
 ): Promise<WorkspaceSkillStatus[]> {
-  const names = await bundledSkillNames()
-  const skillsDir = skillsDirFor(workspaceRoot, type)
+  return skillStatusesForLocations(await resolveSkillLocations(workspaceRoot, type))
+}
+
+export async function skillStatusesForLocations(
+  locations: SkillLocation[]
+): Promise<WorkspaceSkillStatus[]> {
   return Promise.all(
-    names.map(async name => ({
+    locations.map(async ({ name, path, brokenLink }) => ({
       name,
+      path,
       bundled: await readSkillVersion(join(BUNDLED_SKILLS_DIR, name, 'SKILL.md')),
-      installed: await readSkillVersion(join(skillsDir, name, 'SKILL.md'))
+      installed: brokenLink ? null : await readSkillVersion(join(path, 'SKILL.md'))
     }))
   )
 }
@@ -126,7 +119,9 @@ export async function staleSkillNotice(cwd: string): Promise<string | null> {
       isMinorBehind(s.installed, s.bundled)
     )
     if (stale.length === 0) return null
-    const parts = stale.map(s => `${s.name} (${s.installed ?? 'none'} → ${s.bundled})`)
+    const parts = stale.map(
+      s => `${displaySkillPath(root, s.path)} (${s.installed ?? 'none'} → ${s.bundled})`
+    )
     return `⚠ Moi skill outdated: ${parts.join(', ')} — run \`moi skill update\` to refresh.`
   } catch {
     return null

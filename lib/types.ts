@@ -474,6 +474,7 @@ export type WorkspaceType = 'claude-code' | 'openclaw' | 'codex' | 'hermes'
 
 export type WorkspaceSkillStatus = {
   name: string
+  path: string
   installed: string | null
   bundled: string | null
 }
