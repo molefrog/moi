@@ -1,5 +1,16 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { exists, mkdir, mkdtemp, rm } from 'node:fs/promises'
+import {
+  chmod,
+  exists,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readlink,
+  rm,
+  stat,
+  symlink,
+  utimes
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -38,12 +49,19 @@ async function writeInstalledVersion(
 
 describe('workspace skill update service', () => {
   test('reports patch-only bundled versions as available updates', () => {
-    const skills = [{ name: 'moi-workspace', installed: '0.17.0', bundled: '0.17.1' }]
+    const skills = [
+      {
+        name: 'moi-workspace',
+        path: '/workspace/skills/moi-workspace',
+        installed: '0.17.0',
+        bundled: '0.17.1'
+      }
+    ]
 
     expect(summarizeSkillStatuses(skills)).toEqual({ skills, updateAvailable: true })
   })
 
-  for (const type of ['claude-code', 'codex', 'openclaw'] as const) {
+  for (const type of ['claude-code', 'codex', 'openclaw', 'hermes'] as const) {
     test(`reads ${type} skills from the agent-specific directory`, async () => {
       tempRoot = await mkdtemp(join(tmpdir(), `moi-skill-status-${type}-`))
       await writeInstalledVersion(tempRoot, type, '0.7.1')
@@ -53,9 +71,168 @@ describe('workspace skill update service', () => {
       expect(status.updateAvailable).toBe(true)
       expect(status.skills).toContainEqual({
         name: 'moi-workspace',
+        path: join(skillsDirFor(tempRoot, type), 'moi-workspace'),
         installed: '0.7.1',
         bundled: await readSkillVersion(join(BUNDLED_SKILLS_DIR, 'moi-workspace', 'SKILL.md'))
       })
+    })
+  }
+
+  for (const primary of ['claude-code', 'codex', undefined] as const) {
+    for (const stale of ['claude-code', 'codex'] as const) {
+      test(`updates a stale ${stale} copy with ${primary ?? 'unregistered'} primary`, async () => {
+        tempRoot = await mkdtemp(join(tmpdir(), 'moi-skill-copies-'))
+        for (const type of ['claude-code', 'codex'] as const) {
+          await installBundledSkills(skillsDirFor(tempRoot, type))
+        }
+        await writeInstalledVersion(tempRoot, stale, '0.13.0')
+        const stalePath = join(skillsDirFor(tempRoot, stale), 'moi-workspace')
+        await rm(join(stalePath, 'references', 'INTENTS.md'))
+        await rm(join(stalePath, 'references', 'UI-COMPONENTS.md'))
+        await Bun.write(join(stalePath, 'local.md'), 'keep this')
+        await Bun.write(join(stalePath, 'references', 'COLLAB.md'), 'opted in')
+
+        const before = await getWorkspaceSkillsStatus(tempRoot, primary)
+        expect(before.updateAvailable).toBe(true)
+        expect(before.skills).toHaveLength(2)
+        expect(before.skills.find(skill => skill.path === stalePath)?.installed).toBe('0.13.0')
+
+        const result = await updateWorkspaceSkills(tempRoot, primary)
+        expect(result.changedSkills).toEqual(['moi-workspace'])
+        expect(result.changedSkillPaths).toEqual([stalePath])
+        expect(result.status.updateAvailable).toBe(false)
+        for (const skill of result.status.skills) expect(skill.installed).toBe(skill.bundled)
+        for (const reference of ['INTENTS.md', 'UI-COMPONENTS.md']) {
+          expect(await Bun.file(join(stalePath, 'references', reference)).text()).toBe(
+            await Bun.file(
+              join(BUNDLED_SKILLS_DIR, 'moi-workspace', 'references', reference)
+            ).text()
+          )
+        }
+        expect(await Bun.file(join(stalePath, 'local.md')).text()).toBe('keep this')
+        expect(await Bun.file(join(stalePath, 'references', 'COLLAB.md')).text()).toBe('opted in')
+      })
+    }
+  }
+
+  for (const primary of ['claude-code', 'codex'] as const) {
+    test(`restores missing ${primary} primary without installing absent secondary skills`, async () => {
+      tempRoot = await mkdtemp(join(tmpdir(), 'moi-skill-missing-'))
+      const otherDirectory = primary === 'codex' ? '.claude' : '.agents'
+      const otherSkills = join(tempRoot, otherDirectory, 'skills')
+      await Bun.write(join(otherSkills, 'custom', 'SKILL.md'), 'custom')
+      const before = await getWorkspaceSkillsStatus(tempRoot, primary)
+      expect(before.skills).toHaveLength(1)
+      expect(before.skills[0].installed).toBeNull()
+      expect(before.updateAvailable).toBe(true)
+      const result = await updateWorkspaceSkills(tempRoot, primary)
+      expect(result.status.updateAvailable).toBe(false)
+      expect(await exists(join(otherSkills, 'moi-workspace'))).toBe(false)
+      expect(await Bun.file(join(otherSkills, 'custom', 'SKILL.md')).text()).toBe('custom')
+    })
+  }
+
+  test('repairs an existing secondary directory with no version marker', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'moi-skill-no-marker-'))
+    await installBundledSkills(join(tempRoot, '.claude', 'skills'))
+    const secondary = join(tempRoot, '.agents', 'skills', 'moi-workspace')
+    await mkdir(secondary, { recursive: true })
+    const before = await getWorkspaceSkillsStatus(tempRoot)
+    expect(before.skills).toHaveLength(2)
+    expect(before.skills.find(skill => skill.path === secondary)?.installed).toBeNull()
+    expect(before.updateAvailable).toBe(true)
+    expect((await updateWorkspaceSkills(tempRoot)).status.updateAvailable).toBe(false)
+  })
+
+  for (const level of ['skills', 'skill'] as const) {
+    test(`preserves shared ${level} symlinks and leaves a second update untouched`, async () => {
+      tempRoot = await mkdtemp(join(tmpdir(), 'moi-skill-symlink-'))
+      await writeInstalledVersion(tempRoot, 'claude-code', '0.13.0')
+      const claude = join(tempRoot, '.claude', 'skills', 'moi-workspace')
+      const codex = join(tempRoot, '.agents', 'skills', 'moi-workspace')
+      const link = level === 'skills' ? join(tempRoot, '.agents', 'skills') : codex
+      const target = level === 'skills' ? '../.claude/skills' : '../../.claude/skills/moi-workspace'
+      await mkdir(
+        level === 'skills' ? join(tempRoot, '.agents') : join(tempRoot, '.agents', 'skills'),
+        { recursive: true }
+      )
+      await symlink(target, link, 'dir')
+      const result = await updateWorkspaceSkills(tempRoot, 'codex')
+      expect(result.changedSkillPaths.sort()).toEqual([claude, codex].sort())
+      expect(result.status.skills).toHaveLength(2)
+      expect(result.status.updateAvailable).toBe(false)
+      expect(await readlink(link)).toBe(target)
+      const marker = join(claude, 'SKILL.md')
+      const fixedTime = new Date('2000-01-01T00:00:00.000Z')
+      await utimes(marker, fixedTime, fixedTime)
+      const before = (await stat(marker)).mtimeMs
+      const second = await updateWorkspaceSkills(tempRoot, 'codex')
+      expect(second.changedSkills).toEqual([])
+      expect(second.changedSkillPaths).toEqual([])
+      expect((await stat(marker)).mtimeMs).toBe(before)
+      expect((await lstat(link)).isSymbolicLink()).toBe(true)
+    })
+
+    test(`reports a broken ${level} symlink as stale and refuses to replace it`, async () => {
+      tempRoot = await mkdtemp(join(tmpdir(), 'moi-skill-broken-link-'))
+      await installBundledSkills(join(tempRoot, '.claude', 'skills'))
+      const secondary = join(tempRoot, '.agents', 'skills', 'moi-workspace')
+      const link = level === 'skills' ? join(tempRoot, '.agents', 'skills') : secondary
+      await mkdir(
+        level === 'skills' ? join(tempRoot, '.agents') : join(tempRoot, '.agents', 'skills'),
+        { recursive: true }
+      )
+      await symlink('missing-target', link, 'dir')
+      const before = await getWorkspaceSkillsStatus(tempRoot)
+      expect(before.updateAvailable).toBe(true)
+      expect(before.skills.find(skill => skill.path === secondary)?.installed).toBeNull()
+      await expect(updateWorkspaceSkills(tempRoot)).rejects.toThrow(secondary)
+      expect(await readlink(link)).toBe('missing-target')
+      expect((await getWorkspaceSkillsStatus(tempRoot)).updateAvailable).toBe(true)
+    })
+  }
+
+  for (const blocked of ['skill', 'references'] as const) {
+    test.skipIf(process.getuid?.() === 0 || process.platform === 'win32')(
+      `reports ${blocked} write failures with the copy path and keeps its stale status`,
+      async () => {
+        tempRoot = await mkdtemp(join(tmpdir(), 'moi-skill-read-only-'))
+        await writeInstalledVersion(tempRoot, 'claude-code', '0.13.0')
+        await writeInstalledVersion(tempRoot, 'codex', '0.13.0')
+        const secondary = join(tempRoot, '.agents', 'skills', 'moi-workspace')
+        const readOnly = blocked === 'skill' ? secondary : join(secondary, 'references')
+        await mkdir(readOnly, { recursive: true })
+        await chmod(readOnly, 0o555)
+        try {
+          await expect(updateWorkspaceSkills(tempRoot)).rejects.toThrow(secondary)
+          const status = await getWorkspaceSkillsStatus(tempRoot)
+          expect(status.updateAvailable).toBe(true)
+          expect(status.skills.find(skill => skill.path === secondary)?.installed).toBe('0.13.0')
+        } finally {
+          await chmod(readOnly, 0o755)
+        }
+      }
+    )
+  }
+
+  for (const type of ['openclaw', 'hermes'] as const) {
+    test(`updates ${type} primary plus existing Claude and Codex copies`, async () => {
+      tempRoot = await mkdtemp(join(tmpdir(), 'moi-skill-harnesses-'))
+      const workspace = join(tempRoot, 'workspace')
+      for (const harness of [type, 'claude-code', 'codex'] as const) {
+        await writeInstalledVersion(workspace, harness, '0.13.0')
+      }
+      const primaryPath =
+        type === 'hermes'
+          ? join(tempRoot, 'skills', 'moi-workspace')
+          : join(workspace, 'skills', 'moi-workspace')
+      const result = await updateWorkspaceSkills(workspace, type)
+      expect(result.status.skills).toHaveLength(3)
+      expect(result.changedSkillPaths).toContain(primaryPath)
+      expect(result.status.updateAvailable).toBe(false)
+      expect(await readSkillVersion(join(primaryPath, 'SKILL.md'))).toBe(
+        result.status.skills[0].bundled
+      )
     })
   }
 
