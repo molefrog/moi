@@ -1,8 +1,9 @@
-import { afterEach, expect, test } from 'bun:test'
+import { afterEach, expect, spyOn, test } from 'bun:test'
 import { act, useState } from 'react'
 import { parseHTML } from 'linkedom'
 import { QueryClient, QueryClientProvider, notifyManager } from '@tanstack/react-query'
 import { NameField } from './account-settings'
+import { toast } from '@/client/components/ui/toast'
 
 let cleanup = async () => {}
 afterEach(() => cleanup())
@@ -45,6 +46,7 @@ async function mountField(
   }
   notifyManager.setNotifyFunction(callback => act(callback))
   const qc = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
+  const notification = spyOn(toast, 'add')
   await act(async () =>
     root.render(
       <QueryClientProvider client={qc}>
@@ -69,6 +71,7 @@ async function mountField(
   cleanup = async () => {
     await act(async () => root.unmount())
     qc.clear()
+    notification.mockRestore()
     notifyManager.setNotifyFunction(callback => callback())
     for (const [key, descriptor] of descriptors) {
       if (descriptor) Object.defineProperty(globalThis, key, descriptor)
@@ -79,6 +82,7 @@ async function mountField(
     document,
     input,
     saved,
+    notification,
     emit,
     async type(value: string) {
       await act(async () => {
@@ -120,27 +124,37 @@ test('Enter saves and Escape discards without saving', async () => {
   expect(ui.saved).toEqual(['Grace'])
 })
 
-test('empty names are rejected and a failed save retains the draft for retry', async () => {
+test('empty names restore the saved value without an error', async () => {
+  const ui = await mountField()
+  await ui.type('   ')
+  await ui.emit('focusout')
+  expect(ui.saved).toEqual([])
+  expect(ui.input.value).toBe('Alex')
+  expect(ui.document.querySelector('[role="alert"]')).toBeNull()
+  expect(ui.document.querySelector('button')).toBeNull()
+  expect(ui.notification).not.toHaveBeenCalled()
+})
+
+test('a failed save shows a toast and keeps the draft to retry on blur', async () => {
   let fail = true
   const ui = await mountField(async name => {
     if (fail) throw new Error('Connection lost')
     return name
   })
-  await ui.type('   ')
-  await ui.emit('focusout')
-  expect(ui.saved).toEqual([])
-  expect(ui.document.querySelector('[role="alert"]')?.textContent).toContain('Enter a name')
   await ui.type('Ada')
   await ui.emit('focusout')
   expect(ui.input.value).toBe('Ada')
-  expect(ui.document.querySelector('[role="alert"]')?.textContent).toBe('Connection lost')
-  fail = false
-  await act(async () => {
-    ui.document.querySelector('button')!.click()
-    await new Promise(resolve => setTimeout(resolve, 5))
+  expect(ui.notification).toHaveBeenCalledWith({
+    title: 'Couldn’t save name',
+    description: 'Connection lost',
+    type: 'error'
   })
-  expect(ui.saved).toEqual(['Ada', 'Ada'])
   expect(ui.document.querySelector('[role="alert"]')).toBeNull()
+  expect(ui.document.querySelector('button')).toBeNull()
+  fail = false
+  await ui.emit('focusout')
+  expect(ui.saved).toEqual(['Ada', 'Ada'])
+  expect(ui.input.value).toBe('Ada')
 })
 
 test('provider-managed names cannot be saved', async () => {
@@ -156,7 +170,6 @@ test('a pending name save disables editing and ignores another blur', async () =
   await ui.type('Ada')
   await ui.emit('focusout')
   expect(ui.input.disabled).toBe(true)
-  expect(ui.document.querySelector('[role="status"]')?.textContent).toBe('Saving…')
   await ui.emit('focusout')
   expect(ui.saved).toEqual(['Ada'])
   await act(async () => {

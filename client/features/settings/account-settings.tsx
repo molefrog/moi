@@ -1,8 +1,8 @@
 import { useId, useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { Field, FieldGroup, FieldLabel, FieldDescription, FieldError } from '@/ui-components/field'
-import { Button } from '@/client/components/ui/button'
+import { Field, FieldGroup, FieldLabel } from '@/ui-components/field'
 import { Input } from '@/client/components/ui/input'
+import { toast } from '@/client/components/ui/toast'
 import { useAccount } from '../account/account-provider'
 import { SettingsSection } from './settings-section'
 
@@ -38,35 +38,28 @@ type NameFieldProps = {
 export function NameField({ name, readOnly, onSave }: NameFieldProps) {
   const id = useId()
   const [draft, setDraft] = useState<string>()
-  const [validationError, setValidationError] = useState<string>()
   const save = useMutation({
     mutationFn: onSave,
-    onSuccess: () => setDraft(undefined)
+    onSuccess: () => setDraft(undefined),
+    onError: error =>
+      toast.add({ title: 'Couldn’t save name', description: error.message, type: 'error' })
   })
   const pending = save.isPending
-  const error = validationError ?? save.error?.message
   const skipBlur = useRef(false)
 
   function commit() {
     if (readOnly || pending) return
     const next = (draft ?? name).trim()
-    if (!next || next.length > 80) {
-      setValidationError('Enter a name of up to 80 characters.')
-      return
-    }
-    if (next === name) {
+    if (!next || next.length > 80 || next === name) {
       setDraft(undefined)
-      setValidationError(undefined)
-      save.reset()
       return
     }
-    setValidationError(undefined)
     setDraft(next)
     save.mutate(next)
   }
 
   return (
-    <Field data-invalid={!!error}>
+    <Field>
       <FieldLabel htmlFor={id}>Name</FieldLabel>
       <Input
         id={id}
@@ -75,13 +68,7 @@ export function NameField({ name, readOnly, onSave }: NameFieldProps) {
         maxLength={80}
         readOnly={readOnly}
         disabled={pending}
-        aria-invalid={!!error}
-        aria-describedby={error || readOnly || pending ? `${id}-status` : undefined}
-        onChange={event => {
-          setDraft(event.target.value)
-          setValidationError(undefined)
-          save.reset()
-        }}
+        onChange={event => setDraft(event.target.value)}
         onBlur={() => {
           if (skipBlur.current) {
             skipBlur.current = false
@@ -99,28 +86,10 @@ export function NameField({ name, readOnly, onSave }: NameFieldProps) {
             event.preventDefault()
             skipBlur.current = true
             setDraft(undefined)
-            setValidationError(undefined)
-            save.reset()
             event.currentTarget.blur()
           }
         }}
       />
-      {(error || readOnly || pending) && (
-        <div id={`${id}-status`}>
-          {error ? (
-            <div className="flex flex-col items-start gap-2">
-              <FieldError>{error}</FieldError>
-              <Button variant="outline" size="sm" onClick={() => void commit()}>
-                Try again
-              </Button>
-            </div>
-          ) : (
-            <FieldDescription role="status">
-              {readOnly ? 'Managed by your sign-in provider.' : pending ? 'Saving…' : null}
-            </FieldDescription>
-          )}
-        </div>
-      )}
     </Field>
   )
 }

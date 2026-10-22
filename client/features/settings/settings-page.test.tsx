@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from 'bun:test'
+import { afterEach, expect, spyOn, test } from 'bun:test'
 import { act } from 'react'
 import { getCurrentUser, getDirectory } from '@/client/features/collab/host-state'
 import { accountKeys } from '../account/api'
@@ -13,6 +13,7 @@ import type { AccountFixtureOptions } from '../account/account-test-utils'
 import { AccountSettings } from './account-settings'
 import { TeamSettings } from './team-settings'
 import { SettingsPage } from './settings-page'
+import { toast } from '@/client/components/ui/toast'
 
 afterEach(cleanupAccount)
 
@@ -52,11 +53,22 @@ test('members can see the team but have no management controls', async () => {
 test('failed team mutations retain the list and report the server error', async () => {
   const ui = await mountSettings()
   ui.failures.mutation = true
-  await ui.click('Remove ada@example.com')
-  expect(ui.document.body.textContent).toContain('Ada')
-  expect(ui.document.querySelector('[role="alert"]')?.textContent).toBe(
-    'Only the owner can do that.'
-  )
+  const notification = spyOn(toast, 'add')
+  try {
+    await ui.click('Remove ada@example.com')
+    expect(ui.document.body.textContent).toContain('Ada')
+    expect(notification).toHaveBeenCalledWith({
+      title: 'Couldn’t update team',
+      description: 'Only the owner can do that.',
+      type: 'error'
+    })
+    expect(ui.document.querySelector('[role="alert"]')).toBeNull()
+    ui.failures.mutation = false
+    await ui.click('Remove ada@example.com')
+    expect(ui.document.body.textContent).not.toContain('Ada')
+  } finally {
+    notification.mockRestore()
+  }
 })
 
 test('team errors can be retried', async () => {
@@ -165,7 +177,6 @@ test('team controls stay disabled until a mutation finishes', async () => {
     '[aria-label="Remove ada@example.com"]'
   )!
   expect(remove.disabled).toBe(true)
-  expect(remove.textContent).toBe('Removing…')
   expect(ui.document.querySelector<HTMLInputElement>('#invite-email')?.disabled).toBe(true)
   await act(async () => ui.mutationRequest.resolve())
   await ui.settle()
@@ -214,7 +225,8 @@ test('a failed name save leaves the pending team request able to finish', async 
   await ui.type(input, 'New name')
   await act(async () => input.dispatchEvent(new ui.window.Event('focusout', { bubbles: true })))
   await ui.settle()
-  expect(ui.document.body.textContent).toContain('Only the owner can do that.')
+  expect(ui.calls.some(call => call.path.endsWith('/profile'))).toBe(true)
+  expect(input.disabled).toBe(false)
   await act(async () => ui.teamResponse.resolve(Response.json(ownerTeam)))
   await ui.settle()
   expect(ui.document.querySelector('[aria-label="Loading team"]') === null).toBe(true)

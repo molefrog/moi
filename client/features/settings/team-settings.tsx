@@ -4,6 +4,7 @@ import { Field, FieldLabel } from '@/ui-components/field'
 import { Button } from '@/client/components/ui/button'
 import { Input } from '@/client/components/ui/input'
 import { Skeleton } from '@/client/components/ui/skeleton'
+import { toast } from '@/client/components/ui/toast'
 import { User } from '@/client/features/collab/components/user'
 import {
   getDirectory,
@@ -20,32 +21,24 @@ import {
   removeMember
 } from '../account/api'
 
-type TeamAction = {
-  key: string
-  action: () => Promise<unknown>
-  message: string
-}
-
 export function TeamSettings() {
   const { team } = useAccount()
   const directory = useSyncExternalStore(subscribeDirectoryStore, getDirectory, getDirectory)
   const qc = useQueryClient()
   const [email, setEmail] = useState('')
   const mutation = useMutation({
-    mutationFn: async ({ action, message }: TeamAction) => {
-      await action()
-      return message
-    },
+    mutationFn: (action: () => Promise<unknown>) => action(),
     onSuccess: () => qc.invalidateQueries({ queryKey: accountKeys.team }),
     onError: error => {
+      toast.add({ title: 'Couldn’t update team', description: error.message, type: 'error' })
       if (error instanceof CloudApiError && error.status === 401)
         void qc.invalidateQueries({ queryKey: accountKeys.session })
     }
   })
-  const pending = mutation.isPending ? mutation.variables.key : undefined
+  const pending = mutation.isPending
 
-  function act(key: string, action: () => Promise<unknown>, message: string) {
-    if (!mutation.isPending) mutation.mutate({ key, action, message })
+  function act(action: () => Promise<unknown>) {
+    if (!pending) mutation.mutate(action)
   }
 
   if (team.isPending)
@@ -95,21 +88,16 @@ export function TeamSettings() {
               <Button
                 variant="ghost"
                 size="sm"
-                disabled={!!pending}
+                disabled={pending}
                 aria-label={`Remove ${member.email}`}
-                onClick={() =>
-                  void act(member.id, () => removeMember(member.id), `Removed ${member.email}.`)
-                }
+                onClick={() => act(() => removeMember(member.id))}
               >
-                {pending === member.id ? 'Removing…' : 'Remove'}
+                Remove
               </Button>
             )}
           </li>
         ))}
       </ul>
-      {!owner && (
-        <p className="text-sm text-muted-foreground">Only the owner can invite or remove people.</p>
-      )}
       {owner && (
         <>
           <form
@@ -118,14 +106,10 @@ export function TeamSettings() {
               event.preventDefault()
               const value = email.trim()
               if (!value) return
-              void act(
-                'invite',
-                async () => {
-                  await inviteMember(value)
-                  setEmail('')
-                },
-                `Invitation sent to ${value}.`
-              )
+              act(async () => {
+                await inviteMember(value)
+                setEmail('')
+              })
             }}
           >
             <Field>
@@ -137,12 +121,12 @@ export function TeamSettings() {
                 autoComplete="off"
                 placeholder="Email address"
                 value={email}
-                disabled={!!pending}
+                disabled={pending}
                 onChange={event => setEmail(event.target.value)}
               />
             </Field>
-            <Button type="submit" disabled={!!pending}>
-              {pending === 'invite' ? 'Sending…' : 'Send invitation'}
+            <Button type="submit" disabled={pending}>
+              Send invitation
             </Button>
           </form>
           {invitations.length > 0 && (
@@ -162,17 +146,11 @@ export function TeamSettings() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      disabled={!!pending}
+                      disabled={pending}
                       aria-label={`Cancel invitation for ${invitation.email}`}
-                      onClick={() =>
-                        void act(
-                          invitation.id,
-                          () => cancelInvitation(invitation.id),
-                          `Cancelled invitation for ${invitation.email}.`
-                        )
-                      }
+                      onClick={() => act(() => cancelInvitation(invitation.id))}
                     >
-                      {pending === invitation.id ? 'Cancelling…' : 'Cancel'}
+                      Cancel
                     </Button>
                   </li>
                 ))}
@@ -181,14 +159,6 @@ export function TeamSettings() {
           )}
         </>
       )}
-      {mutation.error && (
-        <p role="alert" className="text-sm text-destructive">
-          {mutation.error.message}
-        </p>
-      )}
-      <p role="status" className="text-sm text-muted-foreground empty:sr-only">
-        {mutation.isSuccess && mutation.data}
-      </p>
     </SettingsSection>
   )
 }
