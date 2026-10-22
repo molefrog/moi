@@ -8,7 +8,7 @@ import type { WorkspaceSkillsStatus } from '@/lib/types'
 import { api } from './index'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
 import { readSkillVersion } from '../skills/version'
-import { BUNDLED_SKILLS_DIR } from '../skills/template'
+import { BUNDLED_SKILLS_DIR, installBundledSkills } from '../skills/template'
 import { skillsDirFor } from '../workspaces/init'
 
 let tempRoot = ''
@@ -24,15 +24,42 @@ afterEach(async () => {
   tempRoot = ''
 })
 
-async function createOutdatedWorkspace(type: 'claude-code' | 'codex') {
+async function createOutdatedWorkspace(
+  type: 'claude-code' | 'codex',
+  registeredType: 'claude-code' | 'codex' = type
+) {
   const workspaceRoot = join(tempRoot, type)
   const skillDir = join(skillsDirFor(workspaceRoot, type), 'moi-workspace')
   await mkdir(skillDir, { recursive: true })
   await Bun.write(join(skillDir, 'SKILL.md'), '<moi-skill version="0.7.1" />\n')
-  return registerWorkspace(workspaceRoot, { type })
+  return registerWorkspace(workspaceRoot, { type: registeredType })
 }
 
 describe('workspace skills API', () => {
+  for (const staleType of ['claude-code', 'codex'] as const) {
+    test(`reports and updates a stale ${staleType} copy alongside a current copy`, async () => {
+      const currentType = staleType === 'codex' ? 'claude-code' : 'codex'
+      const workspace = await createOutdatedWorkspace(staleType, currentType)
+      await installBundledSkills(skillsDirFor(workspace.path, currentType))
+      const response = await api.request(`/api/workspaces/${workspace.id}/skills`)
+      const before = (await response.json()) as WorkspaceSkillsStatus
+      expect(response.status).toBe(200)
+      expect(before.skills).toHaveLength(2)
+      expect(before.updateAvailable).toBe(true)
+      const updated = await api.request(`/api/workspaces/${workspace.id}/skills/update`, {
+        method: 'POST'
+      })
+      const after = (await updated.json()) as WorkspaceSkillsStatus
+      expect(updated.status).toBe(200)
+      expect(after.updateAvailable).toBe(false)
+      expect(after.skills).toHaveLength(2)
+      for (const skill of after.skills) {
+        expect(skill.installed).toBe(skill.bundled)
+        expect(await readSkillVersion(join(skill.path, 'SKILL.md'))).toBe(skill.bundled)
+      }
+    })
+  }
+
   test('reports an actionable bundled-skill update', async () => {
     const workspace = await createOutdatedWorkspace('codex')
 

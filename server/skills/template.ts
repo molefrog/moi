@@ -14,6 +14,11 @@ export const TEMPLATE_DIR = join(import.meta.dir, '..', '..', 'workspace')
 // for what `moi skill update` copies and what versions it compares against.
 export const BUNDLED_SKILLS_DIR = join(TEMPLATE_DIR, '.claude', 'skills')
 
+export async function bundledSkillNames(): Promise<string[]> {
+  const entries = await readdir(BUNDLED_SKILLS_DIR, { withFileTypes: true })
+  return entries.filter(entry => entry.isDirectory()).map(entry => entry.name)
+}
+
 export const COLLAB_REFERENCE_SOURCE_PATH = join(
   BUNDLED_SKILLS_DIR,
   'moi-workspace',
@@ -66,17 +71,25 @@ async function matchesBundledPath(source: string, target: string): Promise<boole
 export async function installBundledSkills(targetSkillsDir: string): Promise<string[]> {
   await mkdir(targetSkillsDir, { recursive: true })
   const changedSkills: string[] = []
-  const skillEntries = await readdir(BUNDLED_SKILLS_DIR, { withFileTypes: true })
-
-  for (const entry of skillEntries) {
-    if (!entry.isDirectory()) continue
-    const source = join(BUNDLED_SKILLS_DIR, entry.name)
-    const target = join(targetSkillsDir, entry.name)
-    if (await matchesBundledPath(source, target)) continue
-
-    await cp(source, target, { recursive: true, force: true, filter: isDefaultSkillFile })
-    changedSkills.push(entry.name)
+  for (const name of await bundledSkillNames()) {
+    if (await installBundledSkill(name, join(targetSkillsDir, name))) changedSkills.push(name)
   }
 
   return changedSkills
+}
+
+// Update one resolved destination without installing other skills beside it.
+export async function installBundledSkill(name: string, target: string): Promise<boolean> {
+  const source = join(BUNDLED_SKILLS_DIR, name)
+  if (await matchesBundledPath(source, target)) return false
+  // Publish the version only after all references copied successfully, so a
+  // partial update cannot hide an outdated installation behind a fresh marker.
+  const marker = join(source, 'SKILL.md')
+  await cp(source, target, {
+    recursive: true,
+    force: true,
+    filter: path => path !== marker && isDefaultSkillFile(path)
+  })
+  await cp(marker, join(target, 'SKILL.md'), { force: true })
+  return true
 }
