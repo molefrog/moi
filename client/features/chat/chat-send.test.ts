@@ -15,7 +15,7 @@ import {
 import { attachmentKey, liveStore } from '@/client/features/chat/chat-store'
 import type { StagedAttachment } from '@/client/features/chat/composer/attachments/types'
 import { MAX_MESSAGE_ATTACHMENTS } from '@/lib/message-attachments'
-import type { SessionInfo, UploadInfo, ViewState, WorkspaceAgent } from '@/lib/types'
+import type { SessionInfo, SessionRecord, UploadInfo, ViewState, WorkspaceAgent } from '@/lib/types'
 import { resolveSelectedModel } from './composer/model-order'
 
 const workspaceId = 'workspace-1'
@@ -74,6 +74,23 @@ describe('startOptimisticSession', () => {
         summary: 'Build a customer dashboard with useful charts'
       }
     ])
+  })
+
+  test('seeds an empty session record so the first turn renders before it loads', () => {
+    const queryClient = new QueryClient()
+    startOptimisticSession({
+      tabId: 'views/notes',
+      queryClient,
+      workspaceId,
+      sessionId,
+      text: 'hello'
+    })
+
+    expect(
+      queryClient.getQueryData<SessionRecord>(workspaceKeys.session(workspaceId, sessionId))
+    ).toEqual({
+      tabId: 'views/notes'
+    })
   })
 
   test('uses filenames for an attachment-only chat', () => {
