@@ -10,7 +10,7 @@ import {
   ownerTeam
 } from '../account/account-test-utils'
 import type { AccountFixtureOptions } from '../account/account-test-utils'
-import { AccountSettings } from './account-settings'
+import { YouSettings } from './you-settings'
 import { TeamSettings } from './team-settings'
 import { SettingsPage } from './settings-page'
 import { toast } from '@/client/components/ui/toast'
@@ -25,7 +25,7 @@ function mountSettings({ mode = 'team', ...options }: FixtureOptions = {}) {
       mode === 'page' ? (
         <SettingsPage />
       ) : (
-        <AccountProbe>{mode === 'team' ? <TeamSettings /> : <AccountSettings />}</AccountProbe>
+        <AccountProbe>{mode === 'team' ? <TeamSettings /> : <YouSettings />}</AccountProbe>
       )
   })
 }
@@ -93,7 +93,7 @@ test('cloud name saves update the account and preserve avatar and color', async 
     avatar: 'https://example.com/avatar.png'
   })
   expect(ui.document.querySelector('[data-account-name]')?.textContent).toBe('New name')
-  expect(ui.document.querySelector('#account-email')?.getAttribute('readOnly')).toBe('')
+  expect(ui.document.querySelector('#you-email')?.getAttribute('readOnly')).toBe('')
 })
 
 test('inviting a teammate sends the trimmed email and refreshes invitations', async () => {
@@ -113,24 +113,24 @@ test('inviting a teammate sends the trimmed email and refreshes invitations', as
   expect(input.value).toBe('')
 })
 
-test('local settings show Account without Email or Team and respect supplied identity', async () => {
+test('local settings show You without Email or Team and respect supplied identity', async () => {
   const ui = await mountSettings({ mode: 'page', environment: 'local' })
   expect([...ui.document.querySelectorAll('h2')].map(heading => heading.textContent)).toEqual([
-    'Account'
+    'You'
   ])
   expect(ui.document.querySelector('input')?.value).toBe('Alex')
   expect(ui.document.querySelector('input')?.hasAttribute('readOnly')).toBe(true)
-  expect(ui.document.querySelector('#account-email')).toBeNull()
+  expect(ui.document.querySelector('#you-email')).toBeNull()
   expect(ui.calls).toEqual([])
 })
 
-test('registered cloud settings show Account, read-only Email, and Team', async () => {
+test('registered cloud settings show You, read-only Email, and Team', async () => {
   const ui = await mountSettings({ mode: 'page' })
   expect([...ui.document.querySelectorAll('h2')].map(heading => heading.textContent)).toEqual([
-    'Account',
+    'You',
     'Team'
   ])
-  expect(ui.document.querySelector('#account-email')?.getAttribute('readOnly')).toBe('')
+  expect(ui.document.querySelector('#you-email')?.getAttribute('readOnly')).toBe('')
   expect(ui.document.querySelector('input')?.hasAttribute('readOnly')).toBe(false)
   expect(ui.document.body.textContent).toContain('Ada')
 })
@@ -165,9 +165,7 @@ test('settings session errors offer a working retry', async () => {
   expect(ui.document.querySelector('input')).toBeNull()
   ui.failures.session = false
   await ui.click('Try again')
-  expect(ui.document.querySelector<HTMLInputElement>('#account-email')?.value).toBe(
-    'alex@example.com'
-  )
+  expect(ui.document.querySelector<HTMLInputElement>('#you-email')?.value).toBe('alex@example.com')
 })
 
 test('team controls stay disabled until a mutation finishes', async () => {
@@ -191,7 +189,7 @@ test.each([{ loadingTeam: true }, { failTeam: true }])(
     await ui.settle()
     expect(getCurrentUser()).toMatchObject({ id: 'me', name: 'Alex', email: 'alex@example.com' })
     expect(ui.document.querySelector('input')?.value).toBe('Alex')
-    expect(ui.document.querySelector('#account-email')).not.toBeNull()
+    expect(ui.document.querySelector('#you-email')).not.toBeNull()
     expect(ui.document.body.textContent).not.toContain('Couldn’t load your account.')
     if (options.loadingTeam)
       expect(ui.document.querySelector('[aria-label="Loading team"]')).not.toBeNull()
