@@ -1,37 +1,32 @@
-import { mkdir, rename } from 'node:fs/promises'
-import { join } from 'path'
-
-import { DATA_DIR } from '../data-dir'
 import type { WorkspaceSessionSelection, WorkspaceTabId } from '@/lib/types'
-import { isWorkspaceTabId } from '@/lib/workspace-tabs'
-
-type Selection = WorkspaceSessionSelection
-type Store = Record<string, Selection>
-const emptySelection = (): Selection => ({ selected: {}, pinned: null })
+import {
+  readWorkspaceState,
+  updateWorkspaceState,
+  type WorkspaceRef,
+  type WorkspaceState
+} from '../workspace-state'
 
 export type SelectedSessionUpdate = {
   changed: boolean
   sessionId: string | null
 }
 
-export const DEFAULT_SELECTED_SESSION_PATH = join(DATA_DIR, 'selected-sessions.json')
-
-let storePath = DEFAULT_SELECTED_SESSION_PATH
+// Temporary ids the harnesses renamed, per workspace id. A request can still
+// carry the old id after the rename landed.
 const renamedSessions = new Map<string, Map<string, string>>()
 
-export function setSelectedSessionPath(path: string): void {
-  storePath = path
+export function forgetSessionRenames(): void {
   renamedSessions.clear()
 }
 
-function rememberSessionRename(workspacePath: string, from: string, to: string): void {
-  const renames = renamedSessions.get(workspacePath) ?? new Map<string, string>()
+export function rememberSessionRename(workspaceId: string, from: string, to: string): void {
+  const renames = renamedSessions.get(workspaceId) ?? new Map<string, string>()
   renames.set(from, to)
-  renamedSessions.set(workspacePath, renames)
+  renamedSessions.set(workspaceId, renames)
 }
 
-export function resolveRenamedSession(workspacePath: string, sessionId: string): string {
-  const renames = renamedSessions.get(workspacePath)
+export function resolveRenamedSession(workspaceId: string, sessionId: string): string {
+  const renames = renamedSessions.get(workspaceId)
   const seen = new Set<string>()
   while (renames?.has(sessionId) && !seen.has(sessionId)) {
     seen.add(sessionId)
@@ -40,160 +35,104 @@ export function resolveRenamedSession(workspacePath: string, sessionId: string):
   return sessionId
 }
 
-async function readStore(): Promise<Store> {
-  try {
-    const parsed: unknown = JSON.parse(await Bun.file(storePath).text())
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
-
-    const store: Store = {}
-    for (const [workspacePath, value] of Object.entries(parsed)) {
-      if (value === null || typeof value === 'string') {
-        store[workspacePath] = { selected: value === null ? {} : { overview: value }, pinned: null }
-      } else if (value && typeof value === 'object' && 'selected' in value) {
-        const entry = value as Selection
-        store[workspacePath] = {
-          selected: Object.fromEntries(
-            Object.entries(entry.selected ?? {}).filter(([, id]) => typeof id === 'string')
-          ),
-          pinned: typeof entry.pinned === 'string' ? entry.pinned : null
-        }
-      }
-    }
-    return store
-  } catch {
-    return {}
-  }
-}
-
-async function writeStore(store: Store): Promise<void> {
-  await mkdir(join(storePath, '..'), { recursive: true })
-  const temporaryPath = `${storePath}.${process.pid}.tmp`
-  await Bun.write(temporaryPath, JSON.stringify(store, null, 2))
-  await rename(temporaryPath, storePath)
-}
-
-let writeChain: Promise<unknown> = Promise.resolve()
-
-function locked<T>(operation: () => Promise<T>): Promise<T> {
-  const run = writeChain.then(operation, operation)
-  writeChain = run.catch(() => {})
-  return run
-}
-
 export async function getSelectedSession(
-  workspacePath: string,
+  ws: WorkspaceRef,
   tabId: WorkspaceTabId = 'overview'
 ): Promise<string | undefined> {
-  const store = await readStore()
-  return store[workspacePath]?.selected[tabId] ?? undefined
+  return (await readWorkspaceState(ws)).selected[tabId]
 }
 
 export async function getWorkspaceSessionSelection(
-  workspacePath: string
+  ws: WorkspaceRef
 ): Promise<WorkspaceSessionSelection> {
-  await writeChain
-  return (await readStore())[workspacePath] ?? emptySelection()
+  const { selected, pinnedSessionId } = await readWorkspaceState(ws)
+  return { selected, pinned: pinnedSessionId ?? null }
 }
 
-export async function getPinnedSession(workspacePath: string): Promise<string | null> {
-  return (await readStore())[workspacePath]?.pinned ?? null
+export async function getPinnedSession(ws: WorkspaceRef): Promise<string | null> {
+  return (await readWorkspaceState(ws)).pinnedSessionId ?? null
 }
 
-export async function pinSession(workspacePath: string, sessionId: string | null): Promise<void> {
-  await locked(async () => {
-    const store = await readStore()
-    const selection = (store[workspacePath] ??= emptySelection())
-    selection.pinned = sessionId === null ? null : resolveRenamedSession(workspacePath, sessionId)
-    await writeStore(store)
+export async function pinSession(ws: WorkspaceRef, sessionId: string | null): Promise<void> {
+  await updateWorkspaceState(ws, state => {
+    if (sessionId === null) delete state.pinnedSessionId
+    else state.pinnedSessionId = resolveRenamedSession(ws.id, sessionId)
   })
 }
 
-export async function dropSessionTab(workspacePath: string, tabId: WorkspaceTabId): Promise<void> {
-  await locked(async () => {
-    const store = await readStore()
-    const selection = store[workspacePath]
-    if (!selection || !(tabId in selection.selected)) return
-    delete selection.selected[tabId]
-    await writeStore(store)
+export async function dropSessionTab(ws: WorkspaceRef, tabId: WorkspaceTabId): Promise<void> {
+  await updateWorkspaceState(ws, state => {
+    delete state.selected[tabId]
   })
+}
+
+// Point `tabId` at `sessionId` inside a state transaction. With
+// `previousSessionId`, only when the tab still shows that chat, so a stale
+// client cannot undo a newer choice.
+export function selectSessionForTab(
+  state: WorkspaceState,
+  workspaceId: string,
+  sessionId: string | null,
+  previousSessionId?: string | null,
+  tabId: WorkspaceTabId = 'overview'
+): SelectedSessionUpdate {
+  const current = state.selected[tabId] ?? null
+  const resolvedSessionId =
+    sessionId === null ? null : resolveRenamedSession(workspaceId, sessionId)
+  const resolvedPreviousSessionId =
+    previousSessionId == null
+      ? previousSessionId
+      : resolveRenamedSession(workspaceId, previousSessionId)
+
+  if (resolvedPreviousSessionId !== undefined && current !== resolvedPreviousSessionId)
+    return { changed: false, sessionId: current }
+  if (current === resolvedSessionId) return { changed: false, sessionId: resolvedSessionId }
+
+  if (resolvedSessionId === null) delete state.selected[tabId]
+  else state.selected[tabId] = resolvedSessionId
+  return { changed: true, sessionId: resolvedSessionId }
 }
 
 export async function saveSelectedSession(
-  workspacePath: string,
+  ws: WorkspaceRef,
   sessionId: string | null,
   previousSessionId?: string | null,
   tabId: WorkspaceTabId = 'overview'
 ): Promise<SelectedSessionUpdate> {
-  return locked(async () => {
-    const store = await readStore()
-    const selection = (store[workspacePath] ??= emptySelection())
-    const current = selection.selected[tabId]
-    const resolvedSessionId =
-      sessionId === null ? null : resolveRenamedSession(workspacePath, sessionId)
-    const resolvedPreviousSessionId =
-      previousSessionId == null
-        ? previousSessionId
-        : resolveRenamedSession(workspacePath, previousSessionId)
-
-    if (
-      resolvedPreviousSessionId !== undefined &&
-      (current ?? null) !== resolvedPreviousSessionId
-    ) {
-      return { changed: false, sessionId: current ?? null }
-    }
-    if ((current ?? null) === resolvedSessionId)
-      return { changed: false, sessionId: resolvedSessionId }
-
-    if (resolvedSessionId === null) delete selection.selected[tabId]
-    else selection.selected[tabId] = resolvedSessionId
-    await writeStore(store)
-    return { changed: true, sessionId: resolvedSessionId }
-  })
+  return updateWorkspaceState(ws, state =>
+    selectSessionForTab(state, ws.id, sessionId, previousSessionId, tabId)
+  )
 }
 
-export async function renameSelectedSession(
-  workspacePath: string,
-  from: string,
-  to: string
-): Promise<SelectedSessionUpdate> {
-  if (from === to) return { changed: false, sessionId: to }
-  return locked(async () => {
-    rememberSessionRename(workspacePath, from, to)
-    const store = await readStore()
-    const selection = (store[workspacePath] ??= emptySelection())
-    let changed = false
-    for (const tabId of Object.keys(selection.selected).filter(isWorkspaceTabId)) {
-      if (selection.selected[tabId] !== from) continue
-      selection.selected[tabId] = to
-      changed = true
-    }
-    if (selection.pinned === from) {
-      selection.pinned = to
-      changed = true
-    }
-    if (changed) await writeStore(store)
-    return { changed, sessionId: selection.selected.overview ?? null }
-  })
+// Follow a temporary id's rename in every tab and the pin.
+export function renameSessionSelection(state: WorkspaceState, from: string, to: string): void {
+  for (const [tabId, sessionId] of Object.entries(state.selected) as [WorkspaceTabId, string][]) {
+    if (sessionId === from) state.selected[tabId] = to
+  }
+  if (state.pinnedSessionId === from) state.pinnedSessionId = to
+}
+
+// Remove an archived chat from every tab and the pin.
+export function clearSessionSelection(
+  state: WorkspaceState,
+  sessionId: string
+): SelectedSessionUpdate {
+  let changed = false
+  for (const [tabId, selected] of Object.entries(state.selected) as [WorkspaceTabId, string][]) {
+    if (selected !== sessionId) continue
+    delete state.selected[tabId]
+    changed = true
+  }
+  if (state.pinnedSessionId === sessionId) {
+    delete state.pinnedSessionId
+    changed = true
+  }
+  return { changed, sessionId: state.selected.overview ?? null }
 }
 
 export async function clearSelectedSession(
-  workspacePath: string,
+  ws: WorkspaceRef,
   sessionId: string
 ): Promise<SelectedSessionUpdate> {
-  return locked(async () => {
-    const store = await readStore()
-    const selection = (store[workspacePath] ??= emptySelection())
-    let changed = false
-    for (const tabId of Object.keys(selection.selected).filter(isWorkspaceTabId)) {
-      if (selection.selected[tabId] !== sessionId) continue
-      delete selection.selected[tabId]
-      changed = true
-    }
-    if (selection.pinned === sessionId) {
-      selection.pinned = null
-      changed = true
-    }
-    if (changed) await writeStore(store)
-    return { changed, sessionId: selection.selected.overview ?? null }
-  })
+  return updateWorkspaceState(ws, state => clearSessionSelection(state, sessionId))
 }

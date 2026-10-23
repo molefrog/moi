@@ -1338,8 +1338,7 @@ async function sendOpenClawMessageImpl(input: {
       if (created?.sessionId && created.sessionId !== input.sessionId) {
         realSessionId = created.sessionId
         await renameSessionReferences(
-          input.workspaceId,
-          input.workspacePath,
+          { id: input.workspaceId, path: input.workspacePath },
           input.sessionId,
           realSessionId
         )

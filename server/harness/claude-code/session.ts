@@ -420,15 +420,19 @@ async function consume(s: LiveSession) {
         const realId = msg.session_id
         if (realId && realId !== s.sessionId) {
           const from = renameSession(s, realId)
-          await renameSessionReferences(s.workspaceId, s.workspacePath, from, s.sessionId)
+          await renameSessionReferences(
+            { id: s.workspaceId, path: s.workspacePath },
+            from,
+            s.sessionId
+          )
         }
         startClaudeSessionTitleJob(s)
         // Seed explicit startup settings only when no saved picker choice exists.
         if (
           (s.model || s.effort || s.fastMode !== undefined) &&
-          !(await hasSessionConfig(s.workspacePath, s.sessionId))
+          !(await hasSessionConfig({ id: s.workspaceId, path: s.workspacePath }, s.sessionId))
         ) {
-          await saveSessionConfig(s.workspacePath, s.sessionId, {
+          await saveSessionConfig({ id: s.workspaceId, path: s.workspacePath }, s.sessionId, {
             model: s.model,
             effort: s.effort,
             fastMode: s.fastMode

@@ -26,6 +26,8 @@ import { allHarnesses, harnessFor } from './harness/registry'
 import { getWorkspace, listWorkspaces } from './workspaces/registry'
 import { failInterruptedViewStarts, sendWorkspaceMessage } from './sessions/view-sessions'
 import { PendingViewError } from './sessions/pending-views'
+import { prepareWorkspaceStates } from './workspace-state'
+import { migrateLegacyWorkspaceState } from './workspace-state/legacy-migration'
 import {
   addClient,
   broadcast,
@@ -110,7 +112,10 @@ function upgrade(server: Upgradable, req: Request, data: WsData) {
 // Bun owns the fullstack surface: the HTML shell + dev bundler/HMR, and the two
 // WebSocket channels (which need Bun's native `server.upgrade` + pub/sub). Every
 // HTTP API route is delegated to the Hono app (`./api`) via `fetch`.
-await Promise.all((await listWorkspaces()).map(failInterruptedViewStarts))
+const registeredWorkspaces = await listWorkspaces()
+await migrateLegacyWorkspaceState(registeredWorkspaces)
+await prepareWorkspaceStates(registeredWorkspaces)
+await Promise.all(registeredWorkspaces.map(failInterruptedViewStarts))
 
 // Managed machines serve the web side on a Unix socket file that only the
 // machine's gateway can open, so nothing else running there reaches the API

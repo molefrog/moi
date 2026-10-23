@@ -17,6 +17,7 @@ import { reloadModules } from './functions'
 import { loadLayout, saveLayout } from '../workspaces/layout'
 import { completeViewBuild, listPendingViews } from '../sessions/pending-views'
 import { archiveViewSessions } from '../sessions/archive'
+import type { WorkspaceRef } from '../workspace-state'
 import { setViewSourceTitle } from './config'
 import { deleteViewSourceFiles, readViewSource, ViewSourceInUseError } from './view-source'
 
@@ -172,15 +173,15 @@ export async function collectViewRequiredEnv(
   return out
 }
 
-export async function getWorkspaceViews(workspacePath: string): Promise<ViewInfo[]> {
-  const compiled = await listCompiledViews(workspacePath)
+export async function getWorkspaceViews(ws: WorkspaceRef): Promise<ViewInfo[]> {
+  const compiled = await listCompiledViews(ws.path)
   const ids = new Set(compiled.map(view => view.id))
-  const pending = (await listPendingViews(workspacePath)).filter(view => !ids.has(view.id))
+  const pending = (await listPendingViews(ws)).filter(view => !ids.has(view.id))
   return [...compiled, ...pending]
 }
 
-export async function listViews(workspacePath: string): Promise<Response> {
-  return Response.json({ views: await getWorkspaceViews(workspacePath) })
+export async function listViews(ws: WorkspaceRef): Promise<Response> {
+  return Response.json({ views: await getWorkspaceViews(ws) })
 }
 
 export async function handleBundleViews(
@@ -216,7 +217,7 @@ export async function handleBundleViews(
   for (const r of results) {
     if (r.status === 'built') {
       publish({ type: 'view:updated', name: r.name, config: r.config ?? null })
-      await completeViewBuild(workspaceId, workspacePath, r.name)
+      await completeViewBuild({ id: workspaceId, path: workspacePath }, r.name)
       for (const m of r.serverModules ?? []) changedServerModules.add(m)
     }
   }
@@ -304,7 +305,7 @@ export async function deleteView(
       throw error
     }
     reloadModules([`views/${viewId}`], workspacePath)
-    await completeViewBuild(workspaceId, workspacePath, viewId)
+    await completeViewBuild(ws, viewId)
     const layout = await loadLayout(workspacePath)
     const tab = viewTabId(viewId)
     await saveLayout(

@@ -11,7 +11,7 @@ export async function archiveWorkspaceSession(ws: WorkspaceEntry, sessionId: str
   if (!harness.archiveSession) throw new Error('Chat archiving is not supported')
   await harness.interrupt(ws.id, sessionId)
   await harness.archiveSession(ws, sessionId)
-  const update = await clearSelectedSession(ws.path, sessionId)
+  const update = await clearSelectedSession(ws, sessionId)
   if (update.changed)
     publishEvent({
       type: 'selected-session:updated',
@@ -23,10 +23,10 @@ export async function archiveWorkspaceSession(ws: WorkspaceEntry, sessionId: str
 
 export async function archiveViewSessions(ws: WorkspaceEntry, viewId: string) {
   const tabId = viewTabId(viewId)
-  const records = await getSessionRecords(ws.path)
+  const records = await getSessionRecords(ws)
   for (const [sessionId, record] of Object.entries(records)) {
     if (record.tabId === tabId) await archiveWorkspaceSession(ws, sessionId)
   }
-  await dropSessionTab(ws.path, tabId)
+  await dropSessionTab(ws, tabId)
   publishEvent({ type: 'selected-session:updated', workspaceId: ws.id, sessionId: null })
 }

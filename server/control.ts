@@ -300,7 +300,7 @@ export const control = Bun.serve({
             return
           }
           try {
-            const view = await updatePendingView(match.id, match.path, appletId, {
+            const view = await updatePendingView(match, appletId, {
               title,
               icon
             })
@@ -321,7 +321,7 @@ export const control = Bun.serve({
           if (!match) return
           const [layout, views] = await Promise.all([
             loadLayout(match.path),
-            getWorkspaceViews(match.path)
+            getWorkspaceViews(match)
           ])
           ws.send(JSON.stringify({ ok: true, tabs: assembleTabRows(views, layout.tabs.active) }))
           return
@@ -336,7 +336,7 @@ export const control = Bun.serve({
             if (!href.startsWith('moi:/') || href.startsWith('moi:/files/'))
               throw new Error('Navigation needs a workspace page address')
             const tab = href.slice(5).split('?', 1)[0]
-            if (isWorkspaceTabId(tab)) assertNavigableTab(tab, await getWorkspaceViews(match.path))
+            if (isWorkspaceTabId(tab)) assertNavigableTab(tab, await getWorkspaceViews(match))
             await navigationRelay.navigate(match.id, href)
             ws.send(JSON.stringify({ ok: true, href }))
           } catch (error) {

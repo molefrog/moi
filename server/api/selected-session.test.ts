@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { DEFAULT_WORKSPACE_STATE_ROOT, setWorkspaceStateRoot } from '../workspace-state'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -6,11 +7,7 @@ import { join } from 'node:path'
 import { api } from './index'
 import { claudeCodeHarness } from '../harness/claude-code'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
-import {
-  DEFAULT_SELECTED_SESSION_PATH,
-  getSelectedSession,
-  setSelectedSessionPath
-} from '../sessions/selected'
+import { getSelectedSession } from '../sessions/selected'
 
 let tempDir = ''
 const originalListSessions = claudeCodeHarness.listSessions
@@ -18,13 +15,13 @@ const originalListSessions = claudeCodeHarness.listSessions
 beforeEach(async () => {
   tempDir = await mkdtemp(join(tmpdir(), 'moi-api-selected-session-'))
   setRegistryPath(join(tempDir, 'workspaces.json'))
-  setSelectedSessionPath(join(tempDir, 'selected-sessions.json'))
+  setWorkspaceStateRoot(join(tempDir, 'state'))
 })
 
 afterEach(async () => {
   claudeCodeHarness.listSessions = originalListSessions
   setRegistryPath(DEFAULT_REGISTRY_PATH)
-  setSelectedSessionPath(DEFAULT_SELECTED_SESSION_PATH)
+  setWorkspaceStateRoot(DEFAULT_WORKSPACE_STATE_ROOT)
   await rm(tempDir, { recursive: true, force: true })
 })
 
@@ -80,7 +77,7 @@ describe('selected session API', () => {
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ selected: {}, pinned: null })
-    expect(await getSelectedSession(workspace.path)).toBeUndefined()
+    expect(await getSelectedSession(workspace)).toBeUndefined()
   })
 
   test('preserves an explicit New chat selection on later reads', async () => {
@@ -120,6 +117,6 @@ describe('selected session API', () => {
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ sessionId: 'real' })
-    expect(await getSelectedSession(workspace.path)).toBe('real')
+    expect(await getSelectedSession(workspace)).toBe('real')
   })
 })

@@ -609,8 +609,7 @@ export async function sendAcpMessage(
       if (realId !== input.sessionId) {
         aliases.set(recKey(input.workspaceId, input.sessionId), realId)
         await renameSessionReferences(
-          input.workspaceId,
-          input.workspacePath,
+          { id: input.workspaceId, path: input.workspacePath },
           input.sessionId,
           realId
         )
@@ -626,8 +625,13 @@ export async function sendAcpMessage(
       })
       await applyNoPromptMode(client, config, realId)
       if (input.model) await setSessionModel(config, rec, client, input.model)
-      if (input.model && !(await hasSessionConfig(input.workspacePath, realId))) {
-        await saveSessionConfig(input.workspacePath, realId, { model: input.model })
+      if (
+        input.model &&
+        !(await hasSessionConfig({ id: input.workspaceId, path: input.workspacePath }, realId))
+      ) {
+        await saveSessionConfig({ id: input.workspaceId, path: input.workspacePath }, realId, {
+          model: input.model
+        })
       }
     } else {
       rec = await resumeSession(config, input)

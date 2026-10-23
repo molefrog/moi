@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
+import { DEFAULT_WORKSPACE_STATE_ROOT, setWorkspaceStateRoot } from '../workspace-state'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -14,12 +15,7 @@ import {
 } from '../harness/acp/archived'
 import { openclawHarness } from '../harness/openclaw'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
-import {
-  DEFAULT_SELECTED_SESSION_PATH,
-  getSelectedSession,
-  saveSelectedSession,
-  setSelectedSessionPath
-} from '../sessions/selected'
+import { getSelectedSession, saveSelectedSession } from '../sessions/selected'
 import { silenceConsole } from '../test/quiet'
 
 // One test makes `archiveSession` throw; the route logs that error on purpose.
@@ -39,7 +35,7 @@ const originalHermesInterrupt = hermesHarness.interrupt
 beforeEach(async () => {
   tempDir = await mkdtemp(join(tmpdir(), 'moi-api-archive-'))
   setRegistryPath(join(tempDir, 'workspaces.json'))
-  setSelectedSessionPath(join(tempDir, 'selected-sessions.json'))
+  setWorkspaceStateRoot(join(tempDir, 'state'))
   setArchivedSessionsPath(join(tempDir, 'acp-archived-sessions.json'))
 })
 
@@ -54,7 +50,7 @@ afterEach(async () => {
   openclawHarness.archiveSession = originalOpenclawArchive
   hermesHarness.interrupt = originalHermesInterrupt
   setRegistryPath(DEFAULT_REGISTRY_PATH)
-  setSelectedSessionPath(DEFAULT_SELECTED_SESSION_PATH)
+  setWorkspaceStateRoot(DEFAULT_WORKSPACE_STATE_ROOT)
   setArchivedSessionsPath(DEFAULT_ARCHIVED_SESSIONS_PATH)
   await rm(tempDir, { recursive: true, force: true })
 })
@@ -115,7 +111,7 @@ test('one archive failure does not block another chat', async () => {
 
 test('archiving the selected session switches the workspace to New chat', async () => {
   const workspace = await registerWorkspace(join(tempDir, 'claude'), { type: 'claude-code' })
-  await saveSelectedSession(workspace.path, 'selected')
+  await saveSelectedSession(workspace, 'selected')
   claudeCodeHarness.interrupt = async () => {}
   claudeCodeHarness.archiveSession = async () => {}
 
@@ -124,7 +120,7 @@ test('archiving the selected session switches the workspace to New chat', async 
   })
 
   expect(response.status).toBe(204)
-  expect(await getSelectedSession(workspace.path)).toBeUndefined()
+  expect(await getSelectedSession(workspace)).toBeUndefined()
 })
 
 test('every provider supports archiving, openclaw via gateway patch', async () => {

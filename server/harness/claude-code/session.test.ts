@@ -6,8 +6,6 @@ import type { Options, Query, SDKMessage, SDKUserMessage } from '@anthropic-ai/c
 import * as state from '../../state'
 import * as workspaceEnv from '../../workspaces/env'
 import * as sessionConfig from '../../sessions/config'
-import * as sessionStore from '../../sessions/store'
-import * as selectedSession from '../../sessions/selected'
 import * as executable from '../executable'
 import type { SendMessageInput } from '../types'
 import * as history from './sessions'
@@ -119,11 +117,6 @@ beforeEach(() => {
       frames.push(frame)
     }),
     spyOn(sessionConfig, 'hasSessionConfig').mockResolvedValue(true),
-    spyOn(sessionStore, 'renameSessionRecord').mockResolvedValue(undefined),
-    spyOn(selectedSession, 'renameSelectedSession').mockResolvedValue({
-      changed: false,
-      sessionId: null
-    }),
     spyOn(titles, 'generateClaudeSessionTitle').mockResolvedValue(null)
   ]
   restores.push(...spies.map(spy => () => spy.mockRestore()))
