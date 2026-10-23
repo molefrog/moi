@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { DEFAULT_WORKSPACE_STATE_ROOT, setWorkspaceStateRoot } from '../workspace-state'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -6,21 +7,13 @@ import { join } from 'node:path'
 import type { PendingView } from '@/lib/types'
 
 import { api } from './index'
-import { DATA_DIR } from '../data-dir'
 import { setEventServer } from '../events'
 import { codexHarness } from '../harness/codex'
 import type { SendMessageInput } from '../harness/types'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
-import {
-  DEFAULT_SELECTED_SESSION_PATH,
-  getSelectedSession,
-  saveSelectedSession,
-  setSelectedSessionPath
-} from '../sessions/selected'
+import { getSelectedSession, saveSelectedSession } from '../sessions/selected'
 import { viewTabId } from '@/lib/workspace-tabs'
 import { addUpload } from '../uploads'
-import { setPendingViewStorePath } from '../sessions/pending-views'
-import { DEFAULT_SESSION_STORE_PATH, setSessionStorePath } from '../sessions/store'
 
 let tempDir: string
 let events: { type: string; workspaceId?: string; sessionId?: string | null }[]
@@ -30,9 +23,7 @@ const originalCodexSendMessage = codexHarness.sendMessage
 beforeEach(async () => {
   tempDir = await mkdtemp(join(tmpdir(), 'moi-api-pending-views-'))
   setRegistryPath(join(tempDir, 'workspaces.json'))
-  setSelectedSessionPath(join(tempDir, 'selected-sessions.json'))
-  setPendingViewStorePath(join(tempDir, 'pending-views.json'))
-  setSessionStorePath(join(tempDir, 'sessions.json'))
+  setWorkspaceStateRoot(join(tempDir, 'state'))
   codexHarness.availability = async () => ({ status: 'available' })
   codexHarness.sendMessage = async () => {}
   events = []
@@ -44,9 +35,7 @@ afterEach(async () => {
   codexHarness.sendMessage = originalCodexSendMessage
   setEventServer({ publish: () => {} })
   setRegistryPath(DEFAULT_REGISTRY_PATH)
-  setSelectedSessionPath(DEFAULT_SELECTED_SESSION_PATH)
-  setPendingViewStorePath(join(DATA_DIR, 'pending-views.json'))
-  setSessionStorePath(DEFAULT_SESSION_STORE_PATH)
+  setWorkspaceStateRoot(DEFAULT_WORKSPACE_STATE_ROOT)
   await rm(tempDir, { recursive: true, force: true })
 })
 
@@ -209,8 +198,7 @@ describe('pending view chat selection', () => {
       method: 'POST'
     })
     const draft = (await createResponse.json()) as PendingView
-    if (previous)
-      await saveSelectedSession(workspace.path, previous, undefined, viewTabId(draft.id))
+    if (previous) await saveSelectedSession(workspace, previous, undefined, viewTabId(draft.id))
     const sent: SendMessageInput[] = []
     codexHarness.sendMessage = async input => {
       sent.push(input)
@@ -229,7 +217,7 @@ describe('pending view chat selection', () => {
     const result = (await response.json()) as { sessionId: string }
     expect(sent).toHaveLength(1)
     expect(sent[0]).toMatchObject({ sessionId: result.sessionId, isNew: true })
-    expect(await getSelectedSession(workspace.path, viewTabId(draft.id))).toBe(
+    expect(await getSelectedSession(workspace, viewTabId(draft.id))).toBe(
       selectedSessionScope === 'browser-tab' ? (previous ?? undefined) : result.sessionId
     )
     expect(events.filter(event => event.type === 'selected-session:updated')).toEqual(

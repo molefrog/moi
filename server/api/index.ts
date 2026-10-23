@@ -195,12 +195,12 @@ one.get('/widgets/*', c => {
 
 // Views — full-screen agent apps. Mirrors the widget pair above: the exact path
 // lists (in manifest/nav order), `/*` serves one bundle file.
-one.get('/views', c => listViews(c.get('ws').path))
+one.get('/views', c => listViews(c.get('ws')))
 
 one.patch('/views/:viewId', async c => {
   const ws = c.get('ws')
   const body = await c.req.json().catch(() => null)
-  if (await getPendingView(ws.path, c.req.param('viewId'))) {
+  if (await getPendingView(ws, c.req.param('viewId'))) {
     try {
       if (
         typeof body?.requirements !== 'string' &&
@@ -209,7 +209,7 @@ one.patch('/views/:viewId', async c => {
       )
         return c.text('Expected requirements, title, or icon', 400)
       return c.json(
-        await updatePendingView(ws.id, ws.path, c.req.param('viewId'), {
+        await updatePendingView(ws, c.req.param('viewId'), {
           requirements: typeof body.requirements === 'string' ? body.requirements : undefined,
           title: typeof body.title === 'string' ? body.title.trim() : undefined,
           icon: typeof body.icon === 'string' ? body.icon : undefined
@@ -236,7 +236,7 @@ one.delete('/views/:viewId', async c => {
   const ws = c.get('ws')
   try {
     const viewId = c.req.param('viewId')
-    if (await getPendingView(ws.path, viewId)) {
+    if (await getPendingView(ws, viewId)) {
       const active = new Set(
         harnessFor(ws)
           .activeSessions()
@@ -262,7 +262,7 @@ one.get('/views/*', c => {
 
 one.post('/views', async c => {
   const ws = c.get('ws')
-  return c.json(await createPendingView(ws.id, ws.path), 201)
+  return c.json(await createPendingView(ws), 201)
 })
 
 one.post('/views/:viewId/submit', async c => {
@@ -480,11 +480,11 @@ one.get('/uploads/:uploadId', c => {
 
 one.get('/sessions', async c => {
   const ws = c.get('ws')
-  return c.json(await withSessionRecords(ws.path, await harnessFor(ws).listSessions(ws)))
+  return c.json(await withSessionRecords(ws, await harnessFor(ws).listSessions(ws)))
 })
 
 one.get('/selected-session', async c => {
-  return c.json(await getWorkspaceSessionSelection(c.get('ws').path))
+  return c.json(await getWorkspaceSessionSelection(c.get('ws')))
 })
 
 one.put('/pinned-session', async c => {
@@ -502,11 +502,11 @@ one.put('/pinned-session', async c => {
       .some(session => session.workspaceId === ws.id && session.sessionId === body.sessionId)
     if (!found && !active) return c.text('Chat not found', 404)
   }
-  await pinSession(ws.path, body.sessionId)
+  await pinSession(ws, body.sessionId)
   publishEvent({
     type: 'selected-session:updated',
     workspaceId: ws.id,
-    sessionId: (await getSelectedSession(ws.path)) ?? null
+    sessionId: (await getSelectedSession(ws)) ?? null
   })
   return c.json({ pinnedSessionId: body.sessionId })
 })
@@ -519,7 +519,7 @@ one.put('/selected-session', async c => {
   const input = body as { sessionId?: unknown; previousSessionId?: unknown; tabId?: unknown }
   const tabId = input.tabId ?? 'overview'
   if (!isWorkspaceTabId(tabId)) return c.text('Invalid chat tab', 400)
-  if (await getPinnedSession(ws.path)) return c.text('Unpin chat before switching', 409)
+  if (await getPinnedSession(ws)) return c.text('Unpin chat before switching', 409)
   const validSessionId = input.sessionId === null || typeof input.sessionId === 'string'
   const hasPreviousSessionId = Object.prototype.hasOwnProperty.call(input, 'previousSessionId')
   const validPreviousSessionId =
@@ -529,7 +529,7 @@ one.put('/selected-session', async c => {
   if (!validSessionId || !validPreviousSessionId) return c.text('Bad request', 400)
 
   const update = await saveSelectedSession(
-    ws.path,
+    ws,
     input.sessionId as string | null,
     hasPreviousSessionId ? (input.previousSessionId as string | null) : undefined,
     tabId
@@ -564,7 +564,7 @@ one.get('/sessions/:sessionId/events', async c => {
 })
 
 one.get('/sessions/:sessionId', async c => {
-  return c.json(await getSessionRecord(c.get('ws').path, c.req.param('sessionId')))
+  return c.json(await getSessionRecord(c.get('ws'), c.req.param('sessionId')))
 })
 
 // Patch run settings and return the complete session record. null clears a setting.
@@ -590,10 +590,10 @@ one.put('/sessions/:sessionId/config', async c => {
     }
     patch.fastMode = value
   }
-  const workspacePath = c.get('ws').path
+  const ws = c.get('ws')
   const sessionId = c.req.param('sessionId')
-  await saveSessionConfig(workspacePath, sessionId, patch)
-  return c.json(await getSessionRecord(workspacePath, sessionId))
+  await saveSessionConfig(ws, sessionId, patch)
+  return c.json(await getSessionRecord(ws, sessionId))
 })
 
 one.get('/mcp', async c => {

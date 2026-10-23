@@ -31,16 +31,14 @@ import {
 } from '../harness/claude-code/session'
 import { getWorkspace, registerWorkspace, setRegistryPath } from '../workspaces/registry'
 import { addClient, removeClient } from '../state'
-import { setSessionStorePath } from '../sessions/store'
-import { setSelectedSessionPath } from '../sessions/selected'
+import { setWorkspaceStateRoot } from '../workspace-state'
 
 // ---------------------------------------------------------------------------
 // Setup: isolated registry + a throwaway Claude Code workspace.
 // ---------------------------------------------------------------------------
 const tmp = mkdtempSync(join(tmpdir(), 'moi-e2e-'))
 setRegistryPath(join(tmp, 'workspaces.json'))
-setSessionStorePath(join(tmp, 'sessions.json'))
-setSelectedSessionPath(join(tmp, 'selected-sessions.json'))
+setWorkspaceStateRoot(join(tmp, 'workspaces'))
 const wsDir = mkdtempSync(join(tmpdir(), 'moi-ws-'))
 const workspace = await registerWorkspace(wsDir, { type: 'claude-code' })
 const WID = workspace.id

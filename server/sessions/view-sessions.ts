@@ -8,16 +8,23 @@ import type { SendMessageInput } from '../harness/types'
 import { ForkUnsupportedError, inheritedHistoryBoundary } from '../harness/fork'
 import { publishEvent } from '../events'
 import { broadcast } from '../state'
-import { getPinnedSession, saveSelectedSession, resolveRenamedSession } from './selected'
-import { getSessionRecord, patchSessionRecord } from './store'
+import { updateWorkspaceState } from '../workspace-state'
+import {
+  getPinnedSession,
+  saveSelectedSession,
+  resolveRenamedSession,
+  selectSessionForTab
+} from './selected'
+import { getSessionRecord, patchSessionRecord, setSessionTab } from './store'
 import { getSessionConfig, saveSessionConfig } from './config'
 import {
-  beginViewBuild,
   createPendingView,
   getPendingView,
   listPendingViews,
   patchPendingView,
-  PendingViewError
+  PendingViewError,
+  startViewBuild,
+  viewsChanged
 } from './pending-views'
 
 export class ViewStartupError extends Error {
@@ -41,15 +48,15 @@ export async function sendWorkspaceMessage(
   input: SendMessageInput & { selectedSessionScope?: SelectedSessionScope; viewBuildId?: string }
 ) {
   const { selectedSessionScope, viewBuildId, ...message } = input
-  const sessionId = resolveRenamedSession(ws.path, input.sessionId)
-  const record = await getSessionRecord(ws.path, sessionId)
+  const sessionId = resolveRenamedSession(ws.id, input.sessionId)
+  const record = await getSessionRecord(ws, sessionId)
   const tabId = input.context?.activeTab?.id ?? record.tabId ?? 'overview'
   const targetViewId = viewBuildId ?? (input.isNew ? viewIdFromTab(tabId) : undefined)
   const ownedViews = targetViewId
     ? []
-    : (await listPendingViews(ws.path)).filter(view => view.executionSessionId === sessionId)
+    : (await listPendingViews(ws)).filter(view => view.executionSessionId === sessionId)
   const pending = targetViewId
-    ? await getPendingView(ws.path, targetViewId)
+    ? await getPendingView(ws, targetViewId)
     : (ownedViews.find(view => view.id === viewIdFromTab(tabId)) ?? ownedViews[0])
   const isBuildRequest = pending && (viewBuildId === pending.id || input.isNew)
   if (
@@ -70,11 +77,11 @@ export async function sendWorkspaceMessage(
     await attachSession(ws, tabId, sessionId, null, selectedSessionScope)
   }
   if (isBuildRequest)
-    await patchPendingView(ws.id, ws.path, pending.id, {
+    await patchPendingView(ws, pending.id, {
       executionSessionId: sessionId
     })
   const collabReference = await getCollabReferencePath(ws.path, ws.type)
-  const pinnedSessionId = await getPinnedSession(ws.path)
+  const pinnedSessionId = await getPinnedSession(ws)
   await harnessFor(ws).sendMessage({
     ...message,
     sessionId,
@@ -104,7 +111,7 @@ export async function sendWorkspaceMessage(
     }
   })
   if (pending && pending.status !== 'starting')
-    await patchPendingView(ws.id, ws.path, pending.id, { status: 'submitted', error: undefined })
+    await patchPendingView(ws, pending.id, { status: 'submitted', error: undefined })
 }
 async function attachSession(
   ws: WorkspaceEntry,
@@ -113,10 +120,10 @@ async function attachSession(
   previousSessionId?: string | null,
   selectedSessionScope: SelectedSessionScope = 'shared'
 ) {
-  await patchSessionRecord(ws.path, sessionId, { tabId: tabId === 'overview' ? undefined : tabId })
+  await patchSessionRecord(ws, sessionId, { tabId: tabId === 'overview' ? undefined : tabId })
   broadcast(ws.id, { type: 'sessions_changed', sessionId })
   if (selectedSessionScope === 'shared') {
-    await saveSelectedSession(ws.path, sessionId, previousSessionId, tabId)
+    await saveSelectedSession(ws, sessionId, previousSessionId, tabId)
     publishEvent({ type: 'selected-session:updated', workspaceId: ws.id, sessionId })
   }
 }
@@ -137,7 +144,7 @@ async function sendBuild(
     viewBuildId: view.id,
     content: view.requirements
   })
-  await patchPendingView(ws.id, ws.path, view.id, { status: 'submitted' }, 'starting')
+  await patchPendingView(ws, view.id, { status: 'submitted' }, 'starting')
 }
 async function failStartup(
   ws: WorkspaceEntry,
@@ -147,8 +154,7 @@ async function failStartup(
 ): Promise<never> {
   if (view)
     await patchPendingView(
-      ws.id,
-      ws.path,
+      ws,
       view.id,
       {
         status: 'failed',
@@ -158,30 +164,43 @@ async function failStartup(
     )
   throw new ViewStartupError(
     error,
-    sessionId ? resolveRenamedSession(ws.path, sessionId) : undefined,
+    sessionId ? resolveRenamedSession(ws.id, sessionId) : undefined,
     view?.id
   )
 }
 
 export async function submitView(ws: WorkspaceEntry, viewId: string, input: SubmitViewInput) {
-  const pinned = await getPinnedSession(ws.path)
-  const sessionId = pinned ?? input.sessionId ?? crypto.randomUUID()
-  const view = await beginViewBuild(
-    ws.id,
-    ws.path,
-    viewId,
-    input.requirements,
-    sessionId,
-    !!input.attachments?.length
-  )
+  const tabId = viewTabId(viewId)
+  const shared = (input.selectedSessionScope ?? 'shared') === 'shared'
+  // The build, the chat's tab and the tab's selection start in one write. A
+  // pinned chat takes the build and keeps its own tab.
+  const { view, sessionId, pinned } = await updateWorkspaceState(ws, state => {
+    const pinned = state.pinnedSessionId
+    const sessionId = pinned ?? input.sessionId ?? crypto.randomUUID()
+    const view = startViewBuild(
+      state,
+      viewId,
+      input.requirements,
+      sessionId,
+      !!input.attachments?.length
+    )
+    if (!pinned) {
+      setSessionTab(state, sessionId, tabId)
+      if (shared) selectSessionForTab(state, ws.id, sessionId, undefined, tabId)
+    }
+    return { view, sessionId, pinned }
+  })
+  viewsChanged(ws.id)
+  if (!pinned) {
+    broadcast(ws.id, { type: 'sessions_changed', sessionId })
+    if (shared) publishEvent({ type: 'selected-session:updated', workspaceId: ws.id, sessionId })
+  }
   try {
-    if (!pinned)
-      await attachSession(ws, viewTabId(view.id), sessionId, undefined, input.selectedSessionScope)
     await sendBuild(ws, view, sessionId, !pinned, input)
   } catch (error) {
     return failStartup(ws, error, sessionId, view)
   }
-  return { viewId, sessionId: resolveRenamedSession(ws.path, sessionId) }
+  return { viewId, sessionId: resolveRenamedSession(ws.id, sessionId) }
 }
 export async function createViewFromSession(
   ws: WorkspaceEntry,
@@ -190,7 +209,7 @@ export async function createViewFromSession(
 ) {
   if (!requirements.trim()) throw new Error('View requirements are required')
   if (fromSessionId === undefined) {
-    const view = await createPendingView(ws.id, ws.path, {
+    const view = await createPendingView(ws, {
       requirements: requirements.trim(),
       status: 'submitted'
     })
@@ -201,7 +220,7 @@ export async function createViewFromSession(
     }
   }
   if (!fromSessionId) throw new Error('Session id cannot be empty')
-  fromSessionId = resolveRenamedSession(ws.path, fromSessionId)
+  fromSessionId = resolveRenamedSession(ws.id, fromSessionId)
   const harness = harnessFor(ws)
   if (
     !(await harness.listSessions(ws)).some(session => session.sessionId === fromSessionId) &&
@@ -213,7 +232,7 @@ export async function createViewFromSession(
   let sessionId: string | undefined
   let view: PendingView | undefined
   try {
-    const sourceConfig = await getSessionConfig(ws.path, fromSessionId)
+    const sourceConfig = await getSessionConfig(ws, fromSessionId)
     try {
       sessionId = await harness.forkSession?.(ws, fromSessionId, sourceConfig)
     } catch (error) {
@@ -222,18 +241,18 @@ export async function createViewFromSession(
     const isNew = !sessionId
     sessionId ??= crypto.randomUUID()
     if (!isNew) {
-      await patchSessionRecord(ws.path, sessionId, { forkedFromSessionId: fromSessionId })
+      await patchSessionRecord(ws, sessionId, { forkedFromSessionId: fromSessionId })
       // The fork API returns only a child ID. A failed history read leaves the
       // child usable and its full transcript visible.
       const history = await harness.sessionEvents(ws, sessionId).catch(() => undefined)
       if (history)
-        await patchSessionRecord(ws.path, sessionId, {
+        await patchSessionRecord(ws, sessionId, {
           forkedFromSessionId: fromSessionId,
           ...inheritedHistoryBoundary(history)
         })
     }
-    const config = await saveSessionConfig(ws.path, sessionId, sourceConfig)
-    view = await createPendingView(ws.id, ws.path, {
+    const config = await saveSessionConfig(ws, sessionId, sourceConfig)
+    view = await createPendingView(ws, {
       status: 'starting',
       requirements: requirements.trim(),
       executionSessionId: sessionId
@@ -243,18 +262,17 @@ export async function createViewFromSession(
     return {
       viewId: view.id,
       mode: 'handoff' as const,
-      sessionId: resolveRenamedSession(ws.path, sessionId)
+      sessionId: resolveRenamedSession(ws.id, sessionId)
     }
   } catch (error) {
     return failStartup(ws, error, sessionId, view)
   }
 }
 export async function failInterruptedViewStarts(ws: WorkspaceEntry) {
-  for (const view of await listPendingViews(ws.path)) {
+  for (const view of await listPendingViews(ws)) {
     if (view.status === 'starting')
       await patchPendingView(
-        ws.id,
-        ws.path,
+        ws,
         view.id,
         {
           status: 'failed',

@@ -955,8 +955,7 @@ async function sendMessage(
         aliases.set(recKey(input.workspaceId, input.sessionId), realId)
         sendLanes.set(recKey(input.workspaceId, realId), lane)
         await renameSessionReferences(
-          input.workspaceId,
-          input.workspacePath,
+          { id: input.workspaceId, path: input.workspacePath },
           input.sessionId,
           realId
         )
@@ -972,9 +971,9 @@ async function sendMessage(
       rec.model = started.model ?? input.model
       if (
         (input.model || input.effort || input.fastMode !== undefined) &&
-        !(await hasSessionConfig(input.workspacePath, realId))
+        !(await hasSessionConfig({ id: input.workspaceId, path: input.workspacePath }, realId))
       ) {
-        await saveSessionConfig(input.workspacePath, realId, {
+        await saveSessionConfig({ id: input.workspaceId, path: input.workspacePath }, realId, {
           model: input.model,
           effort: input.effort,
           fastMode: input.fastMode

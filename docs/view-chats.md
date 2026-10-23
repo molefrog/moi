@@ -52,18 +52,20 @@ place when pinned and use `--from-session` with the current session ID otherwise
 
 ## State and completion
 
-`DATA_DIR/pending-views.json` holds pending views. Their startup statuses are `draft`,
-`starting`, `submitted`, and `failed`. Building/waiting presentation derives from
-normal session activity. `executionSessionId` identifies the builder, including pinned
-execution, independently of chat attribution. Ordinary messages update build state
+Each workspace's `DATA_DIR/workspaces/<workspace id>/state.json` holds its pending
+views. Their startup statuses are `draft`, `starting`, `submitted`, and `failed`.
+Building/waiting presentation derives from normal session activity.
+`executionSessionId` (stored as `buildSessionId`) identifies the builder, including
+pinned execution, independently of chat attribution. Ordinary messages update build state
 only when the sending chat matches this ID.
 
 `moi views set <id> --title "…" --icon <id>` updates pending metadata only. A successful
 bundle reveals the compiled view, whose manifest config supplies its title/icon, and
 removes the pending record. There is no completion-time chat or tab reassignment.
 
-`DATA_DIR/sessions.json` holds attribution, fork provenance, and run settings.
-`DATA_DIR/selected-sessions.json` holds per-tab selections and the workspace pin.
+The same `state.json` holds chat attribution, fork provenance, and run settings, plus
+per-tab selections and the workspace pin. Submitting a view and renaming a chat each
+update it in one write.
 With Collab enabled, unpinned selections are local to each browser tab. Until a
 browser tab chooses a chat, it uses the server selection so CLI view handoffs open
 on their child chat. Choosing New chat saves an explicit empty selection locally.

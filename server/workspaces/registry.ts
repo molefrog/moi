@@ -11,6 +11,7 @@ import { DATA_DIR } from '../data-dir'
 import { allHarnesses } from '../harness/registry'
 import type { DiscoveredWorkspaceCandidate } from '../harness/types'
 import { createdWorkspacesRoot } from '../app-config'
+import { findStateIdForPath } from '../workspace-state'
 
 // Replace the home-dir prefix with `~` for display. Keeps the original
 // absolute path in place; callers should put the result in `displayPath`.
@@ -71,6 +72,17 @@ function locked<T>(operation: () => Promise<T>): Promise<T> {
   return run
 }
 
+// A removed workspace keeps its state folder. Re-adding the same folder takes
+// its old id back, and with it the pinned chat, selections and chat settings.
+async function previousWorkspaceId(
+  entries: WorkspaceEntry[],
+  normalPath: string
+): Promise<string | undefined> {
+  const id = await findStateIdForPath(normalPath)
+  if (!id || validateWorkspaceId(id) || entries.some(e => e.id === id)) return undefined
+  return id
+}
+
 export type RegisterOptions = {
   // Register under this id instead of a generated one. Only accepted while the
   // workspace is unregistered — see `workspaceIdError`.
@@ -124,7 +136,7 @@ export async function registerWorkspace(
     const existing = entries.find(e => e.path === normalPath)
     if (existing) return existing
     const entry: WorkspaceEntry = {
-      id: opts.id ?? newWorkspaceId(),
+      id: opts.id ?? (await previousWorkspaceId(entries, normalPath)) ?? newWorkspaceId(),
       path: normalPath,
       addedAt: new Date().toISOString(),
       ...(opts.type ? { type: opts.type } : {}),

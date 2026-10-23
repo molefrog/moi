@@ -1,4 +1,9 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
+import {
+  DEFAULT_WORKSPACE_STATE_ROOT,
+  setWorkspaceStateRoot,
+  updateWorkspaceState
+} from '../workspace-state'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -17,30 +22,22 @@ import {
   createPendingView,
   getPendingView,
   listPendingViews,
-  setPendingViewStorePath,
   updatePendingView,
   completeViewBuild,
   discardPendingView,
-  beginViewBuild,
+  startViewBuild,
   patchPendingView
 } from './pending-views'
+import { getSessionRecord, patchSessionRecord } from './store'
 import {
-  getSessionRecord,
-  patchSessionRecord,
-  setSessionStorePath,
-  DEFAULT_SESSION_STORE_PATH
-} from './store'
-import {
+  forgetSessionRenames,
   getSelectedSession,
   getPinnedSession,
   pinSession,
-  saveSelectedSession,
-  setSelectedSessionPath,
-  DEFAULT_SELECTED_SESSION_PATH
+  saveSelectedSession
 } from './selected'
 import { renameSessionReferences } from './lifecycle'
 import { getSessionConfig, saveSessionConfig } from './config'
-import { DATA_DIR } from '../data-dir'
 import { setEventServer } from '../events'
 import { getClientFrameLog } from '../harness/debug'
 const harness = harnessFor('codex')
@@ -63,9 +60,8 @@ let stopped: string[]
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'moi-view-sessions-'))
   ws = { id: 'test', path: dir, type: 'codex', addedAt: '' }
-  setPendingViewStorePath(join(dir, 'pending-views.json'))
-  setSessionStorePath(join(dir, 'sessions.json'))
-  setSelectedSessionPath(join(dir, 'selection.json'))
+  setWorkspaceStateRoot(join(dir, 'state'))
+  forgetSessionRenames()
   sent = []
   events = []
   forks = 0
@@ -103,19 +99,17 @@ beforeEach(async () => {
 })
 afterEach(async () => {
   Object.assign(harness, original)
-  setPendingViewStorePath(join(DATA_DIR, 'pending-views.json'))
-  setSessionStorePath(DEFAULT_SESSION_STORE_PATH)
-  setSelectedSessionPath(DEFAULT_SELECTED_SESSION_PATH)
+  setWorkspaceStateRoot(DEFAULT_WORKSPACE_STATE_ROOT)
   setEventServer({ publish: () => {} })
   await rm(dir, { recursive: true, force: true })
 })
 test('manual creation has no session until submission, then attaches once', async () => {
-  const view = await createPendingView(ws.id, ws.path)
+  const view = await createPendingView(ws)
   expect(view.executionSessionId).toBeUndefined()
-  expect(await getSelectedSession(ws.path, `views/${view.id}`)).toBeUndefined()
+  expect(await getSelectedSession(ws, `views/${view.id}`)).toBeUndefined()
   const result = await submitView(ws, view.id, { requirements: 'Build cards', sessionId: 'fresh' })
   expect(result).toEqual({ viewId: view.id, sessionId: 'fresh' })
-  expect(await getSessionRecord(ws.path, 'fresh')).toEqual({ tabId: `views/${view.id}` })
+  expect(await getSessionRecord(ws, 'fresh')).toEqual({ tabId: `views/${view.id}` })
   expect(sent[0]).toMatchObject({ sessionId: 'fresh', isNew: true, content: 'Build cards' })
   expect(renderMoiContext(sent[0].context!)).toContain('Build a new view from this message.')
   expect(renderMoiContext(sent[0].context!)).toContain('moi views create --requirements')
@@ -126,24 +120,24 @@ test('manual creation has no session until submission, then attaches once', asyn
     pinned: false
   })
   expect(sent[0]).not.toHaveProperty('viewBuildId')
-  expect((await getPendingView(ws.path, view.id))?.status).toBe('submitted')
+  expect((await getPendingView(ws, view.id))?.status).toBe('submitted')
 })
 test('CLI prepares a fork and boundary before creating a view while source stays running', async () => {
   harness.forkSession = async () => {
     forks++
-    expect(await listPendingViews(ws.path)).toEqual([])
+    expect(await listPendingViews(ws)).toEqual([])
     return 'child'
   }
   harness.sessionEvents = async () => {
-    expect(await getSessionRecord(ws.path, 'child')).toEqual({ forkedFromSessionId: 'source' })
-    expect(await listPendingViews(ws.path)).toEqual([])
+    expect(await getSessionRecord(ws, 'child')).toEqual({ forkedFromSessionId: 'source' })
+    expect(await listPendingViews(ws)).toEqual([])
     return []
   }
   harness.sendMessage = async input => {
-    expect(await getSessionRecord(ws.path, 'child')).toMatchObject({
+    expect(await getSessionRecord(ws, 'child')).toMatchObject({
       tabId: input.context?.session?.tabId
     })
-    expect((await getSessionRecord(ws.path, 'child')).forkedThroughMessageId).toBeUndefined()
+    expect((await getSessionRecord(ws, 'child')).forkedThroughMessageId).toBeUndefined()
     sent.push(input)
   }
   const result = await createViewFromSession(ws, 'source', 'Build cards')
@@ -194,19 +188,19 @@ test('handoff waits for send acceptance', async () => {
 test.each(['manual', 'cli'])(
   'pinned %s build preserves ownership and leaves the view selection empty',
   async entry => {
-    await patchSessionRecord(ws.path, 'source', { tabId: 'views/original' })
-    await saveSelectedSession(ws.path, 'source', undefined, 'views/original')
-    await pinSession(ws.path, 'source')
+    await patchSessionRecord(ws, 'source', { tabId: 'views/original' })
+    await saveSelectedSession(ws, 'source', undefined, 'views/original')
+    await pinSession(ws, 'source')
     const result =
       entry === 'cli'
         ? await createViewFromSession(ws, undefined, 'Build cards')
-        : await submitView(ws, (await createPendingView(ws.id, ws.path)).id, {
+        : await submitView(ws, (await createPendingView(ws)).id, {
             requirements: 'Build cards'
           })
     expect(forks).toBe(0)
     expect(sent).toHaveLength(entry === 'cli' ? 0 : 1)
-    expect(await getSessionRecord(ws.path, 'source')).toEqual({ tabId: 'views/original' })
-    expect(await getSelectedSession(ws.path, `views/${result.viewId}`)).toBeUndefined()
+    expect(await getSessionRecord(ws, 'source')).toEqual({ tabId: 'views/original' })
+    expect(await getSelectedSession(ws, `views/${result.viewId}`)).toBeUndefined()
     if (entry === 'cli') {
       expect(result).toMatchObject({
         mode: 'in-place',
@@ -223,7 +217,7 @@ test.each(['manual', 'cli'])(
       expect(renderMoiContext(sent[0].context!)).toContain('moi views create --requirements')
     }
     harness.activeSessions = () => []
-    await pinSession(ws.path, null)
+    await pinSession(ws, null)
     await sendWorkspaceMessage(ws, {
       workspaceId: ws.id,
       workspacePath: ws.path,
@@ -232,7 +226,7 @@ test.each(['manual', 'cli'])(
       content: 'Continue',
       context: { activeTab: { id: `views/${result.viewId}` } }
     })
-    expect(await getSessionRecord(ws.path, 'new-chat')).toEqual({ tabId: `views/${result.viewId}` })
+    expect(await getSessionRecord(ws, 'new-chat')).toEqual({ tabId: `views/${result.viewId}` })
     expect(renderMoiContext(sent.at(-1)!.context!)).toContain(
       `The view id is \`${result.viewId}\`.`
     )
@@ -241,8 +235,8 @@ test.each(['manual', 'cli'])(
 test.each([false, true])(
   'CLI creation without a source creates only a view (pinned: %s)',
   async pinned => {
-    await patchSessionRecord(ws.path, 'source', { tabId: 'scratchpad' })
-    if (pinned) await pinSession(ws.path, 'source')
+    await patchSessionRecord(ws, 'source', { tabId: 'scratchpad' })
+    if (pinned) await pinSession(ws, 'source')
     harness.listSessions = async () => {
       throw new Error('Should not look up chats')
     }
@@ -254,13 +248,13 @@ test.each([false, true])(
     const instructions = result.buildInstructions?.join('\n')
     expect(instructions).toContain('moi views create --requirements')
     expect(instructions).not.toContain('--from-session')
-    const view = await getPendingView(ws.path, result.viewId)
+    const view = await getPendingView(ws, result.viewId)
     expect(view).toMatchObject({ requirements: 'Build cards', status: 'submitted' })
     expect(view?.executionSessionId).toBeUndefined()
-    expect(await getSessionRecord(ws.path, 'source')).toEqual({ tabId: 'scratchpad' })
-    expect(await getSessionRecord(ws.path, 'child')).toEqual({})
-    expect(await getPinnedSession(ws.path)).toBe(pinned ? 'source' : null)
-    expect(await getSelectedSession(ws.path, `views/${result.viewId}`)).toBeUndefined()
+    expect(await getSessionRecord(ws, 'source')).toEqual({ tabId: 'scratchpad' })
+    expect(await getSessionRecord(ws, 'child')).toEqual({})
+    expect(await getPinnedSession(ws)).toBe(pinned ? 'source' : null)
+    expect(await getSelectedSession(ws, `views/${result.viewId}`)).toBeUndefined()
     expect(forks).toBe(0)
     expect(sent).toEqual([])
   }
@@ -269,12 +263,12 @@ test('CLI creation rejects an empty explicit source', async () => {
   await expect(createViewFromSession(ws, '', 'Build cards')).rejects.toThrow(
     'Session id cannot be empty'
   )
-  expect(await listPendingViews(ws.path)).toEqual([])
+  expect(await listPendingViews(ws)).toEqual([])
   expect(forks).toBe(0)
   expect(sent).toEqual([])
 })
 test('CLI creation forks the explicit source even when a different chat is pinned', async () => {
-  await pinSession(ws.path, 'source')
+  await pinSession(ws, 'source')
   harness.listSessions = async () => [{ sessionId: 'other', summary: 'Other', lastModified: 1 }]
   harness.forkSession = async (_ws, sourceId) => {
     expect(sourceId).toBe('other')
@@ -283,12 +277,12 @@ test('CLI creation forks the explicit source even when a different chat is pinne
   }
   const result = await createViewFromSession(ws, 'other', 'Build cards')
   expect(result).toEqual({ viewId: expect.any(String), mode: 'handoff', sessionId: 'child' })
-  expect(await getSessionRecord(ws.path, 'child')).toMatchObject({
+  expect(await getSessionRecord(ws, 'child')).toMatchObject({
     tabId: `views/${result.viewId}`,
     forkedFromSessionId: 'other'
   })
-  expect(await getSelectedSession(ws.path, `views/${result.viewId}`)).toBe('child')
-  expect(await getPinnedSession(ws.path)).toBe('source')
+  expect(await getSelectedSession(ws, `views/${result.viewId}`)).toBe('child')
+  expect(await getPinnedSession(ws)).toBe('source')
   expect(forks).toBe(1)
   expect(sent).toHaveLength(1)
   expect(sent[0].context?.session?.pinned).toBe(false)
@@ -297,16 +291,16 @@ test('CLI creation rejects an unknown explicit source before creating a view', a
   await expect(createViewFromSession(ws, 'missing', 'Build cards')).rejects.toThrow(
     'Source chat not found'
   )
-  expect(await listPendingViews(ws.path)).toEqual([])
+  expect(await listPendingViews(ws)).toEqual([])
   expect(forks).toBe(0)
   expect(sent).toEqual([])
 })
 test('CLI creation still requires nonempty requirements in a pinned chat', async () => {
-  await pinSession(ws.path, 'source')
+  await pinSession(ws, 'source')
   await expect(createViewFromSession(ws, undefined, '  ')).rejects.toThrow(
     'View requirements are required'
   )
-  expect(await listPendingViews(ws.path)).toEqual([])
+  expect(await listPendingViews(ws)).toEqual([])
 })
 test.each(['missing', 'unsupported'])('fresh fallback for %s fork support', async kind => {
   harness.forkSession =
@@ -316,7 +310,7 @@ test.each(['missing', 'unsupported'])('fresh fallback for %s fork support', asyn
           throw new ForkUnsupportedError()
         }
   const result = await createViewFromSession(ws, 'source', 'Build cards')
-  expect(await getSessionRecord(ws.path, result.sessionId!)).toEqual({
+  expect(await getSessionRecord(ws, result.sessionId!)).toEqual({
     tabId: `views/${result.viewId}`
   })
   expect(sent[0].isNew).toBe(true)
@@ -330,7 +324,7 @@ test('uncertain fork failure does not create a view or retry', async () => {
     'Connection lost'
   )
   expect(forks).toBe(1)
-  expect(await listPendingViews(ws.path)).toEqual([])
+  expect(await listPendingViews(ws)).toEqual([])
   expect(sent).toEqual([])
 })
 test('boundary read failure keeps the fork and continues with full history', async () => {
@@ -339,7 +333,7 @@ test('boundary read failure keeps the fork and continues with full history', asy
   }
   const result = await createViewFromSession(ws, 'source', 'Build cards')
   expect(result).toEqual({ viewId: expect.any(String), mode: 'handoff', sessionId: 'child' })
-  expect(await getSessionRecord(ws.path, 'child')).toEqual({
+  expect(await getSessionRecord(ws, 'child')).toEqual({
     forkedFromSessionId: 'source',
     tabId: `views/${result.viewId}`
   })
@@ -361,39 +355,39 @@ test('send failure retains view and child and reports both IDs', async () => {
     sessionId: 'child',
     viewId: expect.any(String)
   })
-  const [view] = await listPendingViews(ws.path)
+  const [view] = await listPendingViews(ws)
   expect(view).toMatchObject({ status: 'failed', executionSessionId: 'child' })
   await failInterruptedViewStarts(ws)
   expect(forks).toBe(1)
 })
 test('completion removes build state without moving selection, ownership, or pin', async () => {
   const result = await createViewFromSession(ws, 'source', 'Build cards')
-  await pinSession(ws.path, 'source')
-  await completeViewBuild(ws.id, ws.path, result.viewId)
-  await completeViewBuild(ws.id, ws.path, result.viewId)
-  expect(await listPendingViews(ws.path)).toEqual([])
-  expect(await getSelectedSession(ws.path, `views/${result.viewId}`)).toBe('child')
-  expect(await getSessionRecord(ws.path, 'child')).toMatchObject({
+  await pinSession(ws, 'source')
+  await completeViewBuild(ws, result.viewId)
+  await completeViewBuild(ws, result.viewId)
+  expect(await listPendingViews(ws)).toEqual([])
+  expect(await getSelectedSession(ws, `views/${result.viewId}`)).toBe('child')
+  expect(await getSessionRecord(ws, 'child')).toMatchObject({
     tabId: `views/${result.viewId}`,
     forkedThroughMessageId: 'boundary'
   })
-  expect(await getPinnedSession(ws.path)).toBe('source')
+  expect(await getPinnedSession(ws)).toBe('source')
 })
 test('late send acceptance does not recreate a completed build', async () => {
   harness.sendMessage = async input => {
-    await completeViewBuild(ws.id, ws.path, input.context!.session!.tabId!.slice('views/'.length))
+    await completeViewBuild(ws, input.context!.session!.tabId!.slice('views/'.length))
   }
   await createViewFromSession(ws, 'source', 'Build cards')
-  expect(await listPendingViews(ws.path)).toEqual([])
+  expect(await listPendingViews(ws)).toEqual([])
 })
 test('native rename preserves the execution reference and attached selection', async () => {
   harness.sendMessage = async input => {
-    await renameSessionReferences(ws.id, ws.path, input.sessionId, 'native')
+    await renameSessionReferences(ws, input.sessionId, 'native')
   }
   const result = await createViewFromSession(ws, 'source', 'Build cards')
   expect(result.sessionId).toBe('native')
-  expect((await getPendingView(ws.path, result.viewId))?.executionSessionId).toBe('native')
-  expect(await getSelectedSession(ws.path, `views/${result.viewId}`)).toBe('native')
+  expect((await getPendingView(ws, result.viewId))?.executionSessionId).toBe('native')
+  expect(await getSelectedSession(ws, `views/${result.viewId}`)).toBe('native')
 })
 test.each(allHarnesses().map(harness => harness.id))(
   '%s handoff inherits source settings through native fork or fresh fallback',
@@ -408,12 +402,12 @@ test.each(allHarnesses().map(harness => harness.id))(
     }
     const config = { model: 'model', effort: 'high', fastMode: false }
     const workspace = { ...ws, type, agentId: 'agent' }
-    await saveSessionConfig(ws.path, 'source', config)
+    await saveSessionConfig(ws, 'source', config)
     target.listSessions = harness.listSessions
     target.activeSessions = harness.activeSessions
     target.sessionEvents = async () => []
     target.sendMessage = async input => {
-      expect(await getSessionConfig(ws.path, input.sessionId)).toEqual(config)
+      expect(await getSessionConfig(ws, input.sessionId)).toEqual(config)
       sent.push(input)
     }
     target.forkSession = original.forkSession
@@ -421,13 +415,13 @@ test.each(allHarnesses().map(harness => harness.id))(
           expect(sourceId).toBe('source')
           expect(sourceConfig).toEqual(config)
           // A later source edit must not change the settings of this fork.
-          await saveSessionConfig(ws.path, sourceId, { model: 'other', effort: 'low' })
+          await saveSessionConfig(ws, sourceId, { model: 'other', effort: 'low' })
           return 'child'
         }
       : undefined
     try {
       const result = await createViewFromSession(workspace, 'source', 'Build cards')
-      expect(await getSessionConfig(ws.path, result.sessionId!)).toEqual(config)
+      expect(await getSessionConfig(ws, result.sessionId!)).toEqual(config)
       expect(sent).toHaveLength(1)
       expect(sent[0]).toMatchObject({ ...config, isNew: !original.forkSession })
     } finally {
@@ -436,25 +430,23 @@ test.each(allHarnesses().map(harness => harness.id))(
   }
 )
 test('restart fails a starting view without forking or sending', async () => {
-  const view = await createPendingView(ws.id, ws.path, {
+  const view = await createPendingView(ws, {
     status: 'starting',
     executionSessionId: 'child'
   })
   await failInterruptedViewStarts(ws)
-  expect((await getPendingView(ws.path, view.id))?.status).toBe('failed')
+  expect((await getPendingView(ws, view.id))?.status).toBe('failed')
   expect(sent).toEqual([])
   expect(forks).toBe(0)
 })
 test('metadata updates neither create views nor change status', async () => {
-  await expect(updatePendingView(ws.id, ws.path, 'missing', { title: 'Cards' })).rejects.toThrow(
-    'not found'
-  )
-  const view = await createPendingView(ws.id, ws.path)
-  const updated = await updatePendingView(ws.id, ws.path, view.id, { title: 'Cards', icon: 'book' })
+  await expect(updatePendingView(ws, 'missing', { title: 'Cards' })).rejects.toThrow('not found')
+  const view = await createPendingView(ws)
+  const updated = await updatePendingView(ws, view.id, { title: 'Cards', icon: 'book' })
   expect(updated).toMatchObject({ title: 'Cards', icon: 'book', status: 'draft' })
 })
 test('duplicate submissions are rejected', async () => {
-  const view = await createPendingView(ws.id, ws.path)
+  const view = await createPendingView(ws)
   const results = await Promise.allSettled([
     submitView(ws, view.id, { requirements: 'Cards' }),
     submitView(ws, view.id, { requirements: 'Cards' })
@@ -463,11 +455,11 @@ test('duplicate submissions are rejected', async () => {
   expect(sent).toHaveLength(1)
 })
 test('discard blocks startup and active construction, then archives attributed chats', async () => {
-  const view = await createPendingView(ws.id, ws.path)
-  await beginViewBuild(ws.id, ws.path, view.id, 'Cards', 'child', false)
+  const view = await createPendingView(ws)
+  await updateWorkspaceState(ws, state => startViewBuild(state, view.id, 'Cards', 'child', false))
   await expect(discardPendingView(ws, view.id, new Set())).rejects.toThrow('only be closed')
   await failInterruptedViewStarts(ws)
-  await patchSessionRecord(ws.path, 'child', {
+  await patchSessionRecord(ws, 'child', {
     tabId: `views/${view.id}`,
     forkedFromSessionId: 'source'
   })
@@ -475,20 +467,20 @@ test('discard blocks startup and active construction, then archives attributed c
     'only be closed'
   )
   expect(archived).toEqual([])
-  await patchSessionRecord(ws.path, 'follow-up', { tabId: `views/${view.id}` })
-  await saveSelectedSession(ws.path, 'child', undefined, `views/${view.id}`)
-  await saveSelectedSession(ws.path, 'child')
-  await pinSession(ws.path, 'follow-up')
+  await patchSessionRecord(ws, 'follow-up', { tabId: `views/${view.id}` })
+  await saveSelectedSession(ws, 'child', undefined, `views/${view.id}`)
+  await saveSelectedSession(ws, 'child')
+  await pinSession(ws, 'follow-up')
   await discardPendingView(ws, view.id, new Set())
   expect(archived).toEqual(['child', 'follow-up'])
-  expect(await getPendingView(ws.path, view.id)).toBeUndefined()
-  expect(await getSessionRecord(ws.path, 'child')).toEqual({
+  expect(await getPendingView(ws, view.id)).toBeUndefined()
+  expect(await getSessionRecord(ws, 'child')).toEqual({
     tabId: `views/${view.id}`,
     forkedFromSessionId: 'source'
   })
-  expect(await getSelectedSession(ws.path, `views/${view.id}`)).toBeUndefined()
-  expect(await getSelectedSession(ws.path)).toBeUndefined()
-  expect(await getPinnedSession(ws.path)).toBeNull()
+  expect(await getSelectedSession(ws, `views/${view.id}`)).toBeUndefined()
+  expect(await getSelectedSession(ws)).toBeUndefined()
+  expect(await getPinnedSession(ws)).toBeNull()
   expect(getClientFrameLog(ws.id).map(entry => entry.frame)).toEqual(
     expect.arrayContaining(
       archived.map(sessionId => ({
@@ -501,56 +493,56 @@ test('discard blocks startup and active construction, then archives attributed c
 })
 
 test('discard archives view attribution rather than a pinned execution chat', async () => {
-  const view = await createPendingView(ws.id, ws.path, {
+  const view = await createPendingView(ws, {
     status: 'submitted',
     executionSessionId: 'source'
   })
-  await patchSessionRecord(ws.path, 'source', { tabId: 'scratchpad' })
-  await patchSessionRecord(ws.path, 'sibling', { tabId: 'views/sibling' })
-  await patchSessionRecord(ws.path, 'owned', { tabId: `views/${view.id}` })
-  await pinSession(ws.path, 'source')
-  await saveSelectedSession(ws.path, 'source', undefined, `views/${view.id}`)
-  await saveSelectedSession(ws.path, 'source', undefined, 'scratchpad')
+  await patchSessionRecord(ws, 'source', { tabId: 'scratchpad' })
+  await patchSessionRecord(ws, 'sibling', { tabId: 'views/sibling' })
+  await patchSessionRecord(ws, 'owned', { tabId: `views/${view.id}` })
+  await pinSession(ws, 'source')
+  await saveSelectedSession(ws, 'source', undefined, `views/${view.id}`)
+  await saveSelectedSession(ws, 'source', undefined, 'scratchpad')
   await discardPendingView(ws, view.id, new Set())
   expect(archived).toEqual(['owned'])
-  expect(await getPinnedSession(ws.path)).toBe('source')
-  expect(await getSelectedSession(ws.path, 'scratchpad')).toBe('source')
-  expect(await getSelectedSession(ws.path, `views/${view.id}`)).toBeUndefined()
-  expect(await getSessionRecord(ws.path, 'source')).toEqual({ tabId: 'scratchpad' })
+  expect(await getPinnedSession(ws)).toBe('source')
+  expect(await getSelectedSession(ws, 'scratchpad')).toBe('source')
+  expect(await getSelectedSession(ws, `views/${view.id}`)).toBeUndefined()
+  expect(await getSessionRecord(ws, 'source')).toEqual({ tabId: 'scratchpad' })
 })
 
 test('archive failure leaves a pending view and its selection available to retry', async () => {
-  const view = await createPendingView(ws.id, ws.path, {
+  const view = await createPendingView(ws, {
     status: 'failed',
     executionSessionId: 'child'
   })
-  await patchSessionRecord(ws.path, 'child', { tabId: `views/${view.id}` })
-  await saveSelectedSession(ws.path, 'child', undefined, `views/${view.id}`)
+  await patchSessionRecord(ws, 'child', { tabId: `views/${view.id}` })
+  await saveSelectedSession(ws, 'child', undefined, `views/${view.id}`)
   harness.archiveSession = async () => {
     throw new Error('Archive failed')
   }
   await expect(discardPendingView(ws, view.id, new Set())).rejects.toThrow('Archive failed')
-  expect(await getPendingView(ws.path, view.id)).toEqual(view)
-  expect(await getSelectedSession(ws.path, `views/${view.id}`)).toBe('child')
+  expect(await getPendingView(ws, view.id)).toEqual(view)
+  expect(await getSelectedSession(ws, `views/${view.id}`)).toBe('child')
   harness.archiveSession = async (_, sessionId) => {
     archived.push(sessionId)
   }
   await discardPendingView(ws, view.id, new Set())
   expect(archived).toEqual(['child'])
-  expect(await getPendingView(ws.path, view.id)).toBeUndefined()
+  expect(await getPendingView(ws, view.id)).toBeUndefined()
 })
 
 test('fresh handoff failure reports the provider ID after a native rename', async () => {
   harness.forkSession = undefined
   harness.sendMessage = async input => {
-    await renameSessionReferences(ws.id, ws.path, input.sessionId, 'native-child')
+    await renameSessionReferences(ws, input.sessionId, 'native-child')
     throw new Error('Send rejected')
   }
   await expect(createViewFromSession(ws, 'source', 'Cards')).rejects.toMatchObject({
     sessionId: 'native-child',
     viewId: expect.any(String)
   })
-  expect((await listPendingViews(ws.path))[0]).toMatchObject({
+  expect((await listPendingViews(ws))[0]).toMatchObject({
     status: 'failed',
     executionSessionId: 'native-child'
   })
@@ -558,7 +550,7 @@ test('fresh handoff failure reports the provider ID after a native rename', asyn
 
 test('a fresh chat after unpinning receives the saved view requirements', async () => {
   harness.activeSessions = () => []
-  const view = await createPendingView(ws.id, ws.path, {
+  const view = await createPendingView(ws, {
     requirements: 'Build a gardening board with watering reminders',
     status: 'submitted',
     executionSessionId: 'source'
@@ -574,11 +566,11 @@ test('a fresh chat after unpinning receives the saved view requirements', async 
   expect(sent[0].context?.directives).toContain(
     'Original view requirements:\nBuild a gardening board with watering reminders'
   )
-  expect(await getSessionRecord(ws.path, 'fresh')).toEqual({ tabId: `views/${view.id}` })
+  expect(await getSessionRecord(ws, 'fresh')).toEqual({ tabId: `views/${view.id}` })
 })
 
 test('follow-ups keep chat context without repeating the build request, including off the view tab', async () => {
-  const view = await createPendingView(ws.id, ws.path)
+  const view = await createPendingView(ws)
   await submitView(ws, view.id, { requirements: 'Build cards', sessionId: 'fresh' })
   for (const activeTab of [`views/${view.id}`, 'overview'] as const) {
     await sendWorkspaceMessage(ws, {
@@ -605,15 +597,15 @@ test('follow-ups keep chat context without repeating the build request, includin
 })
 
 test('an unrelated pinned chat cannot take ownership of a running view build', async () => {
-  const view = await createPendingView(ws.id, ws.path)
+  const view = await createPendingView(ws)
   await submitView(ws, view.id, {
     requirements: 'Build a weather dashboard',
     sessionId: 'builder'
   })
-  await saveSelectedSession(ws.path, 'source', undefined, 'overview')
-  await pinSession(ws.path, 'source')
+  await saveSelectedSession(ws, 'source', undefined, 'overview')
+  await pinSession(ws, 'source')
   harness.activeSessions = () => [{ workspaceId: ws.id, sessionId: 'builder', activity: 'running' }]
-  const before = await getPendingView(ws.path, view.id)
+  const before = await getPendingView(ws, view.id)
 
   await sendWorkspaceMessage(ws, {
     workspaceId: ws.id,
@@ -629,26 +621,26 @@ test('an unrelated pinned chat cannot take ownership of a running view build', a
   expect(message.context?.activeTab).toEqual({ id: `views/${view.id}` })
   expect(message.context?.session?.tabId).toBeUndefined()
   expect(renderMoiContext(message.context!)).not.toContain('Build a new view from this message.')
-  expect(await getSessionRecord(ws.path, 'builder')).toEqual({ tabId: `views/${view.id}` })
-  expect(await getSelectedSession(ws.path, `views/${view.id}`)).toBe('builder')
-  expect(await getPinnedSession(ws.path)).toBe('source')
-  expect(await getPendingView(ws.path, view.id)).toEqual(before)
+  expect(await getSessionRecord(ws, 'builder')).toEqual({ tabId: `views/${view.id}` })
+  expect(await getSelectedSession(ws, `views/${view.id}`)).toBe('builder')
+  expect(await getPinnedSession(ws)).toBe('source')
+  expect(await getPendingView(ws, view.id)).toEqual(before)
 })
 
 test('an unrelated pinned chat cannot clear a failed view build or its error', async () => {
-  const view = await createPendingView(ws.id, ws.path)
+  const view = await createPendingView(ws)
   await submitView(ws, view.id, {
     requirements: 'Build a weather dashboard',
     sessionId: 'builder'
   })
-  await patchPendingView(ws.id, ws.path, view.id, {
+  await patchPendingView(ws, view.id, {
     status: 'failed',
     error: 'Weather data could not be loaded'
   })
-  await saveSelectedSession(ws.path, 'source', undefined, 'overview')
-  await pinSession(ws.path, 'source')
+  await saveSelectedSession(ws, 'source', undefined, 'overview')
+  await pinSession(ws, 'source')
   harness.activeSessions = () => []
-  const before = await getPendingView(ws.path, view.id)
+  const before = await getPendingView(ws, view.id)
 
   await sendWorkspaceMessage(ws, {
     workspaceId: ws.id,
@@ -663,14 +655,14 @@ test('an unrelated pinned chat cannot clear a failed view build or its error', a
   expect(renderMoiContext(sent.at(-1)!.context!)).not.toContain(
     'Build a new view from this message.'
   )
-  expect(await getPendingView(ws.path, view.id)).toEqual(before)
+  expect(await getPendingView(ws, view.id)).toEqual(before)
 })
 
 test('a fresh chat cannot take over a view while its builder is running', async () => {
-  const view = await createPendingView(ws.id, ws.path)
+  const view = await createPendingView(ws)
   await submitView(ws, view.id, { requirements: 'Build a weather dashboard', sessionId: 'builder' })
   harness.activeSessions = () => [{ workspaceId: ws.id, sessionId: 'builder', activity: 'running' }]
-  const before = await getPendingView(ws.path, view.id)
+  const before = await getPendingView(ws, view.id)
 
   await expect(
     sendWorkspaceMessage(ws, {
@@ -684,23 +676,23 @@ test('a fresh chat cannot take over a view while its builder is running', async 
   ).rejects.toThrow('already being built in another chat')
 
   expect(sent).toHaveLength(1)
-  expect(await getPendingView(ws.path, view.id)).toEqual(before)
-  expect(await getSelectedSession(ws.path, `views/${view.id}`)).toBe('builder')
-  expect(await getSessionRecord(ws.path, 'fresh')).toEqual({})
+  expect(await getPendingView(ws, view.id)).toEqual(before)
+  expect(await getSelectedSession(ws, `views/${view.id}`)).toBe('builder')
+  expect(await getSessionRecord(ws, 'fresh')).toEqual({})
 })
 
 test('the builder can resume its failed view while an unrelated failed view is visible', async () => {
-  const view = await createPendingView(ws.id, ws.path)
+  const view = await createPendingView(ws)
   await submitView(ws, view.id, { requirements: 'Build weather cards', sessionId: 'builder' })
-  await patchPendingView(ws.id, ws.path, view.id, { status: 'failed', error: 'Build failed' })
-  const other = await createPendingView(ws.id, ws.path, {
+  await patchPendingView(ws, view.id, { status: 'failed', error: 'Build failed' })
+  const other = await createPendingView(ws, {
     status: 'failed',
     requirements: 'Build a calendar',
     executionSessionId: 'other-builder',
     error: 'Other build failed'
   })
-  const otherBefore = await getPendingView(ws.path, other.id)
-  await pinSession(ws.path, 'builder')
+  const otherBefore = await getPendingView(ws, other.id)
+  await pinSession(ws, 'builder')
 
   await sendWorkspaceMessage(ws, {
     workspaceId: ws.id,
@@ -711,12 +703,12 @@ test('the builder can resume its failed view while an unrelated failed view is v
     context: { activeTab: { id: `views/${other.id}` } }
   })
 
-  expect(await getPendingView(ws.path, view.id)).toMatchObject({
+  expect(await getPendingView(ws, view.id)).toMatchObject({
     status: 'submitted',
     executionSessionId: 'builder'
   })
-  expect((await getPendingView(ws.path, view.id))?.error).toBeUndefined()
-  expect(await getPendingView(ws.path, other.id)).toEqual(otherBefore)
+  expect((await getPendingView(ws, view.id))?.error).toBeUndefined()
+  expect(await getPendingView(ws, other.id)).toEqual(otherBefore)
   expect(sent.at(-1)?.context?.session).toEqual({
     id: 'builder',
     tabId: `views/${view.id}`,
@@ -729,7 +721,7 @@ test('the builder can resume its failed view while an unrelated failed view is v
 })
 
 test('ordinary sends preserve the visible tab snapshot and resolve the chat tab separately', async () => {
-  await patchSessionRecord(ws.path, 'source', { tabId: 'views/original' })
+  await patchSessionRecord(ws, 'source', { tabId: 'views/original' })
   const activeTab = { id: 'views/current', title: 'Current view', params: { item: '42' } } as const
   await sendWorkspaceMessage(ws, {
     workspaceId: ws.id,
@@ -745,12 +737,12 @@ test('ordinary sends preserve the visible tab snapshot and resolve the chat tab 
   expect(renderMoiContext(sent[0].context!)).toContain(
     'This chat belongs to the "original" view tab'
   )
-  expect(await getPinnedSession(ws.path)).toBeNull()
-  expect(await getSessionRecord(ws.path, 'source')).toEqual({ tabId: 'views/original' })
+  expect(await getPinnedSession(ws)).toBeNull()
+  expect(await getSessionRecord(ws, 'source')).toEqual({ tabId: 'views/original' })
 })
 
 test('session pin state describes the sender even when a different chat is pinned', async () => {
-  await pinSession(ws.path, 'other')
+  await pinSession(ws, 'other')
   await sendWorkspaceMessage(ws, {
     workspaceId: ws.id,
     workspacePath: ws.path,
@@ -763,8 +755,8 @@ test('session pin state describes the sender even when a different chat is pinne
 })
 
 test('follow-ups refresh the session ID and pin state after a native rename', async () => {
-  await patchSessionRecord(ws.path, 'source', { tabId: 'scratchpad' })
-  await pinSession(ws.path, 'source')
+  await patchSessionRecord(ws, 'source', { tabId: 'scratchpad' })
+  await pinSession(ws, 'source')
   const message = {
     workspaceId: ws.id,
     workspacePath: ws.path,
@@ -775,12 +767,12 @@ test('follow-ups refresh the session ID and pin state after a native rename', as
   await sendWorkspaceMessage(ws, message)
   expect(sent.at(-1)?.context?.session).toEqual({ id: 'source', tabId: 'scratchpad', pinned: true })
 
-  await renameSessionReferences(ws.id, ws.path, 'source', 'native')
+  await renameSessionReferences(ws, 'source', 'native')
   await sendWorkspaceMessage(ws, message)
   expect(sent.at(-1)?.sessionId).toBe('native')
   expect(sent.at(-1)?.context?.session).toEqual({ id: 'native', tabId: 'scratchpad', pinned: true })
 
-  await pinSession(ws.path, null)
+  await pinSession(ws, null)
   await sendWorkspaceMessage(ws, message)
   expect(sent.at(-1)?.context?.session).toEqual({
     id: 'native',
@@ -801,13 +793,13 @@ test('a new browser chat groups the visible view title and params without attach
   })
   expect(sent[0].context?.activeTab).toEqual(activeTab)
   expect(sent[0].context?.session).toEqual({ id: 'fresh', tabId: 'views/garden', pinned: false })
-  expect(await getSessionRecord(ws.path, 'fresh')).toEqual({ tabId: 'views/garden' })
+  expect(await getSessionRecord(ws, 'fresh')).toEqual({ tabId: 'views/garden' })
 })
 
 test('completion keeps the attached chat context without repeating build instructions', async () => {
-  const view = await createPendingView(ws.id, ws.path)
+  const view = await createPendingView(ws)
   await submitView(ws, view.id, { requirements: 'Build cards', sessionId: 'fresh' })
-  await completeViewBuild(ws.id, ws.path, view.id)
+  await completeViewBuild(ws, view.id)
   await sendWorkspaceMessage(ws, {
     workspaceId: ws.id,
     workspacePath: ws.path,
@@ -823,9 +815,9 @@ test('completion keeps the attached chat context without repeating build instruc
 })
 
 test('a pinned chat receives one build request per view, with no repeats on follow-ups', async () => {
-  await pinSession(ws.path, 'source')
+  await pinSession(ws, 'source')
   for (const requirements of ['Build cards', 'Build a calendar']) {
-    const view = await createPendingView(ws.id, ws.path)
+    const view = await createPendingView(ws)
     await submitView(ws, view.id, { requirements })
     expect(renderMoiContext(sent.at(-1)!.context!)).toContain(`The view id is \`${view.id}\`.`)
     expect(renderMoiContext(sent.at(-1)!.context!)).toContain('moi views create --requirements')
@@ -847,7 +839,7 @@ test('a pinned chat receives one build request per view, with no repeats on foll
 })
 
 test('rejected ordinary sends do not mark a pending view submitted', async () => {
-  const view = await createPendingView(ws.id, ws.path, { requirements: 'Cards' })
+  const view = await createPendingView(ws, { requirements: 'Cards' })
   harness.sendMessage = async () => {
     throw new Error('Unavailable')
   }
@@ -861,5 +853,5 @@ test('rejected ordinary sends do not mark a pending view submitted', async () =>
       context: { activeTab: { id: `views/${view.id}` } }
     })
   ).rejects.toThrow('Unavailable')
-  expect((await getPendingView(ws.path, view.id))?.status).toBe('draft')
+  expect((await getPendingView(ws, view.id))?.status).toBe('draft')
 })

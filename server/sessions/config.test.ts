@@ -3,44 +3,47 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import {
+  DEFAULT_WORKSPACE_STATE_ROOT,
+  setWorkspaceStateRoot,
+  updateWorkspaceState
+} from '../workspace-state'
 import { getSessionConfig, saveSessionConfig } from './config'
-import { DEFAULT_SESSION_STORE_PATH, setSessionStorePath, renameSessionRecord } from './store'
+import { renameSessionEntry } from './store'
 
 let scratchDir = ''
-const workspacePath = '/workspace'
-let storePath = ''
+const ws = { id: 'ws-1', path: '/workspace' }
 
 beforeEach(async () => {
   scratchDir = await mkdtemp(join(tmpdir(), 'moi-session-config-'))
-  storePath = join(scratchDir, 'sessions.json')
-  setSessionStorePath(storePath)
+  setWorkspaceStateRoot(scratchDir)
 })
 
 afterEach(async () => {
-  setSessionStorePath(DEFAULT_SESSION_STORE_PATH)
+  setWorkspaceStateRoot(DEFAULT_WORKSPACE_STATE_ROOT)
   await rm(scratchDir, { recursive: true, force: true })
 })
 
 describe('session Fast mode config', () => {
   test('preserves explicit false and clears only when asked', async () => {
-    await saveSessionConfig(workspacePath, 'session-1', {
+    await saveSessionConfig(ws, 'session-1', {
       model: 'sonnet',
       fastMode: false
     })
-    expect(await getSessionConfig(workspacePath, 'session-1')).toEqual({
+    expect(await getSessionConfig(ws, 'session-1')).toEqual({
       model: 'sonnet',
       fastMode: false
     })
 
-    await saveSessionConfig(workspacePath, 'session-1', { fastMode: null })
-    expect(await getSessionConfig(workspacePath, 'session-1')).toEqual({ model: 'sonnet' })
+    await saveSessionConfig(ws, 'session-1', { fastMode: null })
+    expect(await getSessionConfig(ws, 'session-1')).toEqual({ model: 'sonnet' })
   })
 
   test('keeps false when a temporary session config is renamed', async () => {
-    await saveSessionConfig(workspacePath, 'temporary', { fastMode: false })
-    await renameSessionRecord(workspacePath, 'temporary', 'real')
+    await saveSessionConfig(ws, 'temporary', { fastMode: false })
+    await updateWorkspaceState(ws, state => renameSessionEntry(state, 'temporary', 'real'))
 
-    expect(await getSessionConfig(workspacePath, 'temporary')).toEqual({})
-    expect(await getSessionConfig(workspacePath, 'real')).toEqual({ fastMode: false })
+    expect(await getSessionConfig(ws, 'temporary')).toEqual({})
+    expect(await getSessionConfig(ws, 'real')).toEqual({ fastMode: false })
   })
 })

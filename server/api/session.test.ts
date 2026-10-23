@@ -1,15 +1,11 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
+import { DEFAULT_WORKSPACE_STATE_ROOT, setWorkspaceStateRoot } from '../workspace-state'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { api } from './index'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
-import {
-  DEFAULT_SESSION_STORE_PATH,
-  getSessionRecord,
-  patchSessionRecord,
-  setSessionStorePath
-} from '../sessions/store'
+import { getSessionRecord, patchSessionRecord } from '../sessions/store'
 import { harnessFor } from '../harness/registry'
 import type { StreamEvent } from '@/lib/types'
 
@@ -17,11 +13,11 @@ let directory: string
 beforeEach(async () => {
   directory = await mkdtemp(join(tmpdir(), 'moi-api-session-'))
   setRegistryPath(join(directory, 'workspaces.json'))
-  setSessionStorePath(join(directory, 'sessions.json'))
+  setWorkspaceStateRoot(join(directory, 'state'))
 })
 afterEach(async () => {
   setRegistryPath(DEFAULT_REGISTRY_PATH)
-  setSessionStorePath(DEFAULT_SESSION_STORE_PATH)
+  setWorkspaceStateRoot(DEFAULT_WORKSPACE_STATE_ROOT)
   await rm(directory, { recursive: true, force: true })
 })
 
@@ -43,15 +39,15 @@ test('history retries without changing a fork cutoff', async () => {
     expect((await api.request(path)).status).toBe(500)
     failRead = false
     expect((await api.request(path)).status).toBe(200)
-    await patchSessionRecord(workspace.path, 'child', { forkedFromSessionId: 'parent' })
+    await patchSessionRecord(workspace, 'child', { forkedFromSessionId: 'parent' })
     failRead = true
     expect((await api.request(path)).status).toBe(500)
-    expect(await getSessionRecord(workspace.path, 'child')).toEqual({
+    expect(await getSessionRecord(workspace, 'child')).toEqual({
       forkedFromSessionId: 'parent'
     })
     failRead = false
     expect((await api.request(path)).status).toBe(200)
-    expect(await getSessionRecord(workspace.path, 'child')).toEqual({
+    expect(await getSessionRecord(workspace, 'child')).toEqual({
       forkedFromSessionId: 'parent'
     })
     history = [
@@ -66,7 +62,7 @@ test('history retries without changing a fork cutoff', async () => {
       }
     ]
     expect((await api.request(path)).status).toBe(200)
-    expect(await getSessionRecord(workspace.path, 'child')).toEqual({
+    expect(await getSessionRecord(workspace, 'child')).toEqual({
       forkedFromSessionId: 'parent'
     })
     expect(reads).toBe(5)
@@ -83,7 +79,7 @@ test('reads one session record and preserves provenance when updating or clearin
     forkedFromSessionId: 'parent',
     forkedThroughMessageId: 'boundary'
   }
-  await patchSessionRecord(workspace.path, 'child', metadata)
+  await patchSessionRecord(workspace, 'child', metadata)
   const patch = (body: unknown) =>
     api.request(`${path}/config`, {
       method: 'PUT',

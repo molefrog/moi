@@ -17,15 +17,22 @@ import {
   reorderWorkspaces,
   setRegistryPath
 } from './registry'
+import {
+  DEFAULT_WORKSPACE_STATE_ROOT,
+  setWorkspaceStateRoot,
+  updateWorkspaceState
+} from '../workspace-state'
 
 let tmpDir: string
 
 beforeEach(async () => {
   tmpDir = await mkdtemp(join(tmpdir(), 'moi-registry-test-'))
   setRegistryPath(join(tmpDir, 'data', 'workspaces.json'))
+  setWorkspaceStateRoot(join(tmpDir, 'data', 'workspaces'))
 })
 
 afterEach(async () => {
+  setWorkspaceStateRoot(DEFAULT_WORKSPACE_STATE_ROOT)
   await rm(tmpDir, { recursive: true, force: true })
 })
 
@@ -169,6 +176,45 @@ describe('registerWorkspace with a chosen id', () => {
     await expect(assertWorkspaceIdAvailable('.', existing.id)).rejects.toThrow(
       `Workspace id ${existing.id} is already taken`
     )
+  })
+})
+
+describe('re-adding a removed workspace', () => {
+  test('takes back its old id when it left state behind', async () => {
+    const path = join(tmpDir, 'project')
+    const first = await registerWorkspace(path)
+    await updateWorkspaceState(first, state => {
+      state.pinnedSessionId = 'chat-1'
+    })
+    await removeWorkspace(first.id)
+
+    expect((await registerWorkspace(path)).id).toBe(first.id)
+  })
+
+  test('gets a new id when it left no state, or when its old id is taken', async () => {
+    const path = join(tmpDir, 'project')
+    const first = await registerWorkspace(path)
+    await removeWorkspace(first.id)
+    expect((await registerWorkspace(path)).id).not.toBe(first.id)
+
+    const other = join(tmpDir, 'other')
+    const second = await registerWorkspace(other)
+    await updateWorkspaceState(second, state => {
+      state.pinnedSessionId = 'chat-1'
+    })
+    await removeWorkspace(second.id)
+    await registerWorkspace(join(tmpDir, 'third'), { id: second.id })
+    expect((await registerWorkspace(other)).id).not.toBe(second.id)
+  })
+
+  test('an explicitly chosen id wins over the remembered one', async () => {
+    const path = join(tmpDir, 'project')
+    const first = await registerWorkspace(path)
+    await updateWorkspaceState(first, state => {
+      state.pinnedSessionId = 'chat-1'
+    })
+    await removeWorkspace(first.id)
+    expect((await registerWorkspace(path, { id: 'chosen' })).id).toBe('chosen')
   })
 })
 

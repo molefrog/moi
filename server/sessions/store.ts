@@ -1,127 +1,110 @@
-import { mkdir, rename } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
 import type {
-  SessionConfig,
+  SessionInfo,
   SessionRecord,
   SessionRecordPatch,
-  SessionInfo,
-  SessionSummary
+  SessionSummary,
+  WorkspaceTabId
 } from '@/lib/types'
-import { DATA_DIR } from '../data-dir'
+import {
+  readWorkspaceState,
+  updateWorkspaceState,
+  type WorkspaceRef,
+  type WorkspaceSessionState,
+  type WorkspaceState
+} from '../workspace-state'
 
-type Store = Record<string, Record<string, SessionRecord>>
-export const DEFAULT_SESSION_STORE_PATH = join(DATA_DIR, 'sessions.json')
-let storePath = DEFAULT_SESSION_STORE_PATH
-let writes: Promise<unknown> = Promise.resolve()
-
-export function setSessionStorePath(path: string) {
-  storePath = path
-}
-
-async function readFile<T>(path: string): Promise<T | undefined> {
-  const file = Bun.file(path)
-  return (await file.exists()) ? file.json() : undefined
-}
-
-async function read(): Promise<Store> {
-  const stored = await readFile<Store>(storePath)
-  if (stored) return stored
-  // Import old files until the first unified write; leave the originals intact.
-  const directory = dirname(storePath)
-  const configs = await readFile<Record<string, Record<string, SessionConfig>>>(
-    join(directory, 'session-config.json')
-  )
-  const store: Store = {}
-  for (const [workspace, sessions] of Object.entries(configs ?? {})) {
-    const records = (store[workspace] ??= {})
-    for (const [id, config] of Object.entries(sessions)) records[id] = { ...records[id], config }
+// The API keeps fork fields flat on the record; the state file groups them.
+function toSessionRecord(session: WorkspaceSessionState | undefined): SessionRecord {
+  if (!session) return {}
+  const { fork, ...rest } = session
+  if (!fork) return rest
+  return {
+    ...rest,
+    forkedFromSessionId: fork.fromSessionId,
+    ...(fork.throughMessageId ? { forkedThroughMessageId: fork.throughMessageId } : {}),
+    ...(fork.noticeIds ? { forkedNoticeIds: fork.noticeIds } : {})
   }
-  return store
 }
 
-export async function getSessionRecords(workspacePath: string) {
-  await writes
-  return (await read())[workspacePath] ?? {}
+function fromSessionRecord(record: SessionRecord): WorkspaceSessionState {
+  const { forkedFromSessionId, forkedThroughMessageId, forkedNoticeIds, ...rest } = record
+  if (forkedFromSessionId === undefined) {
+    if (forkedThroughMessageId !== undefined || forkedNoticeIds !== undefined)
+      throw new Error('Fork history requires a source session')
+    return rest
+  }
+  return {
+    ...rest,
+    fork: {
+      fromSessionId: forkedFromSessionId,
+      ...(forkedThroughMessageId ? { throughMessageId: forkedThroughMessageId } : {}),
+      ...(forkedNoticeIds ? { noticeIds: forkedNoticeIds } : {})
+    }
+  }
+}
+
+export async function getSessionRecords(ws: WorkspaceRef): Promise<Record<string, SessionRecord>> {
+  const { sessions } = await readWorkspaceState(ws)
+  return Object.fromEntries(
+    Object.entries(sessions).map(([sessionId, session]) => [sessionId, toSessionRecord(session)])
+  )
 }
 
 export async function getSessionRecord(
-  workspacePath: string,
+  ws: WorkspaceRef,
   sessionId: string
 ): Promise<SessionRecord> {
-  return (await getSessionRecords(workspacePath))[sessionId] ?? {}
-}
-
-export async function updateSessionRecords<T>(
-  workspacePath: string,
-  change: (sessions: Record<string, SessionRecord>) => T
-) {
-  const run = writes.then(async () => {
-    const store = await read()
-    const sessions = (store[workspacePath] ??= {})
-    const result = change(sessions)
-    if (result === false) return result
-    for (const [id, record] of Object.entries(sessions)) {
-      if (Object.keys(record).length === 0) delete sessions[id]
-    }
-    if (Object.keys(sessions).length === 0) delete store[workspacePath]
-    await mkdir(dirname(storePath), { recursive: true })
-    const temp = `${storePath}.${process.pid}.tmp`
-    await Bun.write(temp, JSON.stringify(store, null, 2))
-    await rename(temp, storePath)
-    return result
-  })
-  writes = run.catch(() => {})
-  return run
-}
-
-export async function renameSessionRecord(workspacePath: string, from: string, to: string) {
-  if (from === to) return
-  await updateSessionRecords(workspacePath, sessions => {
-    if (sessions[from]) {
-      const source = sessions[from]
-      const target = sessions[to]
-      sessions[to] = {
-        ...source,
-        ...target,
-        ...(source.config || target?.config
-          ? { config: { ...source.config, ...target?.config } }
-          : {})
-      }
-      delete sessions[from]
-    }
-    for (const record of Object.values(sessions)) {
-      if (record.forkedFromSessionId === from) record.forkedFromSessionId = to
-    }
-  })
+  return toSessionRecord((await readWorkspaceState(ws)).sessions[sessionId])
 }
 
 export async function withSessionRecords(
-  workspacePath: string,
+  ws: WorkspaceRef,
   sessions: SessionSummary[]
 ): Promise<SessionInfo[]> {
-  const records = await getSessionRecords(workspacePath)
+  const records = await getSessionRecords(ws)
   return sessions.map(session => {
     const { config: _, ...metadata } = records[session.sessionId] ?? {}
     return { ...session, ...metadata }
   })
 }
 
-export async function patchSessionRecord(
-  workspacePath: string,
+// Merge `patch` into a session entry inside a state transaction.
+export function patchSessionEntry(
+  state: WorkspaceState,
   sessionId: string,
-  metadata: SessionRecordPatch
-) {
-  await updateSessionRecords(workspacePath, sessions => {
-    const next = { ...sessions[sessionId], ...metadata }
-    assertSessionRecord(next)
-    sessions[sessionId] = next
+  patch: SessionRecordPatch
+): void {
+  state.sessions[sessionId] = fromSessionRecord({
+    ...toSessionRecord(state.sessions[sessionId]),
+    ...patch
   })
 }
 
-function assertSessionRecord(record: Partial<SessionRecord>): asserts record is SessionRecord {
-  if (
-    record.forkedFromSessionId === undefined &&
-    (record.forkedThroughMessageId !== undefined || record.forkedNoticeIds !== undefined)
-  )
-    throw new Error('Fork history requires a source session')
+export function setSessionTab(state: WorkspaceState, sessionId: string, tabId: WorkspaceTabId) {
+  patchSessionEntry(state, sessionId, { tabId: tabId === 'overview' ? undefined : tabId })
+}
+
+export async function patchSessionRecord(
+  ws: WorkspaceRef,
+  sessionId: string,
+  patch: SessionRecordPatch
+): Promise<void> {
+  await updateWorkspaceState(ws, state => patchSessionEntry(state, sessionId, patch))
+}
+
+// A temporary id became the harness's real one. Settings saved under either id
+// survive, the real id's winning, and forks of the old id follow it.
+export function renameSessionEntry(state: WorkspaceState, from: string, to: string): void {
+  if (from === to) return
+  const source = state.sessions[from]
+  if (source) {
+    const target = state.sessions[to]
+    const config =
+      source.config || target?.config ? { ...source.config, ...target?.config } : undefined
+    state.sessions[to] = { ...source, ...target, ...(config ? { config } : {}) }
+    delete state.sessions[from]
+  }
+  for (const session of Object.values(state.sessions)) {
+    if (session.fork?.fromSessionId === from) session.fork.fromSessionId = to
+  }
 }

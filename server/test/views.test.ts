@@ -41,7 +41,7 @@ function seed(jsNames: string[], manifest: object) {
 }
 
 async function views(): Promise<CompiledView[]> {
-  const res = await listViews(WS)
+  const res = await listViews({ id: 'views-test', path: WS })
   return (await res.json()).views
 }
 
