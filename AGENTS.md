@@ -25,7 +25,7 @@ Claude-only config (`.claude/settings.json` hooks, `.claude/launch.json`) stays 
 
 ## File naming and references
 
-- Use kebab-case for repo-owned files and folders, including components, hooks, utilities, and tests: `chat-panel.tsx`, `use-chat.ts`, `chat-panel.test.tsx`. Keep suffixes such as `.test.ts`, `.render.test.tsx`, `.server.ts`, and `.d.ts`.
+- Use kebab-case for repo-owned files and folders, including components, hooks, utilities, and tests: `chat-panel.tsx`, `use-chat.ts`, `chat-panel.test.tsx`. Keep suffixes such as `.test.ts`, `.server.ts`, and `.d.ts`.
 - Keep React components and types in PascalCase (`ChatPanel`, `ChatPanelProps`), and functions, hooks, and variables in camelCase (`useChat`). Filename casing does not change exported identifiers.
 - Preserve established instruction/document names (`AGENTS.md`, `README.md`, `SKILL.md`, `DESIGN.md`, `TESTING.md`, `NOTES.md`, `LICENSE`), bundled skill reference names, established fixture folders such as `__fixtures__`, and vendored files. These are explicit exceptions.
 - When moving, renaming, or deleting files, update imports, lazy imports, test mocks, scripts, comments, and documentation references in the same change. Search for both the old full path and filename, including hidden agent instructions and skills. Historical notes may retain old paths when clearly marked as historical and paired with current guidance.

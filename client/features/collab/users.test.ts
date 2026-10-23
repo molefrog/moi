@@ -1,13 +1,8 @@
+import { userDisplayName } from '@/client/lib/user-display-name'
 import { expect, test } from 'bun:test'
 import type { ConnectionStatus } from 'moi/collab'
 import type { Connection } from '@/lib/collab/types'
-import {
-  summarizeWorkspaceUsers,
-  resolvePeers,
-  resolveUser,
-  userDisplayName,
-  workspaceProfiles
-} from './users'
+import { summarizeWorkspaceUsers, resolvePeers, resolveUser, workspaceProfiles } from './users'
 
 const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
 const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const

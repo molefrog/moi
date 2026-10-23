@@ -36,7 +36,7 @@ function ConnectorsContent({ connectors }: ConnectorsContentProps) {
   if (connectors.isError) {
     return (
       <ConnectorsState>
-        <p className="text-sm text-muted-foreground">Could not load connectors.</p>
+        <p className="text-sm text-muted-foreground">Could not load connectors</p>
         <Button variant="outline" size="sm" onClick={() => connectors.refetch()}>
           Retry
         </Button>
@@ -48,7 +48,7 @@ function ConnectorsContent({ connectors }: ConnectorsContentProps) {
     return (
       <ConnectorsState>
         <IconPlugConnected size={24} stroke={1.5} className="text-muted-foreground" />
-        <p className="text-sm text-foreground">No connectors configured.</p>
+        <p className="text-sm text-foreground">No connectors configured</p>
       </ConnectorsState>
     )
   }
@@ -81,7 +81,7 @@ export function ConnectorsSettings() {
   return (
     <SettingsPage
       title="Connectors"
-      description="Connectors available to the agent in this workspace."
+      description="Connectors available to the agent in this workspace"
     >
       <ConnectorsContent connectors={connectors} />
     </SettingsPage>

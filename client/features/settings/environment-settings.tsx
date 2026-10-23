@@ -57,7 +57,7 @@ export function EnvironmentSettings() {
             <IconLoader2 className="size-4 animate-spin" stroke={1.75} />
           </div>
         ) : variables.length === 0 ? (
-          <p className="px-3.5 py-4 text-sm text-muted-foreground">No variables yet.</p>
+          <p className="px-3.5 py-4 text-sm text-muted-foreground">No variables yet</p>
         ) : (
           variables.map(variable => {
             const editable = variable.source !== 'dotenv'
@@ -132,8 +132,8 @@ export function EnvironmentSettings() {
           title="Inherit .env files"
           description={
             dotenvFiles > 0
-              ? `Discovered ${fileCount} ${fileCount === 1 ? 'key' : 'keys'} across ${dotenvFiles} ${dotenvFiles === 1 ? 'file' : 'files'} in this space.`
-              : 'No .env files found in this space.'
+              ? `Discovered ${fileCount} ${fileCount === 1 ? 'key' : 'keys'} across ${dotenvFiles} ${dotenvFiles === 1 ? 'file' : 'files'} in this space`
+              : 'No .env files found in this space'
           }
           control={
             <Switch

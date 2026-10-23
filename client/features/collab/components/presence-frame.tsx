@@ -1,51 +1,47 @@
-import type { PresenceFrameProps } from 'moi/collab'
+import type { PresenceFrameProps as PresenceFrameContainerProps } from 'moi/collab'
+import type { UserProfile } from '@/lib/collab/types'
 import { useLayoutEffect, useRef } from 'react'
 import type { HTMLAttributes, ReactNode, Ref } from 'react'
 import { cn } from '@/client/lib/cn'
 import type { UserColor } from '@/lib/collab/colors'
 import { Badge } from '@/ui-components/badge'
 import { useUsers } from '../hooks'
-import { userDisplayName } from '../users'
+import { userDisplayName } from '@/client/lib/user-display-name'
 import { usePresenceTarget, useTargetPresence } from './presence-helpers'
 
-export function PresenceFrame({ id, present, align, children, className }: PresenceFrameProps) {
+export function PresenceFrameContainer({
+  id,
+  present,
+  align,
+  children,
+  className
+}: PresenceFrameContainerProps) {
   const target = usePresenceTarget(id)
   const presence = useTargetPresence(target, present)
+  const users = useUsers(presence.users.map(user => user.id)).filter(user => user !== undefined)
   return (
-    <PresenceOutline
-      {...presence.props}
-      ids={presence.users.map(user => user.id)}
-      align={align}
-      className={className}
-    >
+    <PresenceFrame {...presence.props} users={users} align={align} className={className}>
       {children}
-    </PresenceOutline>
+    </PresenceFrame>
   )
 }
 
-type PresenceOutlineProps = HTMLAttributes<HTMLDivElement> & {
+export type PresenceFrameProps = HTMLAttributes<HTMLDivElement> & {
   ref?: Ref<HTMLDivElement>
   // Everyone at this element; the first user's color draws the frame.
-  ids: readonly string[]
+  users: readonly UserProfile[]
   children: ReactNode
-  align?: PresenceFrameProps['align']
+  align?: PresenceFrameContainerProps['align']
 }
 
 // One visible element gets a frame matching its shape; other content gets one shared frame.
-export function PresenceOutline({
-  ids,
-  align,
-  children,
-  className,
-  ...rest
-}: PresenceOutlineProps) {
-  const resolved = useUsers(ids).filter(user => user !== undefined)
+export function PresenceFrame({ users, align, children, className, ...rest }: PresenceFrameProps) {
   return (
     <div className={cn('relative', className)} {...rest}>
       {/* Keep the overlay first so showing it never changes the content's spacing. */}
       <FrameOutline
-        names={resolved.map(userDisplayName).join(', ')}
-        color={resolved[0]?.color}
+        names={users.map(userDisplayName).join(', ')}
+        color={users[0]?.color}
         align={align}
       />
       {children}
@@ -66,7 +62,7 @@ const CORNERS = [
 type FrameOutlineProps = {
   names: string
   color: UserColor | undefined
-  align?: PresenceFrameProps['align']
+  align?: PresenceFrameContainerProps['align']
 }
 
 function FrameOutline({ names, color, align = 'end' }: FrameOutlineProps) {

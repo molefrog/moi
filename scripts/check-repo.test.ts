@@ -49,7 +49,7 @@ test('rejects mixed-case source paths and accepts test suffixes and conventional
     'client/ChatPanel.tsx',
     'client/useChat.ts',
     'lib/bad_folder/item.ts',
-    'client/chat-panel.render.test.tsx',
+    'client/chat-panel.test.tsx',
     'server/test/__fixtures__/hello.tsx',
     'AGENTS.md'
   ]

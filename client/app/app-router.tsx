@@ -4,6 +4,7 @@ import { Redirect, Route, Switch, useLocation } from 'wouter'
 
 import { setWorkspaceSwitchHandler } from '@/client/features/chat/connection/chat-connection'
 
+import { SettingsRoute } from './routes/settings-route'
 import { HomeRoute } from './routes/home-route'
 import { WorkspaceRoute } from './routes/workspace-route'
 
@@ -41,6 +42,7 @@ export function AppRouter() {
     <Switch>
       <Route path="/dev/*?" component={DevLazy} />
       <Route path="/" component={HomeRoute} />
+      <Route path="/settings" component={SettingsRoute} />
       {/* The wildcard is the destination path (`views/orders`, `overview`, …) —
           the URL is the tab address, read downstream with `useParams`. This
           pattern is its only definition. Keyed by workspace id only, so tab

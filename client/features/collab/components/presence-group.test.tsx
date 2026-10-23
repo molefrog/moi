@@ -1,7 +1,11 @@
+import { renderToStaticMarkup } from 'react-dom/server'
 import { expect, test } from 'bun:test'
-import { PresenceGroup } from './presence-group'
-import { PresenceFrame } from './presence-frame'
-import { PresenceAvatars } from './presence-avatars'
+import {
+  PresenceGroupContainer as PresenceGroup,
+  PresenceGroup as PlainPresenceGroup
+} from './presence-group'
+import { PresenceFrameContainer as PresenceFrame } from './presence-frame'
+import { PresenceAvatarsContainer as PresenceAvatars } from './presence-avatars'
 import { presenceTarget } from '../presence-target'
 import { createFocusRoom, renderCollab } from '../testing/component-fixtures'
 
@@ -127,4 +131,14 @@ test('groups reject blank IDs even without any control', () => {
       )
     ).toThrow('nonempty id')
   }
+})
+
+test('plain presence groups retain children without a collaboration provider', () => {
+  expect(
+    renderToStaticMarkup(
+      <PlainPresenceGroup>
+        <input aria-label="Title" />
+      </PlainPresenceGroup>
+    )
+  ).toContain('aria-label="Title"')
 })

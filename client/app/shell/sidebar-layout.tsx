@@ -1,16 +1,21 @@
 import { type ReactNode } from 'react'
 
-import { IconMessage2Share, IconPlus, IconSandbox, IconSmartHome } from '@tabler/icons-react'
+import { IconPlus, IconSandbox, IconSmartHome } from '@tabler/icons-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'wouter'
 
 import { useAppConfig } from '@/client/api/app-config'
 import { useReorderWorkspaces, useWorkspaces } from '@/client/features/home/api'
 import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
-import { UpdateButton, useUpdateControl } from '@/client/features/update/update-control'
+import {
+  UpdateButton as UpdateButtonComponent,
+  useUpdateControl
+} from '@/client/features/update/update-control'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
 import { CreateWorkspaceDialog } from '@/client/features/workspace/add/create-workspace-dialog'
+import { useAccount } from '@/client/features/account/account-provider'
+import { AccountMenu } from '@/client/features/account/account-menu'
 import { DemoDialog } from '@/client/features/demo/demo-dialog'
 import { ReorderableList } from '@/client/components/shared/reorderable-list'
 import type { ReorderableRenderState } from '@/client/components/shared/reorderable-list'
@@ -26,11 +31,9 @@ import { workspaceDisplayName } from '@/client/features/workspace/workspace-pres
 import { cn } from '@/client/lib/cn'
 import type { WorkspaceEntry } from '@/lib/types'
 
-const FEEDBACK_URL = 'https://mlfrg.notion.site/3c678a44b6788042b734d775dd2e935e?pvs=105'
-
 function sidebarNavButtonClass(active: boolean): string {
   return cn(
-    buttonVariants({ variant: 'ghost', size: 'icon' }),
+    buttonVariants({ variant: 'ghost', size: 'icon-lg' }),
     active && 'bg-accent text-accent-foreground'
   )
 }
@@ -79,6 +82,8 @@ type SidebarProps = {
 }
 
 function Sidebar({ workspaces }: SidebarProps) {
+  const { environment } = useAppConfig()
+  const { demo } = useAccount()
   const reorder = useReorderWorkspaces()
 
   return (
@@ -137,62 +142,38 @@ function Sidebar({ workspaces }: SidebarProps) {
           )}
         </nav>
 
-        <div className="size-8 shrink-0">
-          <SidebarFooterAction />
+        <div className="flex shrink-0 flex-col items-center gap-4">
+          {environment === 'local' && <UpdateButton />}
+          {demo ? (
+            <Tooltip>
+              <DemoDialog
+                trigger={
+                  <TooltipTrigger
+                    render={
+                      <Button size="icon" aria-label="Set up Moi">
+                        <IconSandbox stroke={1.5} />
+                      </Button>
+                    }
+                  />
+                }
+              />
+              <TooltipContent side="right">Set up Moi</TooltipContent>
+            </Tooltip>
+          ) : (
+            <AccountMenu />
+          )}
         </div>
       </aside>
     </TooltipProvider>
   )
 }
 
-function SidebarFooterAction() {
-  const { demo } = useAppConfig()
+function UpdateButton() {
   const updateControl = useUpdateControl()
 
-  if (demo) {
-    return (
-      <Tooltip>
-        <DemoDialog
-          trigger={
-            <TooltipTrigger
-              render={
-                <Button size="icon" aria-label="Set up Moi">
-                  <IconSandbox stroke={1.5} />
-                </Button>
-              }
-            />
-          }
-        />
-        <TooltipContent side="right">Set up Moi</TooltipContent>
-      </Tooltip>
-    )
-  }
-
-  if (updateControl.status === 'loading') return null
-  if (updateControl.status === 'available') return <UpdateButton {...updateControl.button} />
-
-  return <FeedbackLink />
-}
-
-function FeedbackLink() {
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <Button
-            render={<a href={FEEDBACK_URL} target="_blank" rel="noreferrer" />}
-            variant="ghost"
-            size="icon"
-            aria-label="Leave feedback"
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <IconMessage2Share stroke={1.5} />
-          </Button>
-        }
-      />
-      <TooltipContent side="right">Leave feedback</TooltipContent>
-    </Tooltip>
-  )
+  return updateControl.status === 'available' ? (
+    <UpdateButtonComponent {...updateControl.button} />
+  ) : null
 }
 
 type WorkspaceButtonProps = {

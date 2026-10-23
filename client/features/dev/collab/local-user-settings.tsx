@@ -1,15 +1,9 @@
-import { useState, useSyncExternalStore } from 'react'
+import { useSyncExternalStore } from 'react'
 
-import { IconArrowsShuffle } from '@tabler/icons-react'
-
-import { Button } from '@/client/components/ui/button'
-import { Input } from '@/client/components/ui/input'
-import { useAppConfig } from '@/client/api/app-config'
 import { USER_COLORS } from '@/lib/collab/colors'
 import type { UserProfile } from '@/lib/collab/types'
 import { User } from '@/client/features/collab/components/user'
 import { UserAvatar } from '@/client/features/collab/components/user-avatar'
-import { randomLocalUser } from '@/client/features/collab/local-user'
 import {
   getCurrentUser,
   getCurrentUserSource,
@@ -18,7 +12,6 @@ import {
 } from '@/client/features/collab/host-state'
 
 export function LocalUserSettings() {
-  const { experimental } = useAppConfig()
   const source = useSyncExternalStore(
     subscribeCurrentUserStore,
     getCurrentUserSource,
@@ -34,14 +27,7 @@ export function LocalUserSettings() {
         Local user
       </h2>
       <p className="text-sm text-muted-foreground">
-        {experimental.collab ? (
-          'Couldn’t resolve your user identity. Reload Moi to try again.'
-        ) : (
-          <>
-            Start Moi with <code className="font-mono">--experimental-collab</code> to create a
-            local user automatically. The playground below uses its own sample users.
-          </>
-        )}
+        Couldn’t resolve your user identity. Reload Moi to try again.
       </p>
     </section>
   )
@@ -64,7 +50,7 @@ function AccessUser({ profile }: AccessUserProps) {
             : 'This server uses Cloudflare Access, but this page wasn’t opened through it. Open Moi at its Cloudflare Access address to appear in workspaces.'}
         </p>
       </header>
-      {profile && <User id={profile.id} />}
+      {profile && <User profile={profile} />}
     </section>
   )
 }
@@ -72,9 +58,6 @@ function AccessUser({ profile }: AccessUserProps) {
 type LocalUserEditorProps = { profile: UserProfile }
 
 function LocalUserEditor({ profile }: LocalUserEditorProps) {
-  // Keep raw input so normalization doesn't eat spaces while a name is being typed.
-  const [name, setName] = useState(profile.name ?? '')
-
   return (
     <section aria-labelledby="local-user-title" className="flex flex-col gap-5">
       <header>
@@ -82,8 +65,7 @@ function LocalUserEditor({ profile }: LocalUserEditorProps) {
           Local user
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Edit the local user for this browser tab. Changes save immediately. To test with two
-          users, open Moi in another browser tab.
+          Change your avatar color here. Edit your name in Settings.
         </p>
       </header>
       <div className="flex flex-col gap-5">
@@ -94,23 +76,9 @@ function LocalUserEditor({ profile }: LocalUserEditorProps) {
             aria-label="Local user preview"
             className="size-16 shrink-0 overflow-hidden rounded-full"
           >
-            <UserAvatar id={profile.id} className="data-[size=default]:size-full" />
+            <UserAvatar profile={profile} className="data-[size=default]:size-full" />
           </div>
           <div className="flex w-full max-w-sm min-w-0 flex-col gap-4">
-            <label className="flex flex-col gap-1.5 text-sm">
-              Name (optional)
-              <Input
-                value={name}
-                maxLength={80}
-                placeholder="Type a name"
-                autoComplete="off"
-                spellCheck={false}
-                onChange={event => {
-                  setName(event.target.value)
-                  setLocalUser({ ...profile, name: event.target.value })
-                }}
-              />
-            </label>
             <div className="flex flex-col gap-1.5 text-sm">
               <span id="collab-color-label">Color</span>
               <div
@@ -140,25 +108,11 @@ function LocalUserEditor({ profile }: LocalUserEditorProps) {
                 ))}
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  const next = randomLocalUser({ name, color: profile.color })
-                  setName(next.name)
-                  setLocalUser({ ...profile, ...next })
-                }}
-              >
-                <IconArrowsShuffle stroke={1.75} />
-                Randomize
-              </Button>
-            </div>
           </div>
         </div>
         <p className="text-sm text-muted-foreground">
-          Your user is saved in this browser tab. The playground below uses its own sample users.
+          Your user is saved in this browser and shared across tabs. The playground below uses its
+          own sample users.
         </p>
       </div>
     </section>

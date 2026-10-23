@@ -100,6 +100,7 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
         {step === 'name' ? (
           <WorkspaceNameStep
             name={name}
+            showExistingFolder={appConfig.environment === 'local'}
             validationError={nameError}
             onNameChange={setName}
             onSubmit={continueToAgent}
@@ -131,6 +132,7 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
 
 type WorkspaceNameStepProps = {
   name: string
+  showExistingFolder: boolean
   validationError: string | null
   onNameChange: (name: string) => void
   onSubmit: () => void
@@ -138,6 +140,7 @@ type WorkspaceNameStepProps = {
 
 function WorkspaceNameStep({
   name,
+  showExistingFolder,
   validationError,
   onNameChange,
   onSubmit
@@ -180,9 +183,9 @@ function WorkspaceNameStep({
       </div>
 
       <div className="flex items-center justify-end gap-2">
-        <ExistingFolderButton />
+        {showExistingFolder && <ExistingFolderButton />}
         <Button type="submit" disabled={!name.trim() || Boolean(validationError)}>
-          Next
+          Continue
         </Button>
       </div>
     </form>

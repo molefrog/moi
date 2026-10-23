@@ -1,9 +1,15 @@
 import { expect, test } from 'bun:test'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { PresenceFrame, PresenceOutline } from './presence-frame'
-import { PresenceAvatars } from './presence-avatars'
+import {
+  PresenceFrameContainer as PresenceFrame,
+  PresenceFrame as PlainPresenceFrame
+} from './presence-frame'
+import {
+  PresenceAvatarsContainer as PresenceAvatars,
+  PresenceAvatars as PlainPresenceAvatars
+} from './presence-avatars'
 import { presenceTarget } from '../presence-target'
-import { PresenceGroup } from './presence-group'
+import { PresenceGroupContainer as PresenceGroup } from './presence-group'
 import { presenceChannels } from '../hooks'
 import {
   createFocusRoom,
@@ -17,18 +23,18 @@ test('presence frames skip unresolved users and clear their identity after remov
   const backend = createFocusRoom()
   const frame = renderCollab(
     backend,
-    <PresenceOutline ids={['missing', 'peer']}>
+    <PresenceFrame id="task:42:title">
       <input />
-    </PresenceOutline>
+    </PresenceFrame>
   )
   expect(frame).toContain('Ada')
   expect(frame).not.toContain('Unknown user')
   backend.setUsers([me])
   const removed = renderCollab(
     backend,
-    <PresenceOutline ids={['missing', 'peer']}>
+    <PresenceFrame id="task:42:title">
       <input />
-    </PresenceOutline>
+    </PresenceFrame>
   )
   expect(removed).toContain('<input')
   expect(removed).not.toContain('Ada')
@@ -195,4 +201,21 @@ test('both appearances reflect remote controlled presence clearing', () => {
       expect(html).toContain('Task')
     }
   }
+})
+
+test('presence components render supplied profiles without a collaboration provider', () => {
+  const frame = renderToStaticMarkup(
+    <PlainPresenceFrame users={[peer]}>
+      <input aria-label="Title" />
+    </PlainPresenceFrame>
+  )
+  expect(frame).toContain('Ada')
+  expect(frame).toContain('aria-label="Title"')
+  const avatars = renderToStaticMarkup(
+    <PlainPresenceAvatars users={[{ id: peer.id, connectionId: 'peer-tab', profile: peer }]}>
+      <input aria-label="Notes" />
+    </PlainPresenceAvatars>
+  )
+  expect(avatars).toContain('aria-label="Ada"')
+  expect(avatars).toContain('aria-label="Notes"')
 })
