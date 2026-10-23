@@ -6,11 +6,11 @@ import { toast } from '@/client/components/ui/toast'
 import { useAccount } from '../account/account-provider'
 import { SettingsSection } from './settings-section'
 
-export function YouSettings() {
+export function ProfileSettings() {
   const account = useAccount()
   if (!account.profile) return null
   return (
-    <SettingsSection title="You">
+    <SettingsSection title="Profile">
       <FieldGroup>
         <NameField
           key={account.profile.id}
@@ -20,8 +20,8 @@ export function YouSettings() {
         />
         {account.email && (
           <Field>
-            <FieldLabel htmlFor="you-email">Email</FieldLabel>
-            <Input id="you-email" value={account.email} readOnly type="email" />
+            <FieldLabel htmlFor="profile-email">Email</FieldLabel>
+            <Input id="profile-email" value={account.email} readOnly type="email" />
           </Field>
         )}
       </FieldGroup>

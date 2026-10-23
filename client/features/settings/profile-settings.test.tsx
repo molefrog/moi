@@ -2,7 +2,7 @@ import { afterEach, expect, spyOn, test } from 'bun:test'
 import { act, useState } from 'react'
 import { parseHTML } from 'linkedom'
 import { QueryClient, QueryClientProvider, notifyManager } from '@tanstack/react-query'
-import { NameField } from './you-settings'
+import { NameField } from './profile-settings'
 import { toast } from '@/client/components/ui/toast'
 
 let cleanup = async () => {}

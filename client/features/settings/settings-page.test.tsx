@@ -11,15 +11,15 @@ import {
   ownerTeam
 } from '../account/account-test-utils'
 import type { AccountFixtureOptions } from '../account/account-test-utils'
-import { YouSettings } from './you-settings'
-import { TeamSettings } from './team-settings'
+import { ProfileSettings } from './profile-settings'
+import { UsersSettings } from './users-settings'
 import { SettingsPage } from './settings-page'
 import { toast, Toaster } from '@/client/components/ui/toast'
 
 afterEach(cleanupAccount)
 
-type FixtureOptions = AccountFixtureOptions & { mode?: 'team' | 'account' | 'page' }
-function mountSettings({ mode = 'team', ...options }: FixtureOptions = {}) {
+type FixtureOptions = AccountFixtureOptions & { mode?: 'users' | 'profile' | 'page' }
+function mountSettings({ mode = 'users', ...options }: FixtureOptions = {}) {
   return mountAccount({
     ...options,
     children: (
@@ -27,7 +27,7 @@ function mountSettings({ mode = 'team', ...options }: FixtureOptions = {}) {
         {mode === 'page' ? (
           <SettingsPage />
         ) : (
-          <AccountProbe>{mode === 'team' ? <TeamSettings /> : <YouSettings />}</AccountProbe>
+          <AccountProbe>{mode === 'users' ? <UsersSettings /> : <ProfileSettings />}</AccountProbe>
         )}
       </Toaster>
     )
@@ -66,7 +66,7 @@ test('Undo restores a member without sending a removal request', async () => {
   expect(ui.document.querySelector<HTMLInputElement>('#invite-email')?.disabled).toBe(false)
 })
 
-test('other team actions stay usable while removal waits for Undo', async () => {
+test('other user actions stay usable while removal waits for Undo', async () => {
   const ui = await mountSettings()
   await ui.click('Remove ada@example.com')
   await ui.click('Cancel invitation for grace@example.com')
@@ -84,7 +84,7 @@ test('pending removals survive leaving settings and Undo after returning', async
         <Link href="/">Home</Link>
         <Link href="/settings">Settings</Link>
         <Route path="/settings">
-          <TeamSettings />
+          <UsersSettings />
         </Route>
       </Toaster>
     )
@@ -102,7 +102,7 @@ test('pending removals survive leaving settings and Undo after returning', async
   expect(ui.calls.some(call => call.path.endsWith('/members/remove'))).toBe(false)
 })
 
-test('team controls remain disabled until every overlapping request finishes', async () => {
+test('user controls remain disabled until every overlapping request finishes', async () => {
   const ui = await mountSettings({ pendingMutation: true, pendingMutationPaths: ['/invite'] })
   await ui.click('Remove ada@example.com')
   await ui.type(ui.document.querySelector<HTMLInputElement>('#invite-email')!, 'new@example.com')
@@ -142,7 +142,7 @@ test('a pending removal is cancelled if the account changes', async () => {
   expect(ui.calls.some(call => call.path.endsWith('/members/remove'))).toBe(false)
 })
 
-test('members can see the team but have no management controls', async () => {
+test('members can see users but have no management controls', async () => {
   const ui = await mountSettings({ role: 'admin' })
   expect(ui.document.body.textContent).toContain('Ada')
   expect(ui.document.querySelector('form')).toBeNull()
@@ -150,7 +150,7 @@ test('members can see the team but have no management controls', async () => {
   expect(ui.document.querySelector('[aria-label^="Cancel"]')).toBeNull()
 })
 
-test('failed team mutations retain the list and report the server error', async () => {
+test('failed user management actions retain the list and report the server error', async () => {
   const ui = await mountSettings()
   ui.failures.mutation = true
   const notification = spyOn(toast, 'add')
@@ -159,7 +159,7 @@ test('failed team mutations retain the list and report the server error', async 
     await ui.click('Close toast')
     expect(ui.document.body.textContent).toContain('Ada')
     expect(notification).toHaveBeenCalledWith({
-      title: 'Couldn’t update team',
+      title: 'Couldn’t update users',
       description: 'Only the owner can do that.',
       type: 'error'
     })
@@ -173,7 +173,7 @@ test('failed team mutations retain the list and report the server error', async 
   }
 })
 
-test('team errors can be retried', async () => {
+test('user loading errors can be retried', async () => {
   const ui = await mountSettings({ failTeam: true })
   await ui.settle()
   expect(ui.document.body.textContent).toContain('Team unavailable')
@@ -183,7 +183,7 @@ test('team errors can be retried', async () => {
 })
 
 test('cloud name saves update the account and preserve avatar and color', async () => {
-  const ui = await mountSettings({ mode: 'account' })
+  const ui = await mountSettings({ mode: 'profile' })
   const input = ui.document.querySelector('input')!
   await ui.type(input, 'New name')
   await act(async () => input.dispatchEvent(new ui.window.Event('focusout', { bubbles: true })))
@@ -195,10 +195,10 @@ test('cloud name saves update the account and preserve avatar and color', async 
     avatar: 'https://example.com/avatar.png'
   })
   expect(ui.document.querySelector('[data-account-name]')?.textContent).toBe('New name')
-  expect(ui.document.querySelector('#you-email')?.getAttribute('readOnly')).toBe('')
+  expect(ui.document.querySelector('#profile-email')?.getAttribute('readOnly')).toBe('')
 })
 
-test('inviting a teammate sends the trimmed email and refreshes invitations', async () => {
+test('inviting a user sends the trimmed email and refreshes invitations', async () => {
   const ui = await mountSettings()
   const input = ui.document.querySelector<HTMLInputElement>('#invite-email')!
   await ui.type(input, '  new@example.com  ')
@@ -225,24 +225,24 @@ test('inviting a teammate sends the trimmed email and refreshes invitations', as
   ).toBeNull()
 })
 
-test('local settings show You without Email or Team and respect supplied identity', async () => {
+test('local settings show Profile without Email or Users and respect supplied identity', async () => {
   const ui = await mountSettings({ mode: 'page', environment: 'local' })
   expect([...ui.document.querySelectorAll('h2')].map(heading => heading.textContent)).toEqual([
-    'You'
+    'Profile'
   ])
   expect(ui.document.querySelector('input')?.value).toBe('Alex')
   expect(ui.document.querySelector('input')?.hasAttribute('readOnly')).toBe(true)
-  expect(ui.document.querySelector('#you-email')).toBeNull()
+  expect(ui.document.querySelector('#profile-email')).toBeNull()
   expect(ui.calls).toEqual([])
 })
 
-test('registered cloud settings show You, read-only Email, and Team', async () => {
+test('registered cloud settings show Profile, read-only Email, and Users', async () => {
   const ui = await mountSettings({ mode: 'page' })
   expect([...ui.document.querySelectorAll('h2')].map(heading => heading.textContent)).toEqual([
-    'You',
-    'Team'
+    'Profile',
+    'Users'
   ])
-  expect(ui.document.querySelector('#you-email')?.getAttribute('readOnly')).toBe('')
+  expect(ui.document.querySelector('#profile-email')?.getAttribute('readOnly')).toBe('')
   expect(ui.document.querySelector('input')?.hasAttribute('readOnly')).toBe(false)
   expect(ui.document.body.textContent).toContain('Ada')
 })
@@ -277,10 +277,12 @@ test('settings session errors offer a working retry', async () => {
   expect(ui.document.querySelector('input')).toBeNull()
   ui.failures.session = false
   await ui.click('Try again')
-  expect(ui.document.querySelector<HTMLInputElement>('#you-email')?.value).toBe('alex@example.com')
+  expect(ui.document.querySelector<HTMLInputElement>('#profile-email')?.value).toBe(
+    'alex@example.com'
+  )
 })
 
-test('team controls stay disabled until a mutation finishes', async () => {
+test('user controls stay disabled until a mutation finishes', async () => {
   const ui = await mountSettings({ pendingMutation: true })
   await ui.click('Remove ada@example.com')
   expect(ui.document.querySelector('[aria-label="Remove ada@example.com"]')).toBeNull()
@@ -300,16 +302,16 @@ test.each([{ loadingTeam: true }, { failTeam: true }])(
     await ui.settle()
     expect(getCurrentUser()).toMatchObject({ id: 'me', name: 'Alex', email: 'alex@example.com' })
     expect(ui.document.querySelector('input')?.value).toBe('Alex')
-    expect(ui.document.querySelector('#you-email')).not.toBeNull()
+    expect(ui.document.querySelector('#profile-email')).not.toBeNull()
     expect(ui.document.body.textContent).not.toContain('Couldn’t load your account.')
     if (options.loadingTeam)
-      expect(ui.document.querySelector('[aria-label="Loading team"]')).not.toBeNull()
+      expect(ui.document.querySelector('[aria-label="Loading users"]')).not.toBeNull()
     else expect(ui.document.body.textContent).toContain('Team unavailable')
   }
 )
 
 test('a name response cannot overwrite an account that changed id while saving', async () => {
-  const ui = await mountSettings({ mode: 'account', pendingMutation: true, loadingTeam: true })
+  const ui = await mountSettings({ mode: 'profile', pendingMutation: true, loadingTeam: true })
   const input = ui.document.querySelector('input')!
   await ui.type(input, 'Old account update')
   await act(async () => input.dispatchEvent(new ui.window.Event('focusout', { bubbles: true })))
@@ -329,7 +331,7 @@ test('a name response cannot overwrite an account that changed id while saving',
 test('a failed name save leaves the pending team request able to finish', async () => {
   const ui = await mountSettings({ mode: 'page', loadingTeam: true })
   ui.failures.mutation = true
-  expect(ui.document.querySelector('[aria-label="Loading team"]')).not.toBeNull()
+  expect(ui.document.querySelector('[aria-label="Loading users"]')).not.toBeNull()
   const input = ui.document.querySelector('input')!
   await ui.type(input, 'New name')
   await act(async () => input.dispatchEvent(new ui.window.Event('focusout', { bubbles: true })))
@@ -338,7 +340,7 @@ test('a failed name save leaves the pending team request able to finish', async 
   expect(input.disabled).toBe(false)
   await act(async () => ui.teamResponse.resolve(Response.json(ownerTeam)))
   await ui.settle()
-  expect(ui.document.querySelector('[aria-label="Loading team"]') === null).toBe(true)
+  expect(ui.document.querySelector('[aria-label="Loading users"]') === null).toBe(true)
   expect(ui.document.body.textContent).toContain('Ada')
   expect(input.value).toBe('New name')
 })

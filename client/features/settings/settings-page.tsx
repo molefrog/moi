@@ -3,8 +3,8 @@ import { Redirect } from 'wouter'
 import { Button } from '@/client/components/ui/button'
 import { Skeleton } from '@/client/components/ui/skeleton'
 import { useAccount } from '../account/account-provider'
-import { YouSettings } from './you-settings'
-import { TeamSettings } from './team-settings'
+import { ProfileSettings } from './profile-settings'
+import { UsersSettings } from './users-settings'
 
 export function SettingsPage() {
   const account = useAccount()
@@ -34,8 +34,8 @@ export function SettingsPage() {
           </div>
         ) : (
           <div className="flex w-full max-w-xl min-w-0 flex-col gap-4">
-            <YouSettings />
-            {account.registered && <TeamSettings />}
+            <ProfileSettings />
+            {account.registered && <UsersSettings />}
           </div>
         )}
       </div>

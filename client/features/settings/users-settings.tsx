@@ -23,7 +23,7 @@ import {
 } from '../account/api'
 import type { CloudSession, TeamMember } from '../account/api'
 
-export function TeamSettings() {
+export function UsersSettings() {
   const { team, removingMemberIds, setRemovingMemberIds } = useAccount()
   const directory = useSyncExternalStore(subscribeDirectoryStore, getDirectory, getDirectory)
   const qc = useQueryClient()
@@ -33,7 +33,7 @@ export function TeamSettings() {
     mutationFn: (action: () => Promise<unknown>) => action(),
     onSuccess: () => qc.invalidateQueries({ queryKey: accountKeys.team }),
     onError: error => {
-      toast.add({ title: 'Couldn’t update team', description: error.message, type: 'error' })
+      toast.add({ title: 'Couldn’t update users', description: error.message, type: 'error' })
       if (error instanceof CloudApiError && error.status === 401)
         void qc.invalidateQueries({ queryKey: accountKeys.session })
     }
@@ -72,8 +72,8 @@ export function TeamSettings() {
 
   if (team.isPending)
     return (
-      <SettingsSection title="Team">
-        <div className="flex flex-col gap-4" aria-label="Loading team">
+      <SettingsSection title="Users">
+        <div className="flex flex-col gap-4" aria-label="Loading users">
           <Skeleton className="h-6 w-32" />
           <Skeleton className="h-24 w-full" />
         </div>
@@ -81,7 +81,7 @@ export function TeamSettings() {
     )
   if (team.isError)
     return (
-      <SettingsSection title="Team">
+      <SettingsSection title="Users">
         <div className="flex flex-col items-start gap-3">
           <p role="alert">{team.error.message}</p>
           <Button variant="outline" onClick={() => void team.refetch()}>
@@ -94,7 +94,7 @@ export function TeamSettings() {
   const owner = role === 'owner'
 
   return (
-    <SettingsSection title="Team">
+    <SettingsSection title="Users">
       <ul className="flex flex-col gap-4">
         {members
           .filter(member => !removingMemberIds.includes(member.id))
@@ -133,6 +133,7 @@ export function TeamSettings() {
             <li
               key={`invitation-${invitation.id}`}
               className="group/invitation flex items-center gap-3"
+              tabIndex={0}
             >
               <User
                 profile={normalizeUserProfile({ id: invitation.id, email: invitation.email })}
@@ -140,14 +141,14 @@ export function TeamSettings() {
                 description={`Invitation expires ${new Date(invitation.expiresAt).toLocaleDateString()}`}
                 className="flex-1 text-muted-foreground [&_[data-slot=avatar]]:opacity-50"
               />
-              <div className="grid shrink-0 items-center justify-items-end">
-                <span className="col-start-1 row-start-1 text-xs text-muted-foreground group-focus-within/invitation:opacity-0 group-hover/invitation:opacity-0 [@media(hover:none)]:opacity-0">
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="text-xs text-muted-foreground [@media(hover:hover)]:group-focus-within/invitation:hidden [@media(hover:hover)]:group-hover/invitation:hidden">
                   Pending invite
                 </span>
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  className="col-start-1 row-start-1 text-muted-foreground transition-none group-focus-within/invitation:opacity-100 group-hover/invitation:opacity-100 [@media(hover:hover)]:opacity-0"
+                  className="text-muted-foreground transition-none group-focus-within/invitation:inline-flex group-hover/invitation:inline-flex [@media(hover:hover)]:hidden"
                   disabled={pending}
                   aria-label={`Cancel invitation for ${invitation.email}`}
                   onClick={() => act(() => cancelInvitation(invitation.id))}
