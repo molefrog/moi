@@ -7,7 +7,10 @@ import { Link, useLocation } from 'wouter'
 import { useAppConfig } from '@/client/api/app-config'
 import { useReorderWorkspaces, useWorkspaces } from '@/client/features/home/api'
 import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
-import { UpdateButton, useUpdateControl } from '@/client/features/update/update-control'
+import {
+  UpdateButton as UpdateButtonComponent,
+  useUpdateControl
+} from '@/client/features/update/update-control'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
 import { CreateWorkspaceDialog } from '@/client/features/workspace/add/create-workspace-dialog'
@@ -140,7 +143,7 @@ function Sidebar({ workspaces }: SidebarProps) {
         </nav>
 
         <div className="flex shrink-0 flex-col items-center gap-4">
-          {environment === 'local' && <LocalUpdateButton />}
+          {environment === 'local' && <UpdateButton />}
           {demo ? (
             <Tooltip>
               <DemoDialog
@@ -165,9 +168,12 @@ function Sidebar({ workspaces }: SidebarProps) {
   )
 }
 
-function LocalUpdateButton() {
+function UpdateButton() {
   const updateControl = useUpdateControl()
-  return updateControl.status === 'available' ? <UpdateButton {...updateControl.button} /> : null
+
+  return updateControl.status === 'available' ? (
+    <UpdateButtonComponent {...updateControl.button} />
+  ) : null
 }
 
 type WorkspaceButtonProps = {
