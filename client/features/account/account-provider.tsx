@@ -65,9 +65,9 @@ function useAccountState() {
 
   async function saveName(value: string) {
     const name = value.trim()
-    if (!name || name.length > 80) throw new Error('Enter a name of up to 80 characters.')
+    if (!name || name.length > 80) throw new Error('Enter a name of up to 80 characters')
     if (cloud) {
-      if (!registered) throw new Error('Sign in to change your name.')
+      if (!registered) throw new Error('Sign in to change your name')
       await qc.cancelQueries({ queryKey: accountKeys.session })
       const result = await updateCloudName(name).catch(error => {
         if (error instanceof CloudApiError && error.status === 401)
@@ -89,7 +89,7 @@ function useAccountState() {
     }
     const localProfile = getCurrentUser()
     if (getCurrentUserSource() !== 'local' || !localProfile || localProfile.id !== profile?.id)
-      throw new Error('This profile is managed by your sign-in provider.')
+      throw new Error('This profile is managed by your sign-in provider')
     setLocalUser({ ...localProfile, name })
     return name
   }

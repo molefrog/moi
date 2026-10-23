@@ -32,7 +32,7 @@ export function GeneralSettings() {
   }
 
   return (
-    <SettingsPage title="General" description="Basic details for this space.">
+    <SettingsPage title="General" description="Basic details for this space">
       <SettingsSection>
         <SettingsRow
           title="Path"

@@ -5,6 +5,7 @@ alwaysApply: true
 
 - Write the product name as `Moi` in all prose and user-facing copy. Preserve lowercase only for technical identifiers and `moi` CLI.
 - Use sentence case for headings, labels, actions, navigation, and messages.
+- Omit trailing periods in labels, tooltips, captions, and short standalone messages, including errors and validation messages. Use normal punctuation for paragraphs and multiple sentences.
 - Prefer the product nouns workspace, chat, agent, model, widget, view, connector, session, and run.
 - Use agent in UI copy for supported coding tools, such as “Connect an agent”.
 - Display `claude-code` as **Claude** and `codex` as **ChatGPT** in user-facing labels and copy. Reuse `workspaceTypeLabel` in the client. Keep Anthropic and OpenAI as company subtitles.
