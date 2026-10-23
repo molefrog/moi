@@ -14,7 +14,7 @@ test('fork boundary follows transcript order when an older turn is updated last'
     }
   })
   expect(
-    inheritedHistoryBoundary([turn('first'), turn('last'), turn('first')]).forkedThroughMessageId
+    inheritedHistoryBoundary([turn('first'), turn('last'), turn('first')]).throughMessageId
   ).toBe('last')
-  expect(inheritedHistoryBoundary([]).forkedThroughMessageId).toBeUndefined()
+  expect(inheritedHistoryBoundary([]).throughMessageId).toBeUndefined()
 })

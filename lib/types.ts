@@ -39,8 +39,9 @@ export type PendingView = {
   title?: string
   icon?: string
   requirements: string
-  // Execution reference only. Ownership lives in SessionRecord.tabId.
-  executionSessionId?: string
+  // The chat running the build: usually the view tab's own chat, or the
+  // pinned chat when one is pinned. Ownership lives in the chat's `tabId`.
+  buildSessionId?: string
   error?: string
 }
 
@@ -290,55 +291,48 @@ export type SessionSummary = {
   flavor?: 'chat' | 'cron' | 'subagent'
 }
 
-// Per-session agent settings, persisted server-side in one global file in Moi's
-// data dir (NOT in the workspace), exposed via GET/PUT
-// /api/workspaces/:id/sessions/:sessionId/config. A session reopens with the same
-// model/effort/Fast mode it last ran with; a brand-new session is seeded from the
-// corresponding workspace defaults.
+// Per-chat agent settings, overriding the workspace defaults in
+// `.moi/.workspace.json`. A chat reopens with the model/effort/Fast mode it
+// last ran with; a brand-new chat is seeded from the workspace defaults.
 export type SessionConfig = {
   model?: string
   effort?: string
   fastMode?: boolean
 }
 
-type SessionForkFields =
-  | {
-      forkedFromSessionId?: undefined
-      forkedThroughMessageId?: never
-      forkedNoticeIds?: never
-    }
-  | {
-      forkedFromSessionId: string
-      // Last copied turn in the child. Without a cutoff, show its full history.
-      forkedThroughMessageId?: string
-      forkedNoticeIds?: string[]
-    }
+export type SessionFork = {
+  fromSessionId: string
+  // Last copied turn in the child. Without a cutoff, show its full history.
+  throughMessageId?: string
+  noticeIds?: string[]
+}
 
-// Local session fields shared by the saved record and session-list rows.
-type SessionMetadata = {
+// Moi's own record of one chat. Titles and history stay with the agent.
+export type WorkspaceSessionState = {
+  // The view tab that owns this chat; absent means the overview.
   tabId?: WorkspaceTabId
-} & SessionForkFields
-
-export type SessionRecord = SessionMetadata & {
   config?: SessionConfig
+  fork?: SessionFork
 }
 
-export type SessionRecordPatch = Partial<Pick<SessionRecord, 'tabId' | 'config'>> &
-  SessionForkFields
-
-// List row returned to the client after local metadata is added.
-export type SessionInfo = SessionSummary & SessionMetadata
-
-export type SelectedSessionState = {
-  sessionId: string | null
+// Per-user chat state for one workspace, kept in Moi's data dir and served by
+// GET /api/workspaces/:id/state. Every write returns it and publishes it as
+// `state:changed`.
+export type WorkspaceState = {
+  // Goes up by one with every saved change. Lets clients drop an older copy
+  // that arrives after a newer one.
+  revision: number
+  // Applies to every tab and overrides `selected`.
+  pinnedSessionId?: string
+  // The chat each tab shows.
+  selected: Partial<Record<WorkspaceTabId, string>>
+  sessions: Record<string, WorkspaceSessionState>
+  // Views not compiled yet, keyed by view id.
+  pendingViews: Record<string, Omit<PendingView, 'id'>>
 }
 
-export type WorkspaceSessionSelection = {
-  // A browser tab can explicitly choose an empty chat (null). An absent key
-  // inherits the server selection, including CLI-created view handoffs.
-  selected: Partial<Record<WorkspaceTabId, string | null>>
-  pinned: string | null
-}
+// A chat-list row: the agent's session plus the tab that owns it.
+export type SessionInfo = SessionSummary & { tabId?: WorkspaceTabId }
 
 // App-wide settings, persisted server-side as `settings.json` in Moi's data
 // dir and exposed via GET/PATCH /api/settings. Every key has a default, so

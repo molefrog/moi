@@ -3,11 +3,14 @@
 // the only process that writes these files (the CLI goes through the control
 // port), so the cache never goes stale. Writes for one workspace run one at a
 // time, each as a synchronous change applied to a copy and saved atomically.
+// Every saved change is published to browsers as `state:changed`.
 import { existsSync } from 'node:fs'
 import { readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 
+import type { WorkspaceState } from '@/lib/types'
 import { DATA_DIR } from '../data-dir'
+import { publishEvent } from '../events'
 import {
   compactWorkspaceState,
   emptyWorkspaceState,
@@ -17,17 +20,11 @@ import {
   type LoadedState
 } from './file'
 import { createKeyedLock } from './lock'
-import type { WorkspaceRef, WorkspaceState } from './types'
+import type { StoredWorkspaceState, WorkspaceRef } from './types'
 
 export { LockTimeoutError } from './lock'
 export { WorkspaceStateVersionError } from './file'
-export type {
-  PendingViewState,
-  SessionFork,
-  WorkspaceRef,
-  WorkspaceSessionState,
-  WorkspaceState
-} from './types'
+export type { StoredWorkspaceState, WorkspaceRef } from './types'
 
 const STATE_FILE = 'state.json'
 // Long enough for a slow disk, short enough that one stuck write does not
@@ -66,8 +63,18 @@ function load(ws: WorkspaceRef): Promise<LoadedState> {
 }
 
 // A copy of the current state. Changing it changes nothing on disk.
-export async function readWorkspaceState(ws: WorkspaceRef): Promise<WorkspaceState> {
+export async function readWorkspaceState(ws: WorkspaceRef): Promise<StoredWorkspaceState> {
   return structuredClone((await load(ws)).state)
+}
+
+// The state as clients see it, without the file's bookkeeping.
+export function toWorkspaceState(stored: StoredWorkspaceState): WorkspaceState {
+  const { version: _version, workspacePath: _workspacePath, ...state } = stored
+  return state
+}
+
+export async function getWorkspaceState(ws: WorkspaceRef): Promise<WorkspaceState> {
+  return toWorkspaceState(await readWorkspaceState(ws))
 }
 
 // Applies `change` to a copy of the state and saves the result in one atomic
@@ -76,7 +83,7 @@ export async function readWorkspaceState(ws: WorkspaceRef): Promise<WorkspaceSta
 // a change that leaves the state as it was skips the write.
 export async function updateWorkspaceState<T>(
   ws: WorkspaceRef,
-  change: (draft: WorkspaceState) => T
+  change: (draft: StoredWorkspaceState) => T
 ): Promise<T> {
   return withLock(ws.id, async lease => {
     const loaded = await load(ws)
@@ -85,11 +92,14 @@ export async function updateWorkspaceState<T>(
     if (result instanceof Promise)
       throw new TypeError('Workspace state changes must be synchronous')
     draft.workspacePath = ws.path
+    draft.revision = loaded.state.revision
     compactWorkspaceState(draft)
     if (JSON.stringify(draft) === JSON.stringify(loaded.state)) return result
     if (!loaded.writable) throw new WorkspaceStateVersionError(statePath(ws.id))
+    draft.revision++
     await writeStateFile(statePath(ws.id), draft, lease)
     loaded.state = draft
+    publishEvent({ type: 'state:changed', workspaceId: ws.id, state: toWorkspaceState(draft) })
     return result
   })
 }

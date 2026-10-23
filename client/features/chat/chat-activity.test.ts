@@ -5,7 +5,6 @@
 import { QueryClient } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test } from 'bun:test'
 
-import { appUiKeys } from '@/client/api/app-ui-keys'
 import {
   __setQueryClientForTests,
   handleFrame
@@ -19,7 +18,7 @@ import {
   liveStore
 } from '@/client/features/chat/chat-store'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import type { WorkspaceSessionSelection, SessionActivity, SessionInfo } from '@/lib/types'
+import type { SessionActivity, SessionInfo, WorkspaceState } from '@/lib/types'
 
 const WS = 'ws1'
 const SID = 'sess-1'
@@ -220,30 +219,28 @@ describe('session rename', () => {
   test('the current chat session follows the provider id', () => {
     const queryClient = new QueryClient()
     __setQueryClientForTests(queryClient)
-    queryClient.setQueryData(appUiKeys.sessionSelection(WS), {
-      selected: { overview: 'temp-1', scratchpad: 'temp-1' },
-      pinned: 'temp-1'
-    })
-    const record = {
+    const session = {
       config: { model: 'sonnet' },
-      tabId: 'scratchpad',
-      forkedFromSessionId: 'parent',
-      forkedThroughMessageId: 'boundary'
+      tabId: 'scratchpad' as const,
+      fork: { fromSessionId: 'parent', throughMessageId: 'boundary' }
     }
-    queryClient.setQueryData(workspaceKeys.session(WS, 'temp-1'), record)
+    queryClient.setQueryData<WorkspaceState>(workspaceKeys.state(WS), {
+      revision: 1,
+      selected: { overview: 'temp-1', scratchpad: 'temp-1' },
+      pinnedSessionId: 'temp-1',
+      sessions: { 'temp-1': session },
+      pendingViews: {}
+    })
 
     handleFrame({ type: 'session_renamed', workspaceId: WS, from: 'temp-1', to: 'real-1' })
 
-    expect(
-      queryClient.getQueryData<WorkspaceSessionSelection>(appUiKeys.sessionSelection(WS))
-    ).toEqual({
+    expect(queryClient.getQueryData<WorkspaceState>(workspaceKeys.state(WS))).toEqual({
+      revision: 1,
       selected: { overview: 'real-1', scratchpad: 'real-1' },
-      pinned: 'real-1'
+      pinnedSessionId: 'real-1',
+      sessions: { 'real-1': session },
+      pendingViews: {}
     })
-    expect(queryClient.getQueryData<typeof record>(workspaceKeys.session(WS, 'real-1'))).toEqual(
-      record
-    )
-    expect(queryClient.getQueryData(workspaceKeys.session(WS, 'temp-1'))).toBeUndefined()
   })
 })
 

@@ -1,6 +1,6 @@
 import { updateWorkspaceState, type WorkspaceRef } from '../workspace-state'
 import { broadcast } from '../state'
-import { renameBuildSession, viewsChanged } from './pending-views'
+import { renameBuildSession } from './pending-views'
 import { rememberSessionRename, renameSessionSelection } from './selected'
 import { renameSessionEntry } from './store'
 
@@ -10,11 +10,10 @@ import { renameSessionEntry } from './store'
 export async function renameSessionReferences(ws: WorkspaceRef, from: string, to: string) {
   if (from === to) return
   rememberSessionRename(ws.id, from, to)
-  const buildsMoved = await updateWorkspaceState(ws, state => {
+  await updateWorkspaceState(ws, state => {
     renameSessionEntry(state, from, to)
     renameSessionSelection(state, from, to)
-    return renameBuildSession(state, from, to)
+    renameBuildSession(state, from, to)
   })
-  if (buildsMoved) viewsChanged(ws.id)
   broadcast(ws.id, { type: 'session_renamed', from, to })
 }

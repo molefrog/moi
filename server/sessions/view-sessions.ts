@@ -6,8 +6,6 @@ import { getCollabReferencePath } from '../collab/config'
 import { harnessFor } from '../harness/registry'
 import type { SendMessageInput } from '../harness/types'
 import { ForkUnsupportedError, inheritedHistoryBoundary } from '../harness/fork'
-import { publishEvent } from '../events'
-import { broadcast } from '../state'
 import { updateWorkspaceState } from '../workspace-state'
 import {
   getPinnedSession,
@@ -15,7 +13,7 @@ import {
   resolveRenamedSession,
   selectSessionForTab
 } from './selected'
-import { getSessionRecord, patchSessionRecord, setSessionTab } from './store'
+import { getSessionEntry, setSessionTab, updateSessionEntry } from './store'
 import { getSessionConfig, saveSessionConfig } from './config'
 import {
   createPendingView,
@@ -23,8 +21,7 @@ import {
   listPendingViews,
   patchPendingView,
   PendingViewError,
-  startViewBuild,
-  viewsChanged
+  startViewBuild
 } from './pending-views'
 
 export class ViewStartupError extends Error {
@@ -49,26 +46,25 @@ export async function sendWorkspaceMessage(
 ) {
   const { selectedSessionScope, viewBuildId, ...message } = input
   const sessionId = resolveRenamedSession(ws.id, input.sessionId)
-  const record = await getSessionRecord(ws, sessionId)
+  const record = await getSessionEntry(ws, sessionId)
   const tabId = input.context?.activeTab?.id ?? record.tabId ?? 'overview'
   const targetViewId = viewBuildId ?? (input.isNew ? viewIdFromTab(tabId) : undefined)
   const ownedViews = targetViewId
     ? []
-    : (await listPendingViews(ws)).filter(view => view.executionSessionId === sessionId)
+    : (await listPendingViews(ws)).filter(view => view.buildSessionId === sessionId)
   const pending = targetViewId
     ? await getPendingView(ws, targetViewId)
     : (ownedViews.find(view => view.id === viewIdFromTab(tabId)) ?? ownedViews[0])
   const isBuildRequest = pending && (viewBuildId === pending.id || input.isNew)
   if (
     isBuildRequest &&
-    pending.executionSessionId &&
-    pending.executionSessionId !== sessionId &&
+    pending.buildSessionId &&
+    pending.buildSessionId !== sessionId &&
     (pending.status === 'starting' ||
       harnessFor(ws)
         .activeSessions()
         .some(
-          session =>
-            session.workspaceId === ws.id && session.sessionId === pending.executionSessionId
+          session => session.workspaceId === ws.id && session.sessionId === pending.buildSessionId
         ))
   )
     throw new PendingViewError('This view is already being built in another chat', 409)
@@ -78,7 +74,7 @@ export async function sendWorkspaceMessage(
   }
   if (isBuildRequest)
     await patchPendingView(ws, pending.id, {
-      executionSessionId: sessionId
+      buildSessionId: sessionId
     })
   const collabReference = await getCollabReferencePath(ws.path, ws.type)
   const pinnedSessionId = await getPinnedSession(ws)
@@ -96,7 +92,7 @@ export async function sendWorkspaceMessage(
       directives: [
         ...(input.context?.directives ?? []),
         ...(isBuildRequest ? viewBuildDirectives(pending.id, APP_ICON_IDS) : []),
-        ...(isBuildRequest && record.forkedFromSessionId
+        ...(isBuildRequest && record.fork
           ? [
               'Inherited conversation is background. Work on the current request; do not resume unrelated earlier tasks.'
             ]
@@ -117,15 +113,11 @@ async function attachSession(
   ws: WorkspaceEntry,
   tabId: WorkspaceTabId,
   sessionId: string,
-  previousSessionId?: string | null,
+  ifMatch?: string | null,
   selectedSessionScope: SelectedSessionScope = 'shared'
 ) {
-  await patchSessionRecord(ws, sessionId, { tabId: tabId === 'overview' ? undefined : tabId })
-  broadcast(ws.id, { type: 'sessions_changed', sessionId })
-  if (selectedSessionScope === 'shared') {
-    await saveSelectedSession(ws, sessionId, previousSessionId, tabId)
-    publishEvent({ type: 'selected-session:updated', workspaceId: ws.id, sessionId })
-  }
+  await updateSessionEntry(ws, sessionId, { tabId: tabId === 'overview' ? undefined : tabId })
+  if (selectedSessionScope === 'shared') await saveSelectedSession(ws, sessionId, tabId, ifMatch)
 }
 async function sendBuild(
   ws: WorkspaceEntry,
@@ -186,15 +178,10 @@ export async function submitView(ws: WorkspaceEntry, viewId: string, input: Subm
     )
     if (!pinned) {
       setSessionTab(state, sessionId, tabId)
-      if (shared) selectSessionForTab(state, ws.id, sessionId, undefined, tabId)
+      if (shared) selectSessionForTab(state, ws.id, sessionId, tabId)
     }
     return { view, sessionId, pinned }
   })
-  viewsChanged(ws.id)
-  if (!pinned) {
-    broadcast(ws.id, { type: 'sessions_changed', sessionId })
-    if (shared) publishEvent({ type: 'selected-session:updated', workspaceId: ws.id, sessionId })
-  }
   try {
     await sendBuild(ws, view, sessionId, !pinned, input)
   } catch (error) {
@@ -241,21 +228,20 @@ export async function createViewFromSession(
     const isNew = !sessionId
     sessionId ??= crypto.randomUUID()
     if (!isNew) {
-      await patchSessionRecord(ws, sessionId, { forkedFromSessionId: fromSessionId })
+      await updateSessionEntry(ws, sessionId, { fork: { fromSessionId } })
       // The fork API returns only a child ID. A failed history read leaves the
       // child usable and its full transcript visible.
       const history = await harness.sessionEvents(ws, sessionId).catch(() => undefined)
       if (history)
-        await patchSessionRecord(ws, sessionId, {
-          forkedFromSessionId: fromSessionId,
-          ...inheritedHistoryBoundary(history)
+        await updateSessionEntry(ws, sessionId, {
+          fork: { fromSessionId, ...inheritedHistoryBoundary(history) }
         })
     }
     const config = await saveSessionConfig(ws, sessionId, sourceConfig)
     view = await createPendingView(ws, {
       status: 'starting',
       requirements: requirements.trim(),
-      executionSessionId: sessionId
+      buildSessionId: sessionId
     })
     await attachSession(ws, viewTabId(view.id), sessionId)
     await sendBuild(ws, view, sessionId, isNew, config)

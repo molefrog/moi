@@ -1,31 +1,27 @@
-import { useCollabEnabled } from '@/client/features/collab'
-import {
-  readSelectedSession,
-  writeSelectedSession
-} from '@/client/features/chat/sessions/browser-tab-state'
-import { useCallback, useMemo } from 'react'
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { useCallback } from 'react'
 import { useParams } from 'wouter'
-import { isWorkspaceTabId } from '@/lib/workspace-tabs'
-import type { WorkspaceSessionSelection, WorkspaceTabId } from '@/lib/types'
-import { composerDraftKey } from '@/lib/session-drafts'
-import { useUiStore } from '@/client/store/ui'
-
-import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { QueryClient } from '@tanstack/react-query'
 
 import { appUiKeys } from '@/client/api/app-ui-keys'
 import { jsonRequest, requestJson } from '@/client/api/http'
-import { toast } from '@/client/components/ui/toast'
+import {
+  readSelectedSession,
+  writeSelectedSession,
+  type BrowserTabSelection
+} from '@/client/features/chat/sessions/browser-tab-state'
+import { useCollabEnabled } from '@/client/features/collab'
 import { useWorkspaceId } from '@/client/features/workspace/workspace-context'
-import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
-import type { SelectedSessionScope, SelectedSessionState } from '@/lib/types'
-
-type SaveSelectedSessionInput = {
-  sessionId: string | null
-  previousSessionId: string | null
-  tabId: WorkspaceTabId
-  scope: SelectedSessionScope
-}
+import {
+  changeWorkspaceStateCache,
+  getCachedWorkspaceState,
+  renameSessionInState,
+  useWorkspaceState,
+  useWorkspaceStateWrite
+} from '@/client/features/workspace/workspace-state'
+import { useUiStore } from '@/client/store/ui'
+import { composerDraftKey } from '@/lib/session-drafts'
+import type { SelectedSessionScope, WorkspaceState, WorkspaceTabId } from '@/lib/types'
+import { isWorkspaceTabId } from '@/lib/workspace-tabs'
 
 type SetSelectedSession = (sessionId: string | null) => void
 
@@ -35,23 +31,25 @@ type SelectedSessionResult = readonly [
   selectSessionForTab: (sessionId: string, tabId: WorkspaceTabId) => Promise<void>
 ]
 
-export type SelectedSessionSaveResult = 'applied' | 'conflict' | 'ignored'
-
-export function selectedSessionKey(workspaceId: string, scope: SelectedSessionScope = 'shared') {
-  const key = appUiKeys.sessionSelection(workspaceId)
-  return scope === 'browser-tab' ? ([...key, 'browser-tab'] as const) : key
+// PUT shows `sessionId` in the tab (only while it still shows `ifMatch`, when
+// given); DELETE clears the tab if it still shows `sessionId`.
+type SelectionWrite = {
+  sessionId: string
+  tabId: WorkspaceTabId
+  show: boolean
+  ifMatch?: string | null
 }
 
-export function selectedSessionOptions(
-  workspaceId: string,
-  scope: SelectedSessionScope = 'shared'
-) {
+export function browserTabSelectionKey(workspaceId: string) {
+  return appUiKeys.browserTabSelection(workspaceId)
+}
+
+// sessionStorage is the source; the query only lets React observe it. Dropped
+// on unmount so the next visit reads storage again.
+export function browserTabSelectionOptions(workspaceId: string) {
   return {
-    queryKey: selectedSessionKey(workspaceId, scope),
-    queryFn: () =>
-      scope === 'browser-tab'
-        ? Promise.resolve(readSelectedSession(workspaceId))
-        : requestJson<WorkspaceSessionSelection>(`/api/workspaces/${workspaceId}/selected-session`),
+    queryKey: browserTabSelectionKey(workspaceId),
+    queryFn: () => Promise.resolve(readSelectedSession(workspaceId)),
     staleTime: Infinity,
     gcTime: 0,
     refetchOnMount: false,
@@ -59,77 +57,102 @@ export function selectedSessionOptions(
   }
 }
 
-function selectedSessionMutationKey(workspaceId: string, scope: SelectedSessionScope) {
-  return [...selectedSessionKey(workspaceId, scope), 'save'] as const
+// The chat a tab shows: the pin, then this browser tab's own choice (collab),
+// then the workspace's. Undefined until the state has loaded.
+export function selectedSessionForTab(
+  state: WorkspaceState | undefined,
+  tabId: WorkspaceTabId,
+  local?: BrowserTabSelection
+): string | null | undefined {
+  if (!state) return undefined
+  if (state.pinnedSessionId) return state.pinnedSessionId
+  if (local && tabId in local.selected) return local.selected[tabId] ?? null
+  return state.selected[tabId] ?? null
 }
 
-export function optimisticallySetSelectedSession(
+function cachedBrowserTabSelection(
+  queryClient: QueryClient,
+  workspaceId: string
+): BrowserTabSelection {
+  return (
+    queryClient.getQueryData<BrowserTabSelection>(browserTabSelectionKey(workspaceId)) ??
+    readSelectedSession(workspaceId)
+  )
+}
+
+// For handlers outside render, which must see a change before React does.
+export function cachedSelectedSession(
+  queryClient: QueryClient,
+  workspaceId: string,
+  tabId: WorkspaceTabId,
+  scope: SelectedSessionScope
+): string | null | undefined {
+  return selectedSessionForTab(
+    getCachedWorkspaceState(queryClient, workspaceId),
+    tabId,
+    scope === 'browser-tab' ? cachedBrowserTabSelection(queryClient, workspaceId) : undefined
+  )
+}
+
+function setBrowserTabSelection(
+  queryClient: QueryClient,
+  workspaceId: string,
+  change: (selected: BrowserTabSelection['selected']) => void
+): void {
+  const selected = { ...cachedBrowserTabSelection(queryClient, workspaceId).selected }
+  change(selected)
+  queryClient.setQueryData<BrowserTabSelection>(browserTabSelectionKey(workspaceId), { selected })
+  writeSelectedSession(workspaceId, { selected })
+}
+
+function applySelectionWrite(draft: WorkspaceState, input: SelectionWrite): void {
+  if (input.show) draft.selected[input.tabId] = input.sessionId
+  else if (draft.selected[input.tabId] === input.sessionId) delete draft.selected[input.tabId]
+}
+
+// The request that points `tabId` at `sessionId` (null: a new chat), or
+// undefined when nothing needs saving. Collab saves locally right here.
+function selectionChange(
   queryClient: QueryClient,
   workspaceId: string,
   sessionId: string | null,
   tabId: WorkspaceTabId,
-  scope: SelectedSessionScope = 'shared'
-): SaveSelectedSessionInput | null {
-  const queryKey = selectedSessionKey(workspaceId, scope)
-  const current = queryClient.getQueryData<WorkspaceSessionSelection>(queryKey)
-  const previousSessionId = current?.selected[tabId] ?? null
-  if (
-    current &&
-    previousSessionId === sessionId &&
-    (scope === 'shared' || tabId in current.selected)
-  )
-    return null
-
-  const selected = { ...current?.selected }
-  if (sessionId === null && scope === 'shared') delete selected[tabId]
-  else selected[tabId] = sessionId
-  queryClient.setQueryData<WorkspaceSessionSelection>(queryKey, {
-    selected,
-    pinned: current?.pinned ?? null
-  })
-  if (scope === 'browser-tab') writeSelectedSession(workspaceId, { selected, pinned: null })
-  return { sessionId, previousSessionId, tabId, scope }
+  scope: SelectedSessionScope
+): SelectionWrite | undefined {
+  if (scope === 'browser-tab') {
+    const local = cachedBrowserTabSelection(queryClient, workspaceId)
+    if (tabId in local.selected && (local.selected[tabId] ?? null) === sessionId) return
+    setBrowserTabSelection(queryClient, workspaceId, selected => {
+      selected[tabId] = sessionId
+    })
+    return
+  }
+  const current = getCachedWorkspaceState(queryClient, workspaceId)?.selected[tabId] ?? null
+  if (current === sessionId) return
+  if (sessionId === null) return current ? { sessionId: current, tabId, show: false } : undefined
+  return { sessionId, tabId, show: true, ifMatch: current }
 }
 
-export function settleSelectedSessionSave(
+// Show a chat in a tab before the server confirms it, without a request: for
+// flows whose own request makes the server select it (view submission).
+export function setSelectedSessionInCache(
   queryClient: QueryClient,
   workspaceId: string,
-  saved: SelectedSessionState,
-  input: SaveSelectedSessionInput
-): SelectedSessionSaveResult {
-  const queryKey = selectedSessionKey(workspaceId, input.scope)
-  const current = queryClient.getQueryData<WorkspaceSessionSelection>(queryKey)
-
-  const currentSessionId = current?.selected[input.tabId] ?? null
-  if (saved.sessionId !== input.sessionId && currentSessionId !== saved.sessionId) {
-    return 'conflict'
-  }
-  if (currentSessionId !== input.sessionId && currentSessionId !== input.previousSessionId) {
-    return 'ignored'
-  }
-
-  const selected = { ...current?.selected }
-  if (saved.sessionId === null && input.scope === 'shared') delete selected[input.tabId]
-  else selected[input.tabId] = saved.sessionId
-  queryClient.setQueryData<WorkspaceSessionSelection>(queryKey, {
-    selected,
-    pinned: current?.pinned ?? null
-  })
-  return 'applied'
-}
-
-export function applySelectedSessionEvent(
-  queryClient: QueryClient,
-  workspaceId: string,
-  hasPendingSave: boolean
+  sessionId: string,
+  tabId: WorkspaceTabId,
+  scope: SelectedSessionScope
 ): void {
-  if (hasPendingSave) return
-  void queryClient.invalidateQueries({
-    queryKey: appUiKeys.sessionSelection(workspaceId),
-    exact: true
-  })
+  if (scope === 'browser-tab')
+    setBrowserTabSelection(queryClient, workspaceId, selected => {
+      selected[tabId] = sessionId
+    })
+  else
+    changeWorkspaceStateCache(queryClient, workspaceId, draft => {
+      draft.selected[tabId] = sessionId
+    })
 }
 
+// A harness replaced a temporary chat id with its real one.
 export function renameSelectedSessionInCache(
   queryClient: QueryClient,
   workspaceId: string,
@@ -139,29 +162,12 @@ export function renameSelectedSessionInCache(
   useUiStore
     .getState()
     .moveComposerDraft(composerDraftKey(workspaceId, from), composerDraftKey(workspaceId, to))
-  for (const scope of ['shared', 'browser-tab'] as const) {
-    queryClient.setQueryData<WorkspaceSessionSelection>(
-      selectedSessionKey(workspaceId, scope),
-      current =>
-        current
-          ? {
-              selected: Object.fromEntries(
-                Object.entries(current.selected).map(([tabId, id]) => [
-                  tabId,
-                  id === from ? to : id
-                ])
-              ),
-              pinned: current.pinned === from ? to : current.pinned
-            }
-          : current
-    )
-  }
-  const local = readSelectedSession(workspaceId)
-  writeSelectedSession(workspaceId, {
-    selected: Object.fromEntries(
-      Object.entries(local.selected).map(([tabId, id]) => [tabId, id === from ? to : id])
-    ),
-    pinned: null
+  changeWorkspaceStateCache(queryClient, workspaceId, draft =>
+    renameSessionInState(draft, from, to)
+  )
+  setBrowserTabSelection(queryClient, workspaceId, selected => {
+    for (const [tabId, sessionId] of Object.entries(selected) as [WorkspaceTabId, string | null][])
+      if (sessionId === from) selected[tabId] = to
   })
 }
 
@@ -170,15 +176,17 @@ export function useCurrentTabId(): WorkspaceTabId {
   return isWorkspaceTabId(tab) ? tab : 'overview'
 }
 
-export function selectedSessionForTab(
-  shared: WorkspaceSessionSelection | undefined,
-  tabId: WorkspaceTabId,
-  local?: WorkspaceSessionSelection
-): string | null | undefined {
-  if (!shared) return undefined
-  if (shared.pinned) return shared.pinned
-  if (local && tabId in local.selected) return local.selected[tabId] ?? null
-  return shared.selected[tabId] ?? null
+function useSelectionWrite(workspaceId: string) {
+  return useWorkspaceStateWrite<SelectionWrite>(workspaceId, {
+    request: ({ sessionId, tabId, show, ifMatch }) =>
+      requestJson<WorkspaceState>(
+        `/api/workspaces/${workspaceId}/sessions/${encodeURIComponent(sessionId)}/selection`,
+        jsonRequest(show ? 'PUT' : 'DELETE', show ? { tabId, ifMatch } : { tabId }),
+        'Couldn’t save selected chat'
+      ),
+    optimistic: applySelectionWrite,
+    errorTitle: 'Couldn’t save selected chat'
+  })
 }
 
 export function useSelectedSession(explicitTabId?: WorkspaceTabId): SelectedSessionResult {
@@ -188,164 +196,71 @@ export function useSelectedSession(explicitTabId?: WorkspaceTabId): SelectedSess
   const collabEnabled = useCollabEnabled()
   const scope: SelectedSessionScope = collabEnabled ? 'browser-tab' : 'shared'
   const queryClient = useQueryClient()
-  const queryKey = useMemo(() => selectedSessionKey(workspaceId, scope), [workspaceId, scope])
-  const mutationKey = useMemo(
-    () => selectedSessionMutationKey(workspaceId, scope),
-    [workspaceId, scope]
-  )
-  const pendingSaves = useIsMutating({ mutationKey, exact: true })
-
-  // WorkspaceContent remains an observer for the active workspace. Nested hook
-  // users reuse its result without refetching; once the route unmounts, dropping
-  // the cache makes the next visit load the server-owned selection again.
-  const query = useQuery(selectedSessionOptions(workspaceId, scope))
-  // A pin is shared with CLI creation and applies to every workspace tab.
-  const sharedSelection = useWorkspaceSessionSelection().data
-
-  const { mutate: saveSelectedSession, mutateAsync: saveSelectedSessionAsync } = useMutation<
-    SelectedSessionState,
-    Error,
-    SaveSelectedSessionInput
-  >({
-    mutationKey,
-    scope: { id: `selected-session:${workspaceId}` },
-    mutationFn: input => {
-      if (input.scope === 'browser-tab') {
-        writeSelectedSession(
-          workspaceId,
-          queryClient.getQueryData<WorkspaceSessionSelection>(queryKey) ??
-            readSelectedSession(workspaceId)
-        )
-        return Promise.resolve({ sessionId: input.sessionId })
-      }
-      return requestJson<SelectedSessionState>(
-        `/api/workspaces/${workspaceId}/selected-session`,
-        jsonRequest('PUT', input),
-        'Couldn’t save selected chat'
-      )
-    },
-    onSuccess: (saved, input) => {
-      const result = settleSelectedSessionSave(queryClient, workspaceId, saved, input)
-      if (result !== 'conflict') return
-
-      toast.add({ title: 'Couldn’t save selected chat', type: 'error' })
-      void queryClient.invalidateQueries({ queryKey, exact: true })
-    },
-    onError: (_error, input) => {
-      const current = queryClient.getQueryData<WorkspaceSessionSelection>(queryKey)
-      if ((current?.selected[input.tabId] ?? null) !== input.sessionId) return
-
-      toast.add({ title: 'Couldn’t save selected chat', type: 'error' })
-      void queryClient.invalidateQueries({ queryKey, exact: true })
-    },
-    onSettled: () => {
-      if (scope === 'shared' && queryClient.isMutating({ mutationKey, exact: true }) === 1)
-        void queryClient.invalidateQueries({ queryKey, exact: true })
-    }
-  })
+  const state = useWorkspaceState(workspaceId).data
+  const local = useQuery({
+    ...browserTabSelectionOptions(workspaceId),
+    enabled: scope === 'browser-tab'
+  }).data
+  const { mutate: save, mutateAsync: saveAsync } = useSelectionWrite(workspaceId)
 
   const setSelectedSessionId = useCallback<SetSelectedSession>(
     sessionId => {
-      if (
-        queryClient.getQueryData<WorkspaceSessionSelection>(selectedSessionKey(workspaceId))?.pinned
-      )
-        return
-      const input = optimisticallySetSelectedSession(
-        queryClient,
-        workspaceId,
-        sessionId,
-        tabId,
-        scope
-      )
-      if (input) saveSelectedSession(input)
+      // A pinned chat shows in every tab until it is unpinned.
+      if (getCachedWorkspaceState(queryClient, workspaceId)?.pinnedSessionId) return
+      const input = selectionChange(queryClient, workspaceId, sessionId, tabId, scope)
+      if (input) save(input)
     },
-    [queryClient, saveSelectedSession, workspaceId, tabId, scope]
+    [queryClient, save, workspaceId, tabId, scope]
   )
 
   const selectSessionForTab = useCallback(
     async (sessionId: string, destination: WorkspaceTabId) => {
-      const input = optimisticallySetSelectedSession(
-        queryClient,
-        workspaceId,
-        sessionId,
-        destination,
-        scope
-      )
+      const input = selectionChange(queryClient, workspaceId, sessionId, destination, scope)
       if (!input) return
-      const saved = await saveSelectedSessionAsync(input)
-      if (
-        saved.sessionId !== sessionId ||
-        queryClient.getQueryData<WorkspaceSessionSelection>(queryKey)?.selected[destination] !==
-          sessionId
-      )
-        throw new Error('Couldn’t save selected chat')
+      const saved = await saveAsync(input)
+      if (saved.selected[destination] !== sessionId) throw new Error('Couldn’t save selected chat')
     },
-    [queryClient, queryKey, saveSelectedSessionAsync, scope, workspaceId]
+    [queryClient, saveAsync, scope, workspaceId]
   )
 
-  useWorkspaceEvent(event => {
-    if (event.type !== 'selected-session:updated' || event.workspaceId !== workspaceId) return
-    applySelectedSessionEvent(queryClient, workspaceId, scope === 'shared' && pendingSaves > 0)
-  })
-
   const selectedSessionId =
-    query.data === undefined || sharedSelection === undefined
+    scope === 'browser-tab' && local === undefined
       ? undefined
-      : selectedSessionForTab(
-          sharedSelection,
-          tabId,
-          scope === 'browser-tab' ? query.data : undefined
-        )
+      : selectedSessionForTab(state, tabId, scope === 'browser-tab' ? local : undefined)
   return [selectedSessionId, setSelectedSessionId, selectSessionForTab]
-}
-
-function useWorkspaceSessionSelection() {
-  const workspaceId = useWorkspaceId()
-  return useQuery(selectedSessionOptions(workspaceId))
 }
 
 export function usePinnedSession() {
   const workspaceId = useWorkspaceId()
   const queryClient = useQueryClient()
-  const { data } = useWorkspaceSessionSelection()
-  const mutation = useMutation({
-    scope: { id: `pinned-session:${workspaceId}` },
-    mutationFn: (sessionId: string | null) =>
-      requestJson<{ pinnedSessionId: string | null }>(
-        `/api/workspaces/${workspaceId}/pinned-session`,
-        jsonRequest('PUT', { sessionId })
-      ),
-    onMutate: sessionId => {
-      const queryKey = appUiKeys.sessionSelection(workspaceId)
-      const previousPinnedSessionId =
-        queryClient.getQueryData<WorkspaceSessionSelection>(queryKey)?.pinned ?? null
-      queryClient.setQueryData<WorkspaceSessionSelection>(queryKey, current => ({
-        selected: current?.selected ?? {},
-        pinned: sessionId
-      }))
-      return previousPinnedSessionId
-    },
-    onError: (_error, sessionId, previousPinnedSessionId) => {
-      queryClient.setQueryData<WorkspaceSessionSelection>(
-        appUiKeys.sessionSelection(workspaceId),
-        current =>
-          current?.pinned === sessionId
-            ? { ...current, pinned: previousPinnedSessionId ?? null }
-            : current
-      )
-      toast.add({ title: 'Couldn’t pin chat', type: 'error' })
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({
-        queryKey: appUiKeys.sessionSelection(workspaceId),
-        exact: true
-      })
+  const state = useWorkspaceState(workspaceId).data
+  const { mutate, mutateAsync } = useWorkspaceStateWrite<{ sessionId: string; pinned: boolean }>(
+    workspaceId,
+    {
+      request: ({ sessionId, pinned }) =>
+        requestJson<WorkspaceState>(
+          `/api/workspaces/${workspaceId}/sessions/${encodeURIComponent(sessionId)}/pin`,
+          { method: pinned ? 'PUT' : 'DELETE' },
+          pinned ? 'Couldn’t pin chat' : 'Couldn’t unpin chat'
+        ),
+      optimistic: (draft, { sessionId, pinned }) => {
+        if (pinned) draft.pinnedSessionId = sessionId
+        else if (draft.pinnedSessionId === sessionId) delete draft.pinnedSessionId
+      },
+      errorTitle: 'Couldn’t change the pinned chat'
     }
-  })
+  )
+  const pin = useCallback((sessionId: string) => mutate({ sessionId, pinned: true }), [mutate])
+  const unpinAsync = useCallback(async () => {
+    const pinned = getCachedWorkspaceState(queryClient, workspaceId)?.pinnedSessionId
+    if (pinned) await mutateAsync({ sessionId: pinned, pinned: false })
+  }, [mutateAsync, queryClient, workspaceId])
+  const unpin = useCallback(() => void unpinAsync().catch(() => {}), [unpinAsync])
   return {
-    pinnedSessionId: data?.pinned ?? null,
-    loaded: data !== undefined,
-    pin: mutation.mutate,
-    pinAsync: mutation.mutateAsync
+    pinnedSessionId: state?.pinnedSessionId,
+    loaded: state !== undefined,
+    pin,
+    unpin,
+    unpinAsync
   }
 }

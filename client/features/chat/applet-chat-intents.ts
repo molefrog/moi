@@ -13,13 +13,10 @@ import { prepareChatAttachments, type ChatSendOptions, type PreparedAttachments 
 import { useLayoutEffect } from 'react'
 import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { toast } from '@/client/components/ui/toast'
-import {
-  selectedSessionForTab,
-  selectedSessionKey
-} from '@/client/features/chat/sessions/use-selected-session'
+import { cachedSelectedSession } from '@/client/features/chat/sessions/use-selected-session'
 import { useCollabEnabled } from '@/client/features/collab'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
-import type { SelectedSessionScope, WorkspaceSessionSelection, WorkspaceTabId } from '@/lib/types'
+import type { SelectedSessionScope, WorkspaceTabId } from '@/lib/types'
 import { useCurrentTabId } from './sessions/use-selected-session'
 import { useWorkspaceId } from '@/client/features/workspace/workspace-context'
 import type { AgentAvailability } from '@/client/lib/agent-availability'
@@ -62,21 +59,8 @@ export function createAppletMessageHandler(
 ) {
   const pending = new Set<() => void>()
   let disposed = false
-  const selectedSession = () => {
-    const state = queryClient.getQueryData<WorkspaceSessionSelection>(
-      selectedSessionKey(workspaceId, scope)
-    )
-    const shared = queryClient.getQueryData<WorkspaceSessionSelection>(
-      selectedSessionKey(workspaceId)
-    )
-    return (
-      selectedSessionForTab(
-        shared,
-        getOptions().tabId,
-        scope === 'browser-tab' ? state : undefined
-      ) ?? null
-    )
-  }
+  const selectedSession = () =>
+    cachedSelectedSession(queryClient, workspaceId, getOptions().tabId, scope) ?? null
 
   async function handle(event: AppletChatMessage): Promise<void> {
     if (disposed) return

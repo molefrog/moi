@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { api } from './index'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
-import { getSessionRecord, patchSessionRecord } from '../sessions/store'
+import { getSessionEntry, updateSessionEntry } from '../sessions/store'
 import { harnessFor } from '../harness/registry'
 import type { StreamEvent } from '@/lib/types'
 
@@ -39,16 +39,16 @@ test('history retries without changing a fork cutoff', async () => {
     expect((await api.request(path)).status).toBe(500)
     failRead = false
     expect((await api.request(path)).status).toBe(200)
-    await patchSessionRecord(workspace, 'child', { forkedFromSessionId: 'parent' })
+    await updateSessionEntry(workspace, 'child', { fork: { fromSessionId: 'parent' } })
     failRead = true
     expect((await api.request(path)).status).toBe(500)
-    expect(await getSessionRecord(workspace, 'child')).toEqual({
-      forkedFromSessionId: 'parent'
+    expect(await getSessionEntry(workspace, 'child')).toEqual({
+      fork: { fromSessionId: 'parent' }
     })
     failRead = false
     expect((await api.request(path)).status).toBe(200)
-    expect(await getSessionRecord(workspace, 'child')).toEqual({
-      forkedFromSessionId: 'parent'
+    expect(await getSessionEntry(workspace, 'child')).toEqual({
+      fork: { fromSessionId: 'parent' }
     })
     history = [
       {
@@ -62,8 +62,8 @@ test('history retries without changing a fork cutoff', async () => {
       }
     ]
     expect((await api.request(path)).status).toBe(200)
-    expect(await getSessionRecord(workspace, 'child')).toEqual({
-      forkedFromSessionId: 'parent'
+    expect(await getSessionEntry(workspace, 'child')).toEqual({
+      fork: { fromSessionId: 'parent' }
     })
     expect(reads).toBe(5)
   } finally {
@@ -71,28 +71,26 @@ test('history retries without changing a fork cutoff', async () => {
   }
 })
 
-test('reads one session record and preserves provenance when updating or clearing config', async () => {
+test('changing chat settings keeps the chat’s tab and fork history', async () => {
   const workspace = await registerWorkspace(join(directory, 'workspace'), { type: 'claude-code' })
-  const path = `/api/workspaces/${workspace.id}/sessions/child`
-  const metadata = {
+  const entry = {
     tabId: 'scratchpad' as const,
-    forkedFromSessionId: 'parent',
-    forkedThroughMessageId: 'boundary'
+    fork: { fromSessionId: 'parent', throughMessageId: 'boundary' }
   }
-  await patchSessionRecord(workspace, 'child', metadata)
+  await updateSessionEntry(workspace, 'child', entry)
   const patch = (body: unknown) =>
-    api.request(`${path}/config`, {
-      method: 'PUT',
+    api.request(`/api/workspaces/${workspace.id}/sessions/child/config`, {
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     })
   const saved = await patch({ model: 'sonnet', fastMode: false })
   expect(saved.status).toBe(200)
-  const expected = { ...metadata, config: { model: 'sonnet', fastMode: false } }
-  expect(await saved.json()).toEqual(expected)
-  expect(await (await api.request(path)).json()).toEqual(expected)
-  expect(await (await patch({ model: null, fastMode: null })).json()).toEqual(metadata)
-  expect(
-    await (await api.request(`/api/workspaces/${workspace.id}/sessions/fresh`)).json()
-  ).toEqual({})
+  expect((await saved.json()).sessions.child).toEqual({
+    ...entry,
+    config: { model: 'sonnet', fastMode: false }
+  })
+  expect((await (await patch({ model: null, fastMode: null })).json()).sessions.child).toEqual(
+    entry
+  )
 })

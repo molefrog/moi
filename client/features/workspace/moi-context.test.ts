@@ -38,7 +38,7 @@ describe('moi context assembly', () => {
         status: 'submitted',
         title: 'Customer overview',
         requirements: '',
-        executionSessionId: 's-1'
+        buildSessionId: 's-1'
       },
       {
         id: 'b-draft',

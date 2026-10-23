@@ -8,19 +8,23 @@ import {
   readWorkspaceState,
   setWorkspaceStateRoot
 } from '../workspace-state'
+import type { WorkspaceTabId } from '@/lib/types'
 import { renameSessionReferences } from './lifecycle'
 import {
   clearSelectedSession,
+  deselectSession,
   forgetSessionRenames,
-  getSelectedSession,
   getPinnedSession,
   pinSession,
-  saveSelectedSession
+  saveSelectedSession,
+  unpinSession
 } from './selected'
-import { patchSessionRecord } from './store'
+import { updateSessionEntry } from './store'
 
 let scratchDir = ''
 const ws = { id: 'ws-1', path: '/workspace' }
+const selected = async (target = ws, tabId: WorkspaceTabId = 'overview') =>
+  (await readWorkspaceState(target)).selected[tabId]
 
 beforeEach(async () => {
   scratchDir = await mkdtemp(join(tmpdir(), 'moi-selected-session-'))
@@ -34,36 +38,43 @@ afterEach(async () => {
 })
 
 describe('selected session persistence', () => {
-  test('tabId selection and workspace pin are independent', async () => {
+  test('tab selection and workspace pin are independent', async () => {
     await saveSelectedSession(ws, 'general')
-    await saveSelectedSession(ws, 'words', undefined, 'views/words')
-    await saveSelectedSession(ws, 'sketch', undefined, 'scratchpad')
-    expect(await getSelectedSession(ws, 'views/genders')).toBeUndefined()
+    await saveSelectedSession(ws, 'words', 'views/words')
+    await saveSelectedSession(ws, 'sketch', 'scratchpad')
+    expect(await selected(ws, 'views/genders')).toBeUndefined()
     await pinSession(ws, 'words')
     expect(await getPinnedSession(ws)).toBe('words')
-    expect(await getSelectedSession(ws, 'scratchpad')).toBe('sketch')
-    await pinSession(ws, null)
-    expect(await getSelectedSession(ws, 'views/words')).toBe('words')
-    expect(await getSelectedSession(ws)).toBe('general')
+    expect(await selected(ws, 'scratchpad')).toBe('sketch')
+    await unpinSession(ws, 'words')
+    expect(await getPinnedSession(ws)).toBeUndefined()
+    expect(await selected(ws, 'views/words')).toBe('words')
+    expect(await selected(ws)).toBe('general')
+  })
+
+  test('unpinning another chat leaves the pin alone', async () => {
+    await pinSession(ws, 'pinned')
+    await unpinSession(ws, 'other')
+    expect(await getPinnedSession(ws)).toBe('pinned')
   })
 
   test('archiving clears both tab selection and the workspace pin', async () => {
-    await saveSelectedSession(ws, 'build', undefined, 'views/words')
+    await saveSelectedSession(ws, 'build', 'views/words')
     await pinSession(ws, 'build')
-    expect(await getSelectedSession(ws, 'views/words')).toBe('build')
     await clearSelectedSession(ws, 'build')
-    expect(await getSelectedSession(ws, 'views/words')).toBeUndefined()
-    expect(await getPinnedSession(ws)).toBeNull()
+    expect(await selected(ws, 'views/words')).toBeUndefined()
+    expect(await getPinnedSession(ws)).toBeUndefined()
   })
 
-  test('New chat removes the remembered selection', async () => {
-    expect(await getSelectedSession(ws)).toBeUndefined()
+  test('deselecting clears the tab only while it still shows that chat', async () => {
     await saveSelectedSession(ws, 'session-1')
-    await saveSelectedSession(ws, null)
-    expect(await getSelectedSession(ws)).toBeUndefined()
+    await deselectSession(ws, 'other', 'overview')
+    expect(await selected(ws)).toBe('session-1')
+    await deselectSession(ws, 'session-1', 'overview')
+    expect(await selected(ws)).toBeUndefined()
   })
 
-  test('serializes writes for different workspaces without dropping either value', async () => {
+  test('writes to different workspaces keep both values', async () => {
     const first = { id: 'first', path: '/first' }
     const second = { id: 'second', path: '/second' }
     await Promise.all([
@@ -71,48 +82,46 @@ describe('selected session persistence', () => {
       saveSelectedSession(second, 'session-2')
     ])
 
-    expect(await getSelectedSession(first)).toBe('session-1')
-    expect(await getSelectedSession(second)).toBe('session-2')
+    expect(await selected(first)).toBe('session-1')
+    expect(await selected(second)).toBe('session-2')
   })
 
   test('rapid selections finish on the latest session', async () => {
     await saveSelectedSession(ws, 'session-1')
 
     await Promise.all([
-      saveSelectedSession(ws, 'session-2', 'session-1'),
-      saveSelectedSession(ws, 'session-3', 'session-2')
+      saveSelectedSession(ws, 'session-2', 'overview', 'session-1'),
+      saveSelectedSession(ws, 'session-3', 'overview', 'session-2')
     ])
 
-    expect(await getSelectedSession(ws)).toBe('session-3')
+    expect(await selected(ws)).toBe('session-3')
+  })
+
+  test('ifMatch null applies only to a tab that shows no chat', async () => {
+    expect(await saveSelectedSession(ws, 'first', 'overview', null)).toBe(true)
+    expect(await saveSelectedSession(ws, 'second', 'overview', null)).toBe(false)
+    expect(await selected(ws)).toBe('first')
   })
 
   test('renames a selected temporary session and rejects a late stale save', async () => {
-    await saveSelectedSession(ws, null)
-    await saveSelectedSession(ws, 'temporary', null)
+    await saveSelectedSession(ws, 'temporary', 'overview', null)
     await renameSessionReferences(ws, 'temporary', 'real')
-    expect(await getSelectedSession(ws)).toBe('real')
+    expect(await selected(ws)).toBe('real')
 
-    expect(await saveSelectedSession(ws, 'temporary', null)).toEqual({
-      changed: false,
-      sessionId: 'real'
-    })
-    expect(await getSelectedSession(ws)).toBe('real')
+    expect(await saveSelectedSession(ws, 'temporary', 'overview', null)).toBe(false)
+    expect(await selected(ws)).toBe('real')
   })
 
   test('resolves a temporary selection saved after its session was renamed', async () => {
-    await saveSelectedSession(ws, null)
     await renameSessionReferences(ws, 'temporary', 'real')
 
-    expect(await saveSelectedSession(ws, 'temporary', null)).toEqual({
-      changed: true,
-      sessionId: 'real'
-    })
-    expect(await getSelectedSession(ws)).toBe('real')
+    expect(await saveSelectedSession(ws, 'temporary', 'overview', null)).toBe(true)
+    expect(await selected(ws)).toBe('real')
   })
 
-  test('a rename moves the record, every tab and the pin in one write', async () => {
-    await patchSessionRecord(ws, 'temporary', { tabId: 'views/words' })
-    await saveSelectedSession(ws, 'temporary', undefined, 'views/words')
+  test('a rename moves the entry, every tab and the pin in one write', async () => {
+    await updateSessionEntry(ws, 'temporary', { tabId: 'views/words' })
+    await saveSelectedSession(ws, 'temporary', 'views/words')
     await saveSelectedSession(ws, 'temporary')
     await pinSession(ws, 'temporary')
     await renameSessionReferences(ws, 'temporary', 'real')
@@ -125,13 +134,9 @@ describe('selected session persistence', () => {
 
   test('clears only the matching selected session', async () => {
     await saveSelectedSession(ws, 'selected')
-    expect(await clearSelectedSession(ws, 'other')).toEqual({
-      changed: false,
-      sessionId: 'selected'
-    })
-    expect(await clearSelectedSession(ws, 'selected')).toEqual({
-      changed: true,
-      sessionId: null
-    })
+    await clearSelectedSession(ws, 'other')
+    expect(await selected(ws)).toBe('selected')
+    await clearSelectedSession(ws, 'selected')
+    expect(await selected(ws)).toBeUndefined()
   })
 })

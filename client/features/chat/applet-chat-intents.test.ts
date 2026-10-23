@@ -1,13 +1,17 @@
 import { afterEach, beforeEach, describe, expect, test, mock, spyOn } from 'bun:test'
 import { QueryClient } from '@tanstack/react-query'
-import { selectedSessionKey } from '@/client/features/chat/sessions/use-selected-session'
+import { workspaceKeys } from '@/client/api/workspace-keys'
+import {
+  browserTabSelectionKey,
+  cachedSelectedSession
+} from '@/client/features/chat/sessions/use-selected-session'
 import { toast } from '@/client/components/ui/toast'
 import * as appletLog from '@/client/features/applets/applet-log'
 import type { AppletChatMessage } from '@/client/features/applets/applet-runtime'
 import { type ChatSendOptions, ownsComposerAttachments, attachmentsForSend } from './chat-send'
 import { liveStore } from './chat-store'
 import { stageTextAttachment } from './composer/attachments/draft-attachments'
-import type { WorkspaceSessionSelection, UploadInfo } from '@/lib/types'
+import type { SelectedSessionScope, UploadInfo, WorkspaceState } from '@/lib/types'
 import { drainChatDirectives, pushChatDirective } from '@/client/features/workspace/moi-context'
 
 import { canSubmitComposerAction } from '@/client/components/shared/composer'
@@ -78,11 +82,20 @@ describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope
   let close: ReturnType<typeof spyOn<typeof toast, 'close'>>
   let log: ReturnType<typeof spyOn<typeof appletLog, 'reportAppletError'>>
 
+  function selectIn(target: SelectedSessionScope, sessionId: string | null) {
+    const selected = sessionId ? { overview: sessionId } : {}
+    if (target === 'browser-tab')
+      queryClient.setQueryData(browserTabSelectionKey(workspaceId), { selected })
+    else
+      queryClient.setQueryData<WorkspaceState>(workspaceKeys.state(workspaceId), {
+        revision: 1,
+        selected,
+        sessions: {},
+        pendingViews: {}
+      })
+  }
   function select(sessionId: string | null) {
-    queryClient.setQueryData(selectedSessionKey(workspaceId, scope), {
-      selected: sessionId ? { overview: sessionId } : {},
-      pinned: null
-    })
+    selectIn(scope, sessionId)
   }
   function deferredUpload() {
     const deferred = Promise.withResolvers<Response>()
@@ -104,11 +117,7 @@ describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope
 
   beforeEach(() => {
     queryClient = new QueryClient()
-    if (scope === 'browser-tab')
-      queryClient.setQueryData(selectedSessionKey(workspaceId), {
-        selected: {},
-        pinned: null
-      })
+    if (scope === 'browser-tab') selectIn('shared', null)
     select('session-1')
     availability = { status: 'available' }
     send = mock(() => {})
@@ -121,10 +130,7 @@ describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope
       queryClient,
       () => ({
         tabId: 'overview',
-        sessionId:
-          queryClient.getQueryData<WorkspaceSessionSelection>(
-            selectedSessionKey(workspaceId, scope)
-          )?.selected.overview ?? null,
+        sessionId: cachedSelectedSession(queryClient, workspaceId, 'overview', scope) ?? null,
         send,
         revealChat: reveal,
         agentAvailability: availability
@@ -155,13 +161,7 @@ describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope
   test('ignores selection changes in the other scope while attachments are prepared', async () => {
     const deferred = deferredUpload()
     const pending = handler.handle(event)
-    queryClient.setQueryData(
-      selectedSessionKey(workspaceId, scope === 'shared' ? 'browser-tab' : 'shared'),
-      {
-        selected: { overview: 'another-chat' },
-        pinned: null
-      }
-    )
+    selectIn(scope === 'shared' ? 'browser-tab' : 'shared', 'another-chat')
     deferred.resolve(Response.json(upload))
     await pending
     expect(send).toHaveBeenCalledTimes(1)

@@ -15,7 +15,13 @@ import {
 import { attachmentKey, liveStore } from '@/client/features/chat/chat-store'
 import type { StagedAttachment } from '@/client/features/chat/composer/attachments/types'
 import { MAX_MESSAGE_ATTACHMENTS } from '@/lib/message-attachments'
-import type { SessionInfo, SessionRecord, UploadInfo, ViewState, WorkspaceAgent } from '@/lib/types'
+import type {
+  SessionSummary,
+  UploadInfo,
+  ViewState,
+  WorkspaceAgent,
+  WorkspaceState
+} from '@/lib/types'
 import { resolveSelectedModel } from './composer/model-order'
 
 const workspaceId = 'workspace-1'
@@ -67,7 +73,7 @@ describe('startOptimisticSession', () => {
     })
 
     expect(
-      queryClient.getQueryData<SessionInfo[]>(workspaceKeys.sessions(workspaceId))
+      queryClient.getQueryData<SessionSummary[]>(workspaceKeys.sessions(workspaceId))
     ).toMatchObject([
       {
         sessionId,
@@ -76,8 +82,10 @@ describe('startOptimisticSession', () => {
     ])
   })
 
-  test('seeds an empty session record so the first turn renders before it loads', () => {
+  test('files a view chat under its tab before the server confirms it', () => {
     const queryClient = new QueryClient()
+    const state: WorkspaceState = { revision: 3, selected: {}, sessions: {}, pendingViews: {} }
+    queryClient.setQueryData(workspaceKeys.state(workspaceId), state)
     startOptimisticSession({
       tabId: 'views/notes',
       queryClient,
@@ -87,10 +95,23 @@ describe('startOptimisticSession', () => {
     })
 
     expect(
-      queryClient.getQueryData<SessionRecord>(workspaceKeys.session(workspaceId, sessionId))
-    ).toEqual({
-      tabId: 'views/notes'
+      queryClient.getQueryData<WorkspaceState>(workspaceKeys.state(workspaceId))?.sessions
+    ).toEqual({ [sessionId]: { tabId: 'views/notes' } })
+  })
+
+  test('leaves an overview chat out of the workspace state', () => {
+    const queryClient = new QueryClient()
+    const state: WorkspaceState = { revision: 3, selected: {}, sessions: {}, pendingViews: {} }
+    queryClient.setQueryData(workspaceKeys.state(workspaceId), state)
+    startOptimisticSession({
+      tabId: 'overview',
+      queryClient,
+      workspaceId,
+      sessionId,
+      text: 'hello'
     })
+
+    expect(queryClient.getQueryData<WorkspaceState>(workspaceKeys.state(workspaceId))).toBe(state)
   })
 
   test('uses filenames for an attachment-only chat', () => {
@@ -104,7 +125,7 @@ describe('startOptimisticSession', () => {
     })
 
     expect(
-      queryClient.getQueryData<SessionInfo[]>(workspaceKeys.sessions(workspaceId))?.[0]?.summary
+      queryClient.getQueryData<SessionSummary[]>(workspaceKeys.sessions(workspaceId))?.[0]?.summary
     ).toBe('brief.pdf')
   })
 })

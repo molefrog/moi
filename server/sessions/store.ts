@@ -1,93 +1,37 @@
-import type {
-  SessionInfo,
-  SessionRecord,
-  SessionRecordPatch,
-  SessionSummary,
-  WorkspaceTabId
-} from '@/lib/types'
-import {
-  readWorkspaceState,
-  updateWorkspaceState,
-  type WorkspaceRef,
-  type WorkspaceSessionState,
-  type WorkspaceState
-} from '../workspace-state'
+import type { WorkspaceSessionState, WorkspaceState, WorkspaceTabId } from '@/lib/types'
+import { readWorkspaceState, updateWorkspaceState, type WorkspaceRef } from '../workspace-state'
 
-// The API keeps fork fields flat on the record; the state file groups them.
-function toSessionRecord(session: WorkspaceSessionState | undefined): SessionRecord {
-  if (!session) return {}
-  const { fork, ...rest } = session
-  if (!fork) return rest
-  return {
-    ...rest,
-    forkedFromSessionId: fork.fromSessionId,
-    ...(fork.throughMessageId ? { forkedThroughMessageId: fork.throughMessageId } : {}),
-    ...(fork.noticeIds ? { forkedNoticeIds: fork.noticeIds } : {})
-  }
+export async function getSessionEntries(
+  ws: WorkspaceRef
+): Promise<Record<string, WorkspaceSessionState>> {
+  return (await readWorkspaceState(ws)).sessions
 }
 
-function fromSessionRecord(record: SessionRecord): WorkspaceSessionState {
-  const { forkedFromSessionId, forkedThroughMessageId, forkedNoticeIds, ...rest } = record
-  if (forkedFromSessionId === undefined) {
-    if (forkedThroughMessageId !== undefined || forkedNoticeIds !== undefined)
-      throw new Error('Fork history requires a source session')
-    return rest
-  }
-  return {
-    ...rest,
-    fork: {
-      fromSessionId: forkedFromSessionId,
-      ...(forkedThroughMessageId ? { throughMessageId: forkedThroughMessageId } : {}),
-      ...(forkedNoticeIds ? { noticeIds: forkedNoticeIds } : {})
-    }
-  }
-}
-
-export async function getSessionRecords(ws: WorkspaceRef): Promise<Record<string, SessionRecord>> {
-  const { sessions } = await readWorkspaceState(ws)
-  return Object.fromEntries(
-    Object.entries(sessions).map(([sessionId, session]) => [sessionId, toSessionRecord(session)])
-  )
-}
-
-export async function getSessionRecord(
+export async function getSessionEntry(
   ws: WorkspaceRef,
   sessionId: string
-): Promise<SessionRecord> {
-  return toSessionRecord((await readWorkspaceState(ws)).sessions[sessionId])
+): Promise<WorkspaceSessionState> {
+  return (await readWorkspaceState(ws)).sessions[sessionId] ?? {}
 }
 
-export async function withSessionRecords(
-  ws: WorkspaceRef,
-  sessions: SessionSummary[]
-): Promise<SessionInfo[]> {
-  const records = await getSessionRecords(ws)
-  return sessions.map(session => {
-    const { config: _, ...metadata } = records[session.sessionId] ?? {}
-    return { ...session, ...metadata }
-  })
-}
-
-// Merge `patch` into a session entry inside a state transaction.
+// Merge `patch` into a session entry inside a state transaction. An undefined
+// field clears it.
 export function patchSessionEntry(
   state: WorkspaceState,
   sessionId: string,
-  patch: SessionRecordPatch
+  patch: Partial<WorkspaceSessionState>
 ): void {
-  state.sessions[sessionId] = fromSessionRecord({
-    ...toSessionRecord(state.sessions[sessionId]),
-    ...patch
-  })
+  state.sessions[sessionId] = { ...state.sessions[sessionId], ...patch }
 }
 
 export function setSessionTab(state: WorkspaceState, sessionId: string, tabId: WorkspaceTabId) {
   patchSessionEntry(state, sessionId, { tabId: tabId === 'overview' ? undefined : tabId })
 }
 
-export async function patchSessionRecord(
+export async function updateSessionEntry(
   ws: WorkspaceRef,
   sessionId: string,
-  patch: SessionRecordPatch
+  patch: Partial<WorkspaceSessionState>
 ): Promise<void> {
   await updateWorkspaceState(ws, state => patchSessionEntry(state, sessionId, patch))
 }

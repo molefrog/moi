@@ -10,7 +10,7 @@ const pendingView: PendingView = {
   id: 'draft-1',
   status: 'draft',
   requirements: '',
-  executionSessionId: 'session-1'
+  buildSessionId: 'session-1'
 }
 
 function renderPendingView(

@@ -1,9 +1,10 @@
-import { afterEach, beforeEach, expect, test } from 'bun:test'
+import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import * as events from '../events'
 import { writeStateFile } from './file'
 import {
   DEFAULT_WORKSPACE_STATE_ROOT,
@@ -34,6 +35,7 @@ test('a missing file reads as empty state for the workspace', async () => {
   expect(await readWorkspaceState(ws)).toEqual({
     version: 1,
     workspacePath: '/projects/notes',
+    revision: 0,
     selected: {},
     sessions: {},
     pendingViews: {}
@@ -52,11 +54,50 @@ test('an update saves the whole state in one file and returns the change result'
   expect(await Bun.file(statePath()).json()).toEqual({
     version: 1,
     workspacePath: '/projects/notes',
+    revision: 1,
     pinnedSessionId: 's1',
     selected: { overview: 's1' },
     sessions: { s1: { config: { model: 'sonnet' } } },
     pendingViews: {}
   })
+})
+
+test('each saved change bumps the revision and is published without file bookkeeping', async () => {
+  const publish = spyOn(events, 'publishEvent').mockImplementation(() => {})
+  try {
+    await updateWorkspaceState(ws, state => {
+      state.selected.overview = 's1'
+    })
+    await updateWorkspaceState(ws, state => {
+      state.selected.overview = 's1'
+    })
+    await updateWorkspaceState(ws, state => {
+      state.pinnedSessionId = 's1'
+    })
+    expect((await readWorkspaceState(ws)).revision).toBe(2)
+    expect(publish).toHaveBeenCalledTimes(2)
+    expect(publish).toHaveBeenLastCalledWith({
+      type: 'state:changed',
+      workspaceId: 'ws-1',
+      state: {
+        revision: 2,
+        pinnedSessionId: 's1',
+        selected: { overview: 's1' },
+        sessions: {},
+        pendingViews: {}
+      }
+    })
+  } finally {
+    publish.mockRestore()
+  }
+})
+
+test('a change cannot set the revision itself', async () => {
+  await updateWorkspaceState(ws, state => {
+    state.revision = 99
+  })
+  expect((await readWorkspaceState(ws)).revision).toBe(0)
+  expect(existsSync(statePath())).toBe(false)
 })
 
 test('reads are copies', async () => {

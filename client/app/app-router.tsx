@@ -3,6 +3,7 @@ import { Suspense, lazy, useEffect } from 'react'
 import { Redirect, Route, Switch, useLocation } from 'wouter'
 
 import { setWorkspaceSwitchHandler } from '@/client/features/chat/connection/chat-connection'
+import { useWorkspaceStateSync } from '@/client/features/workspace/workspace-state'
 
 import { SettingsRoute } from './routes/settings-route'
 import { HomeRoute } from './routes/home-route'
@@ -30,6 +31,7 @@ function DevLazy() {
 // Top-level router — sets up all client-side routes
 export function AppRouter() {
   const [, navigate] = useLocation()
+  useWorkspaceStateSync()
 
   // When the server broadcasts a workspace:switch (e.g. from `moi start`),
   // navigate to that workspace

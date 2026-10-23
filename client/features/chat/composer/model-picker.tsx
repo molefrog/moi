@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react'
 
 import { IconBolt, IconBoltFilled } from '@tabler/icons-react'
 
-import { useSaveSessionConfig, useSession } from '../sessions/api'
+import { useSaveSessionConfig, useSessionState } from '../sessions/api'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import {
   groupModels,
@@ -295,7 +295,7 @@ export const ModelPicker = memo(function ModelPicker({ sessionId }: ModelPickerP
       )
     : []
 
-  const sessionConfig = useSession(workspaceId, sessionId).data?.config
+  const sessionConfig = useSessionState(workspaceId, sessionId).data?.config
   const saveSessionConfig = useSaveSessionConfig(workspaceId)
 
   const selectedModel = (sessionId ? sessionConfig?.model : undefined) ?? layout.selectedModel

@@ -6,7 +6,8 @@ import { notifyManager, QueryClient, QueryClientProvider } from '@tanstack/react
 import { Link, Route, Router } from 'wouter'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { selectedSessionKey } from '@/client/features/chat/sessions/use-selected-session'
+import { browserTabSelectionKey } from '@/client/features/chat/sessions/use-selected-session'
+import type { BrowserTabSelection } from '@/client/features/chat/sessions/browser-tab-state'
 import { CollabContext } from '@/client/features/collab/provider'
 import { NO_ENGINE } from '@/client/features/collab/client'
 import { createFakeEngine } from '@/client/features/collab/testing/fake-engine'
@@ -14,8 +15,8 @@ import * as workspaceEvents from '@/client/runtime/use-workspace-events'
 import { resolveUrl } from '@/lib/navigation'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import type {
-  SessionInfo,
-  WorkspaceSessionSelection,
+  SessionSummary,
+  WorkspaceState,
   WorkspaceTabId,
   WorkspaceTabsState
 } from '@/lib/types'
@@ -83,40 +84,57 @@ function mountNavigation(
   })
 
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  let selection: WorkspaceSessionSelection = { selected: { overview: 'previous' }, pinned: 'other' }
-  const responses: { sessions: SessionInfo[] | Promise<SessionInfo[]> } = {
-    sessions: [{ sessionId: 'source', summary: 'Source', lastModified: 1, tabId: 'scratchpad' }]
+  // The fake server's copy of the workspace state.
+  let server: WorkspaceState = {
+    revision: 1,
+    selected: { overview: 'previous' },
+    pinnedSessionId: 'other',
+    sessions: { source: { tabId: 'scratchpad' } },
+    pendingViews: {}
+  }
+  const setState = (patch: Partial<WorkspaceState>) => {
+    server = { ...server, ...patch }
+    queryClient.setQueryData(workspaceKeys.state('abc'), server)
+  }
+  const responses: { sessions: SessionSummary[] | Promise<SessionSummary[]> } = {
+    sessions: [{ sessionId: 'source', summary: 'Source', lastModified: 1 }]
   }
   queryClient.setQueryData(workspaceKeys.sessions('abc'), responses.sessions)
-  queryClient.setQueryData(selectedSessionKey('abc'), selection)
-  if (collab)
-    queryClient.setQueryData(selectedSessionKey('abc', 'browser-tab'), {
-      selected: {},
-      pinned: null
-    })
+  queryClient.setQueryData(workspaceKeys.state('abc'), server)
+  if (collab) queryClient.setQueryData(browserTabSelectionKey('abc'), { selected: {} })
   const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
     Object.assign(
       async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input)
+        const method = init?.method ?? 'GET'
         if (url.endsWith('/sessions')) return Response.json(await responses.sessions)
-        if (url.endsWith('/selected-session') && !init?.method) return Response.json(selection)
-        const body = JSON.parse(String(init?.body)) as { sessionId: string; tabId: string }
-        if (url.endsWith('/pinned-session')) {
-          selection = { ...selection, pinned: null }
-          return Response.json({ pinnedSessionId: null })
-        }
-        if (url.endsWith('/selected-session')) {
-          selection = {
-            ...selection,
-            selected: { ...selection.selected, [body.tabId]: body.sessionId }
+        if (url.endsWith('/state') && method === 'GET') return Response.json(server)
+        const write = url.match(/\/sessions\/([^/]+)\/(pin|selection)$/)
+        if (!write) throw new Error(`Unexpected request: ${method} ${url}`)
+        const sessionId = decodeURIComponent(write[1]!)
+        if (write[2] === 'pin') {
+          const { pinnedSessionId: _pinned, ...rest } = server
+          server = {
+            ...rest,
+            revision: server.revision + 1,
+            ...(method === 'PUT' ? { pinnedSessionId: sessionId } : {})
           }
-          return Response.json({ sessionId: body.sessionId })
+        } else {
+          const { tabId } = JSON.parse(String(init?.body)) as { tabId: WorkspaceTabId }
+          server = {
+            ...server,
+            revision: server.revision + 1,
+            selected: { ...server.selected, [tabId]: sessionId }
+          }
         }
-        throw new Error(`Unexpected request: ${url}`)
+        return Response.json(server)
       },
       { preconnect: fetch.preconnect }
     )
   )
+  const writes = () =>
+    fetchSpy.mock.calls.filter(([, init]) => init?.method === 'PUT' || init?.method === 'DELETE')
+  const cachedState = () => queryClient.getQueryData<WorkspaceState>(workspaceKeys.state('abc'))
   let navigate: (href: string) => void | Promise<void> = () => {
     throw new Error('Navigation controller was not registered')
   }
@@ -235,13 +253,13 @@ function mountNavigation(
     expect(location.pathname).toBe(`/prefix/workspace/abc/${tab}`)
     expect(document.getElementById('active-tab')?.textContent).toBe(tab)
     expect(document.getElementById('revealed')?.textContent).toBe('yes')
+    expect(cachedState()?.pinnedSessionId).toBeUndefined()
     expect(
-      queryClient.getQueryData<WorkspaceSessionSelection>(selectedSessionKey('abc'))?.pinned
-    ).toBeNull()
-    expect(
-      queryClient.getQueryData<WorkspaceSessionSelection>(
-        selectedSessionKey('abc', collab ? 'browser-tab' : 'shared')
-      )?.selected[tab]
+      collab
+        ? queryClient.getQueryData<BrowserTabSelection>(browserTabSelectionKey('abc'))?.selected[
+            tab
+          ]
+        : cachedState()?.selected[tab]
     ).toBe('source')
   }
   return {
@@ -252,6 +270,9 @@ function mountNavigation(
     waitForReveal,
     queryClient,
     fetchSpy,
+    writes,
+    cachedState,
+    setState,
     responses,
     storage,
     navigate: (href: string) => Promise.resolve(navigate(href)),
@@ -266,7 +287,7 @@ for (const collab of [false, true]) {
       async path => {
         const fixture = mountNavigation('scratchpad?before=1', collab)
         await fixture.render()
-        const lookup = Promise.withResolvers<SessionInfo[]>()
+        const lookup = Promise.withResolvers<SessionSummary[]>()
         fixture.responses.sessions = lookup.promise
         const opening = fixture.navigate('moi:/chats/new')
         await act(async () => {
@@ -280,7 +301,7 @@ for (const collab of [false, true]) {
           `/prefix/workspace/abc/${path}`
         )
         expect(fixture.document.getElementById('revealed')?.textContent).toBe('no')
-        expect(fixture.fetchSpy.mock.calls.filter(([, init]) => init?.method === 'PUT')).toEqual([])
+        expect(fixture.writes()).toEqual([])
       }
     )
     test.each(['chat', 'chats/source'])(
@@ -304,21 +325,12 @@ for (const collab of [false, true]) {
       'invalid chat route %s restores the saved tab without changing selection or pin',
       async path => {
         const fixture = mountNavigation(path, collab)
-        if (collab)
-          fixture.queryClient.setQueryData(selectedSessionKey('abc', 'browser-tab'), {
-            selected: {},
-            pinned: null
-          })
+        const before = fixture.cachedState()
         await fixture.render()
         expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/scratchpad')
         expect(fixture.document.getElementById('revealed')?.textContent).toBe('no')
-        expect(
-          fixture.queryClient.getQueryData<WorkspaceSessionSelection>(selectedSessionKey('abc'))
-        ).toEqual({
-          selected: { overview: 'previous' },
-          pinned: 'other'
-        })
-        expect(fixture.fetchSpy.mock.calls.filter(([, init]) => init?.method === 'PUT')).toEqual([])
+        expect(fixture.cachedState()).toEqual(before)
+        expect(fixture.writes()).toEqual([])
       }
     )
     test('tab navigation restores params and avoids a duplicate history entry', async () => {
@@ -344,15 +356,14 @@ for (const collab of [false, true]) {
       else expect(savedTabs).toBeUndefined()
     })
 
-    test.each([null, 'other'])(
+    test.each([undefined, 'other'])(
       'a direct current-chat URL restores the saved tab and preserves pin %s and selection',
       async pinned => {
         const fixture = mountNavigation('chat', collab)
-        const selection = { selected: { overview: 'previous' }, pinned }
-        const local = { selected: { overview: 'local' }, pinned: null }
-        fixture.queryClient.setQueryData(selectedSessionKey('abc'), selection)
-        if (collab)
-          fixture.queryClient.setQueryData(selectedSessionKey('abc', 'browser-tab'), local)
+        const local: BrowserTabSelection = { selected: { overview: 'local' } }
+        fixture.setState({ selected: { overview: 'previous' }, pinnedSessionId: pinned })
+        const before = fixture.cachedState()
+        if (collab) fixture.queryClient.setQueryData(browserTabSelectionKey('abc'), local)
         await fixture.render()
         await fixture.waitForReveal()
         expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/scratchpad')
@@ -360,16 +371,12 @@ for (const collab of [false, true]) {
         expect(fixture.history).toEqual([
           { kind: 'replace', href: '/prefix/workspace/abc/scratchpad' }
         ])
-        expect(
-          fixture.queryClient.getQueryData<WorkspaceSessionSelection>(selectedSessionKey('abc'))
-        ).toEqual(selection)
+        expect(fixture.cachedState()).toEqual(before)
         if (collab)
           expect(
-            fixture.queryClient.getQueryData<WorkspaceSessionSelection>(
-              selectedSessionKey('abc', 'browser-tab')
-            )
+            fixture.queryClient.getQueryData<BrowserTabSelection>(browserTabSelectionKey('abc'))
           ).toEqual(local)
-        expect(fixture.fetchSpy.mock.calls.filter(([, init]) => init?.method === 'PUT')).toEqual([])
+        expect(fixture.writes()).toEqual([])
       }
     )
 
@@ -377,6 +384,7 @@ for (const collab of [false, true]) {
       'clicking a %s link stays on the current tab and reveals the current chat',
       async kind => {
         const fixture = mountNavigation('scratchpad', collab)
+        const before = fixture.cachedState()
         await fixture.render()
         const click = new fixture.window.Event('click', { bubbles: true, cancelable: true })
         Object.assign(click, { button: 0 })
@@ -389,12 +397,7 @@ for (const collab of [false, true]) {
         expect(fixture.history.filter(entry => entry.kind === 'push')).toHaveLength(
           kind === 'native-chat' ? 0 : 1
         )
-        expect(
-          fixture.queryClient.getQueryData<WorkspaceSessionSelection>(selectedSessionKey('abc'))
-        ).toEqual({
-          selected: { overview: 'previous' },
-          pinned: 'other'
-        })
+        expect(fixture.cachedState()).toEqual(before)
         await act(async () => fixture.window.history.back())
         expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/scratchpad')
       }

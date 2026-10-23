@@ -1,28 +1,73 @@
-import type { MessageAttachment, PendingView, SelectedSessionScope, ViewInfo } from '@/lib/types'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type {
+  CompiledView,
+  MessageAttachment,
+  PendingView,
+  SelectedSessionScope,
+  ViewInfo,
+  WorkspaceState
+} from '@/lib/types'
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { useMemo } from 'react'
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
-import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
+import {
+  getCachedWorkspaceState,
+  useWorkspaceState
+} from '@/client/features/workspace/workspace-state'
 import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
+
+// Compiled views from `.moi/views/`. Build and layout events refetch the list;
+// mounts within 30 s reuse it.
+export function compiledViewsOptions(workspaceId: string) {
+  return {
+    queryKey: workspaceKeys.views(workspaceId),
+    queryFn: async () =>
+      (await requestJson<{ views: CompiledView[] }>(`/api/workspaces/${workspaceId}/views`)).views,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true
+  }
+}
+
+// Compiled views first, then the views still being built (from the workspace
+// state), in creation order. A view that just compiled shows once.
+export function mergeViews(
+  compiled: CompiledView[] | undefined,
+  pending: WorkspaceState['pendingViews'] | undefined
+): ViewInfo[] | undefined {
+  if (!compiled || !pending) return undefined
+  const ids = new Set(compiled.map(view => view.id))
+  const building = Object.entries(pending)
+    .filter(([id]) => !ids.has(id))
+    .map(([id, view]): PendingView => ({ id, ...view }))
+  return [...compiled, ...building]
+}
+
+export function getCachedViews(
+  queryClient: QueryClient,
+  workspaceId: string
+): ViewInfo[] | undefined {
+  return mergeViews(
+    queryClient.getQueryData<CompiledView[]>(workspaceKeys.views(workspaceId)),
+    getCachedWorkspaceState(queryClient, workspaceId)?.pendingViews
+  )
+}
+
+const selectPendingViews = (state: WorkspaceState) => state.pendingViews
 
 export function useViews(workspaceId: string) {
   const queryClient = useQueryClient()
   useWorkspaceEvent(event => {
-    if (
-      (event.type === 'views:changed' || event.type === 'view:deleted') &&
-      event.workspaceId === workspaceId
-    ) {
+    if (event.type === 'view:deleted' && event.workspaceId === workspaceId) {
       void queryClient.invalidateQueries({ queryKey: workspaceKeys.views(workspaceId) })
-      if (event.type === 'view:deleted')
-        void queryClient.invalidateQueries({ queryKey: workspaceKeys.sessions(workspaceId) })
+      void queryClient.invalidateQueries({ queryKey: workspaceKeys.sessions(workspaceId) })
     }
   })
-  return useQuery<ViewInfo[]>({
-    queryKey: workspaceKeys.views(workspaceId),
-    queryFn: async () =>
-      (await requestJson<{ views: ViewInfo[] }>(`/api/workspaces/${workspaceId}/views`)).views,
-    ...WORKSPACE_RESOURCE_OPTIONS
-  })
+  const compiled = useQuery(compiledViewsOptions(workspaceId))
+  const pending = useWorkspaceState(workspaceId, selectPendingViews)
+  const data = useMemo(() => mergeViews(compiled.data, pending.data), [compiled.data, pending.data])
+  return { data, isLoading: compiled.isLoading || pending.isLoading }
 }
 function useViewMutation<T, Input>(workspaceId: string, mutationFn: (input: Input) => Promise<T>) {
   const queryClient = useQueryClient()
