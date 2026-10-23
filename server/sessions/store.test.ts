@@ -8,12 +8,7 @@ import {
   updateWorkspaceState
 } from '../workspace-state'
 import { getSessionConfig, saveSessionConfig } from './config'
-import {
-  getSessionRecord,
-  patchSessionRecord,
-  renameSessionEntry,
-  withSessionRecords
-} from './store'
+import { getSessionEntry, renameSessionEntry, updateSessionEntry } from './store'
 
 const ws = { id: 'ws-1', path: '/ws' }
 let directory: string
@@ -31,64 +26,49 @@ afterEach(async () => {
 const rename = (from: string, to: string) =>
   updateWorkspaceState(ws, state => renameSessionEntry(state, from, to))
 
-test('concurrent config and metadata updates share a record without leaking config into metadata', async () => {
+test('concurrent config and tab updates share one entry', async () => {
   await Promise.all([
     saveSessionConfig(ws, 's1', { model: 'sonnet', fastMode: false }),
-    patchSessionRecord(ws, 's1', { tabId: 'scratchpad' })
+    updateSessionEntry(ws, 's1', { tabId: 'scratchpad' })
   ])
   expect((await Bun.file(path).json()).sessions).toEqual({
     s1: { config: { model: 'sonnet', fastMode: false }, tabId: 'scratchpad' }
   })
-  expect(await getSessionRecord(ws, 's1')).toEqual({
-    config: { model: 'sonnet', fastMode: false },
-    tabId: 'scratchpad'
-  })
-  expect(await withSessionRecords(ws, [{ sessionId: 's1', summary: '', lastModified: 0 }])).toEqual(
-    [{ sessionId: 's1', summary: '', lastModified: 0, tabId: 'scratchpad' }]
-  )
   await saveSessionConfig(ws, 's1', { model: null, fastMode: null })
   expect(await getSessionConfig(ws, 's1')).toEqual({})
-  expect(await getSessionRecord(ws, 's1')).toEqual({ tabId: 'scratchpad' })
+  expect(await getSessionEntry(ws, 's1')).toEqual({ tabId: 'scratchpad' })
 })
 
-test('renaming a session moves the whole record and preserves destination config overrides', async () => {
+test('renaming a session moves the whole entry and preserves destination config overrides', async () => {
   await saveSessionConfig(ws, 'temporary', { model: 'sonnet', effort: 'high' })
-  await patchSessionRecord(ws, 'temporary', { tabId: 'scratchpad' })
+  await updateSessionEntry(ws, 'temporary', { tabId: 'scratchpad' })
   await saveSessionConfig(ws, 'native', { model: 'opus' })
   await rename('temporary', 'native')
-  expect(await getSessionConfig(ws, 'native')).toEqual({ model: 'opus', effort: 'high' })
-  expect(await getSessionRecord(ws, 'native')).toEqual({
+  expect(await getSessionEntry(ws, 'native')).toEqual({
     config: { model: 'opus', effort: 'high' },
     tabId: 'scratchpad'
   })
   expect((await Bun.file(path).json()).sessions.temporary).toBeUndefined()
 })
 
-test('session renames move metadata and fork source ids without changing the boundary', async () => {
-  const provenance = {
-    forkedFromSessionId: 'temp-parent',
-    forkedThroughMessageId: 'boundary'
-  }
-  await patchSessionRecord(ws, 'temp-child', { tabId: 'scratchpad', ...provenance })
+test('session renames move the entry and fork source ids without changing the boundary', async () => {
+  await updateSessionEntry(ws, 'temp-child', {
+    tabId: 'scratchpad',
+    fork: { fromSessionId: 'temp-parent', throughMessageId: 'boundary' }
+  })
   await rename('temp-child', 'child')
   await rename('temp-parent', 'parent')
-  expect(await getSessionRecord(ws, 'temp-child')).toEqual({})
-  const sessions = await withSessionRecords(ws, [
-    { sessionId: 'child', summary: 'Title', lastModified: 1 }
-  ])
-  expect(sessions[0].tabId).toBe('scratchpad')
-  expect(sessions[0]).toMatchObject({ ...provenance, forkedFromSessionId: 'parent' })
-  expect((await Bun.file(path).json()).sessions.child.fork).toEqual({
-    fromSessionId: 'parent',
-    throughMessageId: 'boundary'
+  expect(await getSessionEntry(ws, 'temp-child')).toEqual({})
+  expect(await getSessionEntry(ws, 'child')).toEqual({
+    tabId: 'scratchpad',
+    fork: { fromSessionId: 'parent', throughMessageId: 'boundary' }
   })
 })
 
-test('rejects fork history without a source session', async () => {
-  await expect(
-    patchSessionRecord(ws, 's1', { forkedThroughMessageId: 'boundary' } as never)
-  ).rejects.toThrow('Fork history requires a source session')
-  expect(await getSessionRecord(ws, 's1')).toEqual({})
+test('clearing a field with undefined removes it from the file', async () => {
+  await updateSessionEntry(ws, 's1', { tabId: 'scratchpad', config: { model: 'sonnet' } })
+  await updateSessionEntry(ws, 's1', { tabId: undefined })
+  expect((await Bun.file(path).json()).sessions.s1).toEqual({ config: { model: 'sonnet' } })
 })
 
 test('moves malformed stored data aside instead of overwriting it', async () => {

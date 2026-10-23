@@ -12,8 +12,7 @@ import type {
   PreviewFrame,
   ScratchOp,
   SessionActivity,
-  SessionRecord,
-  SessionInfo,
+  SessionSummary,
   StreamEvent,
   ViewState
 } from '@/lib/types'
@@ -62,7 +61,7 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
     const from = data.from as string
     const to = data.to as string
     const sessionsKey = workspaceKeys.sessions(workspaceId)
-    const cachedSessions = queryClient?.getQueryData<SessionInfo[]>(sessionsKey)
+    const cachedSessions = queryClient?.getQueryData<SessionSummary[]>(sessionsKey)
     const cachedSession = cachedSessions?.find(
       session => session.sessionId === from || session.sessionId === to
     )
@@ -72,7 +71,7 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
     store.renameSession(workspaceId, from, to)
     if (queryClient) renameSelectedSessionInCache(queryClient, workspaceId, from, to)
     if (cachedSession) {
-      queryClient?.setQueryData<SessionInfo[]>(sessionsKey, current => [
+      queryClient?.setQueryData<SessionSummary[]>(sessionsKey, current => [
         {
           ...cachedSession,
           sessionId: to
@@ -89,13 +88,6 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
       queryClient?.removeQueries({ queryKey: workspaceKeys.events(workspaceId, from) })
     }
 
-    const previousSession = queryClient?.getQueryData<SessionRecord>(
-      workspaceKeys.session(workspaceId, from)
-    )
-    if (previousSession !== undefined) {
-      queryClient?.setQueryData(workspaceKeys.session(workspaceId, to), previousSession)
-      queryClient?.removeQueries({ queryKey: workspaceKeys.session(workspaceId, from) })
-    }
     if (!cachedSession) {
       queryClient?.invalidateQueries({ queryKey: sessionsKey })
     }
@@ -109,10 +101,6 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
     const sessionsKey = workspaceKeys.sessions(workspaceId)
     queryClient?.invalidateQueries({ queryKey: sessionsKey })
     queryClient?.invalidateQueries({ queryKey: workspaceKeys.previews })
-    if (typeof data.sessionId === 'string')
-      queryClient?.invalidateQueries({
-        queryKey: workspaceKeys.session(workspaceId, data.sessionId)
-      })
     return
   }
   if (data.type === 'workspace:switch') {

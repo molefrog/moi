@@ -12,6 +12,7 @@ import { composerDraftKey } from '@/lib/session-drafts'
 import type { QueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
+import { changeWorkspaceStateCache } from '@/client/features/workspace/workspace-state'
 import { attachmentKey, liveStore } from '@/client/features/chat/chat-store'
 import { useUiStore } from '@/client/store/ui'
 import type { StagedAttachment } from '@/client/features/chat/composer/attachments/types'
@@ -21,7 +22,7 @@ import { STREAM_RESPONSES } from '@/client/lib/flags'
 import { formatChatTitle } from '@/lib/chat-title'
 import { applyEvent, emptyViewState } from '@/lib/format'
 import { messageAttachmentLimitError } from '@/lib/message-attachments'
-import type { Part, SessionInfo, SessionRecord, ViewState, WorkspaceAgent } from '@/lib/types'
+import type { Part, SessionSummary, ViewState, WorkspaceAgent, WorkspaceTabId } from '@/lib/types'
 
 // Explicit attachments belong to this send, independently of the user's draft.
 export type PreparedAttachments = {
@@ -163,7 +164,7 @@ export function startOptimisticTurn({
 }
 
 type StartOptimisticSessionInput = {
-  tabId?: SessionInfo['tabId']
+  tabId?: WorkspaceTabId
   queryClient: QueryClient
   workspaceId: string
   sessionId: string
@@ -179,19 +180,15 @@ export function startOptimisticSession({
   text,
   filenames = []
 }: StartOptimisticSessionInput): void {
-  // The chat renders only once its record loads. A brand-new session has no
-  // server record yet, so seed the empty one the server would return; otherwise
-  // the optimistic turn stays hidden for two round trips (temp id, then the
-  // harness's renamed id) and the chat looks blank on a slow connection.
-  const recordKey = workspaceKeys.session(workspaceId, sessionId)
-  if (queryClient.getQueryData(recordKey) === undefined)
-    queryClient.setQueryData<SessionRecord>(recordKey, {
-      ...(tabId && tabId !== 'overview' ? { tabId } : {})
+  // File the chat under its tab now; the server confirms it with the send.
+  if (tabId && tabId !== 'overview')
+    changeWorkspaceStateCache(queryClient, workspaceId, draft => {
+      draft.sessions[sessionId] = { ...draft.sessions[sessionId], tabId }
     })
   const summary = formatChatTitle(text, filenames)
   if (!summary) return
-  queryClient.setQueryData<SessionInfo[]>(workspaceKeys.sessions(workspaceId), current => [
-    { sessionId, summary, lastModified: Date.now(), ...(tabId ? { tabId } : {}) },
+  queryClient.setQueryData<SessionSummary[]>(workspaceKeys.sessions(workspaceId), current => [
+    { sessionId, summary, lastModified: Date.now() },
     ...(current ?? []).filter(session => session.sessionId !== sessionId)
   ])
 }

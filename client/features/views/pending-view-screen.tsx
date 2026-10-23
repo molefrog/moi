@@ -57,9 +57,7 @@ export function PendingViewScreen({
     active: active && pendingView.status === 'draft',
     viewId: pendingView.id,
     sessionId:
-      sketchSessionId ??
-      pendingView.executionSessionId ??
-      draftSessionId(viewTabId(pendingView.id)),
+      sketchSessionId ?? pendingView.buildSessionId ?? draftSessionId(viewTabId(pendingView.id)),
     source: viewTabId(pendingView.id),
     workspaceId,
     onEditingStart,

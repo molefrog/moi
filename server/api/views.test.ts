@@ -10,7 +10,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { stringify } from 'devalue'
 
-import type { ViewInfo } from '@/lib/types'
+import type { ViewInfo, WorkspaceState } from '@/lib/types'
 
 import { api } from './index'
 import { setEventServer } from '../events'
@@ -20,8 +20,9 @@ import { loadLayout, saveLayout } from '../workspaces/layout'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
 import { listPendingViews, createPendingView } from '../sessions/pending-views'
 import { buildAllViews, handleBundleViews, updateViewTitle } from '../applets/views'
-import { getSessionRecord, patchSessionRecord } from '../sessions/store'
-import { getWorkspaceSessionSelection, pinSession, saveSelectedSession } from '../sessions/selected'
+import { getSessionEntry, updateSessionEntry } from '../sessions/store'
+import { pinSession, saveSelectedSession } from '../sessions/selected'
+import { readWorkspaceState } from '../workspace-state'
 import { silenceConsole } from '../test/quiet'
 
 silenceConsole('log')
@@ -207,14 +208,13 @@ test('a failed rename does not recreate a source removed during the rebuild', as
 test('deletes a view and its owned state while preserving shared files and data', async () => {
   const metadata = {
     tabId: 'views/cards' as const,
-    forkedFromSessionId: 'source',
-    forkedThroughMessageId: 'boundary'
+    fork: { fromSessionId: 'source', throughMessageId: 'boundary' }
   }
-  await patchSessionRecord(ws, 'child', metadata)
-  await patchSessionRecord(ws, 'follow-up', { tabId: 'views/cards' })
-  await patchSessionRecord(ws, 'sibling', { tabId: 'views/other' })
-  await patchSessionRecord(ws, 'workspace', { config: { model: 'test-model' } })
-  await saveSelectedSession(ws, 'child', undefined, 'views/cards')
+  await updateSessionEntry(ws, 'child', metadata)
+  await updateSessionEntry(ws, 'follow-up', { tabId: 'views/cards' })
+  await updateSessionEntry(ws, 'sibling', { tabId: 'views/other' })
+  await updateSessionEntry(ws, 'workspace', { config: { model: 'test-model' } })
+  await saveSelectedSession(ws, 'child', 'views/cards')
   await saveSelectedSession(ws, 'child')
   await pinSession(ws, 'follow-up')
   await saveLayout(
@@ -236,8 +236,10 @@ test('deletes a view and its owned state while preserving shared files and data'
 
   expect(response.status).toBe(204)
   expect(archived).toEqual(['child', 'follow-up'])
-  expect(await getSessionRecord(ws, 'child')).toEqual(metadata)
-  expect(await getWorkspaceSessionSelection(ws)).toEqual({ selected: {}, pinned: null })
+  expect(await getSessionEntry(ws, 'child')).toEqual(metadata)
+  const state = await readWorkspaceState(ws)
+  expect(state.selected).toEqual({})
+  expect(state.pinnedSessionId).toBeUndefined()
   expect(getClientFrameLog(workspaceId).map(entry => entry.frame)).toEqual(
     expect.arrayContaining(
       archived.map(sessionId => ({
@@ -313,7 +315,7 @@ test('deleting a view does not build or complete an unfinished sibling', async (
 })
 
 test('rejects deleting a source imported by another applet before removing any files', async () => {
-  await patchSessionRecord(ws, 'child', { tabId: 'views/cards' })
+  await updateSessionEntry(ws, 'child', { tabId: 'views/cards' })
   await Bun.write(
     join(workspaceDir, '.moi', 'views', 'summary.tsx'),
     "export { default } from './cards'"
@@ -330,8 +332,8 @@ test('rejects deleting a source imported by another applet before removing any f
 })
 
 test('archive failure leaves compiled view files, chats and tabs available to retry', async () => {
-  await patchSessionRecord(ws, 'child', { tabId: 'views/cards' })
-  await saveSelectedSession(ws, 'child', undefined, 'views/cards')
+  await updateSessionEntry(ws, 'child', { tabId: 'views/cards' })
+  await saveSelectedSession(ws, 'child', 'views/cards')
   codexHarness.archiveSession = async () => {
     throw new Error('Archive failed')
   }
@@ -341,18 +343,21 @@ test('archive failure leaves compiled view files, chats and tabs available to re
   expect(response.status).toBe(500)
   expect(await Bun.file(sourcePath).exists()).toBe(true)
   expect(await Bun.file(serverPath).exists()).toBe(true)
-  expect((await getWorkspaceSessionSelection(ws)).selected['views/cards']).toBe('child')
+  expect((await readWorkspaceState(ws)).selected['views/cards']).toBe('child')
   expect(published).not.toContainEqual({ type: 'view:deleted', workspaceId, name: 'cards' })
 })
 
-test('one view list keeps the same identity when a pending view is bundled', async () => {
+test('a bundled pending view moves from the state to the compiled list', async () => {
   const view = await createPendingView(ws)
   const list = async () =>
     (await (await api.request(`/api/workspaces/${workspaceId}/views`)).json()) as {
       views: ViewInfo[]
     }
-  expect((await list()).views.map(view => view.id)).toEqual(['cards', view.id])
-  expect((await list()).views.find(item => item.id === view.id)?.status).toBe('draft')
+  const pending = async () =>
+    ((await (await api.request(`/api/workspaces/${workspaceId}/state`)).json()) as WorkspaceState)
+      .pendingViews
+  expect((await list()).views.map(view => view.id)).toEqual(['cards'])
+  expect((await pending())[view.id]?.status).toBe('draft')
   await writeFile(
     join(workspaceDir, '.moi', 'views', `${view.id}.tsx`),
     "export const config = { title: 'Finished', icon: 'book' }; export default function View() { return <div>Finished</div> }"
@@ -362,5 +367,6 @@ test('one view list keeps the same identity when a pending view is bundled', asy
   expect(result).toHaveLength(1)
   expect(result[0].status).toBe('compiled')
   expect(result[0]).toMatchObject({ title: 'Finished', icon: 'book' })
+  expect(await pending()).toEqual({})
   expect(await listPendingViews(ws)).toEqual([])
 })

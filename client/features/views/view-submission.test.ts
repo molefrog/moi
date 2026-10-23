@@ -1,11 +1,10 @@
-import type { SessionInfo, WorkspaceSessionSelection } from '@/lib/types'
+import type { SessionSummary, WorkspaceState } from '@/lib/types'
 import { afterEach, expect, test } from 'bun:test'
 import { QueryClient } from '@tanstack/react-query'
 import { recoverViewSubmission } from './view-submission'
 import { liveStore, attachmentKey } from '@/client/features/chat/chat-store'
 import { useUiStore } from '@/client/store/ui'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { appUiKeys } from '@/client/api/app-ui-keys'
 import { composerDraftKey, draftSessionId } from '@/lib/session-drafts'
 import type { StagedAttachment } from '@/client/features/chat/composer/attachments/types'
 
@@ -28,64 +27,58 @@ afterEach(() => {
 
 function setup(status?: 'draft' | 'failed' | 'submitted') {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  const selection = {
+  const state: WorkspaceState = {
+    revision: 2,
     selected: status && status !== 'draft' ? { 'views/garden': 'native' } : {},
-    pinned: null
+    sessions: {},
+    pendingViews: status
+      ? {
+          garden: {
+            status,
+            requirements: text,
+            ...(status === 'draft' ? {} : { buildSessionId: 'native' })
+          }
+        }
+      : {}
   }
   const requests: string[] = []
   globalThis.fetch = (async (input: RequestInfo | URL) => {
     const url = String(input)
     requests.push(url)
     if (!status) throw new Error('Offline')
-    return Response.json(
-      url.endsWith('/views')
-        ? {
-            views: [
-              {
-                id: 'garden',
-                status,
-                requirements: text,
-                executionSessionId: status === 'draft' ? undefined : 'native'
-              }
-            ]
-          }
-        : selection
-    )
+    if (!url.endsWith('/state')) throw new Error(`Unexpected request: ${url}`)
+    return Response.json(state)
   }) as typeof fetch
   liveStore.setState({
     attachments: { [attachmentKey(workspaceId, 'temporary')]: [attachment] },
     activity: { [`${workspaceId}:temporary`]: 'running' }
   })
   qc.setQueryData(workspaceKeys.sessions(workspaceId), [{ sessionId: 'temporary' }])
-  return { qc, requests, selection }
+  return { qc, requests, state }
 }
 
 test('validation rejection restores fresh composer, prompt, and attachments', async () => {
-  const { qc, requests, selection } = setup('draft')
+  const { qc, requests, state } = setup('draft')
   await recoverViewSubmission(qc, workspaceId, 'garden', 'temporary', text, false)
   const draftId = draftSessionId('views/garden')
   expect(liveStore.getState().attachments[attachmentKey(workspaceId, draftId)]).toEqual([
     attachment
   ])
   expect(useUiStore.getState().composerDrafts[composerDraftKey(workspaceId, draftId)]).toBe(text)
-  expect(
-    qc.getQueryData<WorkspaceSessionSelection>(appUiKeys.sessionSelection(workspaceId))
-  ).toEqual(selection)
-  expect(qc.getQueryData<SessionInfo[]>(workspaceKeys.sessions(workspaceId))).toEqual([])
-  expect(requests).toHaveLength(2)
+  expect(qc.getQueryData<WorkspaceState>(workspaceKeys.state(workspaceId))).toEqual(state)
+  expect(qc.getQueryData<SessionSummary[]>(workspaceKeys.sessions(workspaceId))).toEqual([])
+  expect(requests).toEqual([`/api/workspaces/${workspaceId}/state`])
 })
 
 test('failed startup keeps the server chat and restores its draft after native rename', async () => {
-  const { qc, selection } = setup('failed')
+  const { qc, state } = setup('failed')
   liveStore.getState().renameSession(workspaceId, 'temporary', 'native')
   await recoverViewSubmission(qc, workspaceId, 'garden', 'temporary', text, false)
   expect(liveStore.getState().attachments[attachmentKey(workspaceId, 'native')]).toEqual([
     attachment
   ])
   expect(useUiStore.getState().composerDrafts[composerDraftKey(workspaceId, 'native')]).toBe(text)
-  expect(
-    qc.getQueryData<WorkspaceSessionSelection>(appUiKeys.sessionSelection(workspaceId))
-  ).toEqual(selection)
+  expect(qc.getQueryData<WorkspaceState>(workspaceKeys.state(workspaceId))).toEqual(state)
 })
 
 test('lost response after accepted startup retains the chat without replaying or marking it idle', async () => {
@@ -107,7 +100,7 @@ test('offline recovery preserves the draft and attachments without replaying', a
   expect(useUiStore.getState().composerDrafts[composerDraftKey(workspaceId, 'temporary')]).toBe(
     text
   )
-  expect(requests).toHaveLength(2)
+  expect(requests).toHaveLength(1)
 })
 
 test('rejected submission moves the existing composer draft back without replacing it', async () => {

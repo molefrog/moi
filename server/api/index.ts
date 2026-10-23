@@ -60,17 +60,16 @@ import {
 import { loadScratchpadDoc, saveScratchpadDoc } from '../scratchpad/document'
 import { MAX_ASSET_BYTES, scratchpadAssetFile, storeScratchpadAsset } from '../scratchpad/assets'
 import {
+  deselectSession,
   getPinnedSession,
-  getSelectedSession,
-  getWorkspaceSessionSelection,
   pinSession,
-  saveSelectedSession
+  saveSelectedSession,
+  unpinSession
 } from '../sessions/selected'
-import type { SelectedSessionUpdate } from '../sessions/selected'
 import { saveSessionConfig } from '../sessions/config'
 import type { SessionConfigPatch } from '../sessions/config'
-import { getSessionRecord, withSessionRecords } from '../sessions/store'
 import { archiveWorkspaceSession } from '../sessions/archive'
+import { getWorkspaceState } from '../workspace-state'
 import { DIST_DIR, prebuilt } from '../static'
 import { getWorkspaceSkillsStatus, updateWorkspaceSkills } from '../skills/update'
 import { serveWorkspaceImagePreview } from '../workspaces/preview'
@@ -115,15 +114,6 @@ type ApiEnv = { Variables: { ws: WorkspaceEntry } }
 // event so that tab can skip it. See client/lib/browser-tab-id.ts.
 function eventOrigin(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined
-}
-
-function publishSelectedSession(workspaceId: string, update: SelectedSessionUpdate): void {
-  if (!update.changed) return
-  publishEvent({
-    type: 'selected-session:updated',
-    workspaceId,
-    sessionId: update.sessionId
-  })
 }
 
 async function handleFunctionCall(
@@ -195,7 +185,7 @@ one.get('/widgets/*', c => {
 
 // Views — full-screen agent apps. Mirrors the widget pair above: the exact path
 // lists (in manifest/nav order), `/*` serves one bundle file.
-one.get('/views', c => listViews(c.get('ws')))
+one.get('/views', c => listViews(c.get('ws').path))
 
 one.patch('/views/:viewId', async c => {
   const ws = c.get('ws')
@@ -478,97 +468,70 @@ one.get('/uploads/:uploadId', c => {
   })
 })
 
+// Per-user chat state: pin, the chat each tab shows, per-chat settings and
+// fork history, and views being built. Every write below answers with the new
+// state; other clients get it as `state:changed`.
+one.get('/state', async c => c.json(await getWorkspaceState(c.get('ws'))))
+
+// The agent's chats. Tab ownership and settings come from `/state`.
 one.get('/sessions', async c => {
   const ws = c.get('ws')
-  return c.json(await withSessionRecords(ws, await harnessFor(ws).listSessions(ws)))
+  return c.json(await harnessFor(ws).listSessions(ws))
 })
 
-one.get('/selected-session', async c => {
-  return c.json(await getWorkspaceSessionSelection(c.get('ws')))
-})
-
-one.put('/pinned-session', async c => {
+one.put('/sessions/:sessionId/pin', async c => {
   const ws = c.get('ws')
-  const body = await c.req.json<{ sessionId: string | null }>()
-  if (body.sessionId !== null && typeof body.sessionId !== 'string')
-    return c.text('Invalid chat', 400)
-  if (body.sessionId) {
-    const harness = harnessFor(ws)
-    const found = (await harness.listSessions(ws)).some(
-      session => session.sessionId === body.sessionId
-    )
-    const active = harness
-      .activeSessions()
-      .some(session => session.workspaceId === ws.id && session.sessionId === body.sessionId)
-    if (!found && !active) return c.text('Chat not found', 404)
-  }
-  await pinSession(ws, body.sessionId)
-  publishEvent({
-    type: 'selected-session:updated',
-    workspaceId: ws.id,
-    sessionId: (await getSelectedSession(ws)) ?? null
-  })
-  return c.json({ pinnedSessionId: body.sessionId })
+  const sessionId = c.req.param('sessionId')
+  const harness = harnessFor(ws)
+  const found = (await harness.listSessions(ws)).some(session => session.sessionId === sessionId)
+  const active = harness
+    .activeSessions()
+    .some(session => session.workspaceId === ws.id && session.sessionId === sessionId)
+  if (!found && !active) return c.text('Chat not found', 404)
+  await pinSession(ws, sessionId)
+  return c.json(await getWorkspaceState(ws))
 })
 
-one.put('/selected-session', async c => {
+one.delete('/sessions/:sessionId/pin', async c => {
+  const ws = c.get('ws')
+  await unpinSession(ws, c.req.param('sessionId'))
+  return c.json(await getWorkspaceState(ws))
+})
+
+// Show the chat in a tab. `ifMatch` (a chat id, or null for none) applies the
+// change only while the tab still shows that chat.
+one.put('/sessions/:sessionId/selection', async c => {
   const ws = c.get('ws')
   const body: unknown = await c.req.json().catch(() => null)
   if (!body || typeof body !== 'object') return c.text('Bad request', 400)
-
-  const input = body as { sessionId?: unknown; previousSessionId?: unknown; tabId?: unknown }
-  const tabId = input.tabId ?? 'overview'
-  if (!isWorkspaceTabId(tabId)) return c.text('Invalid chat tab', 400)
+  const input = body as { tabId?: unknown; ifMatch?: unknown }
+  if (!isWorkspaceTabId(input.tabId)) return c.text('Invalid chat tab', 400)
+  const hasIfMatch = Object.prototype.hasOwnProperty.call(input, 'ifMatch')
+  if (hasIfMatch && input.ifMatch !== null && typeof input.ifMatch !== 'string')
+    return c.text('ifMatch must be a chat id or null', 400)
   if (await getPinnedSession(ws)) return c.text('Unpin chat before switching', 409)
-  const validSessionId = input.sessionId === null || typeof input.sessionId === 'string'
-  const hasPreviousSessionId = Object.prototype.hasOwnProperty.call(input, 'previousSessionId')
-  const validPreviousSessionId =
-    !hasPreviousSessionId ||
-    input.previousSessionId === null ||
-    typeof input.previousSessionId === 'string'
-  if (!validSessionId || !validPreviousSessionId) return c.text('Bad request', 400)
-
-  const update = await saveSelectedSession(
+  await saveSelectedSession(
     ws,
-    input.sessionId as string | null,
-    hasPreviousSessionId ? (input.previousSessionId as string | null) : undefined,
-    tabId
+    c.req.param('sessionId'),
+    input.tabId,
+    hasIfMatch ? (input.ifMatch as string | null) : undefined
   )
-  publishSelectedSession(ws.id, update)
-  return c.json({ sessionId: update.sessionId })
+  return c.json(await getWorkspaceState(ws))
 })
 
-one.post('/sessions/:sessionId/archive', async c => {
+// Stop showing the chat in a tab, which then opens a new chat. A tab showing
+// another chat is left alone.
+one.delete('/sessions/:sessionId/selection', async c => {
   const ws = c.get('ws')
-  const harness = harnessFor(ws)
-  const sessionId = c.req.param('sessionId')
-  if (!harness.archiveSession) return c.text('Chat archiving is not supported', 501)
-
-  try {
-    await archiveWorkspaceSession(ws, sessionId)
-    return c.body(null, 204)
-  } catch (error) {
-    console.error(`[api] archive chat failed for ${harness.id}`, error)
-    // Harnesses translate backend refusals into actionable one-liners (e.g.
-    // OpenClaw: main chat not archivable, gateway too old) — surface them.
-    const message =
-      error instanceof Error && error.message ? error.message : 'Couldn’t archive chat'
-    return c.text(message, 500)
-  }
+  const body: unknown = await c.req.json().catch(() => null)
+  const tabId = (body as { tabId?: unknown } | null)?.tabId
+  if (!isWorkspaceTabId(tabId)) return c.text('Invalid chat tab', 400)
+  await deselectSession(ws, c.req.param('sessionId'), tabId)
+  return c.json(await getWorkspaceState(ws))
 })
 
-one.get('/sessions/:sessionId/events', async c => {
-  const ws = c.get('ws')
-  const sessionId = c.req.param('sessionId')
-  return c.json(await harnessFor(ws).sessionEvents(ws, sessionId))
-})
-
-one.get('/sessions/:sessionId', async c => {
-  return c.json(await getSessionRecord(c.get('ws'), c.req.param('sessionId')))
-})
-
-// Patch run settings and return the complete session record. null clears a setting.
-one.put('/sessions/:sessionId/config', async c => {
+// Change run settings. Omitted fields stay; null clears one.
+one.patch('/sessions/:sessionId/config', async c => {
   const body = await c.req.json().catch(() => null)
   if (typeof body !== 'object' || body === null) {
     return c.text('Expected a JSON object', 400)
@@ -591,9 +554,33 @@ one.put('/sessions/:sessionId/config', async c => {
     patch.fastMode = value
   }
   const ws = c.get('ws')
+  await saveSessionConfig(ws, c.req.param('sessionId'), patch)
+  return c.json(await getWorkspaceState(ws))
+})
+
+one.post('/sessions/:sessionId/archive', async c => {
+  const ws = c.get('ws')
+  const harness = harnessFor(ws)
   const sessionId = c.req.param('sessionId')
-  await saveSessionConfig(ws, sessionId, patch)
-  return c.json(await getSessionRecord(ws, sessionId))
+  if (!harness.archiveSession) return c.text('Chat archiving is not supported', 501)
+
+  try {
+    await archiveWorkspaceSession(ws, sessionId)
+    return c.json(await getWorkspaceState(ws))
+  } catch (error) {
+    console.error(`[api] archive chat failed for ${harness.id}`, error)
+    // Harnesses translate backend refusals into actionable one-liners (e.g.
+    // OpenClaw: main chat not archivable, gateway too old) — surface them.
+    const message =
+      error instanceof Error && error.message ? error.message : 'Couldn’t archive chat'
+    return c.text(message, 500)
+  }
+})
+
+one.get('/sessions/:sessionId/events', async c => {
+  const ws = c.get('ws')
+  const sessionId = c.req.param('sessionId')
+  return c.json(await harnessFor(ws).sessionEvents(ws, sessionId))
 })
 
 one.get('/mcp', async c => {

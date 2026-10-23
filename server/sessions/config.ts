@@ -1,6 +1,6 @@
 import type { SessionConfig } from '@/lib/types'
 import { updateWorkspaceState, type WorkspaceRef } from '../workspace-state'
-import { getSessionRecord } from './store'
+import { getSessionEntry } from './store'
 
 // null clears a setting; undefined leaves it unchanged.
 export type SessionConfigPatch = {
@@ -13,7 +13,7 @@ export async function getSessionConfig(
   ws: WorkspaceRef,
   sessionId: string
 ): Promise<SessionConfig> {
-  return (await getSessionRecord(ws, sessionId)).config ?? {}
+  return (await getSessionEntry(ws, sessionId)).config ?? {}
 }
 
 export async function hasSessionConfig(ws: WorkspaceRef, sessionId: string): Promise<boolean> {

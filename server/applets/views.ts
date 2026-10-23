@@ -180,8 +180,10 @@ export async function getWorkspaceViews(ws: WorkspaceRef): Promise<ViewInfo[]> {
   return [...compiled, ...pending]
 }
 
-export async function listViews(ws: WorkspaceRef): Promise<Response> {
-  return Response.json({ views: await getWorkspaceViews(ws) })
+// The API lists compiled views only; clients read pending views from the
+// workspace state, which `state:changed` keeps current.
+export async function listViews(workspacePath: string): Promise<Response> {
+  return Response.json({ views: await listCompiledViews(workspacePath) })
 }
 
 export async function handleBundleViews(

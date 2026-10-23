@@ -1,5 +1,11 @@
 import type { NavigationRequest } from '@/lib/navigation'
-import type { AppSettings, HarnessAvailability, ViewInfo, WidgetInfo } from '@/lib/types'
+import type {
+  AppSettings,
+  HarnessAvailability,
+  ViewInfo,
+  WidgetInfo,
+  WorkspaceState
+} from '@/lib/types'
 
 export type WorkspaceEvent =
   | { type: 'widget:updated'; name: string }
@@ -10,8 +16,9 @@ export type WorkspaceEvent =
   | { type: 'view:updated'; name: string }
   | { type: 'view-layout:updated'; views: ViewInfo[] }
   | { type: 'view:deleted'; workspaceId: string; name: string }
-  | { type: 'views:changed'; workspaceId: string }
-  | { type: 'selected-session:updated'; workspaceId: string; sessionId: string | null }
+  // A workspace's chat state changed (pin, selection, chat settings, views
+  // being built). Carries the whole state, so caches update without a refetch.
+  | { type: 'state:changed'; workspaceId: string; state: WorkspaceState }
   // `origin` on an event is the browser tab whose write caused it (absent for
   // CLI and agent changes), so that tab can skip its own echo. See
   // client/lib/browser-tab-id.ts.

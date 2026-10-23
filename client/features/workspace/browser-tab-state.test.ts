@@ -2,14 +2,15 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { QueryClient, QueryObserver } from '@tanstack/react-query'
 
 import {
-  applySelectedSessionEvent,
-  optimisticallySetSelectedSession,
+  browserTabSelectionKey,
+  browserTabSelectionOptions,
+  cachedSelectedSession,
   renameSelectedSessionInCache,
   selectedSessionForTab,
-  selectedSessionKey,
-  settleSelectedSessionSave
+  setSelectedSessionInCache
 } from '@/client/features/chat/sessions/use-selected-session'
-import type { SessionInfo, WorkspaceSessionSelection, WorkspaceTabsState } from '@/lib/types'
+import { receiveWorkspaceState } from '@/client/features/workspace/workspace-state'
+import type { SessionSummary, WorkspaceState, WorkspaceTabsState } from '@/lib/types'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { reduceChatFrame } from '@/client/features/chat/connection/chat-frames'
@@ -18,7 +19,8 @@ import { mergeLayoutForSave } from '@/server/workspaces/layout'
 import { readWorkspaceTabs, writeWorkspaceTabs } from './browser-tab-state'
 import {
   readSelectedSession,
-  writeSelectedSession
+  writeSelectedSession,
+  type BrowserTabSelection
 } from '@/client/features/chat/sessions/browser-tab-state'
 
 const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage')
@@ -51,9 +53,18 @@ afterEach(() => {
 })
 
 const defaults: WorkspaceTabsState = { open: ['overview', 'views/board'], active: 'overview' }
-const selection = (selected: WorkspaceSessionSelection['selected']): WorkspaceSessionSelection => ({
+const selection = (selected: BrowserTabSelection['selected']): BrowserTabSelection => ({
+  selected
+})
+const workspaceState = (
+  selected: WorkspaceState['selected'],
+  pinnedSessionId?: string
+): WorkspaceState => ({
+  revision: 1,
   selected,
-  pinned: null
+  sessions: {},
+  pendingViews: {},
+  ...(pinnedSessionId ? { pinnedSessionId } : {})
 })
 
 describe('collab browser tab state', () => {
@@ -147,14 +158,17 @@ describe('collab browser tab state', () => {
   test('an optimistic view selection survives reload without changing shared selection', () => {
     useBrowserTab(browserTab())
     const client = new QueryClient()
-    client.setQueryData(selectedSessionKey('workspace'), selection({ overview: 'shared-chat' }))
-    client.setQueryData(selectedSessionKey('workspace', 'browser-tab'), selection({}))
+    client.setQueryData(
+      workspaceKeys.state('workspace'),
+      workspaceState({ overview: 'shared-chat' })
+    )
+    client.setQueryData(browserTabSelectionKey('workspace'), selection({}))
 
-    optimisticallySetSelectedSession(client, 'workspace', 'view-chat', 'views/board', 'browser-tab')
+    setSelectedSessionInCache(client, 'workspace', 'view-chat', 'views/board', 'browser-tab')
 
     expect(readSelectedSession('workspace')).toEqual(selection({ 'views/board': 'view-chat' }))
-    expect(client.getQueryData<WorkspaceSessionSelection>(selectedSessionKey('workspace'))).toEqual(
-      selection({ overview: 'shared-chat' })
+    expect(client.getQueryData<WorkspaceState>(workspaceKeys.state('workspace'))).toEqual(
+      workspaceState({ overview: 'shared-chat' })
     )
   })
 })
@@ -203,21 +217,20 @@ describe('collab selected chat cache transitions', () => {
         })
         writeSelectedSession('workspace', local)
         writeSelectedSession('other', selection({ overview: 'archived-chat' }))
-        client.setQueryData(selectedSessionKey('workspace', 'browser-tab'), local)
-        client.setQueryData(selectedSessionKey('workspace'), {
-          selected: { overview: 'shared-chat', 'views/board': 'cli-child' },
-          pinned: 'unrelated-pin'
-        })
-        client.setQueryData(selectedSessionKey('other'), {
-          selected: { overview: 'archived-chat' },
-          pinned: 'archived-chat'
-        })
+        client.setQueryData(browserTabSelectionKey('workspace'), local)
+        client.setQueryData(
+          workspaceKeys.state('workspace'),
+          workspaceState({ overview: 'shared-chat', 'views/board': 'cli-child' }, 'unrelated-pin')
+        )
+        client.setQueryData(
+          workspaceKeys.state('other'),
+          workspaceState({ overview: 'archived-chat' }, 'archived-chat')
+        )
         client.setQueryData(workspaceKeys.sessions('workspace'), [
           { sessionId: 'archived-chat', summary: 'Board', lastModified: 1 },
           { sessionId: ownChat, summary: 'Own chat', lastModified: 2 }
         ])
         client.setQueryData(workspaceKeys.events('workspace', 'archived-chat'), {})
-        client.setQueryData(workspaceKeys.session('workspace', 'archived-chat'), {})
         reduceChatFrame(
           {
             type: 'session_archived',
@@ -229,32 +242,22 @@ describe('collab selected chat cache transitions', () => {
         const expected = selection({ overview: ownChat, 'views/board': null, scratchpad: null })
         expect(readSelectedSession('workspace')).toEqual(expected)
         expect(
-          client.getQueryData<WorkspaceSessionSelection>(
-            selectedSessionKey('workspace', 'browser-tab')
-          )
+          client.getQueryData<BrowserTabSelection>(browserTabSelectionKey('workspace'))
         ).toEqual(expected)
-        const shared = client.getQueryData<WorkspaceSessionSelection>(
-          selectedSessionKey('workspace')
-        )!
-        expect(shared.pinned).toBe('unrelated-pin')
+        const shared = client.getQueryData<WorkspaceState>(workspaceKeys.state('workspace'))!
+        expect(shared.pinnedSessionId).toBe('unrelated-pin')
         expect(
-          selectedSessionForTab({ ...shared, pinned: null }, 'views/board', expected)
+          selectedSessionForTab({ ...shared, pinnedSessionId: undefined }, 'views/board', expected)
         ).toBeNull()
         expect(readSelectedSession('other')).toEqual(selection({ overview: 'archived-chat' }))
-        expect(client.getQueryData<WorkspaceSessionSelection>(selectedSessionKey('other'))).toEqual(
-          {
-            selected: { overview: 'archived-chat' },
-            pinned: 'archived-chat'
-          }
+        expect(client.getQueryData<WorkspaceState>(workspaceKeys.state('other'))).toEqual(
+          workspaceState({ overview: 'archived-chat' }, 'archived-chat')
         )
-        expect(client.getQueryData<SessionInfo[]>(workspaceKeys.sessions('workspace'))).toEqual([
+        expect(client.getQueryData<SessionSummary[]>(workspaceKeys.sessions('workspace'))).toEqual([
           { sessionId: ownChat, summary: 'Own chat', lastModified: 2 }
         ])
         expect(
           client.getQueryData(workspaceKeys.events('workspace', 'archived-chat'))
-        ).toBeUndefined()
-        expect(
-          client.getQueryData(workspaceKeys.session('workspace', 'archived-chat'))
         ).toBeUndefined()
       } finally {
         client.clear()
@@ -267,10 +270,10 @@ describe('collab selected chat cache transitions', () => {
     const client = new QueryClient()
     try {
       writeSelectedSession('workspace', selection({ overview: 'archived-chat' }))
-      client.setQueryData(selectedSessionKey('workspace'), {
-        selected: { overview: 'archived-chat', scratchpad: 'other-chat' },
-        pinned: 'archived-chat'
-      })
+      client.setQueryData(
+        workspaceKeys.state('workspace'),
+        workspaceState({ overview: 'archived-chat', scratchpad: 'other-chat' }, 'archived-chat')
+      )
       reduceChatFrame(
         {
           type: 'session_archived',
@@ -279,9 +282,9 @@ describe('collab selected chat cache transitions', () => {
         },
         { queryClient: client, sendMessage: () => {}, onWorkspaceSwitch: null }
       )
-      expect(
-        client.getQueryData<WorkspaceSessionSelection>(selectedSessionKey('workspace'))
-      ).toEqual(selection({ scratchpad: 'other-chat' }))
+      expect(client.getQueryData<WorkspaceState>(workspaceKeys.state('workspace'))).toEqual(
+        workspaceState({ scratchpad: 'other-chat' })
+      )
       expect(readSelectedSession('workspace')).toEqual(selection({ overview: null }))
     } finally {
       client.clear()
@@ -293,54 +296,45 @@ describe('collab selected chat cache transitions', () => {
     const client = new QueryClient()
     try {
       const local = selection({ overview: 'chat', 'views/board': null })
-      const shared = { selected: { overview: 'chat' }, pinned: 'chat' }
+      const shared = workspaceState({ overview: 'chat' }, 'chat')
       writeSelectedSession('workspace', local)
-      client.setQueryData(selectedSessionKey('workspace', 'browser-tab'), local)
-      client.setQueryData(selectedSessionKey('workspace'), shared)
+      client.setQueryData(browserTabSelectionKey('workspace'), local)
+      client.setQueryData(workspaceKeys.state('workspace'), shared)
       reduceChatFrame(
         { type: 'sessions_changed', workspaceId: 'workspace', sessionId: 'chat' },
         { queryClient: client, sendMessage: () => {}, onWorkspaceSwitch: null }
       )
       expect(readSelectedSession('workspace')).toEqual(local)
-      expect(
-        client.getQueryData<WorkspaceSessionSelection>(
-          selectedSessionKey('workspace', 'browser-tab')
-        )
-      ).toEqual(local)
-      expect(
-        client.getQueryData<WorkspaceSessionSelection>(selectedSessionKey('workspace'))
-      ).toEqual(shared)
+      expect(client.getQueryData<BrowserTabSelection>(browserTabSelectionKey('workspace'))).toEqual(
+        local
+      )
+      expect(client.getQueryData<WorkspaceState>(workspaceKeys.state('workspace'))).toEqual(shared)
     } finally {
       client.clear()
     }
   })
 
-  test('supplying a current user switches the mounted chat observer to the saved tab chat', async () => {
-    useBrowserTab(browserTab())
+  test('turning on the browser tab selection reads the saved tab chat once', async () => {
+    const storage = browserTab()
+    const getItem = storage.getItem
+    let reads = 0
+    storage.getItem = key => {
+      reads++
+      return getItem(key)
+    }
+    useBrowserTab(storage)
     writeSelectedSession('workspace', selection({ overview: 'saved-tab-chat' }))
     const client = new QueryClient()
-    const sharedKey = selectedSessionKey('workspace')
-    client.setQueryData(sharedKey, selection({ overview: 'old-shared-chat' }))
-    const options = { staleTime: Infinity, gcTime: 0, refetchOnMount: false as const }
-    const observer = new QueryObserver<WorkspaceSessionSelection>(client, {
-      ...options,
-      queryKey: sharedKey,
-      queryFn: async () => selection({ overview: 'old-shared-chat' })
+    const observer = new QueryObserver<BrowserTabSelection>(client, {
+      ...browserTabSelectionOptions('workspace'),
+      enabled: false
     })
     const stop = observer.subscribe(() => {})
     let stopInspect = () => {}
-    let reads = 0
     try {
-      observer.setOptions({
-        ...options,
-        queryKey: selectedSessionKey('workspace', 'browser-tab'),
-        queryFn: async () => {
-          reads++
-          return readSelectedSession('workspace')
-        }
-      })
       expect(observer.getCurrentResult().data).toBeUndefined()
-      const selected = await new Promise<WorkspaceSessionSelection | undefined>(resolve => {
+      observer.setOptions({ ...browserTabSelectionOptions('workspace'), enabled: true })
+      const selected = await new Promise<BrowserTabSelection | undefined>(resolve => {
         const inspect = () => {
           const result = observer.getCurrentResult()
           if (result.isSuccess) resolve(result.data)
@@ -357,52 +351,36 @@ describe('collab selected chat cache transitions', () => {
     }
   })
 
-  test('a late shared save and remote selection event cannot replace the current browser tab chat', () => {
+  test('shared selection changes from this tab or others never replace the browser tab chat', () => {
+    useBrowserTab(browserTab())
     const client = new QueryClient()
     try {
       client.setQueryData(
-        selectedSessionKey('workspace'),
-        selection({ overview: 'old-shared-chat' })
+        workspaceKeys.state('workspace'),
+        workspaceState({ overview: 'old-shared-chat' })
       )
-      const pendingShared = optimisticallySetSelectedSession(
-        client,
-        'workspace',
-        'in-flight-shared-chat',
-        'overview'
-      )
-      client.setQueryData(selectedSessionKey('workspace', 'browser-tab'), selection({}))
-      const pendingBrowserTab = optimisticallySetSelectedSession(
+      client.setQueryData(browserTabSelectionKey('workspace'), selection({}))
+      setSelectedSessionInCache(client, 'workspace', 'in-flight-shared-chat', 'overview', 'shared')
+      setSelectedSessionInCache(
         client,
         'workspace',
         'browser-tab-chat',
         'views/board',
         'browser-tab'
       )
-      if (!pendingShared || !pendingBrowserTab) throw new Error('Expected pending selections')
-      settleSelectedSessionSave(
-        client,
-        'workspace',
-        { sessionId: 'in-flight-shared-chat' },
-        pendingShared
+      receiveWorkspaceState(client, 'workspace', {
+        ...workspaceState({ overview: 'remote-chat', 'views/board': 'remote-board-chat' }),
+        revision: 2
+      })
+      expect(client.getQueryData<BrowserTabSelection>(browserTabSelectionKey('workspace'))).toEqual(
+        selection({ 'views/board': 'browser-tab-chat' })
       )
-      applySelectedSessionEvent(client, 'workspace', false)
-      expect(
-        client.getQueryData<WorkspaceSessionSelection>(
-          selectedSessionKey('workspace', 'browser-tab')
-        )
-      ).toEqual(selection({ 'views/board': 'browser-tab-chat' }))
-      expect(client.getQueryState(selectedSessionKey('workspace'))?.isInvalidated).toBe(true)
-      settleSelectedSessionSave(
-        client,
-        'workspace',
-        { sessionId: 'browser-tab-chat' },
-        pendingBrowserTab
+      expect(cachedSelectedSession(client, 'workspace', 'views/board', 'browser-tab')).toBe(
+        'browser-tab-chat'
       )
-      expect(
-        client.getQueryData<WorkspaceSessionSelection>(
-          selectedSessionKey('workspace', 'browser-tab')
-        )
-      ).toEqual(selection({ 'views/board': 'browser-tab-chat' }))
+      expect(cachedSelectedSession(client, 'workspace', 'overview', 'browser-tab')).toBe(
+        'remote-chat'
+      )
     } finally {
       client.clear()
     }
@@ -413,24 +391,22 @@ describe('collab selected chat cache transitions', () => {
     const client = new QueryClient()
     try {
       writeSelectedSession('workspace', selection({ 'views/board': 'temporary-id' }))
-      client.setQueryData(selectedSessionKey('workspace', 'browser-tab'), {
-        selected: { 'views/board': 'temporary-id' },
-        pinned: null
-      })
       client.setQueryData(
-        selectedSessionKey('workspace'),
-        selection({ overview: 'different-shared-chat' })
+        browserTabSelectionKey('workspace'),
+        selection({ 'views/board': 'temporary-id' })
+      )
+      client.setQueryData(
+        workspaceKeys.state('workspace'),
+        workspaceState({ overview: 'different-shared-chat' })
       )
       renameSelectedSessionInCache(client, 'workspace', 'temporary-id', 'provider-id')
       expect(readSelectedSession('workspace')).toEqual(selection({ 'views/board': 'provider-id' }))
-      expect(
-        client.getQueryData<WorkspaceSessionSelection>(
-          selectedSessionKey('workspace', 'browser-tab')
-        )
-      ).toEqual(selection({ 'views/board': 'provider-id' }))
-      expect(
-        client.getQueryData<WorkspaceSessionSelection>(selectedSessionKey('workspace'))
-      ).toEqual(selection({ overview: 'different-shared-chat' }))
+      expect(client.getQueryData<BrowserTabSelection>(browserTabSelectionKey('workspace'))).toEqual(
+        selection({ 'views/board': 'provider-id' })
+      )
+      expect(client.getQueryData<WorkspaceState>(workspaceKeys.state('workspace'))).toEqual(
+        workspaceState({ overview: 'different-shared-chat' })
+      )
     } finally {
       client.clear()
     }

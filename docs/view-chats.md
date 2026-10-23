@@ -2,10 +2,11 @@
 
 A view has one permanent ID and one `views/<id>` tab from its sketch screen through
 its compiled applet. The views API returns a flat union: unfinished views carry a
-startup `status`, while compiled views carry `status: "compiled"`. Native transcripts
-remain owned by each harness.
+startup `status`, while compiled views carry `status: "compiled"`. `GET /views` lists
+compiled views; unfinished ones come from the workspace state (`GET /state`), and the
+client merges the two. Native transcripts remain owned by each harness.
 
-Chats belong to a workspace. `SessionRecord.tabId` optionally attributes a chat to
+Chats belong to a workspace. A chat's `tabId` in the workspace state optionally attributes it to
 a view or Scratchpad. Completion changes neither attribution nor selection.
 The displayed chat is `pinnedSessionId ?? selectedSessionIdForTab ?? null`.
 A null selection means a fresh composer. Its first send creates an attached chat.
@@ -55,7 +56,7 @@ place when pinned and use `--from-session` with the current session ID otherwise
 Each workspace's `DATA_DIR/workspaces/<workspace id>/state.json` holds its pending
 views. Their startup statuses are `draft`, `starting`, `submitted`, and `failed`.
 Building/waiting presentation derives from normal session activity.
-`executionSessionId` (stored as `buildSessionId`) identifies the builder, including
+`buildSessionId` identifies the builder, including
 pinned execution, independently of chat attribution. Ordinary messages update build state
 only when the sending chat matches this ID.
 
@@ -65,7 +66,11 @@ removes the pending record. There is no completion-time chat or tab reassignment
 
 The same `state.json` holds chat attribution, fork provenance, and run settings, plus
 per-tab selections and the workspace pin. Submitting a view and renaming a chat each
-update it in one write.
+update it in one write. `GET /api/workspaces/:id/state` returns it; every write
+(`PUT`/`DELETE /sessions/:id/pin`, `PUT`/`DELETE /sessions/:id/selection`,
+`PATCH /sessions/:id/config`, `POST /sessions/:id/archive`) answers with the new state,
+and every change is published as `state:changed` with the whole state. A `revision`
+that goes up with each change lets clients drop an older copy that arrives late.
 With Collab enabled, unpinned selections are local to each browser tab. Until a
 browser tab chooses a chat, it uses the server selection so CLI view handoffs open
 on their child chat. Choosing New chat saves an explicit empty selection locally.
@@ -75,8 +80,8 @@ Native session renames move those session references together.
 
 ## Failures and history
 
-`forkedFromSessionId` is saved immediately after child creation. When the initial child
-history read finds copied turns, `forkedThroughMessageId` identifies the last
+`fork.fromSessionId` is saved immediately after child creation. When the initial child
+history read finds copied turns, `fork.throughMessageId` identifies the last
 one. Inherited turns and notices stay hidden behind a context indicator. When
 there is no cutoff, the full transcript remains visible. A failed initial read
 does not block the build or later sends, and later reads never move the cutoff.
@@ -96,7 +101,9 @@ another server-selected chat. Unrelated selections and pins remain unchanged.
 
 `server/sessions/view-sessions.ts` coordinates sends and view handoffs.
 `pending-views.ts` in the same directory owns pending-view persistence;
-`store.ts` owns session records, `selected.ts` owns selections and pins,
+`store.ts` owns chat entries, `selected.ts` owns selections and pins,
 `archive.ts` owns archiving, and `lifecycle.ts` coordinates ID renames.
 Compiled view manifests and build completion live in `server/applets/views.ts`.
 CLI creation and metadata commands live in `server/cli/commands/views.ts`.
+On the client, `client/features/workspace/workspace-state.ts` owns the one state cache,
+its writes, and the app-wide `state:changed` listener.

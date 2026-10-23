@@ -10,7 +10,8 @@ export const workspaceKeys = {
   views: (id: string) => ['workspaces', 'views', id] as const,
   sessions: (id: string) => ['workspaces', 'sessions', id] as const,
   events: (id: string, sessionId: string) => ['workspaces', 'events', id, sessionId] as const,
-  session: (id: string, sessionId: string) => ['workspaces', 'session', id, sessionId] as const,
+  // Per-user chat state (`GET /api/workspaces/:id/state`).
+  state: (id: string) => ['workspaces', 'state', id] as const,
   mcp: (id: string) => ['workspaces', 'mcp', id] as const,
   agent: (id: string) => ['workspaces', 'agent', id] as const,
   skills: (id: string) => ['workspaces', 'skills', id] as const,

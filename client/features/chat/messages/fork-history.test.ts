@@ -1,12 +1,12 @@
 import { expect, test } from 'bun:test'
 import { emptyViewState } from '@/lib/format'
-import type { SessionRecord, Turn } from '@/lib/types'
+import type { SessionFork, Turn } from '@/lib/types'
 import { visibleForkHistory } from './fork-history'
 
-const fork: SessionRecord = {
-  forkedFromSessionId: 'parent',
-  forkedThroughMessageId: 'child-boundary',
-  forkedNoticeIds: ['old-notice']
+const fork: SessionFork = {
+  fromSessionId: 'parent',
+  throughMessageId: 'child-boundary',
+  noticeIds: ['old-notice']
 }
 const turn = (id: string): Turn => ({
   id,
@@ -37,7 +37,7 @@ test('missing boundary in the loaded transcript shows its full history', () => {
 })
 
 test('an empty source needs no synthetic first message', () => {
-  const emptyFork: SessionRecord = { forkedFromSessionId: 'parent' }
+  const emptyFork: SessionFork = { fromSessionId: 'parent' }
   expect(visibleForkHistory(emptyViewState(), emptyFork).turns).toEqual([])
   const view = { ...emptyViewState(), turns: [turn('new')] }
   expect(visibleForkHistory(view, emptyFork)).toBe(view)
@@ -45,7 +45,7 @@ test('an empty source needs no synthetic first message', () => {
 
 test('a failed cutoff read leaves inherited history visible', () => {
   const view = { ...emptyViewState(), turns: [turn('inherited')] }
-  expect(visibleForkHistory(view, { forkedFromSessionId: 'parent' })).toBe(view)
+  expect(visibleForkHistory(view, { fromSessionId: 'parent' })).toBe(view)
 })
 
 test('hides inherited notices and keeps new ones', () => {

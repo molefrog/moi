@@ -1,18 +1,15 @@
 import { mkdir, rename, rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
+import type { PendingView, SessionFork, WorkspaceSessionState } from '@/lib/types'
 import { isWorkspaceTabId } from '@/lib/workspace-tabs'
 import { LockTimeoutError, type Lease } from './lock'
-import {
-  WORKSPACE_STATE_VERSION,
-  type PendingViewState,
-  type SessionFork,
-  type WorkspaceSessionState,
-  type WorkspaceState
-} from './types'
+import { WORKSPACE_STATE_VERSION, type StoredWorkspaceState } from './types'
+
+type PendingViewState = Omit<PendingView, 'id'>
 
 export type LoadedState = {
-  state: WorkspaceState
+  state: StoredWorkspaceState
   // False for a file written by a newer Moi: read what we understand, never
   // overwrite what we don't.
   writable: boolean
@@ -26,10 +23,11 @@ export class WorkspaceStateVersionError extends Error {
 
 const PENDING_VIEW_STATUSES = new Set<string>(['draft', 'starting', 'submitted', 'failed'])
 
-export function emptyWorkspaceState(workspacePath: string): WorkspaceState {
+export function emptyWorkspaceState(workspacePath: string): StoredWorkspaceState {
   return {
     version: WORKSPACE_STATE_VERSION,
     workspacePath,
+    revision: 0,
     selected: {},
     sessions: {},
     pendingViews: {}
@@ -94,8 +92,10 @@ function normalizePendingView(value: unknown): PendingViewState | undefined {
 export function normalizeWorkspaceState(
   value: Record<string, unknown>,
   workspacePath: string
-): WorkspaceState {
+): StoredWorkspaceState {
   const state = emptyWorkspaceState(optionalString(value.workspacePath) ?? workspacePath)
+  if (typeof value.revision === 'number' && Number.isSafeInteger(value.revision))
+    state.revision = value.revision
   const pinned = optionalString(value.pinnedSessionId)
   if (pinned) state.pinnedSessionId = pinned
   if (isRecord(value.selected)) {
@@ -119,7 +119,7 @@ export function normalizeWorkspaceState(
 
 // Empty session entries and settings carry no information; leaving them out
 // keeps the file readable.
-export function compactWorkspaceState(state: WorkspaceState): WorkspaceState {
+export function compactWorkspaceState<T extends StoredWorkspaceState>(state: T): T {
   for (const [sessionId, session] of Object.entries(state.sessions)) {
     for (const key of Object.keys(session) as (keyof WorkspaceSessionState)[])
       if (session[key] === undefined) delete session[key]
@@ -163,7 +163,7 @@ let tempSequence = 0
 // Write to a sibling temp file, then rename over the target: readers see the
 // old file or the new one, never a partial write. A holder whose lock expired
 // gives up before the rename, so a late write cannot replace a newer one.
-export async function writeStateFile(path: string, state: WorkspaceState, lease: Lease) {
+export async function writeStateFile(path: string, state: StoredWorkspaceState, lease: Lease) {
   await mkdir(dirname(path), { recursive: true })
   const temp = `${path}.${process.pid}.${++tempSequence}.tmp`
   try {

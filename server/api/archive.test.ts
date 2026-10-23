@@ -15,7 +15,7 @@ import {
 } from '../harness/acp/archived'
 import { openclawHarness } from '../harness/openclaw'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
-import { getSelectedSession, saveSelectedSession } from '../sessions/selected'
+import { saveSelectedSession } from '../sessions/selected'
 import { silenceConsole } from '../test/quiet'
 
 // One test makes `archiveSession` throw; the route logs that error on purpose.
@@ -80,14 +80,14 @@ test('each archive stops its chat before archiving and requests can overlap', as
     { method: 'POST' }
   )
 
-  expect(secondResponse.status).toBe(204)
+  expect(secondResponse.status).toBe(200)
   expect(calls).toContain('stop:first')
   expect(calls).toEqual(expect.arrayContaining(['stop:second', 'archive:second']))
   expect(calls.indexOf('stop:second')).toBeLessThan(calls.indexOf('archive:second'))
   expect(calls).not.toContain('archive:first')
 
   releaseFirst?.()
-  expect((await firstRequest).status).toBe(204)
+  expect((await firstRequest).status).toBe(200)
   expect(calls.indexOf('stop:first')).toBeLessThan(calls.indexOf('archive:first'))
 })
 
@@ -106,7 +106,7 @@ test('one archive failure does not block another chat', async () => {
   expect(failed.status).toBe(500)
   // Harness error messages pass through so backend refusals stay actionable.
   expect(await failed.text()).toBe('archive failed')
-  expect(succeeded.status).toBe(204)
+  expect(succeeded.status).toBe(200)
 })
 
 test('archiving the selected session switches the workspace to New chat', async () => {
@@ -119,8 +119,9 @@ test('archiving the selected session switches the workspace to New chat', async 
     method: 'POST'
   })
 
-  expect(response.status).toBe(204)
-  expect(await getSelectedSession(workspace)).toBeUndefined()
+  expect(response.status).toBe(200)
+  // The reply is the new state, without the archived chat.
+  expect((await response.json()).selected).toEqual({})
 })
 
 test('every provider supports archiving, openclaw via gateway patch', async () => {
@@ -145,7 +146,7 @@ test('every provider supports archiving, openclaw via gateway patch', async () =
 
   expect((await claudeAgent.json()).supportsArchiving).toBe(true)
   expect((await codexAgent.json()).supportsArchiving).toBe(true)
-  expect(openclawArchive.status).toBe(204)
+  expect(openclawArchive.status).toBe(200)
   expect(archived).toEqual(['chat'])
 })
 
@@ -160,6 +161,6 @@ test('archiving a hermes chat records it in the acp store', async () => {
     method: 'POST'
   })
 
-  expect(response.status).toBe(204)
+  expect(response.status).toBe(200)
   expect(await archivedAcpSessions(join(tempDir, 'hermes'))).toEqual(new Set(['sess-1']))
 })
