@@ -55,6 +55,7 @@ export type AccountFixtureOptions = {
   failSession?: boolean
   loadingSession?: boolean
   pendingMutation?: boolean
+  pendingMutationPaths?: string[]
   injected?: boolean
   loadingTeam?: boolean
 }
@@ -69,6 +70,7 @@ export async function mountAccount({
   failSession = false,
   loadingSession = false,
   pendingMutation = false,
+  pendingMutationPaths = [],
   injected = true,
   loadingTeam = false
 }: AccountFixtureOptions = {}) {
@@ -147,7 +149,12 @@ export async function mountAccount({
           cloudSession = null
           return Response.json({ success: true })
         }
-        if (pendingMutation) await mutationRequest.promise
+        if (
+          pendingMutation &&
+          (pendingMutationPaths.length === 0 ||
+            pendingMutationPaths.some(suffix => path.endsWith(suffix)))
+        )
+          await mutationRequest.promise
         if (failures.mutation)
           return Response.json({ error: 'Only the owner can do that.' }, { status: 403 })
         if (path.endsWith('/profile')) {

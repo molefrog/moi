@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useSyncExternalStore } from 'react'
+import { createContext, useContext, useEffect, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAppConfig } from '@/client/api/app-config'
@@ -33,6 +33,7 @@ function useAccountState() {
   const session = useQuery({ ...sessionQuery, enabled: cloud && !demo })
   const registered = cloud && !demo && !!session.data && !session.data.user.isAnonymous
   const team = useQuery({ ...teamQuery(session.data?.user.id), enabled: registered })
+  const [removingMemberIds, setRemovingMemberIds] = useState<string[]>([])
 
   const signOut = useMutation({
     mutationFn: signOutCloud,
@@ -112,6 +113,8 @@ function useAccountState() {
     canEdit: cloud ? registered : source === 'local',
     registered,
     team,
+    removingMemberIds,
+    setRemovingMemberIds,
     saveName,
     signOut,
     retry: () => {

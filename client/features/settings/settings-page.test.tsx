@@ -1,5 +1,6 @@
 import { afterEach, expect, spyOn, test } from 'bun:test'
 import { act } from 'react'
+import { Link, Route } from 'wouter'
 import { getCurrentUser, getDirectory } from '@/client/features/collab/host-state'
 import { accountKeys } from '../account/api'
 import type { CloudSession } from '../account/api'
@@ -13,7 +14,7 @@ import type { AccountFixtureOptions } from '../account/account-test-utils'
 import { YouSettings } from './you-settings'
 import { TeamSettings } from './team-settings'
 import { SettingsPage } from './settings-page'
-import { toast } from '@/client/components/ui/toast'
+import { toast, Toaster } from '@/client/components/ui/toast'
 
 afterEach(cleanupAccount)
 
@@ -21,25 +22,124 @@ type FixtureOptions = AccountFixtureOptions & { mode?: 'team' | 'account' | 'pag
 function mountSettings({ mode = 'team', ...options }: FixtureOptions = {}) {
   return mountAccount({
     ...options,
-    children:
-      mode === 'page' ? (
-        <SettingsPage />
-      ) : (
-        <AccountProbe>{mode === 'team' ? <TeamSettings /> : <YouSettings />}</AccountProbe>
-      )
+    children: (
+      <Toaster>
+        {mode === 'page' ? (
+          <SettingsPage />
+        ) : (
+          <AccountProbe>{mode === 'team' ? <TeamSettings /> : <YouSettings />}</AccountProbe>
+        )}
+      </Toaster>
+    )
   })
 }
 
 test('owners can remove members and cancel invitations, and directory follows the response', async () => {
   const ui = await mountSettings()
   await ui.click('Remove ada@example.com')
+  expect(ui.calls.some(call => call.body?.memberId === 'member-ada')).toBe(false)
+  expect(ui.document.querySelector('[aria-label="Remove ada@example.com"]')).toBeNull()
+  await ui.click('Close toast')
   expect(ui.calls.some(call => call.body?.memberId === 'member-ada')).toBe(true)
-  expect(ui.document.body.textContent).not.toContain('Ada')
+  expect(ui.document.querySelector('[aria-label="Remove ada@example.com"]')).toBeNull()
   expect(getDirectory()?.map(user => user.id)).toEqual(['me'])
   await ui.click('Cancel invitation for grace@example.com')
   expect(
     ui.document.querySelector('[aria-label="Cancel invitation for grace@example.com"]')
   ).toBeNull()
+})
+
+test('Undo restores a member without sending a removal request', async () => {
+  const ui = await mountSettings()
+  await ui.click('Remove ada@example.com')
+  expect(ui.document.querySelector('[aria-label="Remove ada@example.com"]')).toBeNull()
+  const callsBeforeUndo = ui.calls.length
+  await ui.click('Undo')
+  expect(ui.calls).toHaveLength(callsBeforeUndo)
+  expect(ui.document.querySelector('[aria-label="Remove ada@example.com"]')).not.toBeNull()
+  expect(ui.calls.some(call => call.path.endsWith('/members/remove'))).toBe(false)
+  expect(
+    getDirectory()
+      ?.map(user => user.id)
+      .sort()
+  ).toEqual(['ada', 'me'])
+  expect(ui.document.querySelector<HTMLInputElement>('#invite-email')?.disabled).toBe(false)
+})
+
+test('other team actions stay usable while removal waits for Undo', async () => {
+  const ui = await mountSettings()
+  await ui.click('Remove ada@example.com')
+  await ui.click('Cancel invitation for grace@example.com')
+  expect(ui.calls.some(call => call.path.endsWith('/cancel'))).toBe(true)
+  expect(ui.calls.some(call => call.path.endsWith('/members/remove'))).toBe(false)
+  expect(ui.document.querySelector('[aria-label="Remove ada@example.com"]')).toBeNull()
+  await ui.click('Undo')
+  expect(ui.document.querySelector('[aria-label="Remove ada@example.com"]')).not.toBeNull()
+})
+
+test('pending removals survive leaving settings and Undo after returning', async () => {
+  const ui = await mountAccount({
+    children: (
+      <Toaster>
+        <Link href="/">Home</Link>
+        <Link href="/settings">Settings</Link>
+        <Route path="/settings">
+          <TeamSettings />
+        </Route>
+      </Toaster>
+    )
+  })
+  await ui.click('Remove ada@example.com')
+  await act(async () => ui.document.querySelector<HTMLAnchorElement>('a[href="/"]')!.click())
+  expect(ui.document.querySelector('#invite-email')).toBeNull()
+  await act(async () =>
+    ui.document.querySelector<HTMLAnchorElement>('a[href="/settings"]')!.click()
+  )
+  expect(ui.document.querySelector('#invite-email')).not.toBeNull()
+  expect(ui.document.querySelector('[aria-label="Remove ada@example.com"]')).toBeNull()
+  await ui.click('Undo')
+  expect(ui.document.querySelector('[aria-label="Remove ada@example.com"]')).not.toBeNull()
+  expect(ui.calls.some(call => call.path.endsWith('/members/remove'))).toBe(false)
+})
+
+test('team controls remain disabled until every overlapping request finishes', async () => {
+  const ui = await mountSettings({ pendingMutation: true, pendingMutationPaths: ['/invite'] })
+  await ui.click('Remove ada@example.com')
+  await ui.type(ui.document.querySelector<HTMLInputElement>('#invite-email')!, 'new@example.com')
+  await act(async () =>
+    ui.document
+      .querySelector('form')!
+      .dispatchEvent(new ui.window.Event('submit', { bubbles: true, cancelable: true }))
+  )
+  await ui.settle()
+  expect(ui.calls.some(call => call.path.endsWith('/invite'))).toBe(true)
+  await ui.click('Close toast')
+  expect(getDirectory()?.map(user => user.id)).toEqual(['me'])
+  expect(ui.document.querySelector<HTMLInputElement>('#invite-email')?.disabled).toBe(true)
+  await act(async () => ui.mutationRequest.resolve())
+  await ui.settle()
+  expect(ui.document.querySelector<HTMLInputElement>('#invite-email')?.disabled).toBe(false)
+})
+
+test('removal commits when the undo toast expires', async () => {
+  const ui = await mountSettings()
+  await ui.click('Remove ada@example.com')
+  expect(ui.calls.some(call => call.path.endsWith('/members/remove'))).toBe(false)
+  await act(async () => {
+    await new Promise(resolve => setTimeout(resolve, 5100))
+  })
+  await ui.settle()
+  expect(ui.calls.filter(call => call.path.endsWith('/members/remove'))).toHaveLength(1)
+  expect(ui.document.querySelector('[aria-label="Remove ada@example.com"]')).toBeNull()
+  expect(getDirectory()?.map(user => user.id)).toEqual(['me'])
+}, 10000)
+
+test('a pending removal is cancelled if the account changes', async () => {
+  const ui = await mountSettings()
+  await ui.click('Remove ada@example.com')
+  await act(async () => ui.qc.setQueryData(accountKeys.session, null))
+  await ui.click('Close toast')
+  expect(ui.calls.some(call => call.path.endsWith('/members/remove'))).toBe(false)
 })
 
 test('members can see the team but have no management controls', async () => {
@@ -56,6 +156,7 @@ test('failed team mutations retain the list and report the server error', async 
   const notification = spyOn(toast, 'add')
   try {
     await ui.click('Remove ada@example.com')
+    await ui.click('Close toast')
     expect(ui.document.body.textContent).toContain('Ada')
     expect(notification).toHaveBeenCalledWith({
       title: 'Couldn’t update team',
@@ -65,7 +166,8 @@ test('failed team mutations retain the list and report the server error', async 
     expect(ui.document.querySelector('[role="alert"]')).toBeNull()
     ui.failures.mutation = false
     await ui.click('Remove ada@example.com')
-    expect(ui.document.body.textContent).not.toContain('Ada')
+    await ui.click('Close toast')
+    expect(ui.document.querySelector('[aria-label="Remove ada@example.com"]')).toBeNull()
   } finally {
     notification.mockRestore()
   }
@@ -111,6 +213,16 @@ test('inviting a teammate sends the trimmed email and refreshes invitations', as
   })
   expect(ui.document.body.textContent).toContain('new@example.com')
   expect(input.value).toBe('')
+  const rows = ui.document.querySelectorAll('ul > li')
+  const invitation = rows[rows.length - 1]!
+  expect(invitation.textContent).toContain('new@example.com')
+  expect(invitation.textContent).toContain('Invitation expires')
+  expect(invitation.querySelector('button')?.textContent).toBe('')
+  await ui.click('Cancel invitation for new@example.com')
+  expect(ui.calls.some(call => call.path.endsWith('/invitation/invite-new/cancel'))).toBe(true)
+  expect(
+    ui.document.querySelector('[aria-label="Cancel invitation for new@example.com"]')
+  ).toBeNull()
 })
 
 test('local settings show You without Email or Team and respect supplied identity', async () => {
@@ -171,14 +283,13 @@ test('settings session errors offer a working retry', async () => {
 test('team controls stay disabled until a mutation finishes', async () => {
   const ui = await mountSettings({ pendingMutation: true })
   await ui.click('Remove ada@example.com')
-  const remove = ui.document.querySelector<HTMLButtonElement>(
-    '[aria-label="Remove ada@example.com"]'
-  )!
-  expect(remove.disabled).toBe(true)
+  expect(ui.document.querySelector('[aria-label="Remove ada@example.com"]')).toBeNull()
+  expect(ui.document.querySelector<HTMLInputElement>('#invite-email')?.disabled).toBe(false)
+  await ui.click('Close toast')
   expect(ui.document.querySelector<HTMLInputElement>('#invite-email')?.disabled).toBe(true)
   await act(async () => ui.mutationRequest.resolve())
   await ui.settle()
-  expect(ui.document.body.textContent).not.toContain('Ada')
+  expect(ui.document.querySelector('[aria-label="Remove ada@example.com"]')).toBeNull()
   expect(ui.document.querySelector<HTMLInputElement>('#invite-email')?.disabled).toBe(false)
 })
 

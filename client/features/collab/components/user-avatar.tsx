@@ -50,7 +50,7 @@ export function UserAvatar({
       <AvatarFallback>
         {user ? (
           <Blobatar
-            className="scale-125"
+            className="scale-150"
             name={user.id}
             animate="hover"
             background="circle"
