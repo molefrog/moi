@@ -79,6 +79,8 @@ type SidebarProps = {
 }
 
 function Sidebar({ workspaces }: SidebarProps) {
+  const { environment } = useAppConfig()
+  const { demo } = useAccount()
   const reorder = useReorderWorkspaces()
 
   return (
@@ -138,41 +140,30 @@ function Sidebar({ workspaces }: SidebarProps) {
         </nav>
 
         <div className="flex shrink-0 flex-col items-center gap-4">
-          <SidebarFooterAction />
+          {demo ? (
+            <Tooltip>
+              <DemoDialog
+                trigger={
+                  <TooltipTrigger
+                    render={
+                      <Button size="icon" aria-label="Set up Moi">
+                        <IconSandbox stroke={1.5} />
+                      </Button>
+                    }
+                  />
+                }
+              />
+              <TooltipContent side="right">Set up Moi</TooltipContent>
+            </Tooltip>
+          ) : (
+            <>
+              {environment === 'local' && <LocalUpdateButton />}
+              <AccountMenu />
+            </>
+          )}
         </div>
       </aside>
     </TooltipProvider>
-  )
-}
-
-function SidebarFooterAction() {
-  const { environment } = useAppConfig()
-  const { demo } = useAccount()
-
-  if (demo) {
-    return (
-      <Tooltip>
-        <DemoDialog
-          trigger={
-            <TooltipTrigger
-              render={
-                <Button size="icon" aria-label="Set up Moi">
-                  <IconSandbox stroke={1.5} />
-                </Button>
-              }
-            />
-          }
-        />
-        <TooltipContent side="right">Set up Moi</TooltipContent>
-      </Tooltip>
-    )
-  }
-
-  return (
-    <>
-      {environment === 'local' && <LocalUpdateButton />}
-      <AccountMenu />
-    </>
   )
 }
 
