@@ -140,6 +140,7 @@ function Sidebar({ workspaces }: SidebarProps) {
         </nav>
 
         <div className="flex shrink-0 flex-col items-center gap-4">
+          {environment === 'local' && <LocalUpdateButton />}
           {demo ? (
             <Tooltip>
               <DemoDialog
@@ -156,10 +157,7 @@ function Sidebar({ workspaces }: SidebarProps) {
               <TooltipContent side="right">Set up Moi</TooltipContent>
             </Tooltip>
           ) : (
-            <>
-              {environment === 'local' && <LocalUpdateButton />}
-              <AccountMenu />
-            </>
+            <AccountMenu />
           )}
         </div>
       </aside>
