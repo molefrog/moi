@@ -69,7 +69,7 @@ function useAccountState() {
     if (cloud) {
       if (!registered) throw new Error('Sign in to change your name')
       await qc.cancelQueries({ queryKey: accountKeys.session })
-      const result = await updateCloudName(name).catch(error => {
+      await updateCloudName(name).catch(error => {
         if (error instanceof CloudApiError && error.status === 401)
           void qc.invalidateQueries({ queryKey: accountKeys.session })
         throw error
@@ -81,11 +81,11 @@ function useAccountState() {
         latestSession.user.isAnonymous
       )
         throw new Error('Your account changed. Reload Moi to try again.')
-      const next: CloudSession = { user: { ...latestSession.user, name: result.name } }
+      const next: CloudSession = { user: { ...latestSession.user, name } }
       qc.setQueryData(accountKeys.session, next)
       syncCloudIdentity(next, team.data)
       void qc.invalidateQueries({ queryKey: accountKeys.team })
-      return result.name
+      return name
     }
     const localProfile = getCurrentUser()
     if (getCurrentUserSource() !== 'local' || !localProfile || localProfile.id !== profile?.id)
