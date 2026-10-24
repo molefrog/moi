@@ -1,0 +1,29 @@
+name: Visual rerun
+
+# The upload in "Visual tests" fails while a pull request has unreviewed visual changes.
+# Accepting them flips the "UI Verify: <slug>" check to success; this re-runs the failed job
+# so the Actions check turns green too. `status` events only run this file from the default
+# branch.
+
+on: status
+
+permissions:
+  actions: write
+
+jobs:
+  rerun:
+    if: startsWith(github.event.context, 'UI Verify:') && github.event.state == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Re-run the failed visual workflow for this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.event.sha }}
+        run: |
+          set -euo pipefail
+          run_ids=$(gh run list --repo "$GITHUB_REPOSITORY" \
+            --workflow visual.yml --commit "$HEAD_SHA" \
+            --status failure --json databaseId --jq '.[].databaseId')
+          for run_id in $run_ids; do
+            gh run rerun "$run_id" --failed --repo "$GITHUB_REPOSITORY"
+          done

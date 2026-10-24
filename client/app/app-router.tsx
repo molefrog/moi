@@ -9,12 +9,13 @@ import { HomeRoute } from './routes/home-route'
 import { WorkspaceRoute } from './routes/workspace-route'
 
 // Dev-only playground routes: colocated in features/dev and loaded as a
-// separate lazy chunk. The NODE_ENV gate is statically false in the prod
-// build (scripts/build-client.ts defines it), so the bundler drops the
-// dynamic import and none of features/dev is emitted into dist at all.
-// In prod /dev redirects home.
+// separate lazy chunk. Both gates are statically false in the prod build
+// (scripts/build-client.ts defines them), so the bundler drops the dynamic
+// import and none of features/dev is emitted into dist at all. In prod /dev
+// redirects home. MOI_DEV_ROUTES keeps them in a prod build for the visual
+// tests, which capture the playground pages.
 const DevRoutes =
-  process.env.NODE_ENV === 'development'
+  process.env.NODE_ENV === 'development' || process.env.MOI_DEV_ROUTES === 'true'
     ? lazy(() => import('@/client/features/dev/dev-routes'))
     : null
 
