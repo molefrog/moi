@@ -2,6 +2,8 @@ import type { WorkspaceSkillStatus } from '@/lib/types'
 import { defineCommand } from 'citty'
 import { resolve } from 'path'
 import { updateWorkspaceSkills } from '../../skills/update'
+import type { WorkspaceSkillUpdateResult } from '../../skills/update'
+import { displaySkillPath } from '../../skills/locations'
 import { isBehind, isMinorBehind, resolveWorkspace, skillStatuses } from '../../skills/version'
 import { dirArg } from '../args'
 import pc from '../pc'
@@ -11,38 +13,34 @@ import { columns } from '../ui'
 // filesystem op — no running server needed. Resolves the workspace root the
 // same way `moi bundle` does, so it works from `.moi/` or any subdirectory.
 async function runSkillUpdate(cwd: string): Promise<void> {
-  // Type-aware: an OpenClaw workspace keeps its skills in `skills/`, so the
-  // update must target the same dir the agent actually loads from.
+  // Include the primary harness destination and existing copies for other agents.
   const { root, type } = await resolveWorkspace(cwd)
-  const { before, status, changedSkills, updatedAppletTypes } = await updateWorkspaceSkills(
-    root,
-    type ?? 'claude-code'
-  )
-  const after = status.skills
+  const result = await updateWorkspaceSkills(root, type)
+  const { changedSkills, updatedAppletTypes } = result
   const heading = changedSkills.length > 0 ? 'Skills updated in ' : 'Skills unchanged in '
 
   console.log('\n' + pc.green('✓') + ' ' + heading + pc.bold(root) + '\n')
-  printSkillUpdateTable(before, after, changedSkills)
+  printSkillUpdateTable(root, result)
   for (const file of updatedAppletTypes) {
     console.log(pc.dim('  Applet types regenerated: ') + pc.bold(`.moi/${file}\n`))
   }
 }
 
 function printSkillUpdateTable(
-  before: WorkspaceSkillStatus[],
-  after: WorkspaceSkillStatus[],
-  changedSkills: string[]
+  root: string,
+  { before, status, changedSkills, changedSkillPaths }: WorkspaceSkillUpdateResult
 ): void {
-  const changedSkillNames = new Set(changedSkills)
+  const changedPaths = new Set(changedSkillPaths)
   console.log(
     columns(
-      ['skill', 'from', 'to'].map(h => pc.dim(h)),
-      after.map(s => {
-        const prev = before.find(b => b.name === s.name)?.installed ?? null
+      ['skill', 'path', 'from', 'to'].map(h => pc.dim(h)),
+      status.skills.map(s => {
+        const prev = before.find(b => b.name === s.name && b.path === s.path)?.installed ?? null
         const versionChanged = prev !== s.installed
-        const filesChanged = changedSkillNames.has(s.name)
+        const filesChanged = changedPaths.has(s.path)
         return [
           s.name,
+          displaySkillPath(root, s.path),
           prev ?? pc.dim('none'),
           versionChanged
             ? pc.green(s.installed ?? '?')
@@ -105,9 +103,10 @@ export const skill = defineCommand({
     console.log('\n' + pc.bold('moi skill') + pc.dim(' — workspace skills') + '\n')
     console.log(
       columns(
-        ['skill', 'installed', 'bundled', 'status'].map(h => pc.dim(h)),
+        ['skill', 'path', 'installed', 'bundled', 'status'].map(h => pc.dim(h)),
         statuses.map(s => [
           s.name,
+          displaySkillPath(root, s.path),
           s.installed ?? pc.dim('—'),
           s.bundled ?? pc.dim('—'),
           skillState(s)
