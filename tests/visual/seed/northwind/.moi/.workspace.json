@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "widgetGrid": [
+    { "i": "_moi_views", "x": 0, "y": 0 },
+    { "i": "orders-today", "x": 0, "y": 1 },
+    { "i": "revenue", "x": 2, "y": 1 },
+    { "i": "shipping", "x": 0, "y": 2 }
+  ],
+  "layoutMode": "split",
+  "theme": { "font": "geometric", "color": "mint", "radius": "squishy", "agent": "pill" },
+  "tabs": { "open": ["overview", "scratchpad", "views/orders"], "active": "overview" }
+}

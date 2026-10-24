@@ -1,0 +1,87 @@
+name: Visual upload
+
+# Uploads the capture a fork's pull request saved in "Visual tests". workflow_run always runs
+# this file from the default branch, with the repo's secrets, so a pull request can't change
+# what it does. Nothing from the pull request runs here: no checkout of its files, no
+# `bun install`, no CLI inside its tree. Values the pull request controls, like its branch
+# name, reach the shell only through env.
+
+on:
+  workflow_run:
+    workflows: [Visual tests]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+jobs:
+  upload:
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name != github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Download the capture
+        uses: actions/download-artifact@v4
+        with:
+          name: uiverify-archive
+          path: ${{ runner.temp }}/archive
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Find the pull request
+        id: meta
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_OWNER: ${{ github.event.workflow_run.head_repository.owner.login }}
+        run: |
+          set -euo pipefail
+          # workflow_run lists no pull requests for a fork, so look it up by its head.
+          pr=$(gh api -X GET "repos/$REPO/pulls" -f state=open -f "head=$HEAD_OWNER:$HEAD_BRANCH" --jq '.[0].number // empty')
+          if [ -z "$pr" ]; then echo "::warning::No open pull request for $HEAD_OWNER:$HEAD_BRANCH, so nothing was uploaded."; fi
+          {
+            echo "pr=$pr"
+            echo "branch<<__EOF__"
+            echo "$HEAD_OWNER:$HEAD_BRANCH" # a fork's "main" must not look like ours
+            echo "__EOF__"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Fetch the commit's history (objects only, no checkout)
+        if: steps.meta.outputs.pr != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          git init -q "$RUNNER_TEMP/repo"
+          cd "$RUNNER_TEMP/repo"
+          git remote add origin "https://github.com/$REPO"
+          # The read-only job token, so the fetch also works while the repo is private.
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git -c "http.extraheader=AUTHORIZATION: basic $auth" fetch -q --filter=blob:none --no-tags origin "$HEAD_SHA"
+          git update-ref HEAD "$HEAD_SHA"
+
+      - name: Upload to UI Verify
+        if: steps.meta.outputs.pr != ''
+        env:
+          UIVERIFY_API_KEY: ${{ secrets.UIVERIFY_API_KEY }}
+          COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+          BRANCH: ${{ steps.meta.outputs.branch }}
+          PR_NUMBER: ${{ steps.meta.outputs.pr }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/clean" && cd "$RUNNER_TEMP/clean"
+          npx -y uiverify@1.8.0 upload \
+            --static-dir "$RUNNER_TEMP/archive" \
+            --working-directory "$RUNNER_TEMP/repo" \
+            --exit-zero-on-changes

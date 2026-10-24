@@ -1,0 +1,71 @@
+name: Visual tests
+
+# Captures the visual tests and uploads them to UI Verify, which diffs them against the
+# accepted baseline and posts a "UI Verify: <slug>" check on the commit. A push to main
+# accepts its captures as the new baseline. A pull request from a fork gets no secrets, so
+# it saves the capture as an artifact instead and visual-upload.yml uploads it.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: visual-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  visual:
+    name: Visual tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          # UI Verify finds each commit's baseline through the git history.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Bun.WebView drives the Chrome already installed on the runner.
+      - name: Capture
+        run: bun run test:visual
+
+      # The uiverify CLI needs Node 24.
+      - name: Set up Node
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # Everything except a fork's pull request uploads here, with the key.
+      - name: Upload to UI Verify
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          FLAGS="--static-dir uiverify-archive"
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then FLAGS="$FLAGS --auto-accept-changes"; fi
+          npx --yes uiverify@1.8.0 upload $FLAGS
+        env:
+          UIVERIFY_API_KEY: ${{ secrets.UIVERIFY_API_KEY }}
+
+      # A fork's pull request has no key: save the capture for visual-upload.yml.
+      - name: Save the capture
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+        uses: actions/upload-artifact@v4
+        with:
+          name: uiverify-archive
+          path: uiverify-archive/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7

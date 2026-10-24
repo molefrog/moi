@@ -1,16 +1,40 @@
 {
   "version": 1,
   "skills": {
+    "check-visual-changes": {
+      "source": "uiverify/uiverify",
+      "sourceType": "github",
+      "skillPath": "packages/skills/skills/check-visual-changes/SKILL.md",
+      "computedHash": "4b8b62ce19f17fc3f3fb4b675d7536a1e3531af6d6f08135df0c29ef2c855baa"
+    },
+    "economical-visual-tests": {
+      "source": "uiverify/uiverify",
+      "sourceType": "github",
+      "skillPath": "packages/skills/skills/economical-visual-tests/SKILL.md",
+      "computedHash": "6dcf84486a480d04041e068a744a43f73758a4ec46693d36a96a7e94c84b7fbe"
+    },
     "gh-stack": {
       "source": "github/gh-stack",
       "sourceType": "github",
       "skillPath": "skills/gh-stack/SKILL.md",
       "computedHash": "6a5289601eedbeedc2d79c2d8627277afb9b9a3fbd78b4da3399a46dd788ae0a"
     },
+    "making-ui-changes": {
+      "source": "uiverify/uiverify",
+      "sourceType": "github",
+      "skillPath": "packages/skills/skills/making-ui-changes/SKILL.md",
+      "computedHash": "33d135d556bc4e198f1622389afd610f2ce9a7814afe7fa0427ed91fe724b5b6"
+    },
     "shadcn": {
       "source": "shadcn/ui",
       "sourceType": "github",
       "computedHash": "507f011a70e8b3ae242bdc0bb5b39fd91a1d4049a0f3c281991ccf84973d591c"
+    },
+    "triage-visual-changes": {
+      "source": "uiverify/uiverify",
+      "sourceType": "github",
+      "skillPath": "packages/skills/skills/triage-visual-changes/SKILL.md",
+      "computedHash": "d97509489ddda0eca9e0fda7ec519352d2d98dcc3fffeae5e726f3ef869ea131"
     }
   }
 }

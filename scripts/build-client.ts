@@ -29,6 +29,7 @@ const result = await Bun.build({
   plugins: [tailwind, externalizeReact],
   define: {
     'process.env.NODE_ENV': '"production"',
+    'process.env.MOI_DEV_ROUTES': JSON.stringify(process.env.MOI_DEV_ROUTES ?? 'false'),
     // Inline the public tldraw license key. `define` (not `env: 'PUBLIC_*'`)
     // because it always replaces the literal — `?? ''` guarantees an unset key
     // degrades to an empty string (→ undefined client-side) instead of leaving a

@@ -18,6 +18,7 @@ Agent chat UI powered by Claude Agent SDK, Bun, React, and Tailwind.
   - `animations.md` (`*.tsx`, `*.css`) — `tw-animate-css` utilities, no custom keyframes
   - `bun.md` — Bun instead of Node/npm/vite, Bun-native APIs
   - `pull-requests.md` (before creating or updating a PR) — description format, length budget, update-on-pivot
+  - `visual-tests.md` (`*.tsx`, `*.css`) — keep `tests/visual` capturing every component, page, and visible state
   - `README.md` — format for writing new rules
 - `.agents/skills/` — skills in the `SKILL.md` [Agent Skills](https://agentskills.io) format (canonical). Codex and other tools that follow the standard discover this directory natively; Claude Code loads them via per-skill symlinks in `.claude/skills/`. When adding a skill, put it in `.agents/skills/<name>/` and add a matching symlink in `.claude/skills/`.
 
@@ -48,6 +49,10 @@ Claude-only config (`.claude/settings.json` hooks, `.claude/launch.json`) stays 
 ## Tests
 
 Read [TESTING.md](TESTING.md) when deciding what test coverage a change needs.
+
+### Visual tests
+
+Before changing any component, page, or styles, read the `making-ui-changes` skill: reuse before you create, add or update the capture in the same change, check the blast radius, and prove it with a visual test. The captures live in `tests/visual` (rules in [.agents/rules/visual-tests.md](.agents/rules/visual-tests.md)); preview a change with the `check-visual-changes` skill, write captures with `economical-visual-tests`, and review a PR's UI Verify build with `triage-visual-changes`.
 
 ## Commands
 
