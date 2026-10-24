@@ -113,18 +113,35 @@ export function WorkspaceUsersList({
     (a, b) =>
       USER_STATUS_ORDER[a.status] - USER_STATUS_ORDER[b.status] || Number(b.self) - Number(a.self)
   )
+  const groups: { label: string; users: WorkspaceUserInfo[] }[] = [
+    { label: 'People', users: [] },
+    { label: 'Bots', users: [] }
+  ]
+  for (const user of sorted) {
+    const bot = /\+(bot|grok)/i.test(user.profile.email?.split('@')[0] ?? '')
+    groups[bot ? 1 : 0]!.users.push(user)
+  }
   return (
-    <ul className="flex max-h-80 scroll-fade flex-col overflow-y-auto">
-      {sorted.map(user => (
-        <UserRow
-          key={user.profile.id}
-          user={user}
-          page={page}
-          describeTab={describeTab}
-          onOpenTab={onOpenTab}
-        />
-      ))}
-    </ul>
+    <div className="flex max-h-80 scroll-fade flex-col gap-1 overflow-y-auto">
+      {groups
+        .filter(group => group.users.length > 0)
+        .map(group => (
+          <section key={group.label} aria-label={group.label}>
+            <h3 className="px-2 py-1 text-xs text-muted-foreground">{group.label}</h3>
+            <ul>
+              {group.users.map(user => (
+                <UserRow
+                  key={user.profile.id}
+                  user={user}
+                  page={page}
+                  describeTab={describeTab}
+                  onOpenTab={onOpenTab}
+                />
+              ))}
+            </ul>
+          </section>
+        ))}
+    </div>
   )
 }
 
