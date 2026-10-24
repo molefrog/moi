@@ -5,6 +5,8 @@ import { canUseDataDir } from '../data-dir'
 import { versionWithCommit } from '../version'
 import { bundle } from './commands/bundle'
 import { callServerFn } from './commands/call-server-fn'
+import { call } from './commands/call'
+import { tools } from './commands/tools'
 import { check } from './commands/check'
 import { config, printConfigHelp } from './commands/config'
 import { debug } from './commands/debug'
@@ -36,6 +38,8 @@ const workspaceCommands = {
   refresh,
   views,
   'call-server-fn': callServerFn,
+  tools,
+  call,
   debug,
   theme,
   config,

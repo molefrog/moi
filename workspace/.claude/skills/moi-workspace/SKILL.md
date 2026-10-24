@@ -108,7 +108,7 @@ Use the task-specific sections below for workflow guidance. The CLI will grow ov
 `moi --help` to discover commands and `moi <command> --help` before using an unfamiliar command or option.
 
 - **Develop applets:** `moi check`, `moi bundle`, and `moi refresh`.
-- **Call actions:** `moi call-server-fn`.
+- **Call actions:** `moi tools view:<id>` and `moi call view:<id> <tool> '{args}'` for published server tools; `moi call-server-fn` for legacy async exports.
 - **Debug applets:** `moi debug logs` (see Debugging).
 - **Navigate the workspace:** `moi tabs` and `moi navigate <address>` (see Workspace navigation).
 - **Customize the workspace:** `moi theme` and `moi config` (see Appearance and settings).
@@ -379,7 +379,7 @@ Inspect source only for local customizations, doc conflicts, or concrete build i
 
 ### Server functions
 
-In `<name>.server.ts`, export named `async function`s (only — no `const`, sync, or class) and call
+In `<name>.server.ts`, export named `async function`s and call
 them from the component like ordinary async functions; arguments and return values are auto-serialized (`Date`, `Map`,
 `Set`, … work). They run on the Bun server with `process.env` and full filesystem access, at
 `cwd = <workspace root>` (the parent of `.moi/`, where you operate) — so workspace files are plain
@@ -397,6 +397,42 @@ The component fetches on mount; after you change underlying data a server fn rea
 
 It's plain Bun — every Bun API is available with no setup: `bun:sqlite`, `Bun.redis`, `Bun.s3`,
 `Bun.file`, `fetch`, …
+
+### Server tools for browser agents
+
+To expose backend operations through WebMCP, export a `tools` object from the view's
+`.moi/views/<id>.server.ts`. Keys are tool names; each value has `description`,
+`inputSchema` (JSON Schema), `execute`, and optional boolean annotations
+`readOnlyHint`, `untrustedContentHint` and `consequentialHint`.
+
+```ts
+import type { ServerTool } from 'moi'
+
+export const tools = {
+  hello: {
+    description: 'Greet an agent',
+    inputSchema: {
+      type: 'object', properties: { name: { type: 'string' } },
+      required: ['name'], additionalProperties: false
+    },
+    execute: ({ name }) => ({ message: `Hello, ${name}!` })
+  } satisfies ServerTool<{ name: string }>
+}
+```
+
+Arguments must be JSON objects; results must be JSON values. Validation runs on the
+server. Keep `moi` imports type-only in server files. Existing async function exports
+keep working and are not automatically exposed to agents.
+
+- Run `moi bundle --only views` after editing the view or server companion.
+- Discover with `moi tools view:<id>`; call with `moi call view:<id> hello '{"name":"Ada"}'`.
+- React can `import { tools } from './<id>.server'` and await
+  `tools.hello.execute({ name: 'Ada' })`; the bundler generates HTTP proxies.
+- WebMCP registers tools for the active view in supported browsers. Switching away
+  removes them. CLI calls work without a browser. Frontend `useTool` is not provided.
+- For shared data, reuse the view's refresh/subscription mechanism after mutations.
+  A tool call alone does not refresh React state. Handlers can take `{ signal }` as
+  a second argument for cancellation; cancellation does not undo completed writes.
 
 ### Files and assets
 
@@ -520,4 +556,4 @@ This skill is installed with Moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.20.0" />
+<moi-skill version="0.23.0" />

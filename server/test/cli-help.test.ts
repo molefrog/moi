@@ -51,6 +51,14 @@ async function runHelp(
 }
 
 describe('moi --help (e2e)', () => {
+  test('published tools have separate discovery and calls with optional JSON arguments', async () => {
+    const discovery = await runHelp({}, 'tools')
+    const call = await runHelp({}, 'call')
+    expect(discovery).toContain('<TARGET>')
+    expect(call).toContain('<TARGET> <TOOL> [ARGS]')
+    expect(call).toContain('JSON object (default {})')
+  }, 30_000)
+
   test('views set only exposes pending metadata', async () => {
     const help = await runHelp({}, ['views', 'set'])
     expect(help).not.toContain('--kind')

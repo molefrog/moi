@@ -63,7 +63,9 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-async function validateServerExports(filePath: string): Promise<string[]> {
+async function validateServerExports(
+  filePath: string
+): Promise<{ functions: string[]; hasTools: boolean }> {
   const source = await Bun.file(filePath).text()
   const transpiler = new Bun.Transpiler({ loader: 'ts' })
   const { exports } = transpiler.scan(source)
@@ -74,6 +76,8 @@ async function validateServerExports(filePath: string): Promise<string[]> {
     return !typePattern.test(source)
   })
 
+  const functions: string[] = []
+  let hasTools = false
   for (const name of runtimeExports) {
     const escaped = escapeRegex(name)
     const asyncFnPattern = new RegExp(
@@ -82,14 +86,19 @@ async function validateServerExports(filePath: string): Promise<string[]> {
         `export\\s+const\\s+${escaped}\\s*=\\s*async\\s*[\\(]`
     )
     if (!asyncFnPattern.test(source)) {
+      if (name === 'tools') {
+        hasTools = true
+        continue
+      }
       throw new Error(
         `"${name}" in ${basename(filePath)} is not an async function. ` +
-          `.server.ts files can only export async functions.`
+          `.server.ts files can export tools and legacy async functions.`
       )
     }
+    functions.push(name)
   }
 
-  return runtimeExports
+  return { functions, hasTools }
 }
 
 // Server modules are keyed by their path relative to the Moi root
@@ -185,18 +194,23 @@ function appletRuntimePlugin(
 
       // Generate proxy stubs using mei:rpc
       build.onLoad({ filter: /.*/, namespace: 'server-proxy' }, async args => {
-        const exports = await validateServerExports(args.path)
+        const { functions: exports, hasTools } = await validateServerExports(args.path)
         const moduleName = serverModuleKey(args.path, moiRoot)
 
         serverModules.push({ name: moduleName, exports })
 
         const lines = [
-          `import { rpc } from "mei:rpc";`,
+          `import { rpc, toolProxy } from "mei:rpc";`,
           ...exports.map(
             name =>
               `export const ${name} = rpc(${JSON.stringify(moduleName)}, ${JSON.stringify(name)});`
           )
         ]
+        if (hasTools) {
+          const view = /^views\/([A-Za-z0-9_$-]+)$/.exec(moduleName)
+          if (!view) throw new Error('Browser tool imports must come from views/<id>.server.ts')
+          lines.push(`export const tools = /* @__PURE__ */ toolProxy(${JSON.stringify(view[1])});`)
+        }
 
         return { contents: lines.join('\n'), loader: 'js' }
       })
@@ -471,5 +485,17 @@ export async function buildApplet(
 
   const config =
     kind === 'view' ? await extractViewConfig(entrypoint) : await extractWidgetConfig(entrypoint)
+  if (kind === 'view') {
+    const companion = join(sourceDir, `${widgetName}.server.ts`)
+    const exists = await Bun.file(companion).exists()
+    if (exists) {
+      const name = serverModuleKey(companion, moiRoot)
+      const { functions: exports } = await validateServerExports(companion)
+      if (!serverModules.some(module => module.name === name)) serverModules.push({ name, exports })
+    }
+    // Record presence as well as imports: removing a tool-only companion must
+    // invalidate the old worker/catalog even though the view never imports it.
+    files.push({ name: 'server-companion.json', kind: 'asset', data: JSON.stringify({ exists }) })
+  }
   return { js, files, serverModules, config }
 }

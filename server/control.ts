@@ -14,6 +14,7 @@ import { serializeWorkspaceBundle } from './applets/bundle-queue'
 import { CONTROL_HOST, CONTROL_PORT, PORT } from './constants'
 import { applyEnvChanged } from './workspaces/env-apply'
 import { callFunctionEphemeral, parseFunctionPath } from './applets/functions'
+import { callTool, listTools } from './applets/tools'
 import { processIcon } from './workspaces/icon'
 import { loadLayout, saveLayout } from './workspaces/layout'
 import { publishEvent } from './events'
@@ -184,6 +185,26 @@ export const control = Bun.serve({
             return
           }
           ws.send(JSON.stringify({ ok: true, entries: getAppletLog(match.path) }))
+          return
+        }
+
+        if (data.type === 'tools:list' || data.type === 'tools:call') {
+          const match = await resolveWorkspace(ws, data.path)
+          if (!match) return
+          try {
+            const target = String(data.target ?? '')
+            if (data.type === 'tools:list') {
+              ws.send(JSON.stringify({ ok: true, tools: await listTools(match.path, target) }))
+            } else {
+              const args: unknown = JSON.parse(String(data.args ?? '{}'))
+              const result = await callTool(match.path, target, String(data.name ?? ''), args)
+              ws.send(JSON.stringify({ ok: true, result }))
+            }
+          } catch (error) {
+            ws.send(
+              JSON.stringify({ error: error instanceof Error ? error.message : String(error) })
+            )
+          }
           return
         }
 

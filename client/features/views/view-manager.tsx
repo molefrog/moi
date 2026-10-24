@@ -27,6 +27,7 @@ import {
 import { WidgetErrorBoundary } from '@/client/features/applets/widget-error-boundary'
 import { AppletPresenceProvider } from '@/client/features/collab'
 import { useWorkspaceId } from '@/client/features/workspace/workspace-context'
+import { useServerWebMcpTools } from '@/client/runtime/use-server-webmcp-tools'
 import { cn } from '@/client/lib/cn'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import type { CompiledView } from '@/lib/types'
@@ -37,6 +38,8 @@ import {
   type ResidentView,
   sameResidents
 } from './view-residency'
+
+const reportToolError = (message: string) => console.error(`[Moi] ${message}`)
 
 type ViewManagerProps = {
   views: CompiledView[]
@@ -60,6 +63,14 @@ export const ViewManager = memo(function ViewManager({
   activeViewId,
   params
 }: ViewManagerProps) {
+  const workspaceId = useWorkspaceId()
+  const activeView = views.find(view => view.id === activeViewId)
+  useServerWebMcpTools(
+    workspaceId,
+    activeView ? `view:${activeView.id}` : null,
+    activeView?.revision,
+    reportToolError
+  )
   const residents = useResidentViews(activeViewId, views)
   // Render in workspace order, not residency order: the policy ranks views by
   // recency, and reordering the children would make React move live DOM around

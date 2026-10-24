@@ -10,6 +10,18 @@ declare module 'moi' {
     | JsonValue[]
     | { [key: string]: JsonValue }
 
+  // Explicit server operations exposed to agents through WebMCP and the CLI.
+  export type ServerTool<T extends Record<string, unknown> = Record<string, unknown>> = {
+    description: string
+    inputSchema: Record<string, unknown>
+    annotations?: {
+      readOnlyHint?: boolean
+      untrustedContentHint?: boolean
+      consequentialHint?: boolean
+    }
+    execute: (args: T, options?: { signal: AbortSignal }) => JsonValue | Promise<JsonValue>
+  }
+
   // Resolve moi:/views/..., moi:/files/... or an HTTP(S) address for the browser.
   // moi addresses become root-relative URLs using the current page's origin.
   // Workspace files use the server's media/asset stream.

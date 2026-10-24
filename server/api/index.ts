@@ -33,6 +33,7 @@ import { apiBaseFor, parseAppletTail, serveWorkspaceFile } from '../applets'
 import { applyEnvChanged } from '../workspaces/env-apply'
 import { publishEvent } from '../events'
 import { callFunction, parseFunctionPath } from '../applets/functions'
+import { callTool, listTools } from '../applets/tools'
 import { processIcon } from '../workspaces/icon'
 import {
   getWorkspacePreview,
@@ -169,6 +170,37 @@ const withWorkspace = createMiddleware<ApiEnv>(async (c, next) => {
 // ---- single workspace: /api/workspaces/:id/* --------------------------------
 const one = new Hono<ApiEnv>()
 one.use('*', withWorkspace)
+
+one.get('/tools/:target', async c => {
+  try {
+    const tools = await listTools(c.get('ws').path, c.req.param('target'), c.req.raw.signal)
+    c.header('Cache-Control', 'no-store')
+    return c.json(tools)
+  } catch (error) {
+    return c.text(error instanceof Error ? error.message : 'Tool discovery failed', 500)
+  }
+})
+
+one.post('/tools/:target/:name', async c => {
+  let args: unknown
+  try {
+    args = await c.req.json()
+  } catch {
+    return c.text('Tool arguments must be valid JSON', 400)
+  }
+  try {
+    const result = await callTool(
+      c.get('ws').path,
+      c.req.param('target'),
+      c.req.param('name'),
+      args,
+      c.req.raw.signal
+    )
+    return Response.json(result)
+  } catch (error) {
+    return c.text(error instanceof Error ? error.message : 'Tool call failed', 500)
+  }
+})
 
 one.get('/widgets', c => listWidgets(c.get('ws').path))
 

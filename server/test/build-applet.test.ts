@@ -602,3 +602,16 @@ describe('mixed widget + view build (Tailwind isolation)', () => {
     expect(view.js).not.toContain('.tabular-nums')
   })
 })
+
+test('server tools compile to HTTP proxies without bundling backend implementations', async () => {
+  const result = await buildApplet(join(FIXTURES, 'views/import-tools.tsx'), FIXTURES, 'view')
+  expect(result.serverModules).toContainEqual({
+    name: 'views/tool-demo',
+    exports: ['getSaved', 'saveOrder']
+  })
+  expect(result.js).toContain('/tools/')
+  expect(result.js).not.toContain('server-only-tool-implementation')
+  const legacy = await buildApplet(join(FIXTURES, 'views/legacy-tools.tsx'), FIXTURES, 'view')
+  expect(legacy.serverModules).toContainEqual({ name: 'views/legacy-tools', exports: ['tools'] })
+  expect(legacy.js).toContain('/rpc/')
+})

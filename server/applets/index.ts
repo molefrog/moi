@@ -15,7 +15,7 @@
 // workspace-agnostic.
 import { realpathSync, statSync } from 'node:fs'
 import { mkdir, readdir, rm } from 'node:fs/promises'
-import { join, resolve, sep } from 'path'
+import { dirname, join, resolve, sep } from 'path'
 
 import { analyzeDependencies, resolveSource, scanSources } from './dependencies'
 import type { AppletKind } from './build-applet'
@@ -57,10 +57,29 @@ export function getAppletRevision(
 
 // Server dependencies also trigger rebuilds so their function worker is
 // recycled, even when the client bundle's RPC stubs would remain identical.
-async function needsRebuild(buildDir: string, name: string, srcPath: string): Promise<boolean> {
+async function needsRebuild(
+  buildDir: string,
+  name: string,
+  srcPath: string,
+  kind: AppletKind
+): Promise<boolean> {
   const built = Bun.file(join(buildDir, name, 'index.js'))
   if (!(await built.exists())) return true
-  const graph = await analyzeDependencies([srcPath], built.lastModified)
+  const builtMtime = built.lastModified
+
+  const queue = [srcPath]
+  if (kind === 'view') {
+    const companion = join(dirname(srcPath), `${name}.server.ts`)
+    const exists = await Bun.file(companion).exists()
+    try {
+      const previous = await Bun.file(join(buildDir, name, 'server-companion.json')).json()
+      if (previous.exists !== exists) return true
+    } catch {
+      return true
+    }
+    if (exists) queue.push(companion)
+  }
+  const graph = await analyzeDependencies(queue, builtMtime)
   return !graph.complete
 }
 
@@ -456,7 +475,7 @@ export async function buildApplets<C>(
       if (target && name !== target) return { name, status: 'skipped' as const }
       const srcPath = await resolveSource(sourceDir, name)
       if (!srcPath) return { name, status: 'failed' as const, error: 'Source file not found' }
-      if (!force && !(await needsRebuild(buildDir, name, srcPath))) {
+      if (!force && !(await needsRebuild(buildDir, name, srcPath, kind))) {
         return { name, status: 'skipped' as const }
       }
       return { name, srcPath, status: 'pending' as const }

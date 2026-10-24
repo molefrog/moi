@@ -57,6 +57,7 @@ export type WorkspaceEventsClientOptions = {
 // in between without touching the connection. A dropped socket reopens on its
 // own. Framework-free, so the connection logic is testable without React.
 export class WorkspaceEventsClient {
+  private readonly reconnectListeners = new Set<() => void>()
   private readonly listeners = new Set<WorkspaceEventHandler>()
   private readonly baseDelayMs: number
   private readonly maxDelayMs: number
@@ -96,6 +97,13 @@ export class WorkspaceEventsClient {
     }
   }
 
+  onReconnect(listener: () => void): () => void {
+    this.reconnectListeners.add(listener)
+    return () => {
+      this.reconnectListeners.delete(listener)
+    }
+  }
+
   send(message: object) {
     if (this.socket?.readyState !== WebSocket.OPEN) return
     this.socket.send(JSON.stringify(message))
@@ -129,6 +137,7 @@ export class WorkspaceEventsClient {
     socket.onopen = () => {
       this.reconnectAttempt = 0
       this.sendNavigationPresence()
+      for (const listener of this.reconnectListeners) listener()
     }
 
     socket.onmessage = event => {
