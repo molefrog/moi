@@ -5,6 +5,7 @@ import {
   IconArrowUpRight,
   IconBrowserPlus,
   IconMessageChatbot,
+  IconUsersGroup,
   IconX
 } from '@tabler/icons-react'
 
@@ -136,8 +137,15 @@ function DemoDialogContent() {
                 className="mt-0.5 size-8 shrink-0 text-muted-foreground"
               />
               <span className="text-sm text-foreground">
-                Create as many workspaces, views, and widgets as you want
+                Create without limits building as many workspaces as you want
               </span>
+            </li>
+            <li className="flex items-center gap-3">
+              <IconUsersGroup
+                stroke={0.75}
+                className="mt-0.5 size-8 shrink-0 text-muted-foreground"
+              />
+              <span className="text-sm text-foreground">Share what you've built with anyone</span>
             </li>
             <li className="flex items-center gap-3">
               <IconMessageChatbot
@@ -145,7 +153,7 @@ function DemoDialogContent() {
                 className="mt-0.5 size-8 shrink-0 text-muted-foreground"
               />
               <span className="text-sm text-foreground">
-                Build with{' '}
+                Use your{' '}
                 <span className="inline-flex items-baseline gap-1">
                   <img src={claudeIcon} alt="" className="size-3.5 self-center object-contain" />
                   <strong className="font-medium">Claude</strong>
@@ -155,7 +163,7 @@ function DemoDialogContent() {
                   <img src={openaiIcon} alt="" className="size-3.5 self-center object-contain" />
                   <strong className="font-medium">ChatGPT</strong>
                 </span>{' '}
-                using your subscription and app connectors
+                subscription and app connectors
               </span>
             </li>
           </ul>

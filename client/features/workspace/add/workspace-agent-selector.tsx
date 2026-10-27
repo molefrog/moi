@@ -9,7 +9,6 @@ import { Skeleton } from '@/client/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { workspaceTypeLabel } from '@/client/features/workspace/workspace-presentation'
 import { cn } from '@/client/lib/cn'
-import { useUiStore } from '@/client/store/ui'
 import type { WorkspaceType } from '@/lib/types'
 
 import {
@@ -17,7 +16,7 @@ import {
   type WorkspaceAgentOption
 } from './workspace-agent-options'
 
-const WORKSPACE_AGENT_DESCRIPTION = 'Choose which agent Moi will use to build your workspace'
+const WORKSPACE_AGENT_DESCRIPTION = 'Choose the agent to build the workspace'
 type WorkspaceAgentSelectorProps = {
   title: string
   selectedType: WorkspaceType
@@ -47,15 +46,8 @@ export function WorkspaceAgentSelector({
   onTypeChange,
   onSubmit
 }: WorkspaceAgentSelectorProps) {
-  const hasSentMessageFromMoi = useUiStore(state => state.hasSentMessageFromMoi)
   const selectableType = resolveWorkspaceAgentSelection(options, selectedType)
   const selectedUnavailable = selectableType !== selectedType
-  const subscriptionTip =
-    selectableType === 'claude-code'
-      ? 'Tip: you can use your existing Claude subscription in Moi'
-      : selectableType === 'codex'
-        ? 'Tip: you can use your existing ChatGPT subscription in Moi'
-        : undefined
 
   useEffect(() => {
     if (!isPending && selectableType && selectedUnavailable) onTypeChange(selectableType)
@@ -85,9 +77,6 @@ export function WorkspaceAgentSelector({
             selectedType={selectedUnavailable ? undefined : selectedType}
             onTypeChange={onTypeChange}
           />
-        )}
-        {!hasSentMessageFromMoi && subscriptionTip && (
-          <p className="w-0 min-w-full text-sm text-muted-foreground">{subscriptionTip}</p>
         )}
       </div>
 
