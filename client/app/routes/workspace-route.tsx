@@ -29,13 +29,15 @@ export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
   const { environment } = useAppConfig()
 
   return (
-    <Workspace id={id}>
-      <WorkspaceLayoutProvider id={id}>
-        <CollabProvider workspaceId={id} enabled={environment === 'cloud'}>
-          <WorkspaceContent id={id} />
-        </CollabProvider>
-      </WorkspaceLayoutProvider>
-    </Workspace>
+    <SidebarLayout>
+      <Workspace id={id}>
+        <WorkspaceLayoutProvider id={id}>
+          <CollabProvider workspaceId={id} enabled={environment === 'cloud'}>
+            <WorkspaceContent id={id} />
+          </CollabProvider>
+        </WorkspaceLayoutProvider>
+      </Workspace>
+    </SidebarLayout>
   )
 }
 
@@ -71,14 +73,12 @@ function WorkspaceContent({ id }: WorkspaceRouteProps) {
     layoutLoading || selectedSessionId === undefined || widgets.isLoading || views.isLoading
 
   return (
-    <SidebarLayout>
-      {/* Reset the screen when switching between shared and browser tab state. */}
-      <WorkspaceScreen
-        key={collabEnabled ? 'browser-tab' : 'shared'}
-        contentPending={contentPending}
-        widgets={widgets.data}
-        views={views.data ?? []}
-      />
-    </SidebarLayout>
+    // Reset the screen when switching between shared and browser tab state.
+    <WorkspaceScreen
+      key={collabEnabled ? 'browser-tab' : 'shared'}
+      contentPending={contentPending}
+      widgets={widgets.data}
+      views={views.data ?? []}
+    />
   )
 }

@@ -8,6 +8,8 @@ import { parseHTML } from 'linkedom'
 import { notifyManager, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 import * as config from '@/client/api/app-config'
+import { SidebarLayout } from '@/client/app/shell/sidebar-layout'
+import { AccountProvider } from '@/client/features/account/account-provider'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import * as events from '@/client/runtime/use-workspace-events'
 import type { WorkspaceAgent, HarnessAvailability } from '@/lib/types'
@@ -15,6 +17,7 @@ import { createUiStore } from '@/client/store/ui'
 import { attachmentKey, liveStore, useLive } from '@/client/features/chat/chat-store'
 import { WorkspaceScreen } from '../workspace-screen'
 import * as workspaceContent from '../workspace-content'
+import * as workspaceFrame from '../workspace-frame'
 import { WorkspaceLayoutContext } from '../workspace-layout-context'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import { welcomeNewWorkspace } from './workspace-welcome-state'
@@ -167,6 +170,7 @@ async function mount(
     )
   }
   const contentSpy = spyOn(workspaceContent, 'WorkspaceContent').mockImplementation(Content)
+  const frameSpy = spyOn(workspaceFrame, 'WorkspaceFrame')
   const root = createRoot(document.getElementById('root')!)
   cleanup = async () => {
     await act(async () => {
@@ -176,6 +180,7 @@ async function mount(
     })
     liveStore.setState({ attachments: originalAttachments })
     contentSpy.mockRestore()
+    frameSpy.mockRestore()
     fetchSpy.mockRestore()
     configSpy.mockRestore()
     locationSpy.mockRestore()
@@ -229,6 +234,7 @@ async function mount(
     configSpy,
     document,
     contentSpy,
+    frameSpy,
     update,
     click,
     requests,
@@ -244,8 +250,9 @@ async function mount(
 }
 
 test('signed-out workspace shows only its own login and no workspace content', async () => {
-  const { document, contentSpy } = await mount()
+  const { document, contentSpy, frameSpy } = await mount()
   expect(contentSpy).not.toHaveBeenCalled()
+  expect(frameSpy).not.toHaveBeenCalled()
   expect(document.body.textContent).toContain('Set up ChatGPT')
   expect(
     document.querySelector('[data-slot="workspace-pane"] [aria-label="Workspace setup"]')
@@ -263,10 +270,15 @@ test('fresh readiness from home opens the workspace without another request', as
 })
 
 test('one loading state waits for workspace content after readiness succeeds', async () => {
-  const { document, setContentPending } = await mount({ status: 'available' }, false, false, true)
-  expect(
-    document.querySelector('[data-slot="workspace-pane"] [aria-label="Loading"]')
-  ).not.toBeNull()
+  const { document, setContentPending, frameSpy } = await mount(
+    { status: 'available' },
+    false,
+    false,
+    true
+  )
+  expect(document.querySelector('[aria-label="Loading"]')).not.toBeNull()
+  expect(document.querySelector('[data-slot="workspace-pane"]')).toBeNull()
+  expect(frameSpy).not.toHaveBeenCalled()
   expect(document.querySelector('[aria-label="Workspace setup"]')).toBeNull()
   expect(document.querySelector('[data-content]')).toBeNull()
   await setContentPending(false)
@@ -294,12 +306,47 @@ test('a cold entry shows only a loading spinner until readiness is known', async
     </QueryClientProvider>
   )
   client.clear()
-  expect(html).toContain('data-slot="workspace-pane"')
+  expect(html).not.toContain('data-slot="workspace-pane"')
   expect(html).toContain('aria-label="Loading"')
   expect(html).not.toContain('aria-label="Workspace setup"')
   expect(html).not.toContain('Checking your agent')
   expect(html).not.toContain('<h1')
   expect(html).not.toContain('Workspace content')
+})
+
+test('the app sidebar renders known workspaces while the workspace area waits for readiness', async () => {
+  await mount(undefined, true)
+  const client = new QueryClient()
+  client.setQueryData(workspaceKeys.all, [
+    {
+      id: 'cold',
+      name: 'My workspace',
+      path: '/tmp/cold',
+      type: 'codex',
+      addedAt: '2026-01-01T00:00:00Z'
+    }
+  ])
+  try {
+    const html = renderToStaticMarkup(
+      <QueryClientProvider client={client}>
+        <router.Router ssrPath="/workspace/cold">
+          <AccountProvider>
+            <SidebarLayout>
+              <ScreenFixture workspaceId="cold" contentPending />
+            </SidebarLayout>
+          </AccountProvider>
+        </router.Router>
+      </QueryClientProvider>
+    )
+    const { document } = parseHTML(`<html><body>${html}</body></html>`)
+    expect(document.querySelector('aside a[aria-label="Home"]')).not.toBeNull()
+    expect(document.querySelector('aside a[href="/workspace/cold"]')).not.toBeNull()
+    expect(document.querySelector('main [aria-label="Loading"]')).not.toBeNull()
+    expect(document.querySelector('main [data-slot="workspace-pane"]')).toBeNull()
+    expect(document.querySelector('main [aria-label="Workspace setup"]')).toBeNull()
+  } finally {
+    client.clear()
+  }
 })
 
 test('expiry unmounts content and portals, then restores stored drafts and attachments', async () => {
@@ -418,7 +465,7 @@ test('cached sign-out waits for verification without briefly showing login', asy
 
 test('confirmed sign-out shows login and keeps it visible while retrying', async () => {
   const check = Promise.withResolvers<HarnessAvailability>()
-  const { document, client, key, setCheck } = await mount(
+  const { document, client, key, setCheck, frameSpy } = await mount(
     undefined,
     false,
     false,
@@ -426,14 +473,16 @@ test('confirmed sign-out shows login and keeps it visible while retrying', async
     check.promise
   )
   expect(document.body.textContent).not.toContain('Set up ChatGPT')
-  const pane = document.querySelector('[data-slot="workspace-pane"]')
-  expect(pane).not.toBeNull()
+  expect(document.querySelector('[data-slot="workspace-pane"]')).toBeNull()
+  expect(frameSpy).not.toHaveBeenCalled()
   expect(document.querySelector('[aria-label="Workspace setup"]')).toBeNull()
   await act(async () => {
     check.resolve({ status: 'login-required', reason: 'Signed out' })
     await Bun.sleep(20)
   })
-  expect(document.querySelector('[data-slot="workspace-pane"]')).toBe(pane)
+  const pane = document.querySelector('[data-slot="workspace-pane"]')
+  expect(pane).not.toBeNull()
+  expect(frameSpy).not.toHaveBeenCalled()
   expect(pane?.querySelector('[aria-label="Workspace setup"]')).not.toBeNull()
   expect(document.body.textContent).toContain('Set up ChatGPT')
   const retry = Promise.withResolvers<HarnessAvailability>()
