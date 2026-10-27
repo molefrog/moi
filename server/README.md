@@ -17,7 +17,7 @@ WebSocket handlers, and CLI commands call the same feature modules.
 | `scratchpad/`      | Canvas documents, assets, headless drawing, and browser screenshot requests.                                                                                                                                                            |
 | `skills/`          | Bundled workspace skill installation, version checks, and updates. These modules manage the copies shipped under `workspace/`.                                                                                                          |
 | `harness/`         | Provider adapters, transports, sessions, discovery, authentication, and readiness. See [the harness guide](harness/README.md).                                                                                                          |
-| `collab/`          | Optional collaboration workers, presence, proxy identity, and the collaboration skill.                                                                                                                                                  |
+| `collab/`          | Cloud collaboration workers, presence, proxy identity, and the optional collaboration skill.                                                                                                                                            |
 | `test/`            | Integration tests and existing tests that share fixtures. Other unit tests live beside their modules.                                                                                                                                   |
 
 Use direct module imports such as `workspaces/registry` or `sessions/store`.

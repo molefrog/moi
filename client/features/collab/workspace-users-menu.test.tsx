@@ -62,6 +62,23 @@ function renderUsers(options: FakeEngineOptions, list = false) {
   )
 }
 
+test('menu is hidden for a single member even with multiple open tabs', () => {
+  expect(
+    renderUsers({
+      self,
+      users: [self],
+      otherConnections: [connection(self, 'scratchpad')]
+    })
+  ).toBe('')
+})
+
+test('menu remains visible when other members are offline', () => {
+  const html = renderUsers({ self, users: [self, ...offline] })
+  expect(html).toContain('aria-label="Users in this workspace"')
+  expect(html).toContain('aria-label="Self"')
+  expect(html).not.toContain('Offline colleague')
+})
+
 test('avatar group includes self and connected peers, excluding offline users', () => {
   const html = renderUsers({
     self,

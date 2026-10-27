@@ -24,7 +24,7 @@ beforeEach(async () => {
   await Bun.write(
     join(bin, 'bun'),
     '#!/bin/sh\n' +
-      `printf '{"entry":"%s","cwd":"%s","command":"%s","flag":"%s","dev":"%s","server":"%s"}\\n' "$1" "$PWD" "$2" "$3" "$MOI_DEV" "$MOI_SERVER" > "$COLLAB_CAPTURE_PATH"\n`
+      `printf '{"entry":"%s","cwd":"%s","command":"%s","flag":"%s","dev":"%s","server":"%s","environment":"%s"}\\n' "$1" "$PWD" "$2" "$3" "$MOI_DEV" "$MOI_SERVER" "$MOI_ENVIRONMENT" > "$COLLAB_CAPTURE_PATH"\n`
   )
   await chmod(join(bin, 'bun'), 0o755)
   await Bun.write(
@@ -41,6 +41,7 @@ beforeEach(async () => {
     MOI_SERVICE: undefined,
     MOI_DEMO: undefined,
     MOI_DEV: undefined,
+    MOI_ENVIRONMENT: 'local',
     // A legacy environment setting does not enable plain start.
     MOI_COLLAB: '1',
     COLLAB_CAPTURE_PATH: capturePath,
@@ -86,6 +87,7 @@ async function capturedServerLaunch(): Promise<{
   flag: string
   dev: string
   server: string
+  environment: string
 }> {
   const deadline = Date.now() + 10_000
   while (Date.now() < deadline) {
@@ -99,21 +101,19 @@ async function capturedServerLaunch(): Promise<{
   throw new Error('The CLI did not launch its server child')
 }
 
-describe('collab runtime CLI flag', () => {
+describe('collab deployment environment', () => {
   for (const dev of [false, true]) {
-    for (const enabled of [false, true]) {
-      const args = [
-        'start',
-        ...(dev ? ['--dev'] : []),
-        ...(enabled ? ['--experimental-collab'] : [])
-      ]
-      test(`${args.join(' ')} forwards only the requested runtime flag`, async () => {
+    for (const environment of ['local', 'cloud']) {
+      const args = ['start', ...(dev ? ['--dev'] : [])]
+      test(`${args.join(' ')} preserves the ${environment} environment without a runtime flag`, async () => {
+        env.MOI_ENVIRONMENT = environment
         const child = spawnCli(args)
         const launch = await capturedServerLaunch()
         expect(launch).toMatchObject({
           entry: CLI,
           command: 'start',
-          flag: enabled ? '--experimental-collab' : '',
+          flag: '',
+          environment,
           dev: dev ? '1' : '',
           server: '1'
         })
@@ -134,13 +134,6 @@ describe('collab runtime CLI flag', () => {
       }, 15_000)
     }
   }
-
-  test('an unregistered experimental flag fails before starting the server', async () => {
-    const result = await runCli(['start', '--experimental-unknown'])
-    expect(result.code).not.toBe(0)
-    expect(result.stderr).toContain('Unknown experimental feature: unknown')
-    expect(await Bun.file(capturePath).exists()).toBe(false)
-  }, 15_000)
 })
 
 describe('collab init CLI flag', () => {
@@ -151,7 +144,7 @@ describe('collab init CLI flag', () => {
     expect((await runCli(args)).code).toBe(0)
     expect(await Bun.file(guide).exists()).toBe(false)
     expect(await Bun.file(types).exists()).toBe(false)
-    const initialized = await runCli([...args, '--experimental-collab'])
+    const initialized = await runCli([...args, '--collab'])
     expect(initialized.code).toBe(0)
     expect(initialized.stdout).toContain('Collaboration guide installed')
     expect(await Bun.file(guide).exists()).toBe(true)
@@ -162,20 +155,20 @@ describe('collab init CLI flag', () => {
     expect(await Bun.file(types).exists()).toBe(true)
   }, 30_000)
 
-  test('init --web --experimental-collab installs docs without enabling the runtime', async () => {
-    spawnCli(['init', '--harness=codex', '--web', '--experimental-collab'])
+  test('init --web --collab installs docs without enabling the runtime', async () => {
+    spawnCli(['init', '--harness=codex', '--web', '--collab'])
     expect((await capturedServerLaunch()).flag).toBe('')
     expect(await Bun.file(join(workspace, '.moi', 'collab.d.ts')).exists()).toBe(true)
   }, 15_000)
 
-  test('both commands explain their separate flags in help', async () => {
+  test('only init offers the optional collaboration guide in help', async () => {
     const start = await runCli(['start', '--help'])
     expect(start.code).toBe(0)
-    expect(start.stdout).toContain('--experimental-collab')
-    expect(start.stdout).toContain('Enable experimental collab')
+    expect(start.stdout).not.toContain('--collab')
+    expect(start.stdout).not.toContain('--experimental-collab')
     const init = await runCli(['init', '--help'])
     expect(init.code).toBe(0)
-    expect(init.stdout).toContain('--experimental-collab')
+    expect(init.stdout).toContain('--collab')
     expect(init.stdout).toContain('guide and applet types')
   }, 15_000)
 })

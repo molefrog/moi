@@ -59,4 +59,6 @@ All three must be absolute paths.
 
 ## Not in the config
 
-Experimental features are switched on only with `moi start` flags, such as `--experimental-collab`. User settings live in `settings.json` and change while moi runs.
+Collaboration is enabled automatically when `environment` is `"cloud"` and disabled for `"local"`. The UI and presence server use the same environment setting. Use `moi init --collab` to install the optional collaboration guide and applet types. User settings live in `settings.json` and change while moi runs.
+
+For future startup experiments, see the [ExperimentalFeatures implementation guide](experimental-features.md). It preserves the previous CLI-only flag pattern, including server enforcement and browser config.

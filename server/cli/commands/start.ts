@@ -1,5 +1,3 @@
-import type { ExperimentalFeatures } from '@/lib/experimental'
-import { EXPERIMENTAL_FEATURES, experimentalFlagName } from '@/lib/experimental'
 import { defineCommand } from 'citty'
 import { getAppConfig, initializeAppConfig } from '../../app-config'
 import { CONTROL_PORT, PORT } from '../../constants'
@@ -11,38 +9,15 @@ import { isServerRunning } from '../control'
 import pc from '../pc'
 import { assertDevRuntime, runDevSupervisor, spawnServer } from '../server'
 
-const experimentalArgs = Object.fromEntries(
-  EXPERIMENTAL_FEATURES.map(feature => {
-    const name = experimentalFlagName(feature)
-    const label = name.slice('experimental-'.length).replaceAll('-', ' ')
-    return [name, { type: 'boolean' as const, description: `Enable experimental ${label}` }]
-  })
-)
-
 export const start = defineCommand({
   meta: { name: 'start', description: 'Start the Moi web server' },
   args: {
     port: {
       type: 'string',
       description: 'HTTP port to listen on (default: 13337)'
-    },
-    ...experimentalArgs
+    }
   },
-  async run({ args, rawArgs }) {
-    const knownFlags = new Set(EXPERIMENTAL_FEATURES.map(experimentalFlagName))
-    for (const arg of rawArgs) {
-      if (arg.startsWith('--experimental-') && !knownFlags.has(arg.slice(2))) {
-        throw new Error(`Unknown experimental feature: ${arg.slice('--experimental-'.length)}`)
-      }
-    }
-    const experimental: Partial<ExperimentalFeatures> = {}
-    const experimentalFlags: string[] = []
-    for (const feature of EXPERIMENTAL_FEATURES) {
-      const flag = experimentalFlagName(feature)
-      if (args[flag] !== true) continue
-      experimental[feature] = true
-      experimentalFlags.push(`--${flag}`)
-    }
+  async run({ args }) {
     const projectRoot = PACKAGE_ROOT
     // Undocumented: --dev runs the watch-and-full-restart dev supervisor.
     const dev = process.argv.includes('--dev')
@@ -95,20 +70,18 @@ export const start = defineCommand({
         ...(debug ? { MOI_DEBUG: '1' } : {})
       }
       if (dev) {
-        await runDevSupervisor(projectRoot, env, experimentalFlags)
+        await runDevSupervisor(projectRoot, env)
         return
       }
       const cwd = serverCwd(projectRoot, dev)
-      const proc = spawnServer(cwd, env, experimentalFlags)
-      process.exit(
-        await superviseServerUpdates(proc, () => spawnServer(cwd, env, experimentalFlags))
-      )
+      const proc = spawnServer(cwd, env)
+      process.exit(await superviseServerUpdates(proc, () => spawnServer(cwd, env)))
     }
 
     // This IS the server process (MOI_SERVER=1). cwd is the package root when the
     // dev bundler runs (bunfig loaded at Bun startup) or a neutral dir for a
     // prebuilt install — see serverCwd().
-    initializeAppConfig(experimental)
+    initializeAppConfig()
     try {
       await import('../../web')
     } catch (err) {

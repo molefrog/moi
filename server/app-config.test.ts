@@ -19,7 +19,6 @@ test('defaults apply when no config file exists', () => {
   expect(config).toEqual({
     environment: 'local',
     demo: false,
-    experimental: { collab: false },
     demoInstallUrl: 'https://moi.computer',
     cloudflareAccess: null,
     workspacesDir: null,
@@ -38,7 +37,7 @@ test('config file values override defaults', async () => {
   )
   const config = loadAppConfig(file, NO_ENV)
   expect(config.demo).toBe(true)
-  expect(config.experimental.collab).toBe(false)
+  expect(config).not.toHaveProperty('experimental')
   expect(config.demoInstallUrl).toBe('https://moi.computer/download')
 })
 
@@ -48,7 +47,7 @@ test('env vars override the config file', async () => {
     MOI_DEMO: '0'
   })
   expect(config.demo).toBe(false)
-  expect(config.experimental.collab).toBe(false)
+  expect(config).not.toHaveProperty('experimental')
 })
 
 test('boolean env accepts 1/true/0/false and ignores anything else', () => {
@@ -68,13 +67,7 @@ test('legacy experiment names and collab settings do not enable collaboration', 
     MOI_COLLAB: '1',
     MOI_DEV: '1'
   })
-  expect(config.experimental.collab).toBe(false)
-})
-
-test('only an explicit CLI flag enables collaboration', async () => {
-  const file = await configFile(JSON.stringify({ experimental: { collab: true } }))
-  expect(loadAppConfig(file, NO_ENV).experimental.collab).toBe(false)
-  expect(loadAppConfig(file, NO_ENV, { collab: true }).experimental.collab).toBe(true)
+  expect(config).not.toHaveProperty('experimental')
 })
 
 test('invalid JSON falls back to defaults without throwing', async () => {
@@ -106,7 +99,7 @@ test('wrong-typed keys are dropped individually, valid keys survive', async () =
   )
   const config = loadAppConfig(file, NO_ENV)
   expect(config.demo).toBe(false)
-  expect(config.experimental.collab).toBe(false)
+  expect(config).not.toHaveProperty('experimental')
   expect(config.demoInstallUrl).toBe('https://moi.computer')
 })
 
@@ -139,7 +132,6 @@ test('managed-machine paths come from config.json only, and must be absolute', a
 test('the resolved config is frozen', () => {
   const config = loadAppConfig('/nonexistent', NO_ENV)
   expect(Object.isFrozen(config)).toBe(true)
-  expect(Object.isFrozen(config.experimental)).toBe(true)
 })
 
 const TEAM = 'MOI_CLOUDFLARE_ACCESS_TEAM_DOMAIN'

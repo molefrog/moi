@@ -60,7 +60,7 @@ export function WorkspaceUsersMenu({
     .map(user => user.profile.id)
   const [open, setOpen] = useState(false)
 
-  if (!enabled) return null
+  if (!enabled || workspaceUsers.length <= 1) return null
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

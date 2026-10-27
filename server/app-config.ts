@@ -2,8 +2,7 @@ import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { isAbsolute, join } from 'path'
 
-import type { AppEnvironment, ClientAppConfig, ExperimentalFeatures } from '@/lib/types'
-import { EXPERIMENTAL_DEFAULTS } from '@/lib/experimental'
+import type { AppEnvironment, ClientAppConfig } from '@/lib/types'
 
 import { DATA_DIR } from './data-dir'
 
@@ -13,8 +12,7 @@ import { DATA_DIR } from './data-dir'
 // runtime): config.json describes the deployment itself — nothing here changes
 // without a server restart, and no API writes it.
 //
-// Resolution: defaults < config.json < env. Experimental features are enabled
-// only by explicit CLI flags.
+// Resolution: defaults < config.json < env.
 // A missing file is the normal local case; a malformed file or wrong-typed key
 // warns on stderr and falls back per-key, so a broken config never takes the
 // CLI or server down with it.
@@ -23,7 +21,6 @@ export type AppConfig = {
   // Demo mode: workspace creation is blocked (UI shows the
   // cloud-demo promo dialog instead) and `moi` system commands are disabled.
   demo: boolean
-  experimental: ExperimentalFeatures
   // Link target for the cloud-demo promo dialog.
   demoInstallUrl: string
   // Cloudflare Access (Zero Trust) in front of this deployment: each viewer
@@ -48,12 +45,9 @@ export type CloudflareAccessConfig = {
   audience: readonly string[]
 }
 
-type DeploymentConfig = Omit<AppConfig, 'experimental'>
-
 const DEFAULTS: AppConfig = {
   environment: 'local',
   demo: false,
-  experimental: { ...EXPERIMENTAL_DEFAULTS },
   demoInstallUrl: 'https://moi.computer',
   cloudflareAccess: null,
   workspacesDir: null,
@@ -197,8 +191,8 @@ function readConfigFile(file: string): Record<string, unknown> {
   return parsed as Record<string, unknown>
 }
 
-function fileValues(raw: Record<string, unknown>): Partial<DeploymentConfig> {
-  const out: Partial<DeploymentConfig> = {}
+function fileValues(raw: Record<string, unknown>): Partial<AppConfig> {
+  const out: Partial<AppConfig> = {}
   const environment = parseEnvironment(raw.environment)
   if (environment !== undefined) out.environment = environment
   if (raw.demo !== undefined) {
@@ -221,33 +215,28 @@ function fileValues(raw: Record<string, unknown>): Partial<DeploymentConfig> {
 // Pure resolver, exported for tests. `getAppConfig` is the cached entrypoint.
 export function loadAppConfig(
   file: string = APP_CONFIG_FILE,
-  env: Record<string, string | undefined> = process.env,
-  cliExperimental: Partial<ExperimentalFeatures> = {}
+  env: Record<string, string | undefined> = process.env
 ): AppConfig {
   const raw = readConfigFile(file)
   const fromFile = fileValues(raw)
-  const fromEnv: Partial<DeploymentConfig> = {
+  const fromEnv: Partial<AppConfig> = {
     environment: parseEnvironment(env.MOI_ENVIRONMENT),
     demo: parseBool(env.MOI_DEMO),
     demoInstallUrl: parseString(env.MOI_DEMO_INSTALL_URL)
   }
   const merged = { ...DEFAULTS, ...fromFile }
-  for (const key of Object.keys(fromEnv) as (keyof DeploymentConfig)[]) {
+  for (const key of Object.keys(fromEnv) as (keyof AppConfig)[]) {
     if (fromEnv[key] === undefined) delete fromEnv[key]
   }
   const cloudflareAccess = resolveCloudflareAccess(raw.cloudflareAccess, env)
-  const experimental = Object.freeze({
-    ...DEFAULTS.experimental,
-    ...cliExperimental
-  })
-  return Object.freeze({ ...merged, ...fromEnv, cloudflareAccess, experimental })
+  return Object.freeze({ ...merged, ...fromEnv, cloudflareAccess })
 }
 
 let _config: AppConfig | null = null
 
-// The CLI supplies explicit startup flags before importing the web server.
-export function initializeAppConfig(experimental: Partial<ExperimentalFeatures> = {}): void {
-  _config = loadAppConfig(undefined, undefined, experimental)
+// Resolve deployment settings before importing the web server.
+export function initializeAppConfig(): void {
+  _config = loadAppConfig()
 }
 
 export function getAppConfig(): AppConfig {
@@ -270,6 +259,6 @@ export function resetAppConfig(): void {
 // The only shape that reaches the browser (GET /api/config). Server-only keys
 // added to AppConfig later stay out unless explicitly forwarded here.
 export function clientAppConfig(): ClientAppConfig {
-  const { environment, demo, experimental, demoInstallUrl } = getAppConfig()
-  return { environment, demo, experimental: { ...experimental }, demoInstallUrl }
+  const { environment, demo, demoInstallUrl } = getAppConfig()
+  return { environment, demo, demoInstallUrl }
 }

@@ -3,9 +3,9 @@ import type { WorkspaceType } from '@/lib/types'
 import { getAppConfig } from '../app-config'
 import { collabSkillReferencePath } from './skill'
 
-// Only an explicit startup CLI flag enables this process setting.
+// Collaboration is available only on cloud deployments.
 export function isCollabEnabled(): boolean {
-  return getAppConfig().experimental.collab
+  return getAppConfig().environment === 'cloud'
 }
 
 export async function getCollabReferencePath(

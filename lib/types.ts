@@ -1,6 +1,5 @@
 import type { PreviewBlock, StreamEvent } from './format'
 import type { AppIconId } from './app-icons'
-import type { ExperimentalFeatures } from './experimental'
 import type { MoiContext } from './moi-context'
 import type { WorkspaceTheme } from './themes'
 import type { AttachmentInput, WidgetConfig } from 'moi'
@@ -344,8 +343,7 @@ export type AppSettings = {
 }
 
 // Client-safe startup config, served by GET /api/config. Deployment settings
-// come from config.json and MOI_* env overrides; experimental flags come from
-// explicit CLI options. See server/app-config.ts.
+// come from config.json and MOI_* env overrides. See server/app-config.ts.
 export type AppEnvironment = 'local' | 'cloud'
 
 export type ClientAppConfig = {
@@ -353,12 +351,9 @@ export type ClientAppConfig = {
   // Demo mode: workspace creation is blocked; the UI offers the
   // cloud-demo promo dialog instead.
   demo: boolean
-  experimental: ExperimentalFeatures
   // Link target for the cloud-demo promo dialog.
   demoInstallUrl: string
 }
-
-export type { ExperimentalFeatures } from './experimental'
 
 export type UpdateStatus = {
   runningVersion: string

@@ -8,12 +8,13 @@ import { getCollabReferencePath, isCollabEnabled } from './config'
 import { collabSkillReferencePath } from './skill'
 
 let workspacePath: string
-const envKeys = ['MOI_COLLAB', 'MOI_DEV']
+const envKeys = ['MOI_COLLAB', 'MOI_DEV', 'MOI_ENVIRONMENT']
 let savedEnv: Record<string, string | undefined>
 beforeEach(async () => {
   workspacePath = await mkdtemp(join(tmpdir(), 'moi-collab-config-'))
   savedEnv = Object.fromEntries(envKeys.map(key => [key, process.env[key]]))
   for (const key of envKeys) delete process.env[key]
+  process.env.MOI_ENVIRONMENT = 'local'
   resetAppConfig()
 })
 afterEach(async () => {
@@ -34,40 +35,46 @@ describe('collab startup configuration', () => {
       JSON.stringify({ version: 1, experimental: { collab: true } })
     )
     expect(isCollabEnabled()).toBe(false)
-    expect(clientAppConfig().experimental.collab).toBe(false)
+    expect(clientAppConfig().environment === 'cloud').toBe(false)
     expect(await getCollabReferencePath(workspacePath)).toBeUndefined()
   })
 
-  test('the process flag enables every workspace without configuration or files', async () => {
-    initializeAppConfig({ collab: true })
+  test('the cloud environment enables every workspace without workspace configuration or files', async () => {
+    process.env.MOI_ENVIRONMENT = 'cloud'
+    initializeAppConfig()
     expect(isCollabEnabled()).toBe(true)
-    expect(clientAppConfig().experimental.collab).toBe(true)
+    expect(clientAppConfig().environment === 'cloud').toBe(true)
     expect(await getCollabReferencePath(workspacePath)).toBeUndefined()
     expect(await getCollabReferencePath(join(workspacePath, 'another'))).toBeUndefined()
     expect(await Bun.file(join(workspacePath, '.moi', '.workspace.json')).exists()).toBe(false)
     expect(await Bun.file(collabSkillReferencePath(workspacePath)).exists()).toBe(false)
   })
 
-  test('runtime and client flag stay in agreement across initialization and reset', () => {
-    initializeAppConfig({ collab: true })
+  test('runtime and client environment stay in agreement across initialization and reset', () => {
+    process.env.MOI_ENVIRONMENT = 'cloud'
+    initializeAppConfig()
     expect(isCollabEnabled()).toBe(true)
-    expect(clientAppConfig().experimental.collab).toBe(true)
-    initializeAppConfig({ collab: false })
+    expect(clientAppConfig().environment === 'cloud').toBe(true)
+    process.env.MOI_ENVIRONMENT = 'local'
+    initializeAppConfig()
     expect(isCollabEnabled()).toBe(false)
-    expect(clientAppConfig().experimental.collab).toBe(false)
-    initializeAppConfig({ collab: true })
+    expect(clientAppConfig().environment === 'cloud').toBe(false)
+    process.env.MOI_ENVIRONMENT = 'cloud'
+    initializeAppConfig()
     expect(isCollabEnabled()).toBe(true)
-    expect(clientAppConfig().experimental.collab).toBe(true)
+    expect(clientAppConfig().environment === 'cloud').toBe(true)
+    process.env.MOI_ENVIRONMENT = 'local'
     resetAppConfig()
     expect(isCollabEnabled()).toBe(false)
-    expect(clientAppConfig().experimental.collab).toBe(false)
+    expect(clientAppConfig().environment === 'cloud').toBe(false)
   })
 
   test('returns an installed reference path only when runtime is enabled', async () => {
     const referencePath = collabSkillReferencePath(workspacePath)
     await Bun.write(referencePath, '# Collab')
     expect(await getCollabReferencePath(workspacePath)).toBeUndefined()
-    initializeAppConfig({ collab: true })
+    process.env.MOI_ENVIRONMENT = 'cloud'
+    initializeAppConfig()
     expect(await getCollabReferencePath(workspacePath)).toBe(referencePath)
   })
 })
