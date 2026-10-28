@@ -1,3 +1,5 @@
+import type { FastMode } from '@/lib/types'
+import { isFastMode } from '@/lib/fast-mode'
 import { detectInstalledHarnesses } from '../harness/executable'
 import { isMessageAttachments } from '@/lib/message-attachments'
 import { Hono } from 'hono'
@@ -264,7 +266,7 @@ one.post('/views/:viewId/submit', async c => {
     selectedSessionScope?: SelectedSessionScope
     model?: string
     effort?: string
-    fastMode?: boolean
+    fastMode?: FastMode
     stream?: boolean
     attachments?: unknown
   }>()
@@ -300,7 +302,7 @@ one.post('/views/:viewId/submit', async c => {
       optimisticId: body.optimisticId,
       model: typeof body.model === 'string' ? body.model : undefined,
       effort: typeof body.effort === 'string' ? body.effort : undefined,
-      fastMode: typeof body.fastMode === 'boolean' ? body.fastMode : undefined,
+      fastMode: isFastMode(body.fastMode) ? body.fastMode : undefined,
       stream: body.stream === true ? true : undefined
     })
     return c.json(result)
@@ -548,8 +550,8 @@ one.patch('/sessions/:sessionId/config', async c => {
   }
   if ('fastMode' in record) {
     const value = record.fastMode
-    if (value !== null && typeof value !== 'boolean') {
-      return c.text('fastMode must be a boolean or null', 400)
+    if (value !== null && !isFastMode(value)) {
+      return c.text('fastMode must be a boolean, "ultrafast", or null', 400)
     }
     patch.fastMode = value
   }

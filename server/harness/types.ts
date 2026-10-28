@@ -1,3 +1,4 @@
+import type { FastMode } from '@/lib/types'
 // The harness contract: what an agent backend must implement to be drivable
 // by moi. See README.md in this folder for the full checklist and the
 // message-type layers; each harness's index.ts exports one Harness object
@@ -39,7 +40,7 @@ export type SendMessageInput = {
   optimisticId?: string
   model?: string
   effort?: string
-  fastMode?: boolean
+  fastMode?: FastMode
   stream?: boolean
   // Structured moi context (lib/moi-context.ts). Each harness renders and
   // injects it its own way: Claude Code as a leading system-reminder text

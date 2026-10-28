@@ -25,6 +25,15 @@ afterEach(async () => {
 })
 
 describe('session Fast mode config', () => {
+  test('Ultrafast survives a disk reload and a session rename', async () => {
+    await saveSessionConfig(ws, 'temporary', { fastMode: 'ultrafast' })
+    setWorkspaceStateRoot(scratchDir)
+    expect(await getSessionConfig(ws, 'temporary')).toEqual({ fastMode: 'ultrafast' })
+    await updateWorkspaceState(ws, state => renameSessionEntry(state, 'temporary', 'real'))
+    expect(await getSessionConfig(ws, 'real')).toEqual({ fastMode: 'ultrafast' })
+    await saveSessionConfig(ws, 'real', { fastMode: false })
+    expect(await getSessionConfig(ws, 'real')).toEqual({ fastMode: false })
+  })
   test('preserves explicit false and clears only when asked', async () => {
     await saveSessionConfig(ws, 'session-1', {
       model: 'sonnet',

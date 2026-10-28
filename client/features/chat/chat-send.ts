@@ -1,3 +1,4 @@
+import type { FastMode } from '@/lib/types'
 import type {
   AttachmentInput,
   AttachmentOrigin,
@@ -16,7 +17,7 @@ import { changeWorkspaceStateCache } from '@/client/features/workspace/workspace
 import { attachmentKey, liveStore } from '@/client/features/chat/chat-store'
 import { useUiStore } from '@/client/store/ui'
 import type { StagedAttachment } from '@/client/features/chat/composer/attachments/types'
-import { resolveSelectedModel } from '@/client/features/chat/composer/model-order'
+import { resolveFastMode, resolveSelectedModel } from '@/client/features/chat/composer/model-order'
 import type { MoiUserMessageOptions } from '@/client/features/workspace/moi-context'
 import { STREAM_RESPONSES } from '@/client/lib/flags'
 import { formatChatTitle } from '@/lib/chat-title'
@@ -197,8 +198,8 @@ export function resolveChatRunOptions(
   modelsData: WorkspaceAgent | undefined,
   pickedModel: string | undefined,
   pickedEffort: string | undefined,
-  pickedFastMode?: boolean
-): { model?: string; effort?: string; fastMode?: boolean; stream?: true } {
+  pickedFastMode?: FastMode
+): { model?: string; effort?: string; fastMode?: FastMode; stream?: true } {
   const models = modelsData?.models
   const savedModel =
     !pickedModel || !models || models.some(candidate => candidate.value === pickedModel)
@@ -220,9 +221,9 @@ export function resolveChatRunOptions(
       ? pickedEffort
       : undefined
   const fastMode =
-    pickedFastMode === undefined || !modelInfo || modelInfo.supportsFastMode
-      ? pickedFastMode
-      : false
+    modelInfo && (pickedFastMode !== undefined || modelsData?.provider === 'codex')
+      ? resolveFastMode(modelInfo, pickedFastMode)
+      : pickedFastMode
   const stream = STREAM_RESPONSES && modelsData?.supportsStreaming ? true : undefined
   return {
     model,

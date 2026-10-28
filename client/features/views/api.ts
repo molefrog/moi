@@ -1,3 +1,4 @@
+import type { FastMode } from '@/lib/types'
 import type {
   CompiledView,
   MessageAttachment,
@@ -123,7 +124,7 @@ export type SubmitViewInput = {
   attachments?: MessageAttachment[]
   model?: string
   effort?: string
-  fastMode?: boolean
+  fastMode?: FastMode
   stream?: boolean
 }
 export function useSubmitView(workspaceId: string) {

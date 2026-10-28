@@ -1,3 +1,4 @@
+import { isFastMode } from '@/lib/fast-mode'
 import { mkdir, rename, rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
@@ -65,7 +66,7 @@ function normalizeSession(value: unknown): WorkspaceSessionState {
     const config = {
       ...(typeof model === 'string' ? { model } : {}),
       ...(typeof effort === 'string' ? { effort } : {}),
-      ...(typeof fastMode === 'boolean' ? { fastMode } : {})
+      ...(isFastMode(fastMode) ? { fastMode } : {})
     }
     if (Object.keys(config).length) session.config = config
   }

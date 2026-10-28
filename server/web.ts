@@ -1,3 +1,4 @@
+import { isFastMode } from '@/lib/fast-mode'
 import type { UserProfile } from '@/lib/collab/types'
 import { isMessageAttachments } from '@/lib/message-attachments'
 import type { ClientMessage, StatusSnapshotMessage } from '@/lib/types'
@@ -79,7 +80,7 @@ function isClientMessage(value: unknown): value is ClientMessage {
       (v.optimisticId === undefined || typeof v.optimisticId === 'string') &&
       (v.model === undefined || typeof v.model === 'string') &&
       (v.effort === undefined || typeof v.effort === 'string') &&
-      (v.fastMode === undefined || typeof v.fastMode === 'boolean') &&
+      (v.fastMode === undefined || isFastMode(v.fastMode)) &&
       (v.stream === undefined || typeof v.stream === 'boolean') &&
       (v.context === undefined || isMoiContext(v.context)) &&
       (v.attachments === undefined || isMessageAttachments(v.attachments))

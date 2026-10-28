@@ -18,6 +18,39 @@ import {
 
 const THREAD = 'thread-1'
 
+test('Ultrafast follows advertised capabilities and configured defaults', () => {
+  const model = {
+    id: 'sol',
+    model: 'sol',
+    displayName: 'Sol',
+    serviceTiers: [
+      { id: 'priority', name: 'Fast', description: '' },
+      { id: 'ultrafast', name: 'Ultrafast', description: '' }
+    ]
+  }
+  expect(codexModelToModel(model, 'ultrafast')).toMatchObject({
+    supportsFastMode: true,
+    supportsUltrafastMode: true,
+    defaultFastMode: 'ultrafast'
+  })
+  expect(
+    codexModelToModel({
+      ...model,
+      serviceTiers: undefined,
+      additionalSpeedTiers: ['fast', 'ultrafast']
+    }).supportsUltrafastMode
+  ).toBe(true)
+  expect(
+    codexModelToModel({ ...model, serviceTiers: [], additionalSpeedTiers: ['ultrafast'] })
+      .supportsUltrafastMode
+  ).toBeUndefined()
+  expect(
+    codexModelToModel({ ...model, serviceTiers: [model.serviceTiers[0]] }, 'ultrafast')
+      .defaultFastMode
+  ).toBe(false)
+  expect(codexServiceTierForFastMode('ultrafast')).toBe('ultrafast')
+})
+
 test('current service tiers take precedence over deprecated speed tiers', () => {
   const model = { id: 'm', model: 'm', displayName: 'M', additionalSpeedTiers: ['fast'] }
   expect(codexModelToModel(model).supportsFastMode).toBe(true)
