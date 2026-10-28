@@ -37,6 +37,9 @@ import { resolveWorkspaceEnv } from '../../workspaces/env'
 import { requireHarnessExecutable } from '../executable'
 import type { SendMessageInput } from '../types'
 
+// Claude supports only the original two speed modes.
+type ClaudeSendMessageInput = Omit<SendMessageInput, 'fastMode'> & { fastMode?: boolean }
+
 // Media types Claude vision accepts; uploads.ts guarantees every image upload is
 // normalized to one of these, so the cast on `media_type` below is sound.
 type ImageMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
@@ -80,7 +83,7 @@ type InputQueue = {
 }
 
 type PendingMessage = {
-  input: SendMessageInput
+  input: ClaudeSendMessageInput
   content: MessageContent
   titleSource: string
   turnId: string
@@ -671,7 +674,11 @@ function createLiveSession(input: {
 
 // Accept immediately, but keep the prompt and its settings in Moi until its
 // turn starts. The returned promise settles when the message reaches the SDK.
-export async function sendCCMessage(input: SendMessageInput): Promise<void> {
+export async function sendCCMessage(incoming: SendMessageInput): Promise<void> {
+  const input: ClaudeSendMessageInput = {
+    ...incoming,
+    fastMode: incoming.fastMode === 'ultrafast' ? false : incoming.fastMode
+  }
   const prepared = prepareAttachmentMessage(input.workspaceId, input.content, input.attachments)
   if (!prepared.text) return
   const { content: userContent, parts } = buildUserMessage(prepared)

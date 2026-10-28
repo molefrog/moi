@@ -1,3 +1,4 @@
+import type { FastMode } from '@/lib/types'
 import type { MessageAttachment } from '@/lib/types'
 import { attachmentLabel } from '@/lib/moi-attachments'
 // Live state per (workspaceId, sessionId): display history, native lifecycle,
@@ -905,7 +906,7 @@ type CodexSendInput = {
   optimisticId?: string
   model?: string
   effort?: string
-  fastMode?: boolean
+  fastMode?: FastMode
   stream?: boolean
   // Rendered through native additionalContext or the legacy text envelope.
   context?: MoiContext
