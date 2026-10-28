@@ -14,6 +14,17 @@ function model(value: string, resolvedModel?: string): Model {
   return { value, resolvedModel, displayName: value }
 }
 
+test('Ultrafast selection and defaults follow the selected model capabilities', () => {
+  const supported = { ...model('sol'), supportsFastMode: true, supportsUltrafastMode: true }
+  expect(resolveFastMode(supported, 'ultrafast')).toBe('ultrafast')
+  expect(resolveFastMode({ ...supported, defaultFastMode: 'ultrafast' }, undefined)).toBe(
+    'ultrafast'
+  )
+  expect(resolveFastMode({ ...supported, defaultFastMode: 'ultrafast' }, false)).toBe(false)
+  expect(resolveFastMode({ ...supported, supportsUltrafastMode: false }, 'ultrafast')).toBe(true)
+  expect(resolveFastMode(model('no-speed-modes'), 'ultrafast')).toBe(false)
+})
+
 describe('sortModelsByProviderOrder', () => {
   test('orders Anthropic model families while preserving SDK order within each family', () => {
     const models = [
