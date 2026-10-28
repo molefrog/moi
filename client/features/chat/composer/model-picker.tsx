@@ -3,6 +3,7 @@ import { type ComponentProps, type ReactNode, memo, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 
 import { IconBolt, IconBoltFilled } from '@tabler/icons-react'
+import { IconUltrafast } from '@/client/components/shared/ultrafast-icon'
 
 import { useSaveSessionConfig, useSessionState } from '../sessions/api'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
@@ -113,24 +114,6 @@ function ModelDropdown({ current, model, models, onValueChange }: ModelDropdownP
   )
 }
 
-type UltrafastIconProps = { size: 16 | 20 }
-
-function UltrafastIcon({ size }: UltrafastIconProps) {
-  const stroke = size === 16 ? 1.75 : 1.5
-  return (
-    <span
-      aria-hidden="true"
-      className={cn(
-        'relative inline-block shrink-0 text-primary',
-        size === 16 ? 'size-4' : 'size-5'
-      )}
-    >
-      <IconBolt className="absolute inset-0 size-full translate-x-0.5" stroke={stroke} />
-      <IconBoltFilled className="absolute inset-0 size-full -translate-x-0.5" stroke={stroke} />
-    </span>
-  )
-}
-
 type FastModeToggleProps = {
   fastMode: FastMode
   supportsFastMode: boolean
@@ -170,7 +153,7 @@ function FastModeToggle({
             className="-my-1 -mr-1"
           >
             {fastMode === 'ultrafast' ? (
-              <UltrafastIcon size={16} />
+              <IconUltrafast className="text-primary" stroke={1.75} />
             ) : fastMode ? (
               <IconBoltFilled className="text-primary" stroke={1.75} />
             ) : (
@@ -235,7 +218,7 @@ function EffortPicker({
             label={displayedLabel}
             leadingIcon={
               fastMode === 'ultrafast' ? (
-                <UltrafastIcon size={20} />
+                <IconUltrafast className="text-primary" stroke={1.5} />
               ) : fastMode ? (
                 <IconBolt stroke={1.5} />
               ) : undefined
