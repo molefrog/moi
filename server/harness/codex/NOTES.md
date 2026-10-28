@@ -125,7 +125,8 @@ to `additionalSpeedTiers: ["fast"]`. Ultrafast uses the same capability check fo
 The picker cycles regular → fast → ultrafast → regular, skipping unavailable
 tiers. Existing boolean preferences remain valid; the third value is
 `"ultrafast"`. A non-null configured tier takes precedence
-over the catalog default.
+over the catalog default. Both `fast` and `priority` config values select Fast;
+outgoing requests use the canonical `priority` tier.
 
 | Moi fast-mode setting | Native `serviceTier`                     |
 | --------------------- | ---------------------------------------- |
