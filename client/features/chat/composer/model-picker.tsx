@@ -113,6 +113,24 @@ function ModelDropdown({ current, model, models, onValueChange }: ModelDropdownP
   )
 }
 
+type UltrafastIconProps = { size: 16 | 20 }
+
+function UltrafastIcon({ size }: UltrafastIconProps) {
+  const stroke = size === 16 ? 1.75 : 1.5
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        'relative inline-block shrink-0 text-primary',
+        size === 16 ? 'size-4' : 'size-5'
+      )}
+    >
+      <IconBolt className="absolute inset-0 size-full translate-x-0.5" stroke={stroke} />
+      <IconBoltFilled className="absolute inset-0 size-full -translate-x-0.5" stroke={stroke} />
+    </span>
+  )
+}
+
 type FastModeToggleProps = {
   fastMode: FastMode
   supportsFastMode: boolean
@@ -149,9 +167,11 @@ function FastModeToggle({
             aria-label={`Speed: ${label}. Switch to ${nextLabel}`}
             aria-pressed={fastMode !== false}
             onClick={() => onChange(nextMode)}
-            className={cn('-my-1 -mr-1', fastMode === 'ultrafast' && 'ring-2 ring-primary/30')}
+            className="-my-1 -mr-1"
           >
-            {fastMode ? (
+            {fastMode === 'ultrafast' ? (
+              <UltrafastIcon size={16} />
+            ) : fastMode ? (
               <IconBoltFilled className="text-primary" stroke={1.75} />
             ) : (
               <IconBolt className="text-muted-foreground" stroke={1.75} />
@@ -215,7 +235,7 @@ function EffortPicker({
             label={displayedLabel}
             leadingIcon={
               fastMode === 'ultrafast' ? (
-                <IconBoltFilled className="text-primary" stroke={1.5} />
+                <UltrafastIcon size={20} />
               ) : fastMode ? (
                 <IconBolt stroke={1.5} />
               ) : undefined
