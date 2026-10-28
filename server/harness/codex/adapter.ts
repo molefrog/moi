@@ -220,7 +220,8 @@ export function codexModelToModel(m: CodexModel, configuredServiceTier?: string 
           defaultFastMode:
             supportsUltrafastMode && defaultServiceTier === 'ultrafast'
               ? 'ultrafast'
-              : supportsFastMode && defaultServiceTier === CODEX_FAST_SERVICE_TIER
+              : supportsFastMode &&
+                (defaultServiceTier === CODEX_FAST_SERVICE_TIER || defaultServiceTier === 'fast')
         }
       : {})
   }
