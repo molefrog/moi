@@ -67,6 +67,9 @@ jobs:
         run: bun run typecheck
 
       - name: Test
+        # Match CI: headless tests use the file-backed secret store.
+        env:
+          MOI_SECRET_BACKEND: file
         run: bun test
 
       - name: Pack and inspect package
