@@ -56,14 +56,13 @@ Read [TESTING.md](TESTING.md) when deciding what test coverage a change needs.
 ### Dev mode
 
 Use the Bun version in `package.json`'s `packageManager` field or newer.
-The dev launcher checks this; after upgrading Bun, restart `bun run dev` once.
 
 `bun run dev` starts a small supervisor that runs the server **without `bun --hot`**:
 
-- **Frontend (`client/`)** — updated by `Bun.serve`'s dev bundler (HMR). Accepted component edits refresh in place; unaccepted updates automatically reload the page. Neither requires a server restart.
+- **Frontend (`client/`)** — changes refresh components or reload the page automatically. No server restart needed.
 - **Server (`server/`, `lib/`)** — the supervisor watches these and does a **full process restart** on change (graceful `SIGTERM` → close servers, kill function workers, respawn). Module state is rebuilt cleanly each time.
 
-Do **not** start the server with `bun --hot server/web.ts`: `bun --hot` soft-reloads server modules in place, which churns the dev bundler's chunk hashes and serves **stale frontend bundles** (the symptom: edits don't show up, browser keeps old code). The supervisor exists specifically to avoid this. `moi start --dev` uses the same supervisor as `bun run dev`.
+Do **not** use `bun --hot server/web.ts`; it can leave the browser serving stale frontend bundles. `moi start --dev` uses the same supervisor as `bun run dev`.
 
 Only one server runs at a time — it binds port 13337 (HTTP) and 13059 (control). To restart, kill the existing `bun run dev` process and start it again; a second instance fails on the control port.
 
