@@ -20,9 +20,9 @@ import { startHmrWatchdog } from './runtime/hmr-watchdog'
 // bundle/vendor boundary. The one missing piece was that the externalized
 // virtual modules (`esm:react/jsx-dev-runtime` etc.) were never hot-accepted,
 // which made EVERY edit propagate to the entry and force a full reload —
-// fixed by the `import.meta.hot.accept()` in externalize-react.ts. Component
-// edits now apply in place; non-component modules (main.tsx, lib/*) still
-// fall back to a full reload via Bun's runtime, which is correct.
+// fixed by the `import.meta.hot.accept()` in externalize-react.ts. Accepted
+// component edits apply in place; updates reaching non-component or mixed
+// exports still fall back to Bun's full reload.
 if (import.meta.hot) {
   startHmrWatchdog()
 }

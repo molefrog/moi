@@ -48,6 +48,9 @@ jobs:
         run: bun run typecheck
 
       - name: Test
+        # Avoid loading Linux keychain libraries into the Sharp test process.
+        env:
+          MOI_SECRET_BACKEND: file
         run: bun test
 
       - name: Pack and inspect package

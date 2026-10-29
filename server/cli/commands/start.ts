@@ -9,7 +9,7 @@ import { superviseServerUpdates } from '../../update'
 import { PACKAGE_ROOT } from '../../version'
 import { isServerRunning } from '../control'
 import pc from '../pc'
-import { runDevSupervisor, spawnServer } from '../server'
+import { assertDevRuntime, runDevSupervisor, spawnServer } from '../server'
 
 const experimentalArgs = Object.fromEntries(
   EXPERIMENTAL_FEATURES.map(feature => {
@@ -46,6 +46,7 @@ export const start = defineCommand({
     const projectRoot = PACKAGE_ROOT
     // Undocumented: --dev runs the watch-and-full-restart dev supervisor.
     const dev = process.argv.includes('--dev')
+    if (dev) assertDevRuntime()
     // Undocumented: --debug turns on the messaging trace (MOI_DEBUG) in the
     // server — console lines for each message/session/turn in the chat pipeline.
     const debug = process.argv.includes('--debug')

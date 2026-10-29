@@ -1,6 +1,18 @@
 import { join } from 'path'
+import { packageManager } from '../../package.json'
 import { PACKAGE_ROOT } from '../version'
 import pc from './pc'
+
+export function assertDevRuntime(version = Bun.version): void {
+  // Reuse CI's baseline; packageManager does not select the local executable.
+  const requiredVersion = packageManager.slice('bun@'.length)
+  if (!Bun.semver.satisfies(version, `>=${requiredVersion}`)) {
+    throw new Error(
+      `Moi development requires Bun ${requiredVersion} or newer (running ${version}). ` +
+        `Run \`bun upgrade --version ${requiredVersion}\`, then restart \`bun run dev\`.`
+    )
+  }
+}
 
 // Spawn the server as a child. MOI_SERVER=1 tells the child it is the actual
 // server process. No `--hot`: frontend HMR comes from Bun.serve's dev bundler,
@@ -11,7 +23,13 @@ export function spawnServer(
   env: Record<string, string | undefined> = process.env,
   experimentalFlags: string[] = []
 ): ReturnType<typeof Bun.spawn> {
-  const argv = ['bun', join(PACKAGE_ROOT, 'server', 'cli.ts'), 'start', ...experimentalFlags]
+  // Keep the checked runtime instead of resolving a different Bun on PATH.
+  const argv = [
+    process.execPath,
+    join(PACKAGE_ROOT, 'server', 'cli.ts'),
+    'start',
+    ...experimentalFlags
+  ]
   return Bun.spawn(argv, {
     stdin: 'inherit',
     stdout: 'inherit',
