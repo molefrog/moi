@@ -337,6 +337,7 @@ export type SessionInfo = SessionSummary & { tabId?: WorkspaceTabId }
 // dir and exposed via GET/PATCH /api/settings. Every key has a default, so
 // GET always returns a complete object.
 export type AppSettings = {
+  showOnboarding: boolean
   // Apply bundled workspace-skill updates automatically when a workspace
   // with outdated skills is opened, instead of prompting each time.
   autoUpdateSkills: boolean

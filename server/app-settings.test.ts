@@ -32,28 +32,47 @@ describe('app settings API', () => {
     const settings = (await response.json()) as AppSettings
 
     expect(response.status).toBe(200)
-    expect(settings).toEqual({ autoUpdateSkills: false })
+    expect(settings).toEqual({ autoUpdateSkills: false, showOnboarding: true })
+  })
+
+  test('existing settings without the flag get onboarding, saved false survives restart', async () => {
+    await Bun.write(join(tempDir, 'settings.json'), JSON.stringify({ autoUpdateSkills: true }))
+    setAppSettingsDir(tempDir)
+    expect(await (await api.request('/api/settings')).json()).toEqual({
+      autoUpdateSkills: true,
+      showOnboarding: true
+    })
+    await api.request('/api/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ showOnboarding: false })
+    })
+    setAppSettingsDir(tempDir)
+    expect((await (await api.request('/api/settings')).json()).showOnboarding).toBe(false)
   })
 
   test('persists a patched setting to settings.json', async () => {
     const response = await api.request('/api/settings', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ autoUpdateSkills: true })
+      body: JSON.stringify({ autoUpdateSkills: true, showOnboarding: false })
     })
     const settings = (await response.json()) as AppSettings
 
     expect(response.status).toBe(200)
     expect(settings.autoUpdateSkills).toBe(true)
     expect(JSON.parse(await Bun.file(join(tempDir, 'settings.json')).text())).toEqual({
-      autoUpdateSkills: true
+      autoUpdateSkills: true,
+      showOnboarding: false
     })
 
     const readBack = await api.request('/api/settings')
     expect(((await readBack.json()) as AppSettings).autoUpdateSkills).toBe(true)
 
     // Other open clients learn about the change over the live-event channel.
-    expect(published).toEqual([{ type: 'settings:updated', settings: { autoUpdateSkills: true } }])
+    expect(published).toEqual([
+      { type: 'settings:updated', settings: { autoUpdateSkills: true, showOnboarding: false } }
+    ])
   })
 
   test('rejects a non-boolean flag and unknown-only patches change nothing', async () => {
@@ -70,6 +89,9 @@ describe('app settings API', () => {
       body: JSON.stringify({ nope: true })
     })
     expect(unknown.status).toBe(200)
-    expect((await unknown.json()) as AppSettings).toEqual({ autoUpdateSkills: false })
+    expect((await unknown.json()) as AppSettings).toEqual({
+      autoUpdateSkills: false,
+      showOnboarding: true
+    })
   })
 })
