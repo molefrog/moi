@@ -11,7 +11,14 @@ export function spawnServer(
   env: Record<string, string | undefined> = process.env,
   experimentalFlags: string[] = []
 ): ReturnType<typeof Bun.spawn> {
-  const argv = ['bun', join(PACKAGE_ROOT, 'server', 'cli.ts'), 'start', ...experimentalFlags]
+  // Keep the runtime checked by the launcher; resolving `bun` on PATH again
+  // can select an older installation for the child (and every restart).
+  const argv = [
+    process.execPath,
+    join(PACKAGE_ROOT, 'server', 'cli.ts'),
+    'start',
+    ...experimentalFlags
+  ]
   return Bun.spawn(argv, {
     stdin: 'inherit',
     stdout: 'inherit',
