@@ -19,14 +19,18 @@ beforeEach(async () => {
   await Bun.write(join(workspace, '.moi', 'package.json'), '{}\n')
   const bin = join(directory, 'bin')
   await mkdir(bin)
-  // The real CLI runs under process.execPath. Its spawned server goes through
-  // this stub so we can assert the launch boundary without starting moi.
+  // The CLI's child runtime is stubbed so we can inspect launch arguments
+  // without starting Moi. Cover both execPath and PATH-based child launches.
   await Bun.write(
     join(bin, 'bun'),
     '#!/bin/sh\n' +
       `printf '{"entry":"%s","cwd":"%s","command":"%s","flag":"%s","dev":"%s","server":"%s"}\\n' "$1" "$PWD" "$2" "$3" "$MOI_DEV" "$MOI_SERVER" > "$COLLAB_CAPTURE_PATH"\n`
   )
   await chmod(join(bin, 'bun'), 0o755)
+  await Bun.write(
+    join(directory, 'preload.ts'),
+    `process.execPath = ${JSON.stringify(join(bin, 'bun'))}\n`
+  )
   env = {
     ...process.env,
     PATH: `${bin}:${process.env.PATH ?? ''}`,
@@ -53,7 +57,8 @@ afterEach(async () => {
 })
 
 function spawnCli(args: string[]) {
-  const child = Bun.spawn([process.execPath, CLI, ...args], {
+  const preload = join(directory, 'preload.ts')
+  const child = Bun.spawn([process.execPath, '--preload', preload, CLI, ...args], {
     cwd: workspace,
     stdin: 'ignore',
     stdout: 'pipe',

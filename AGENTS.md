@@ -55,10 +55,8 @@ Read [TESTING.md](TESTING.md) when deciding what test coverage a change needs.
 
 ### Dev mode
 
-Use Bun 1.3.14 or newer (the `packageManager` baseline); the dev launcher
-rejects older runtimes. Bun 1.3.10 can lose TanStack Query re-exports after
-incremental builds. See [development server](docs/development.md) for the
-root cause, upgrade steps, and browser-reload behavior.
+Use the Bun version in `package.json`'s `packageManager` field or newer.
+The dev launcher checks this; after upgrading Bun, restart `bun run dev` once.
 
 `bun run dev` starts a small supervisor that runs the server **without `bun --hot`**:
 

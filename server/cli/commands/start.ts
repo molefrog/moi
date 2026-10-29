@@ -8,9 +8,8 @@ import { queryServerInfo, webAddress } from '../../service'
 import { superviseServerUpdates } from '../../update'
 import { PACKAGE_ROOT } from '../../version'
 import { isServerRunning } from '../control'
-import { assertDevRuntime } from '../dev-runtime'
 import pc from '../pc'
-import { runDevSupervisor, spawnServer } from '../server'
+import { assertDevRuntime, runDevSupervisor, spawnServer } from '../server'
 
 const experimentalArgs = Object.fromEntries(
   EXPERIMENTAL_FEATURES.map(feature => {

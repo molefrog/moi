@@ -22,8 +22,7 @@ import { startHmrWatchdog } from './runtime/hmr-watchdog'
 // which made EVERY edit propagate to the entry and force a full reload —
 // fixed by the `import.meta.hot.accept()` in externalize-react.ts. Accepted
 // component edits apply in place; updates reaching non-component or mixed
-// exports still fall back to Bun's full reload. Dependency barrel rebuilds
-// can also take that path — see docs/development.md.
+// exports still fall back to Bun's full reload.
 if (import.meta.hot) {
   startHmrWatchdog()
 }
