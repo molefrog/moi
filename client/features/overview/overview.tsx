@@ -38,15 +38,13 @@ type NoWidgetsCreatedProps = {
 
 function NoWidgetsCreated({ onCreateWidget, showOnboarding }: NoWidgetsCreatedProps) {
   return (
-    <div className="relative grid size-full grid-cols-4 grid-rows-2 gap-2 overflow-hidden">
-      <div className="col-span-2 overflow-hidden rounded-2xl bg-muted texture-checker squircle">
-        <div className="flex size-full items-start justify-start bg-radial-[at_top_left] from-muted from-40% to-transparent p-12">
+    <div className="relative grid size-full grid-cols-2 grid-rows-1 gap-2 overflow-hidden">
+      <div className="overflow-hidden rounded-2xl bg-muted texture-checker squircle">
+        <div className="flex size-full items-center justify-start bg-linear-to-r from-muted from-40% to-transparent p-12">
           <h2 className="text-2xl font-semibold text-foreground">Widgets</h2>
         </div>
       </div>
-      <div className="col-span-2 overflow-hidden rounded-2xl bg-muted texture-checker squircle" />
-      <div className="col-span-2 overflow-hidden rounded-2xl bg-muted texture-checker squircle" />
-      <div className="col-span-2 overflow-hidden rounded-2xl bg-muted texture-checker squircle">
+      <div className="overflow-hidden rounded-2xl bg-muted texture-checker squircle">
         {showOnboarding && (
           <div className="flex size-full items-end justify-end">
             <span className="m-8 max-w-56 text-right text-sm text-muted-foreground">
@@ -60,11 +58,11 @@ function NoWidgetsCreated({ onCreateWidget, showOnboarding }: NoWidgetsCreatedPr
         variant="outline"
         className={cn(
           'absolute inset-0 m-auto h-fit w-fit',
-          'flex-col gap-1 rounded-2xl border-0 py-4 pr-12 pl-12! text-xs shadow-sm transition-shadow duration-300 ease-out squircle hover:bg-background hover:shadow-lg [&_svg]:size-8'
+          'flex-col gap-1 rounded-2xl border-0 py-4 pr-8 pl-8! text-xs shadow-sm transition-shadow duration-300 ease-out squircle hover:bg-background hover:shadow-lg [&_svg]:size-8'
         )}
         onClick={onCreateWidget}
       >
-        <IconPlus data-icon="inline-start" stroke={1} />
+        <IconPlus data-icon="inline-start" stroke={1.5} />
         New widget
       </Button>
     </div>

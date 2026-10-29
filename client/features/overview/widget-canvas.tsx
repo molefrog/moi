@@ -74,7 +74,7 @@ function WidgetGrid({
           x: 0,
           y: layout.reduce((bottom, item) => Math.max(bottom, item.y + item.h), 0),
           w: 4,
-          h: 2,
+          h: 1,
           static: true
         }
       ]
