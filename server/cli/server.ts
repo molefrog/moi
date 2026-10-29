@@ -20,10 +20,11 @@ export function assertDevRuntime(version = Bun.version): void {
 // (see runDevSupervisor).
 export function spawnServer(
   cwd: string,
-  env: Record<string, string | undefined> = process.env
+  env: Record<string, string | undefined> = process.env,
+  args: string[] = []
 ): ReturnType<typeof Bun.spawn> {
   // Keep the checked runtime instead of resolving a different Bun on PATH.
-  const argv = [process.execPath, join(PACKAGE_ROOT, 'server', 'cli.ts'), 'start']
+  const argv = [process.execPath, join(PACKAGE_ROOT, 'server', 'cli.ts'), 'start', ...args]
   return Bun.spawn(argv, {
     stdin: 'inherit',
     stdout: 'inherit',

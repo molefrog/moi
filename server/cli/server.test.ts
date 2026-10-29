@@ -19,9 +19,11 @@ test('server children use the launcher runtime even when PATH has no Bun', async
   try {
     // Help exits before opening ports or touching user state, while exercising
     // the real child executable and CLI entrypoint. A bare `bun` cannot launch.
-    const child = spawnServer(PACKAGE_ROOT, { ...process.env, PATH: emptyPath, NO_COLOR: '1' }, [
-      '--help'
-    ])
+    const child = spawnServer(
+      PACKAGE_ROOT,
+      { ...process.env, PATH: emptyPath, MOI_DATA_DIR: join(emptyPath, 'data'), NO_COLOR: '1' },
+      ['--help']
+    )
     expect(await child.exited).toBe(0)
   } finally {
     await rm(emptyPath, { recursive: true, force: true })
