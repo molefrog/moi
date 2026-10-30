@@ -260,7 +260,7 @@ export type ClientMessage =
       effort?: string
       // Opt into the selected model's faster processing mode. Omitted inherits
       // the provider configuration; false explicitly disables a stored default.
-      fastMode?: boolean
+      fastMode?: FastMode
       // Opt into live token-by-token streaming for this turn. Omitted/false runs
       // the current whole-block behavior. Only honored for providers that report
       // `supportsStreaming` (Claude Code); ignored otherwise. Like effort, a
@@ -291,13 +291,16 @@ export type SessionSummary = {
   flavor?: 'chat' | 'cron' | 'subagent'
 }
 
+// Keep existing boolean preferences: false is regular, true is fast.
+export type FastMode = boolean | 'ultrafast'
+
 // Per-chat agent settings, overriding the workspace defaults in
 // `.moi/.workspace.json`. A chat reopens with the model/effort/Fast mode it
 // last ran with; a brand-new chat is seeded from the workspace defaults.
 export type SessionConfig = {
   model?: string
   effort?: string
-  fastMode?: boolean
+  fastMode?: FastMode
 }
 
 export type SessionFork = {
@@ -651,7 +654,7 @@ export type WorkspaceLayout = {
   // Reasoning-effort default for new sessions (a `supportedEffortLevels` value).
   selectedEffort?: string
   // Fast-mode default for new sessions. Undefined inherits the provider setting.
-  selectedFastMode?: boolean
+  selectedFastMode?: FastMode
   theme?: WorkspaceTheme
 }
 
@@ -755,8 +758,9 @@ export type Model = {
   defaultEffort?: string
   supportsAdaptiveThinking?: boolean
   supportsFastMode?: boolean
+  supportsUltrafastMode?: boolean
   // Provider-resolved default when moi has no stored Fast-mode preference.
-  defaultFastMode?: boolean
+  defaultFastMode?: FastMode
   supportsAutoMode?: boolean
 }
 

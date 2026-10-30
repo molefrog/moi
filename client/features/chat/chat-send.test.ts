@@ -237,6 +237,31 @@ describe('Codex model selection', () => {
     ]
   }
 
+  test('sends Ultrafast only to a model that advertises it', () => {
+    const data = {
+      ...catalog,
+      models: catalog.models.map(model => ({ ...model, supportsUltrafastMode: true }))
+    }
+    expect(resolveChatRunOptions(data, 'gpt-5.6-sol', 'low', 'ultrafast').fastMode).toBe(
+      'ultrafast'
+    )
+    expect(resolveChatRunOptions(catalog, 'gpt-5.6-sol', 'low', 'ultrafast').fastMode).toBe(true)
+    expect(resolveChatRunOptions(catalog, 'gpt-5.6-luna', 'low', 'ultrafast').fastMode).toBe(false)
+  })
+
+  test('sends the displayed Codex default and clears inherited tiers on unsupported models', () => {
+    const data = {
+      ...catalog,
+      models: catalog.models.map(model =>
+        model.value === 'gpt-5.6-sol'
+          ? { ...model, supportsUltrafastMode: true, defaultFastMode: 'ultrafast' as const }
+          : model
+      )
+    }
+    expect(resolveChatRunOptions(data, 'gpt-5.6-sol', 'low').fastMode).toBe('ultrafast')
+    expect(resolveChatRunOptions(data, 'gpt-5.6-luna', 'low').fastMode).toBe(false)
+  })
+
   for (const pick of [undefined, 'default', 'gpt-6-astra', 'gpt-5.6-sol']) {
     test(`sends the displayed Sol model for ${pick ?? 'an implicit default'}`, () => {
       const displayed = resolveSelectedModel(catalog.models, pick)

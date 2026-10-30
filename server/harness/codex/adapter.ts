@@ -13,7 +13,7 @@ import type {
   Turn
 } from '@/lib/format'
 import { stripMoiContextLoose } from '@/lib/moi-context'
-import type { McpServer, Model, SessionSummary } from '@/lib/types'
+import type { FastMode, McpServer, Model, SessionSummary } from '@/lib/types'
 
 import type { WorkspaceActivityPreview } from '../types'
 
@@ -134,9 +134,10 @@ export function withCodexTurnDuration(turn: Turn, durationMs: number | null | un
 const CODEX_FAST_SERVICE_TIER = 'priority'
 
 export function codexServiceTierForFastMode(
-  fastMode: boolean | undefined
-): typeof CODEX_FAST_SERVICE_TIER | null | undefined {
+  fastMode: FastMode | undefined
+): typeof CODEX_FAST_SERVICE_TIER | 'ultrafast' | null | undefined {
   if (fastMode === undefined) return undefined
+  if (fastMode === 'ultrafast') return 'ultrafast'
   return fastMode ? CODEX_FAST_SERVICE_TIER : null
 }
 
@@ -192,6 +193,10 @@ export function codexModelToModel(m: CodexModel, configuredServiceTier?: string 
     m.serviceTiers !== undefined
       ? m.serviceTiers.some(tier => tier.id === CODEX_FAST_SERVICE_TIER)
       : (m.additionalSpeedTiers ?? []).includes('fast')
+  const supportsUltrafastMode =
+    m.serviceTiers !== undefined
+      ? m.serviceTiers.some(tier => tier.id === 'ultrafast')
+      : (m.additionalSpeedTiers ?? []).includes('ultrafast')
   // The effective user/project config governs omitted wire values. A null
   // config value leaves the model catalog's default in charge.
   const defaultServiceTier = configuredServiceTier ?? m.defaultServiceTier
@@ -208,10 +213,15 @@ export function codexModelToModel(m: CodexModel, configuredServiceTier?: string 
     ...(m.defaultReasoningEffort && efforts.includes(m.defaultReasoningEffort)
       ? { defaultEffort: m.defaultReasoningEffort }
       : {}),
-    ...(supportsFastMode
+    ...(supportsUltrafastMode ? { supportsUltrafastMode: true } : {}),
+    ...(supportsFastMode || supportsUltrafastMode
       ? {
-          supportsFastMode: true,
-          defaultFastMode: defaultServiceTier === CODEX_FAST_SERVICE_TIER
+          ...(supportsFastMode ? { supportsFastMode: true } : {}),
+          defaultFastMode:
+            supportsUltrafastMode && defaultServiceTier === 'ultrafast'
+              ? 'ultrafast'
+              : supportsFastMode &&
+                (defaultServiceTier === CODEX_FAST_SERVICE_TIER || defaultServiceTier === 'fast')
         }
       : {})
   }

@@ -16,7 +16,8 @@ concurrency:
 jobs:
   check:
     name: Checks (Linux)
-    runs-on: ubuntu-latest
+    # Ubuntu 26.04's native-addon runtime crashes Bun when sharp follows applet builds.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Checkout repository

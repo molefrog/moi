@@ -3,6 +3,7 @@ import { type ComponentProps, type ReactNode, memo, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 
 import { IconBolt, IconBoltFilled } from '@tabler/icons-react'
+import { IconUltrafast } from '@/client/components/shared/ultrafast-icon'
 
 import { useSaveSessionConfig, useSessionState } from '../sessions/api'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
@@ -35,7 +36,7 @@ import { Slider } from '@/client/components/ui/slider'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-layout-context'
 import { cn } from '@/client/lib/cn'
-import type { Model } from '@/lib/types'
+import type { FastMode, Model } from '@/lib/types'
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
@@ -113,9 +114,31 @@ function ModelDropdown({ current, model, models, onValueChange }: ModelDropdownP
   )
 }
 
-type FastModeToggleProps = { fastMode: boolean; onChange: (value: boolean) => void }
+type FastModeToggleProps = {
+  fastMode: FastMode
+  supportsFastMode: boolean
+  supportsUltrafastMode: boolean
+  onChange: (value: FastMode) => void
+}
 
-function FastModeToggle({ fastMode, onChange }: FastModeToggleProps) {
+function FastModeToggle({
+  fastMode,
+  supportsFastMode,
+  supportsUltrafastMode,
+  onChange
+}: FastModeToggleProps) {
+  const nextMode =
+    fastMode === 'ultrafast'
+      ? false
+      : fastMode
+        ? supportsUltrafastMode
+          ? 'ultrafast'
+          : false
+        : supportsFastMode
+          ? true
+          : 'ultrafast'
+  const label = fastMode === 'ultrafast' ? 'Ultrafast' : fastMode ? 'Fast' : 'Regular'
+  const nextLabel = nextMode === 'ultrafast' ? 'ultrafast' : nextMode ? 'fast' : 'regular'
   return (
     <Tooltip>
       <TooltipTrigger
@@ -124,12 +147,14 @@ function FastModeToggle({ fastMode, onChange }: FastModeToggleProps) {
             type="button"
             variant="ghost"
             size="icon-sm"
-            aria-label={fastMode ? 'Turn off fast mode' : 'Turn on fast mode'}
-            aria-pressed={fastMode}
-            onClick={() => onChange(!fastMode)}
+            aria-label={`Speed: ${label}. Switch to ${nextLabel}`}
+            aria-pressed={fastMode !== false}
+            onClick={() => onChange(nextMode)}
             className="-my-1 -mr-1"
           >
-            {fastMode ? (
+            {fastMode === 'ultrafast' ? (
+              <IconUltrafast className="text-primary" stroke={1.75} />
+            ) : fastMode ? (
               <IconBoltFilled className="text-primary" stroke={1.75} />
             ) : (
               <IconBolt className="text-muted-foreground" stroke={1.75} />
@@ -138,8 +163,10 @@ function FastModeToggle({ fastMode, onChange }: FastModeToggleProps) {
         }
       />
       <TooltipContent align="center" className="flex-col gap-0">
-        <span>Fast mode</span>
-        <span className="font-normal text-muted-foreground">More usage</span>
+        <span>{label} mode</span>
+        <span className="font-normal text-muted-foreground">
+          {fastMode ? 'More usage · ' : ''}Switch to {nextLabel}
+        </span>
       </TooltipContent>
     </Tooltip>
   )
@@ -148,9 +175,10 @@ function FastModeToggle({ fastMode, onChange }: FastModeToggleProps) {
 type EffortPickerProps = {
   currentEffort: string
   effortLevels: readonly string[]
-  fastMode: boolean
-  showFastMode: boolean
-  onFastModeChange: (value: boolean) => void
+  fastMode: FastMode
+  supportsFastMode: boolean
+  supportsUltrafastMode: boolean
+  onFastModeChange: (value: FastMode) => void
   onValueChange: (value: string) => void
 }
 
@@ -158,7 +186,8 @@ function EffortPicker({
   currentEffort,
   effortLevels,
   fastMode,
-  showFastMode,
+  supportsFastMode,
+  supportsUltrafastMode,
   onFastModeChange,
   onValueChange
 }: EffortPickerProps) {
@@ -187,7 +216,13 @@ function EffortPicker({
         render={
           <PickerTrigger
             label={displayedLabel}
-            leadingIcon={fastMode ? <IconBolt stroke={1.5} /> : undefined}
+            leadingIcon={
+              fastMode === 'ultrafast' ? (
+                <IconUltrafast className="text-primary" stroke={1.5} />
+              ) : fastMode ? (
+                <IconBolt stroke={1.5} />
+              ) : undefined
+            }
             aria-label={`Effort: ${displayedLabel}`}
           />
         }
@@ -223,7 +258,14 @@ function EffortPicker({
                   <span className="text-muted-foreground">Effort</span>
                   <output aria-live="polite">{displayedLabel}</output>
                 </div>
-                {showFastMode && <FastModeToggle fastMode={fastMode} onChange={onFastModeChange} />}
+                {(supportsFastMode || supportsUltrafastMode) && (
+                  <FastModeToggle
+                    fastMode={fastMode}
+                    supportsFastMode={supportsFastMode}
+                    supportsUltrafastMode={supportsUltrafastMode}
+                    onChange={onFastModeChange}
+                  />
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -313,7 +355,7 @@ export const ModelPicker = memo(function ModelPicker({ sessionId }: ModelPickerP
     else setLayout({ selectedEffort: value })
   }
 
-  const setSelectedFastMode = (value: boolean) => {
+  const setSelectedFastMode = (value: FastMode) => {
     if (sessionId) saveSessionConfig.mutate({ sessionId, patch: { fastMode: value } })
     else setLayout({ selectedFastMode: value })
   }
@@ -333,8 +375,13 @@ export const ModelPicker = memo(function ModelPicker({ sessionId }: ModelPickerP
         models={models}
         onValueChange={setSelectedModel}
       />
-      {!showEffort && model.supportsFastMode && (
-        <FastModeToggle fastMode={fastMode} onChange={setSelectedFastMode} />
+      {!showEffort && (model.supportsFastMode || model.supportsUltrafastMode) && (
+        <FastModeToggle
+          fastMode={fastMode}
+          supportsFastMode={model.supportsFastMode === true}
+          supportsUltrafastMode={model.supportsUltrafastMode === true}
+          onChange={setSelectedFastMode}
+        />
       )}
       {showEffort && (
         <EffortPicker
@@ -342,7 +389,8 @@ export const ModelPicker = memo(function ModelPicker({ sessionId }: ModelPickerP
           currentEffort={currentEffort}
           effortLevels={effortLevels}
           fastMode={fastMode}
-          showFastMode={model.supportsFastMode === true}
+          supportsFastMode={model.supportsFastMode === true}
+          supportsUltrafastMode={model.supportsUltrafastMode === true}
           onFastModeChange={setSelectedFastMode}
           onValueChange={setSelectedEffort}
         />
