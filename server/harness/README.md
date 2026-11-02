@@ -352,12 +352,10 @@ describes what Moi exposes, not every RPC available in the upstream protocol.
 
 ## Ephemeral actions
 
-`Harness.runAction` is optional and currently implemented by Claude and Codex.
-It takes a prompt, JSON Schema, and cancellation signal, and returns parsed structured
-output without registering a workspace or visible chat. Callers validate the result
-and control timeouts through the signal. Provider adapters own temporary files and
-fixed read/search restrictions; chat history is not injected automatically.
-Onboarding owns its prompt, suggestion validation, and job persistence.
+Claude and Codex support `Harness.runAction` for read/search tasks without a workspace
+or visible chat. Pass a prompt, Zod `resultSchema`, and cancellation signal to get a
+validated, typed result. For progress updates, supply `progressSchema` and `onProgress`
+together. See [the action runner](run-action.ts) for implementation details.
 
 ## Design lessons so far
 

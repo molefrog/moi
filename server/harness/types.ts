@@ -3,6 +3,7 @@
 // message-type layers; each harness's index.ts exports one Harness object
 // wrapping its session/adapter/transport modules.
 import type { MessageAttachment } from '@/lib/types'
+import type { ZodType } from 'zod'
 import type { MoiContext } from '@/lib/moi-context'
 import type {
   HarnessAvailability,
@@ -81,19 +82,27 @@ export type DiscoveredWorkspaceCandidate = {
 
 export type HarnessWorkspace = Pick<WorkspaceEntry, 'id' | 'path' | 'type' | 'agentId'>
 
-export type HarnessActionInput = {
+export type HarnessActionInput<TResult = unknown, TProgress = never> = {
   prompt: string
-  schema: Record<string, unknown>
+  resultSchema: ZodType<TResult>
   signal: AbortSignal
-}
+} & (
+  | { progressSchema?: never; onProgress?: never }
+  | {
+      progressSchema: ZodType<TProgress>
+      onProgress: (progress: TProgress) => void | Promise<void>
+    }
+)
 
 export type Harness = {
   id: WorkspaceType
   capabilities: HarnessCapabilities
 
   // Ephemeral read/search action without a workspace or visible chat.
-  // Returns parsed structured output; callers validate it and control timeout.
-  runAction?(input: HarnessActionInput): Promise<unknown>
+  // Validates structured output against resultSchema; callers control timeout.
+  runAction?<TResult, TProgress = never>(
+    input: HarnessActionInput<TResult, TProgress>
+  ): Promise<TResult>
 
   // -- chat lifecycle ---------------------------------------------------------
   sendMessage(input: SendMessageInput): Promise<void>

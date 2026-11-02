@@ -342,15 +342,16 @@ test('creation failures keep the ideas and retry the same operation', async () =
   expect(requests[1].body.operationId).toBe(requests[0].body.operationId)
 })
 
-test('discovery keeps the intro visible and can be cancelled to start from scratch', async () => {
+test('discovery shows reported progress and can be cancelled to start from scratch', async () => {
   const page = await mount(true, false, true, false, undefined, async () =>
-    Response.json({ status: 'running' })
+    Response.json({ status: 'running', progress: { message: 'Reading recent email' } })
   )
   await page.click('ChatGPTOpenAI')
-  const description = page.document.querySelector('h1 + p')?.textContent
   await page.click('Find ideas')
-  expect(page.document.querySelector('h1')?.textContent).toBe('Choose a starting point')
-  expect(page.document.querySelector('h1 + p')?.textContent).toBe(description)
+  expect(page.document.querySelector('h1')?.textContent).toBe('Finding ideas for you')
+  expect(page.document.querySelector('[role="status"]')?.textContent).toContain(
+    'Reading recent email'
+  )
   expect(page.document.querySelector('[role="status"]')?.getAttribute('aria-label')).toBe(
     'Finding ideas'
   )

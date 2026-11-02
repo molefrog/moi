@@ -1,5 +1,20 @@
 import type { AppIconId } from './app-icons'
 import type { WorkspaceTheme } from './themes'
+import { z } from 'zod'
+
+export const discoveryProgressSchema = z
+  .object({
+    message: z
+      .string()
+      .trim()
+      .min(1)
+      .max(160)
+      .describe(
+        'Brief current activity in plain language, such as Reading recent email or Putting together ideas. No private details, names, quotes, or unverified claims.'
+      )
+  })
+  .strict()
+export type DiscoveryProgress = z.infer<typeof discoveryProgressSchema>
 
 export type OnboardingHarness = 'claude-code' | 'codex'
 export type OnboardingAppletPlan = {
@@ -25,6 +40,7 @@ export type WorkspaceBuild = {
 }
 export type OnboardingJobResult = {
   status: 'running' | 'done' | 'failed'
+  progress?: DiscoveryProgress
   ideas?: OnboardingIdea[]
   workspaceId?: string
   sessionId?: string

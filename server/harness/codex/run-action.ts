@@ -1,12 +1,14 @@
 import { join } from 'node:path'
-import { createHarnessTempDir, removeHarnessTempDir, runHarnessCommand } from '../command'
+import { runHarnessCommand } from '../command'
 import type { HarnessActionInput } from '../types'
 import { requireHarnessExecutable } from '../executable'
+import { actionProgressServerName, executeHarnessAction } from '../run-action'
 export function codexActionCommand(
   executable: string,
   cwd: string,
   schema: string,
-  output: string
+  output: string,
+  progressUrl?: string
 ): string[] {
   return [
     executable,
@@ -40,21 +42,31 @@ export function codexActionCommand(
     'features.multi_agent=false',
     '-c',
     'notify=[]',
+    ...(progressUrl
+      ? ['-c', `mcp_servers.${actionProgressServerName}.url=${JSON.stringify(progressUrl)}`]
+      : []),
     '-'
   ]
 }
 
-export async function runCodexAction(input: HarnessActionInput): Promise<unknown> {
-  if (input.signal.aborted) throw new Error('Action cancelled')
-  const cwd = await createHarnessTempDir()
-  try {
+export async function runCodexAction<TResult, TProgress = never>(
+  input: HarnessActionInput<TResult, TProgress>
+): Promise<TResult> {
+  return executeHarnessAction(input, async action => {
+    const { cwd } = action
     const schema = join(cwd, 'schema.json'),
       output = join(cwd, 'result.json')
-    await Bun.write(schema, JSON.stringify(input.schema))
+    await Bun.write(schema, JSON.stringify(action.resultSchema))
     const result = await runHarnessCommand({
-      command: codexActionCommand(requireHarnessExecutable('codex'), cwd, schema, output),
+      command: codexActionCommand(
+        requireHarnessExecutable('codex'),
+        cwd,
+        schema,
+        output,
+        action.progressUrl
+      ),
       cwd,
-      stdin: input.prompt,
+      stdin: action.prompt,
       signal: input.signal,
       env: Object.fromEntries(
         Object.entries(process.env).filter(
@@ -64,7 +76,5 @@ export async function runCodexAction(input: HarnessActionInput): Promise<unknown
     })
     if (result === null) throw new Error('The agent could not complete the action')
     return JSON.parse(await Bun.file(output).text())
-  } finally {
-    await removeHarnessTempDir(cwd).catch(() => {})
-  }
+  })
 }

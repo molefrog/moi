@@ -132,6 +132,7 @@ export function WorkspaceSetupStep({
   return (
     <DiscoveryIntro
       loading
+      progressMessage={ideas.data?.progress?.message}
       disabled={busy}
       failed={false}
       onFindIdeas={findIdeas}
@@ -143,6 +144,7 @@ export function WorkspaceSetupStep({
 
 type DiscoveryIntroProps = {
   loading?: boolean
+  progressMessage?: string
   disabled: boolean
   failed: boolean
   onFindIdeas: () => void
@@ -151,6 +153,7 @@ type DiscoveryIntroProps = {
 }
 function DiscoveryIntro({
   loading = false,
+  progressMessage,
   disabled,
   failed,
   onFindIdeas,
@@ -160,15 +163,19 @@ function DiscoveryIntro({
   return (
     <OnboardingScreen className="max-w-sm" footer={footer}>
       <div className="flex flex-col items-center gap-2 text-center">
-        <h1 className="text-xl font-medium">Choose a starting point</h1>
-        <p className="text-sm text-muted-foreground">
-          Moi can look through your recent conversations, emails, and connected apps to suggest
-          ideas for you to build
-        </p>
+        <h1 className="text-xl font-medium">
+          {loading ? 'Finding ideas for you' : 'Choose a starting point'}
+        </h1>
+        {!loading && (
+          <p className="text-sm text-muted-foreground">
+            Moi can look through your recent conversations, emails, and connected apps to suggest
+            ideas for you to build
+          </p>
+        )}
       </div>
       <div className="flex flex-col items-center gap-3">
         {loading ? (
-          <DiscoveryProgress />
+          <DiscoveryProgress message={progressMessage} />
         ) : (
           <Button size="lg" disabled={disabled} onClick={onFindIdeas}>
             <IconSearch stroke={1.5} aria-hidden="true" />
@@ -181,10 +188,18 @@ function DiscoveryIntro({
   )
 }
 
-function DiscoveryProgress() {
+type DiscoveryProgressProps = { message?: string }
+function DiscoveryProgress({ message }: DiscoveryProgressProps) {
   return (
-    <div role="status" aria-label="Finding ideas" className="flex h-9 items-center justify-center">
+    <div
+      role="status"
+      aria-label="Finding ideas"
+      className="flex flex-col items-center justify-center gap-3"
+    >
       <Spinner className="size-5 text-muted-foreground" stroke={1.5} />
+      <p className="text-center text-sm text-muted-foreground">
+        {message ?? 'Checking available context…'}
+      </p>
     </div>
   )
 }

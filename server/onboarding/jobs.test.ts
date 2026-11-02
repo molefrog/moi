@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import type { IdeaDiscovery, WorkspaceBuild } from '@/lib/onboarding'
 import { harnessFor } from '../harness/registry'
 import { createOnboardingJobs } from './jobs'
-import { ideasJsonSchema } from './ideas'
+import { ideasSchema } from './ideas'
 import { composeBuildBrief } from './brief'
 import { getWorkspaceConfig, setWorkspaceConfig } from '../workspaces/config'
 import { loadLayout } from '../workspaces/layout'
@@ -84,9 +84,9 @@ test('concurrent polls run discovery once, persist results, and keep separate ru
     directory: dir,
     harnessFor: () => ({
       ...harnessFor('claude-code'),
-      runAction: async () => {
+      runAction: async input => {
         calls++
-        return { options }
+        return input.resultSchema.parse({ options })
       }
     })
   })
@@ -119,7 +119,10 @@ test('skip cancellation wins over a late result and cannot restart the old actio
   const result = Promise.withResolvers<unknown>()
   const jobs = createOnboardingJobs({
     directory: await directory(),
-    harnessFor: () => ({ ...harnessFor('claude-code'), runAction: () => result.promise })
+    harnessFor: () => ({
+      ...harnessFor('claude-code'),
+      runAction: async input => input.resultSchema.parse(await result.promise)
+    })
   })
   const state = progress()
   await jobs.discoverIdeas(state)
@@ -258,7 +261,8 @@ test('restart reconciles an accepted first message without sending it twice', as
 
 for (const type of ['claude-code', 'codex'] as const) {
   test(`discovery dispatches prompt and schema to ${type} and forwards cancellation`, async () => {
-    let input: HarnessActionInput | undefined
+    let input: Pick<HarnessActionInput, 'prompt' | 'resultSchema' | 'signal'> | undefined
+    let report: ((value: unknown) => Promise<void>) | undefined
     const result = Promise.withResolvers<unknown>()
     const jobs = createOnboardingJobs({
       directory: await directory(),
@@ -268,7 +272,11 @@ for (const type of ['claude-code', 'codex'] as const) {
           ...harnessFor(type),
           runAction: async request => {
             input = request
-            return result.promise
+            report = async value => {
+              if (request.progressSchema && request.onProgress)
+                await request.onProgress(request.progressSchema.parse(value))
+            }
+            return request.resultSchema.parse(await result.promise)
           }
         }
       }
@@ -289,10 +297,17 @@ for (const type of ['claude-code', 'codex'] as const) {
     expect(input!.prompt.slice(dates[0].length + 2)).toBe(
       await Bun.file(new URL('./prompt.md', import.meta.url)).text()
     )
-    expect(input?.schema).toEqual(ideasJsonSchema)
+    expect(input?.resultSchema).toBe(ideasSchema)
     expect(input?.signal.aborted).toBe(false)
+    await report!({ message: 'Reading recent email' })
+    expect((await jobs.discoverIdeas(state)).progress).toEqual({ message: 'Reading recent email' })
     await jobs.cancelIdeas(state.runId)
     expect(input?.signal.aborted).toBe(true)
+    await report!({ message: 'Late update' })
+    expect(await jobs.discoverIdeas(state)).toEqual({
+      status: 'failed',
+      error: 'Discovery cancelled'
+    })
     result.resolve({ options })
     await Bun.sleep(10)
   })
@@ -318,9 +333,9 @@ for (const failure of ['provider', 'invalid-output'] as const) {
       directory: await directory(),
       harnessFor: () => ({
         ...harnessFor('codex'),
-        runAction: async () => {
+        runAction: async input => {
           if (failure === 'provider') throw new Error('Provider unavailable')
-          return { options: [] }
+          return input.resultSchema.parse({ options: [] })
         }
       })
     })

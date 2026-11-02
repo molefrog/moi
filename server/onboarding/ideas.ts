@@ -55,7 +55,6 @@ const idea = z
 
 export const onboardingIdeaSchema = idea.extend({ id: z.string().uuid() })
 export const ideasSchema = z.object({ options: z.array(idea).length(3) }).strict()
-export const ideasJsonSchema = z.toJSONSchema(ideasSchema)
 export function parseIdeas(value: unknown): OnboardingIdea[] {
   const result = ideasSchema.parse(value)
   if (new Set(result.options.map(option => option.name.toLowerCase())).size !== 3)

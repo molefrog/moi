@@ -1,6 +1,7 @@
 import { mkdir, rename, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { OnboardingJobResult, IdeaDiscovery, WorkspaceBuild } from '@/lib/onboarding'
+import { discoveryProgressSchema } from '@/lib/onboarding'
 import { DATA_DIR } from '../data-dir'
 import { createdWorkspacesRoot } from '../app-config'
 import { provisionWorkspace } from '../workspaces/init'
@@ -13,7 +14,7 @@ import { harnessFor } from '../harness/registry'
 import { sendWorkspaceMessage } from '../sessions/view-sessions'
 import { resolveRenamedSession, saveSelectedSession } from '../sessions/selected'
 import { readWorkspaceState } from '../workspace-state'
-import { ideasJsonSchema, onboardingIdeaSchema, parseIdeas } from './ideas'
+import { ideasSchema, onboardingIdeaSchema, parseIdeas } from './ideas'
 import { composeBuildBrief } from './brief'
 
 type Job = OnboardingJobResult & {
@@ -115,7 +116,14 @@ export function createOnboardingJobs(overrides: Partial<typeof defaults> = {}) {
           const dates = `Research dates (UTC): today ${dateAgo(0)}; last 30 days start ${dateAgo(30)}; last 60 days start ${dateAgo(60)}.`
           return harness.runAction!({
             prompt: `${dates}\n\n${await Bun.file(new URL('./prompt.md', import.meta.url)).text()}`,
-            schema: ideasJsonSchema,
+            resultSchema: ideasSchema,
+            progressSchema: discoveryProgressSchema,
+            onProgress: update =>
+              locked(key, async () => {
+                const current = await read(key)
+                if (!controller.signal.aborted && current?.status === 'running')
+                  await write(key, { ...current, progress: update })
+              }),
             signal: controller.signal
           })
         })

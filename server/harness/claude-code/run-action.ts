@@ -1,8 +1,13 @@
 import { query, type Query } from '@anthropic-ai/claude-agent-sdk'
 import { claudeCodeSpawn } from '../../agent-launcher'
-import { createHarnessTempDir, removeHarnessTempDir } from '../command'
 import type { HarnessActionInput } from '../types'
 import { requireHarnessExecutable } from '../executable'
+import {
+  type ActionExecution,
+  actionProgressServerName,
+  actionProgressToolName,
+  executeHarnessAction
+} from '../run-action'
 const readTools = new Set([
   'Read',
   'Glob',
@@ -24,7 +29,7 @@ export function canReadTool(
   )
 }
 
-async function claudeAction(input: HarnessActionInput, cwd: string): Promise<unknown> {
+async function claudeAction(input: ActionExecution): Promise<unknown> {
   const controller = new AbortController()
   const abort = () => controller.abort()
   input.signal.addEventListener('abort', abort, { once: true })
@@ -34,7 +39,7 @@ async function claudeAction(input: HarnessActionInput, cwd: string): Promise<unk
     run = query({
       prompt: input.prompt,
       options: {
-        cwd,
+        cwd: input.cwd,
         abortController: controller,
         persistSession: false,
         maxTurns: 24,
@@ -42,7 +47,12 @@ async function claudeAction(input: HarnessActionInput, cwd: string): Promise<unk
         spawnClaudeCodeProcess: claudeCodeSpawn(),
         settingSources: [],
         env: { ...process.env, CLAUDECODE: undefined },
-        outputFormat: { type: 'json_schema', schema: input.schema },
+        outputFormat: { type: 'json_schema', schema: input.resultSchema },
+        mcpServers: input.progressUrl
+          ? {
+              [actionProgressServerName]: { type: 'http', url: input.progressUrl, alwaysLoad: true }
+            }
+          : undefined,
         permissionMode: 'default',
         hooks: {
           PreToolUse: [
@@ -50,7 +60,11 @@ async function claudeAction(input: HarnessActionInput, cwd: string): Promise<unk
               hooks: [
                 async event => {
                   if (event.hook_event_name !== 'PreToolUse') return {}
-                  let allowed = canReadTool(event.tool_name)
+                  let allowed =
+                    canReadTool(event.tool_name) ||
+                    (!!input.progressUrl &&
+                      event.tool_name ===
+                        `mcp__${actionProgressServerName}__${actionProgressToolName}`)
                   if (!allowed && event.tool_name.startsWith('mcp__') && run) {
                     const servers = await run.mcpServerStatus()
                     allowed = servers.some(server =>
@@ -80,9 +94,12 @@ async function claudeAction(input: HarnessActionInput, cwd: string): Promise<unk
       }
     })
     for await (const message of run) {
-      if (message.type === 'result' && message.subtype === 'success')
+      if (message.type === 'result' && message.subtype === 'success' && !message.is_error)
         return message.structured_output
-      if (message.type === 'result') throw new Error('The agent could not complete the action')
+      if (message.type === 'result')
+        throw new Error(
+          message.subtype === 'success' ? message.result : 'The agent could not complete the action'
+        )
     }
     throw new Error('The agent returned no structured output')
   } finally {
@@ -91,12 +108,8 @@ async function claudeAction(input: HarnessActionInput, cwd: string): Promise<unk
   }
 }
 
-export async function runClaudeAction(input: HarnessActionInput): Promise<unknown> {
-  if (input.signal.aborted) throw new Error('Action cancelled')
-  const cwd = await createHarnessTempDir()
-  try {
-    return await claudeAction(input, cwd)
-  } finally {
-    await removeHarnessTempDir(cwd).catch(() => {})
-  }
+export async function runClaudeAction<TResult, TProgress = never>(
+  input: HarnessActionInput<TResult, TProgress>
+): Promise<TResult> {
+  return executeHarnessAction(input, claudeAction)
 }
