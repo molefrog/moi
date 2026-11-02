@@ -44,7 +44,7 @@ describe('collab startup configuration', () => {
     initializeAppConfig()
     expect(isCollabEnabled()).toBe(false)
     expect(clientAppConfig().environment === 'cloud').toBe(true)
-    expect(clientAppConfig().collabEnabled).toBe(false)
+    expect(clientAppConfig().collab).toBe(false)
     expect(await getCollabReferencePath(workspacePath)).toBeUndefined()
     expect(await getCollabReferencePath(join(workspacePath, 'another'))).toBeUndefined()
     expect(await Bun.file(join(workspacePath, '.moi', '.workspace.json')).exists()).toBe(false)

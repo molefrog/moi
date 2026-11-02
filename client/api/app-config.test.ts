@@ -14,7 +14,7 @@ test('startup receives confirmed config while a failed refresh cannot enable a l
   const config: ClientAppConfig = {
     environment: 'local',
     demo: false,
-    collabEnabled: false,
+    collab: false,
     demoInstallUrl: 'https://moi.computer'
   }
   Object.defineProperty(globalThis, 'fetch', {

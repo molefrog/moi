@@ -18,7 +18,7 @@ import { DATA_DIR } from './data-dir'
 // CLI or server down with it.
 export type AppConfig = {
   environment: AppEnvironment
-  collabEnabled: boolean
+  collab: boolean
   // Demo mode: workspace creation is blocked (UI shows the
   // cloud-demo promo dialog instead) and `moi` system commands are disabled.
   demo: boolean
@@ -49,7 +49,7 @@ export type CloudflareAccessConfig = {
 const DEFAULTS: AppConfig = {
   environment: 'local',
   // Temporarily disabled while collaboration is being reconsidered.
-  collabEnabled: false,
+  collab: false,
   demo: false,
   demoInstallUrl: 'https://moi.computer',
   cloudflareAccess: null,
@@ -262,6 +262,6 @@ export function resetAppConfig(): void {
 // The only shape that reaches the browser (GET /api/config). Server-only keys
 // added to AppConfig later stay out unless explicitly forwarded here.
 export function clientAppConfig(): ClientAppConfig {
-  const { environment, collabEnabled, demo, demoInstallUrl } = getAppConfig()
-  return { environment, collabEnabled, demo, demoInstallUrl }
+  const { environment, collab, demo, demoInstallUrl } = getAppConfig()
+  return { environment, collab, demo, demoInstallUrl }
 }

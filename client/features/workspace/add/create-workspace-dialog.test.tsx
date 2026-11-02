@@ -34,7 +34,7 @@ test('create blocks dismissal while submitting and permits it again after failur
   const configSpy = spyOn(config, 'useAppConfig').mockReturnValue({
     environment: 'local',
     demo: false,
-    collabEnabled: false,
+    collab: false,
     demoInstallUrl: ''
   })
   const locationSpy = spyOn(router, 'useLocation').mockReturnValue(['/', () => {}])

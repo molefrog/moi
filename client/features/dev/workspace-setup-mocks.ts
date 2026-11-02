@@ -46,7 +46,7 @@ export function createSetupMocks(
       return Response.json({
         environment,
         demo: false,
-        collabEnabled: false,
+        collab: false,
         demoInstallUrl: ''
       })
     }

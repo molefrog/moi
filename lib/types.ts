@@ -349,7 +349,7 @@ export type AppEnvironment = 'local' | 'cloud'
 
 export type ClientAppConfig = {
   environment: AppEnvironment
-  collabEnabled: boolean
+  collab: boolean
   // Demo mode: workspace creation is blocked; the UI offers the
   // cloud-demo promo dialog instead.
   demo: boolean

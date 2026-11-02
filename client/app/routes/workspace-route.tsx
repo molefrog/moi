@@ -26,13 +26,13 @@ type WorkspaceRouteProps = {
 // Navigation reads the raw browser address so encoded paths and query params
 // are decoded exactly once; the route only owns the workspace ID.
 export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
-  const { collabEnabled } = useAppConfig()
+  const { collab } = useAppConfig()
 
   return (
     <SidebarLayout>
       <Workspace id={id}>
         <WorkspaceLayoutProvider id={id}>
-          <CollabProvider workspaceId={id} enabled={collabEnabled}>
+          <CollabProvider workspaceId={id} enabled={collab}>
             <WorkspaceContent id={id} />
           </CollabProvider>
         </WorkspaceLayoutProvider>

@@ -59,6 +59,6 @@ All three must be absolute paths.
 
 ## Not in the config
 
-Collaboration is temporarily disabled in both cloud and local deployments by `collabEnabled: false` in [server/app-config.ts](../server/app-config.ts). The UI and presence server read the same app config value. It currently has no file or environment override. Use `moi init --collab` to install the optional collaboration guide and applet types. User settings live in `settings.json` and change while moi runs.
+Collaboration is temporarily disabled in both cloud and local deployments by `collab: false` in [server/app-config.ts](../server/app-config.ts). The UI and presence server read the same app config value. It currently has no file or environment override. Use `moi init --collab` to install the optional collaboration guide and applet types. User settings live in `settings.json` and change while moi runs.
 
 For future startup experiments, see the [ExperimentalFeatures implementation guide](experimental-features.md). It preserves the previous CLI-only flag pattern, including server enforcement and browser config.

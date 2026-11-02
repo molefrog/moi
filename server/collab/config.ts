@@ -4,7 +4,7 @@ import { getAppConfig } from '../app-config'
 import { collabSkillReferencePath } from './skill'
 
 export function isCollabEnabled(): boolean {
-  return getAppConfig().collabEnabled
+  return getAppConfig().collab
 }
 
 export async function getCollabReferencePath(

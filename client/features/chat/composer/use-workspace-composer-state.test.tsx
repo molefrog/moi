@@ -57,7 +57,7 @@ test.each([
     const cfg = spyOn(config, 'useAppConfig').mockReturnValue({
       environment: 'local',
       demo,
-      collabEnabled: false,
+      collab: false,
       demoInstallUrl: ''
     })
     const skillUpdates = spyOn(skills, 'useWorkspaceSkillUpdates').mockReturnValue({

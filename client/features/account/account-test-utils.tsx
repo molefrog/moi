@@ -112,7 +112,7 @@ export async function mountAccount({
   const configSpy = spyOn(config, 'useAppConfig').mockReturnValue({
     environment,
     demo,
-    collabEnabled: false,
+    collab: false,
     demoInstallUrl: '/'
   })
   let cloudSession: CloudSession = signedOut
