@@ -1,3 +1,9 @@
+import { mkdtemp, mkdir, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join, basename } from 'node:path'
+import * as appConfig from '../app-config'
+import * as init from '../workspaces/init'
+import { DEFAULT_REGISTRY_PATH, setRegistryPath } from '../workspaces/registry'
 import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test'
 
 import { api } from './index'
@@ -138,5 +144,37 @@ test('creation checks installation without requiring login', async () => {
     expect(authSpy).not.toHaveBeenCalled()
   } finally {
     authSpy.mockRestore()
+  }
+})
+
+test('unnamed workspaces get an available default name and the selected agent', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'moi-empty-workspace-'))
+  setRegistryPath(join(directory, 'registry.json'))
+  const root = spyOn(appConfig, 'createdWorkspacesRoot').mockReturnValue(directory)
+  const provision = spyOn(init, 'provisionWorkspace').mockImplementation(async path => {
+    await mkdir(path, { recursive: true })
+    return { skillsDir: path, scaffold: 'exists', installLogPath: join(path, 'install.log') }
+  })
+  try {
+    for (const [type, name] of [
+      ['codex', 'My workspace'],
+      ['claude-code', 'My workspace 2']
+    ]) {
+      const response = await api.request('/api/workspaces/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type })
+      })
+      expect(response.status).toBe(201)
+      const workspace = await response.json()
+      expect(basename(workspace.path)).toBe(name)
+      expect(workspace.type).toBe(type)
+      expect(provision).toHaveBeenCalledWith(join(directory, name!), type)
+    }
+  } finally {
+    provision.mockRestore()
+    root.mockRestore()
+    setRegistryPath(DEFAULT_REGISTRY_PATH)
+    await rm(directory, { recursive: true, force: true })
   }
 })

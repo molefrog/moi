@@ -1,13 +1,11 @@
+import { createHarnessTempDir, removeHarnessTempDir, runHarnessCommand } from '../command'
 import { getSessionInfo, renameSession, type SDKSessionInfo } from '@anthropic-ai/claude-agent-sdk'
 
 import {
   SESSION_TITLE_SCHEMA,
   SESSION_TITLE_SYSTEM_PROMPT,
   SESSION_TITLE_TIMEOUT_MS,
-  createSessionTitleTempDir,
-  parseGeneratedSessionTitle,
-  removeSessionTitleTempDir,
-  runSessionTitleCommand
+  parseGeneratedSessionTitle
 } from '../session-title'
 import { requireHarnessExecutable } from '../executable'
 
@@ -61,8 +59,8 @@ export async function generateClaudeSessionTitle(input: {
   )
   let tempDir: string | undefined
   try {
-    tempDir = await createSessionTitleTempDir()
-    const output = await runSessionTitleCommand({
+    tempDir = await createHarnessTempDir()
+    const output = await runHarnessCommand({
       command: claudeSessionTitleCommand(requireHarnessExecutable('claude-code')),
       cwd: tempDir,
       stdin: JSON.stringify({ sessionTitleSource: input.source }),
@@ -72,7 +70,7 @@ export async function generateClaudeSessionTitle(input: {
     return output ? parseClaudeSessionTitleOutput(output) : null
   } finally {
     clearTimeout(timer)
-    if (tempDir) await removeSessionTitleTempDir(tempDir).catch(() => {})
+    if (tempDir) await removeHarnessTempDir(tempDir).catch(() => {})
   }
 }
 

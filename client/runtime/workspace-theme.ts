@@ -26,9 +26,14 @@ const WORKSPACE_COLOR_PROPERTIES = THEME_COLOR_TOKENS.map(
   token => [token, themeColorProperty(token)] as const
 )
 const WORKSPACE_RADIUS_PROPERTY = '--radius' as const
+const WORKSPACE_COLOR_ALIASES = {
+  '--secondary': 'var(--accent)',
+  '--secondary-foreground': 'var(--accent-foreground)'
+} as const
 const WORKSPACE_THEME_PROPERTIES = [
   ...WORKSPACE_FONT_PROPERTIES.map(([, property]) => property),
   ...WORKSPACE_COLOR_PROPERTIES.map(([, property]) => property),
+  ...(Object.keys(WORKSPACE_COLOR_ALIASES) as (keyof typeof WORKSPACE_COLOR_ALIASES)[]),
   WORKSPACE_RADIUS_PROPERTY
 ]
 
@@ -63,6 +68,10 @@ export function getWorkspaceThemeColorStyle(
 
   for (const [token, property] of WORKSPACE_COLOR_PROPERTIES) {
     style[property] = colors?.[token]
+  }
+  // CSS aliases resolve where declared; inherited root aliases keep the root colors.
+  for (const [property, value] of Object.entries(WORKSPACE_COLOR_ALIASES)) {
+    style[property as keyof typeof WORKSPACE_COLOR_ALIASES] = colors ? value : undefined
   }
   return style
 }

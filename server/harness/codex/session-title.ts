@@ -1,3 +1,4 @@
+import { createHarnessTempDir, removeHarnessTempDir, runHarnessCommand } from '../command'
 import { join } from 'node:path'
 
 import type { CodexThread } from './adapter'
@@ -7,10 +8,7 @@ import {
   SESSION_TITLE_SCHEMA,
   SESSION_TITLE_SYSTEM_PROMPT,
   SESSION_TITLE_TIMEOUT_MS,
-  createSessionTitleTempDir,
-  parseGeneratedSessionTitleJson,
-  removeSessionTitleTempDir,
-  runSessionTitleCommand
+  parseGeneratedSessionTitleJson
 } from '../session-title'
 import { requireHarnessExecutable } from '../executable'
 
@@ -96,10 +94,10 @@ export async function generateCodexSessionTitle(input: {
   )
   let tempDir: string | undefined
   try {
-    tempDir = await createSessionTitleTempDir()
+    tempDir = await createHarnessTempDir()
     const executable = requireHarnessExecutable('codex')
     const env = codexSessionTitleEnv()
-    const featureOutput = await runSessionTitleCommand({
+    const featureOutput = await runHarnessCommand({
       command: [executable, 'features', 'list'],
       cwd: tempDir,
       signal: input.abortController.signal,
@@ -111,7 +109,7 @@ export async function generateCodexSessionTitle(input: {
     const schemaPath = join(tempDir, 'schema.json')
     const outputPath = join(tempDir, 'result.json')
     await Bun.write(schemaPath, JSON.stringify(SESSION_TITLE_SCHEMA))
-    const output = await runSessionTitleCommand({
+    const output = await runHarnessCommand({
       command: codexSessionTitleCommand({
         executable,
         cwd: tempDir,
@@ -128,7 +126,7 @@ export async function generateCodexSessionTitle(input: {
     return parseGeneratedSessionTitleJson(await Bun.file(outputPath).text())
   } finally {
     clearTimeout(timer)
-    if (tempDir) await removeSessionTitleTempDir(tempDir).catch(() => {})
+    if (tempDir) await removeHarnessTempDir(tempDir).catch(() => {})
   }
 }
 

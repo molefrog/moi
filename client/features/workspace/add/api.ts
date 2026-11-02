@@ -58,7 +58,7 @@ export function useWorkspaceCreationInfo() {
 }
 
 export type CreateWorkspaceInput = {
-  name: string
+  name?: string
   type: WorkspaceType
 }
 

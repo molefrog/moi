@@ -161,6 +161,7 @@ export const app = Bun.serve<WsData>({
       : devSandbox,
     '/workspace/*': shell,
     '/settings': shell,
+    '/onboarding': shell,
 
     // Chat websocket — app-wide (one per client, not per workspace). Each chat
     // frame carries its own workspaceId.

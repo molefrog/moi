@@ -81,9 +81,19 @@ export type DiscoveredWorkspaceCandidate = {
 
 export type HarnessWorkspace = Pick<WorkspaceEntry, 'id' | 'path' | 'type' | 'agentId'>
 
+export type HarnessActionInput = {
+  prompt: string
+  schema: Record<string, unknown>
+  signal: AbortSignal
+}
+
 export type Harness = {
   id: WorkspaceType
   capabilities: HarnessCapabilities
+
+  // Ephemeral read/search action without a workspace or visible chat.
+  // Returns parsed structured output; callers validate it and control timeout.
+  runAction?(input: HarnessActionInput): Promise<unknown>
 
   // -- chat lifecycle ---------------------------------------------------------
   sendMessage(input: SendMessageInput): Promise<void>

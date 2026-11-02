@@ -1,5 +1,6 @@
 // Claude Code as a Harness. Thin wiring over this folder's modules — see
 // ../types.ts for the contract and ../README.md for the architecture.
+import { runClaudeAction } from './run-action'
 import { join } from 'node:path'
 import { forkSession } from '@anthropic-ai/claude-agent-sdk'
 
@@ -82,6 +83,7 @@ onClaudeCliChanged(() => retireCCSessionsOnCliChange())
 
 export const claudeCodeHarness: Harness = {
   id: 'claude-code',
+  runAction: runClaudeAction,
   capabilities: {
     supportsStreaming: true,
     imagesInline: 'base64',

@@ -24,9 +24,10 @@ Where links are used:
 - **Views:** `moi:/views/events?eventId=123` opens the `events` view. Query values become
   its component's `params` prop: `{ eventId: '123' }`.
 - **Chats:** `moi:/chat` reveals or focuses the current chat, preserving selection and pin.
-  `moi:/chats/<session-id>` selects an existing chat and reveals the chat panel. Both use
-  the workspace's last opened tab, like a bare workspace URL, and restore its remembered
-  view parameters. Query values on chat links are ignored.
+  `moi:/chats/<session-id>` selects an existing chat and opens its owning tab: its view,
+  Scratchpad, or Overview for a general chat. Opening the already-pinned chat keeps the
+  current tab. Tab changes restore remembered view parameters. Query values on chat links
+  are ignored.
 - **Files:** `moi:/files/clips/video.mp4` opens a file relative to the workspace root through
   `/api/workspaces/<id>/files/clips/video.mp4`. Query strings and fragments stay on the file URL.
 - **Web addresses:** `https://example.com` (or HTTP) opens an ordinary web address.

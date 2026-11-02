@@ -1,5 +1,6 @@
 import { changeWorkspaceHarness } from '../workspaces/change-harness'
 import { HarnessTransitionError, reserveWorkspaceOperation } from '../workspaces/harness-transition'
+import { onboarding } from './onboarding'
 import { detectInstalledHarnesses } from '../harness/executable'
 import { isMessageAttachments } from '@/lib/message-attachments'
 import { Hono } from 'hono'
@@ -1054,7 +1055,12 @@ workspaces.post('/create', async c => {
   }
   const availability = await workspaceTypeAvailability(type)
   if (availability.status !== 'available') return c.text(availability.reason, 400)
-  const name = typeof body?.name === 'string' ? body.name.trim() : ''
+  let name = typeof body?.name === 'string' ? body.name.trim() : ''
+  if (body?.name === undefined) {
+    name = 'My workspace'
+    for (let suffix = 2; existsSync(join(createdWorkspacesRoot(), name)); suffix++)
+      name = `My workspace ${suffix}`
+  }
   const invalid = validateWorkspaceFolderName(name)
   if (invalid) return c.text(invalid, 400)
   const path = join(createdWorkspacesRoot(), name)
@@ -1081,6 +1087,7 @@ export const api = new Hono()
 
 api.route('/api/workspaces', workspaces)
 api.route('/api/harnesses', harnesses)
+api.route('/api/onboarding', onboarding)
 
 // Startup config (config.json in the data dir + MOI_* env), client-safe
 // subset. Immutable for the process lifetime — clients cache it forever.

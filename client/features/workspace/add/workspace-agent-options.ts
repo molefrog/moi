@@ -14,13 +14,8 @@ const workspaceAgents: Record<WorkspaceType, WorkspaceAgentConfig> = {
   hermes: { importOnly: true }
 }
 
-export type WorkspaceAgentOption = {
-  type: WorkspaceType
-  description: string
-  disabled: boolean
-  disabledReason?: string
-  disabledCommand?: string
-}
+export type { HarnessOption as WorkspaceAgentOption } from '@/client/features/harness/harness-selector'
+import type { HarnessOption as WorkspaceAgentOption } from '@/client/features/harness/harness-selector'
 
 export function getWorkspaceAgentOptions(
   installed?: HarnessInstallations,

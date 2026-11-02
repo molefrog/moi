@@ -76,7 +76,11 @@ export function useSelectLinkedChat() {
   const stateRef = useLatestRef({ collabEnabled, selectSessionForTab, unpinAsync })
   // Stable so selection updates do not restart a pending chat link.
   return useCallback(
-    async (sessionId: string, tab: WorkspaceTabId, signal: AbortSignal): Promise<boolean> => {
+    async (
+      sessionId: string,
+      tab: WorkspaceTabId,
+      signal: AbortSignal
+    ): Promise<WorkspaceTabId | undefined> => {
       const { collabEnabled, selectSessionForTab, unpinAsync } = stateRef.current
       signal.throwIfAborted()
       let sessions =
@@ -88,22 +92,24 @@ export function useSelectLinkedChat() {
           staleTime: 0
         })
       signal.throwIfAborted()
-      if (!sessions.some(session => session.sessionId === sessionId)) return false
+      if (!sessions.some(session => session.sessionId === sessionId)) return undefined
       const state = await queryClient.ensureQueryData(
         workspaceStateOptions(queryClient, workspaceId)
       )
       if (collabEnabled) await queryClient.ensureQueryData(browserTabSelectionOptions(workspaceId))
       signal.throwIfAborted()
       const pinned = state.pinnedSessionId
+      const destination =
+        pinned === sessionId ? tab : (state.sessions[sessionId]?.tabId ?? 'overview')
       if (pinned && pinned !== sessionId) {
         await unpinAsync()
         signal.throwIfAborted()
       }
       if (pinned !== sessionId) {
-        await selectSessionForTab(sessionId, tab)
+        await selectSessionForTab(sessionId, destination)
         signal.throwIfAborted()
       }
-      return true
+      return destination
     },
     [queryClient, stateRef, workspaceId]
   )

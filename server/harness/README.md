@@ -348,7 +348,16 @@ describes what Moi exposes, not every RPC available in the upstream protocol.
 | Home card preview        | ✅ session file scan                                | ✅ cached first message   | ⚠️ live app-server only               | ⚠️ live process only                 |
 | MCP status               | ✅ `mcpServerStatus()`                              | n/a                       | ✅ `mcpServerStatus/list`             | ⚠️ per-session config, no status RPC |
 | Usage reporting          | ⚠️ cost/duration on `result` (adapter drops tokens) | ✅ tokens + cost per turn | ✅ per-turn tokens and duration       | ✅ tokens per turn                   |
-| Structured output        | ❌                                                  | ❌                        | ⚠️ title generation only              | ❌                                   |
+| Structured output        | ✅ ephemeral actions                                | ❌                        | ✅ ephemeral actions via Codex exec   | ❌                                   |
+
+## Ephemeral actions
+
+`Harness.runAction` is optional and currently implemented by Claude and Codex.
+It takes a prompt, JSON Schema, and cancellation signal, and returns parsed structured
+output without registering a workspace or visible chat. Callers validate the result
+and control timeouts through the signal. Provider adapters own temporary files and
+fixed read/search restrictions; chat history is not injected automatically.
+Onboarding owns its prompt, suggestion validation, and job persistence.
 
 ## Design lessons so far
 
