@@ -16,8 +16,8 @@ export function OnboardingPage() {
     return <OnboardingStatus error={onboarding.error || undefined} onRetry={onboarding.retry} />
   if (!onboarding.enabled || !onboarding.data?.showOnboarding) return <Redirect to={destination} />
 
-  function finish(workspaceId: string) {
-    setDestination(`/workspace/${workspaceId}/overview`)
+  function finish(workspaceId?: string) {
+    setDestination(workspaceId ? `/workspace/${workspaceId}/overview` : '/')
     save.mutate({ showOnboarding: false })
   }
   if (!harness) return <AgentSetupStep onComplete={setHarness} />

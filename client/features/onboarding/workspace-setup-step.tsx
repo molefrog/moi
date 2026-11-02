@@ -3,6 +3,8 @@ import { useMutation } from '@tanstack/react-query'
 import { IconSearch } from '@tabler/icons-react'
 import { Button } from '@/client/components/ui/button'
 import { Spinner } from '@/client/components/ui/spinner'
+import { requestJson } from '@/client/api/http'
+import type { WorkspaceEntry } from '@/lib/types'
 import type { IdeaDiscovery, OnboardingHarness, OnboardingIdea } from '@/lib/onboarding'
 import { useCreateWorkspace } from '@/client/features/workspace/add/api'
 import { usePreloadWorkspaceFonts } from '@/client/runtime/workspace-theme'
@@ -12,7 +14,7 @@ import { cancelDiscovery, useOnboardingJob } from './api'
 
 type WorkspaceSetupStepProps = {
   harness: OnboardingHarness
-  onFinish: (workspaceId: string) => void
+  onFinish: (workspaceId?: string) => void
   finishing: boolean
   finishError?: string
 }
@@ -53,6 +55,8 @@ export function WorkspaceSetupStep({
         await cancelDiscovery(discovery.runId)
         setDiscovery(undefined)
       }
+      const workspaces = await requestJson<WorkspaceEntry[]>('/api/workspaces')
+      if (workspaces.length > 0) return
       const entry = await createWorkspace.mutateAsync({ type: harness })
       return entry.id
     },

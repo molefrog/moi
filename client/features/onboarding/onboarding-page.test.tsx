@@ -17,7 +17,11 @@ async function mount(
   demo = false,
   createResponse?: () => Promise<Response>,
   discoveryResponse?: () => Promise<Response>,
-  scratchResponses?: { create?: () => Promise<Response>; save?: () => Response }
+  scratchResponses?: {
+    create?: () => Promise<Response>
+    save?: () => Response
+    workspaces?: () => Response
+  }
 ) {
   const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>')
   const globals = {
@@ -53,6 +57,7 @@ async function mount(
           if (init?.method === 'PATCH') showOnboarding = body.showOnboarding === true
           return Response.json({ autoUpdateSkills: false, showOnboarding })
         }
+        if (path === '/api/workspaces') return scratchResponses?.workspaces?.() ?? Response.json([])
         if (path === '/api/workspaces/create' && init?.method === 'POST')
           return scratchResponses?.create
             ? scratchResponses.create()
@@ -225,6 +230,40 @@ test('reopening onboarding starts with agent selection again', async () => {
   const reopened = await mount()
   expect(reopened.document.body.textContent).toContain('Choose your agent')
   expect(reopened.calls).toHaveLength(0)
+})
+test('skipping with existing workspaces completes onboarding and returns home', async () => {
+  const page = await mount(true, false, true, false, undefined, undefined, {
+    workspaces: () => Response.json([{ id: 'existing-workspace' }])
+  })
+  await page.click('ChatGPTOpenAI')
+  await page.click('Find ideas')
+  await page.click('Start from scratch')
+  expect(page.location.history?.at(-1)).toBe('/')
+  expect(page.calls.some(call => call.path === '/api/onboarding/cancel')).toBe(true)
+  expect(page.calls.some(call => call.path === '/api/workspaces/create')).toBe(false)
+  expect(page.calls.filter(call => call.path === '/api/settings')).toEqual([
+    { path: '/api/settings', body: { showOnboarding: false } }
+  ])
+})
+
+test('a failed workspace lookup keeps onboarding open and can be retried', async () => {
+  let attempts = 0
+  const page = await mount(true, false, true, false, undefined, undefined, {
+    workspaces: () =>
+      ++attempts === 1
+        ? new Response('Could not load workspaces', { status: 500 })
+        : Response.json([{ id: 'existing-workspace' }])
+  })
+  await page.click('ChatGPTOpenAI')
+  await page.click('Start from scratch')
+  expect(page.document.querySelector('[role="alert"]')?.textContent).toBe(
+    'Could not load workspaces'
+  )
+  expect(page.location.history?.at(-1)).toBe('/onboarding')
+  expect(page.calls).toHaveLength(0)
+  await page.click('Start from scratch')
+  expect(page.location.history?.at(-1)).toBe('/')
+  expect(page.calls).toEqual([{ path: '/api/settings', body: { showOnboarding: false } }])
 })
 test('connection has no Skip or Switch agent action', async () => {
   const page = await mount(true, false, false)
