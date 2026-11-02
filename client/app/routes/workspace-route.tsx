@@ -1,3 +1,4 @@
+import { useWorkspaceHarnessChanges } from '@/client/features/workspace/harness-transition'
 import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
 import { CollabProvider, useCollabEnabled } from '@/client/features/collab'
 import { useQueryClient } from '@tanstack/react-query'
@@ -42,7 +43,8 @@ function WorkspaceContent({ id }: WorkspaceRouteProps) {
   const collabEnabled = useCollabEnabled()
   const queryClient = useQueryClient()
   const [selectedSessionId] = useSelectedSession()
-  const { isLoading: layoutLoading, layout } = useWorkspaceLayoutCtx()
+  const { isLoading: layoutLoading, layout, provider } = useWorkspaceLayoutCtx()
+  useWorkspaceHarnessChanges(id, provider)
   useWorkspaceTheme(layout.theme)
   const widgets = useWidgets(id)
   const views = useViews(id)

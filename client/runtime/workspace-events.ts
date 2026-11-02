@@ -4,10 +4,13 @@ import type {
   HarnessAvailability,
   ViewInfo,
   WidgetInfo,
+  WorkspaceType,
   WorkspaceState
 } from '@/lib/types'
 
 export type WorkspaceEvent =
+  | { type: 'connection:opened' }
+  | { type: 'workspace-harness:changed'; workspaceId: string; harness: WorkspaceType }
   | { type: 'widget:updated'; name: string }
   | { type: 'widget-layout:updated'; widgets: WidgetInfo[] }
   // `moi refresh` — cache-bust and re-fetch applets without a rebuild. `only`
@@ -129,6 +132,7 @@ export class WorkspaceEventsClient {
     socket.onopen = () => {
       this.reconnectAttempt = 0
       this.sendNavigationPresence()
+      for (const handler of this.listeners) handler({ type: 'connection:opened' })
     }
 
     socket.onmessage = event => {

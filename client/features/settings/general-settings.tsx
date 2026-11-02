@@ -1,4 +1,4 @@
-import { IconLoader2 } from '@tabler/icons-react'
+import { IconChevronDown, IconLoader2 } from '@tabler/icons-react'
 import { useLocation } from 'wouter'
 
 import { useAppConfig } from '@/client/api/app-config'
@@ -17,7 +17,19 @@ import { Button } from '@/client/components/ui/button'
 import { Input } from '@/client/components/ui/input'
 import { useRemoveWorkspace } from '@/client/features/home/api'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-layout-context'
+import { harnessIcon, harnessLabel } from '@/client/features/harness/harness-presentation'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem
+} from '@/client/components/ui/dropdown-menu'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/client/components/ui/tooltip'
+import { useLive } from '@/client/features/chat/chat-store'
+import { useWorkspaceCreationInfo } from '@/client/features/workspace/add/api'
 
+import { useChangeWorkspaceHarness } from '../api'
 import { SettingsPage, SettingsRow, SettingsSection } from './settings-layout'
 
 export function GeneralSettings() {
@@ -46,6 +58,7 @@ export function GeneralSettings() {
             />
           }
         />
+        <WorkspaceHarnessSetting />
       </SettingsSection>
 
       {!demo && (
@@ -56,7 +69,7 @@ export function GeneralSettings() {
             control={
               <AlertDialog>
                 <AlertDialogTrigger
-                  render={<Button type="button" variant="destructive" size="sm" />}
+                  render={<Button type="button" variant="destructive" />}
                   disabled={removeWorkspace.isPending}
                 >
                   Remove
@@ -99,5 +112,72 @@ export function GeneralSettings() {
         </SettingsSection>
       )}
     </SettingsPage>
+  )
+}
+
+function WorkspaceHarnessSetting() {
+  const { demo } = useAppConfig()
+  const { workspaceId, provider } = useWorkspaceLayoutCtx()
+  const type = provider ?? 'claude-code'
+  const installations = useWorkspaceCreationInfo()
+  const change = useChangeWorkspaceHarness(workspaceId, type)
+  const active = useLive(state =>
+    Object.entries(state.activity).some(
+      ([key, activity]) => key.startsWith(`${workspaceId}:`) && activity !== 'idle'
+    )
+  )
+  const reason = demo
+    ? 'Changing agents is unavailable in the demo'
+    : type === 'hermes' || type === 'openclaw'
+      ? 'This workspace belongs to its agent and cannot use another agent'
+      : active
+        ? 'Wait for the agent to finish before changing it'
+        : undefined
+  return (
+    <>
+      <SettingsRow
+        title="Agent"
+        control={
+          <Tooltip disabled={!reason}>
+            <TooltipTrigger render={<span tabIndex={reason ? 0 : undefined} aria-label={reason} />}>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={<Button variant="outline" />}
+                  disabled={Boolean(reason) || change.isPending || !installations.data}
+                  aria-label="Agent"
+                >
+                  <img src={harnessIcon[type]} alt="" className="size-4 shrink-0" />
+                  {harnessLabel[type]}
+                  <IconChevronDown stroke={1.5} />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-44">
+                  <DropdownMenuRadioGroup
+                    value={type}
+                    onValueChange={value => change.mutate(value)}
+                  >
+                    {(['claude-code', 'codex'] as const).map(option => (
+                      <DropdownMenuRadioItem
+                        key={option}
+                        value={option}
+                        disabled={!installations.data?.installed[option]}
+                      >
+                        <img src={harnessIcon[option]} alt="" className="size-4 shrink-0" />
+                        {harnessLabel[option]}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </TooltipTrigger>
+            <TooltipContent>{reason}</TooltipContent>
+          </Tooltip>
+        }
+      />
+      {change.error && (
+        <p role="alert" className="text-sm text-destructive">
+          {change.error.message}
+        </p>
+      )}
+    </>
   )
 }

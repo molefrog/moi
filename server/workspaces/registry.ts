@@ -289,3 +289,17 @@ export async function discoverWorkspaces(): Promise<DiscoveredWorkspace[]> {
     withDisplayPath
   )
 }
+
+export async function updateWorkspaceHarness(
+  id: string,
+  type: WorkspaceType
+): Promise<WorkspaceEntry> {
+  return locked(async () => {
+    const entries = await readRegistry()
+    const entry = entries.find(entry => entry.id === id)
+    if (!entry) throw new Error('Workspace not found')
+    entry.type = type
+    await writeRegistry(entries)
+    return withDisplayPath(entry)
+  })
+}

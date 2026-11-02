@@ -10,7 +10,6 @@ import devSandbox from '../client/dev/index.html'
 import { api } from './api'
 import { getAppConfig } from './app-config'
 import { harnessStore } from './harness/auth'
-import { AttachmentUploadError } from './sessions/attachment-message'
 import { PORT } from './constants'
 import { control } from './control'
 import { proxyUserState } from './collab/cloudflare-access'
@@ -25,7 +24,6 @@ import { resolveScratchOp } from './scratchpad/relay'
 import { allHarnesses, harnessFor } from './harness/registry'
 import { getWorkspace, listWorkspaces } from './workspaces/registry'
 import { failInterruptedViewStarts, sendWorkspaceMessage } from './sessions/view-sessions'
-import { PendingViewError } from './sessions/pending-views'
 import { prepareWorkspaceStates } from './workspace-state'
 import { migrateLegacyWorkspaceState } from './workspace-state/legacy-migration'
 import {
@@ -249,7 +247,7 @@ export const app = Bun.serve<WsData>({
             context: data.context,
             agentId: workspace.agentId
           }).catch(error => {
-            if (error instanceof AttachmentUploadError || error instanceof PendingViewError) {
+            if (error instanceof Error) {
               broadcast(workspace.id, {
                 kind: 'error',
                 sessionId: data.sessionId,

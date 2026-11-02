@@ -655,6 +655,14 @@ export type WorkspaceLayout = {
   theme?: WorkspaceTheme
 }
 
+// GET /api/workspaces/:id: layout plus the local workspace registration.
+export type WorkspaceLayoutResponse = WorkspaceLayout & {
+  cwd: string
+  name: string
+  provider?: WorkspaceType
+  agentId?: string
+}
+
 // One applet's thumbnail freshness record. Image bytes live as files in the
 // workspace's `.moi/.cache/thumbnails/` (server/applets/thumbnails.ts), never in
 // `.workspace.json` — the layout file stays small and commit-safe.

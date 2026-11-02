@@ -1,3 +1,5 @@
+import { changeWorkspaceHarness } from '../workspaces/change-harness'
+import { HarnessTransitionError, reserveWorkspaceOperation } from '../workspaces/harness-transition'
 import { detectInstalledHarnesses } from '../harness/executable'
 import { isMessageAttachments } from '@/lib/message-attachments'
 import { Hono } from 'hono'
@@ -160,15 +162,37 @@ async function handleFunctionCall(
 const withWorkspace = createMiddleware<ApiEnv>(async (c, next) => {
   const id = c.req.param('id')
   if (!id) return c.text('Workspace not found', 404)
-  const ws = await getWorkspace(id)
-  if (!ws) return c.text('Workspace not found', 404)
-  c.set('ws', ws)
-  await next()
+  let release: (() => void) | undefined
+  try {
+    if (c.req.method !== 'GET' && !c.req.path.endsWith('/harness'))
+      release = reserveWorkspaceOperation(id)
+    const ws = await getWorkspace(id)
+    if (!ws) return c.text('Workspace not found', 404)
+    c.set('ws', ws)
+    await next()
+  } catch (error) {
+    if (error instanceof HarnessTransitionError) return c.text(error.message, 409)
+    throw error
+  } finally {
+    release?.()
+  }
 })
 
 // ---- single workspace: /api/workspaces/:id/* --------------------------------
 const one = new Hono<ApiEnv>()
 one.use('*', withWorkspace)
+one.patch('/harness', async c => {
+  if (getAppConfig().demo) return c.text('Changing agents is unavailable in the demo', 403)
+  const body = await c.req.json().catch(() => null)
+  if (!body || !['claude-code', 'codex'].includes(body.type) || !isHarnessType(body.expectedType))
+    return c.text('Invalid agent selection', 400)
+  try {
+    return c.json(await changeWorkspaceHarness(c.get('ws'), body.type, body.expectedType))
+  } catch (error) {
+    if (error instanceof HarnessTransitionError) return c.text(error.message, 409)
+    throw error
+  }
+})
 
 one.get('/widgets', c => listWidgets(c.get('ws').path))
 

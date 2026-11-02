@@ -1,0 +1,69 @@
+import { afterEach, beforeEach, expect, test } from 'bun:test'
+import { QueryClient } from '@tanstack/react-query'
+import { workspaceKeys } from '@/client/api/workspace-keys'
+import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
+import type { WorkspaceState } from '@/lib/types'
+import { receiveWorkspaceHarness } from './harness-transition'
+
+const storageDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage')
+let client: QueryClient
+beforeEach(() => {
+  const storage = new Map<string, string>()
+  Object.defineProperty(globalThis, 'sessionStorage', {
+    configurable: true,
+    value: {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        storage.set(key, value)
+      }
+    }
+  })
+  client = new QueryClient()
+  client.setQueryData(workspaceKeys.layout('one'), {
+    ...createDefaultWorkspaceLayout(),
+    provider: 'claude-code'
+  })
+  client.setQueryData(workspaceKeys.state('one'), {
+    revision: 1,
+    selected: { overview: 'old' },
+    pinnedSessionId: 'old',
+    sessions: {},
+    pendingViews: {}
+  })
+})
+afterEach(() => {
+  client.clear()
+  if (storageDescriptor) Object.defineProperty(globalThis, 'sessionStorage', storageDescriptor)
+  else Reflect.deleteProperty(globalThis, 'sessionStorage')
+})
+
+test('refreshes only harness-dependent queries and preserves a selection after a duplicate event', async () => {
+  client.setQueryData(workspaceKeys.events('one', 'old'), ['transcript'])
+  client.setQueryData(workspaceKeys.agent('one'), { provider: 'claude-code' })
+  client.setQueryData(workspaceKeys.widgets('one'), ['widget'])
+  client.setQueryData(workspaceKeys.agent('two'), { provider: 'codex' })
+  await receiveWorkspaceHarness(client, 'one', 'codex')
+  expect(client.getQueryState(workspaceKeys.agent('one'))?.isInvalidated).toBe(true)
+  expect(client.getQueryState(workspaceKeys.agent('two'))?.isInvalidated).toBe(false)
+  expect(client.getQueryState(workspaceKeys.widgets('one'))?.isInvalidated).toBe(false)
+  expect(client.getQueryData(workspaceKeys.events('one', 'old'))).toBeUndefined()
+  expect(client.getQueryData<WorkspaceState>(workspaceKeys.state('one'))?.selected).toEqual({})
+  client.setQueryData<WorkspaceState>(workspaceKeys.state('one'), state => ({
+    ...state!,
+    selected: { overview: 'new' }
+  }))
+  await receiveWorkspaceHarness(client, 'one', 'codex')
+  expect(client.getQueryData<WorkspaceState>(workspaceKeys.state('one'))?.selected).toEqual({
+    overview: 'new'
+  })
+})
+
+test('detects a missed event after the layout has already refreshed on reconnect', async () => {
+  await receiveWorkspaceHarness(client, 'one', 'claude-code')
+  client.setQueryData(workspaceKeys.layout('one'), {
+    ...createDefaultWorkspaceLayout(),
+    provider: 'codex'
+  })
+  await receiveWorkspaceHarness(client, 'one', 'codex')
+  expect(client.getQueryData<WorkspaceState>(workspaceKeys.state('one'))?.selected).toEqual({})
+})
