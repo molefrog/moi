@@ -11,9 +11,15 @@ import {
 } from '@/client/features/chat/sessions/use-selected-session'
 import * as workspaceEvents from '@/client/runtime/use-workspace-events'
 import type { WorkspaceEvent } from '@/client/runtime/use-workspace-events'
-import type { WorkspaceState } from '@/lib/types'
+import type { CompiledView, WorkspaceState } from '@/lib/types'
+import { useViews } from '@/client/features/views/api'
 import { Workspace } from './workspace-context'
-import { useWorkspaceState, useWorkspaceStateSync, useWorkspaceStateWrite } from './workspace-state'
+import {
+  receiveWorkspaceState,
+  useWorkspaceState,
+  useWorkspaceStateSync,
+  useWorkspaceStateWrite
+} from './workspace-state'
 
 const WORKSPACE_ID = 'abc'
 
@@ -28,7 +34,10 @@ afterEach(() => cleanup())
 
 // Mounts `children` with a query client seeded with `initial`, a fake events
 // socket, and a fake server that answers every request with `respond`.
-function mount(initial: WorkspaceState, respond: (request: Request) => Promise<WorkspaceState>) {
+function mount(
+  initial: WorkspaceState,
+  respond: (request: Request) => Promise<WorkspaceState | { views: CompiledView[] }>
+) {
   const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>')
   const globals = { window, document, IS_REACT_ACT_ENVIRONMENT: true }
   const descriptors = new Map(
@@ -103,6 +112,50 @@ function deferred<T>() {
   const promise = new Promise<T>(done => (resolve = done))
   return { promise, resolve }
 }
+
+test('a finished view stays visible through pending cleanup and a stale list reply', async () => {
+  const reply = deferred<{ views: CompiledView[] }>()
+  const fixture = mount(
+    workspaceState({
+      pendingViews: { board: { status: 'submitted', requirements: 'Build a board' } }
+    }),
+    () => reply.promise
+  )
+  const queryKey = workspaceKeys.views(WORKSPACE_ID)
+  fixture.queryClient.setQueryData(queryKey, [])
+  const rendered: string[][] = []
+  function Probe() {
+    const { data } = useViews(WORKSPACE_ID)
+    useLayoutEffect(() => {
+      rendered.push(data?.map(view => `${view.id}:${view.status}`) ?? [])
+    }, [data])
+    return null
+  }
+  await fixture.render(<Probe />)
+  expect(rendered.at(-1)).toEqual(['board:submitted'])
+
+  const request = fixture.queryClient.refetchQueries({ queryKey })
+  await fixture.settle()
+  fixture.emit({ type: 'view-layout:updated', workspaceId: 'other', views: [] })
+  await fixture.settle()
+  expect(rendered.at(-1)).toEqual(['board:submitted'])
+
+  const compiled: CompiledView = { id: 'board', status: 'compiled', title: 'Board' }
+  fixture.emit({ type: 'view-layout:updated', workspaceId: WORKSPACE_ID, views: [compiled] })
+  await fixture.settle()
+  expect(rendered.at(-1)).toEqual(['board:compiled'])
+  act(() =>
+    receiveWorkspaceState(fixture.queryClient, WORKSPACE_ID, workspaceState({ revision: 2 }))
+  )
+  await fixture.settle()
+  reply.resolve({ views: [] })
+  await request
+  await fixture.settle()
+
+  expect(fixture.queryClient.getQueryData<CompiledView[]>(queryKey)).toEqual([compiled])
+  expect(rendered.every(views => views.length === 1)).toBe(true)
+  expect(rendered.at(-1)).toEqual(['board:compiled'])
+})
 
 describe('workspace state writes', () => {
   test('a reply waits while a later write is in flight; the last reply becomes the cache', async () => {

@@ -362,7 +362,20 @@ test('a bundled pending view moves from the state to the compiled list', async (
     join(workspaceDir, '.moi', 'views', `${view.id}.tsx`),
     "export const config = { title: 'Finished', icon: 'book' }; export default function View() { return <div>Finished</div> }"
   )
+  published = []
   await handleBundleViews(event => published.push(event), workspaceId, workspaceDir, false, view.id)
+  const layoutIndex = published.findIndex(
+    event => (event as { type: string }).type === 'view-layout:updated'
+  )
+  const completedIndex = published.findIndex(
+    event => (event as { type: string }).type === 'state:changed'
+  )
+  expect(layoutIndex).toBeGreaterThanOrEqual(0)
+  expect(completedIndex).toBeGreaterThan(layoutIndex)
+  expect(published[layoutIndex]).toMatchObject({
+    workspaceId,
+    views: expect.arrayContaining([expect.objectContaining({ id: view.id, status: 'compiled' })])
+  })
   const result = (await list()).views.filter(item => item.id === view.id)
   expect(result).toHaveLength(1)
   expect(result[0].status).toBe('compiled')

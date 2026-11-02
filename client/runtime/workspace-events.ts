@@ -1,8 +1,8 @@
 import type { NavigationRequest } from '@/lib/navigation'
 import type {
   AppSettings,
+  CompiledView,
   HarnessAvailability,
-  ViewInfo,
   WidgetInfo,
   WorkspaceType,
   WorkspaceState
@@ -17,7 +17,7 @@ export type WorkspaceEvent =
   // narrows to one kind; absent means both widgets and views.
   | { type: 'applets:refresh'; only?: 'widgets' | 'views' }
   | { type: 'view:updated'; name: string }
-  | { type: 'view-layout:updated'; views: ViewInfo[] }
+  | { type: 'view-layout:updated'; workspaceId: string; views: CompiledView[] }
   | { type: 'view:deleted'; workspaceId: string; name: string }
   // A workspace's chat state changed (pin, selection, chat settings, views
   // being built). Carries the whole state, so caches update without a refetch.

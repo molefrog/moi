@@ -62,7 +62,7 @@ function WorkspaceContent({ id }: WorkspaceRouteProps) {
       // widget:updated too: a rebundle bumps the widget's content revision, and
       // the thumbnail invalidation hook reads it off this query.
       queryClient.invalidateQueries({ queryKey: workspaceKeys.widgets(id) })
-    } else if (event.type === 'view-layout:updated' || event.type === 'view:updated') {
+    } else if (event.type === 'view:updated') {
       // view:updated also bumps the built bundle revision used by thumbnail
       // freshness checks.
       queryClient.invalidateQueries({ queryKey: workspaceKeys.views(id) })
