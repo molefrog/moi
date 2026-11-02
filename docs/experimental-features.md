@@ -1,6 +1,6 @@
 # Experimental features
 
-This is the recipe for restoring Moi's previous `ExperimentalFeatures` system when a new experiment needs it. The runtime code was removed after collaboration became a standard cloud feature. Collaboration now follows the deployment environment; keep that behavior separate from future experiments.
+This is the recipe for restoring Moi's previous `ExperimentalFeatures` system when a new experiment needs it. The runtime code was removed after collaboration became a standard cloud feature. Collaboration is now temporarily disabled through app config in [server/app-config.ts](../server/app-config.ts); keep that setting separate from future experiments.
 
 ## Behavior to preserve
 
@@ -110,6 +110,6 @@ Extend [server/app-config.test.ts](../server/app-config.test.ts) and [client/api
 - Disabled features reject requests and create no workers, database files, or workspace configuration.
 - Enabled features work through their real entry points.
 
-[server/test/cli-collab.test.ts](../server/test/cli-collab.test.ts) has a server-launch capture fixture that can be reused for CLI coverage. Its current collaboration tests follow the cloud environment and should keep doing so.
+[server/test/cli-collab.test.ts](../server/test/cli-collab.test.ts) has a server-launch capture fixture that can be reused for CLI coverage. Its current tests verify deployment environment forwarding and optional guide installation.
 
 Run `bun run check:repo`, typecheck, and the relevant tests. Update [config.md](config.md) and the new feature's docs with its flag and restart requirements.

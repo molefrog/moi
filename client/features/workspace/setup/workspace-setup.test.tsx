@@ -73,6 +73,7 @@ async function mount(
   const configSpy = spyOn(config, 'useAppConfig').mockReturnValue({
     environment,
     demo,
+    collabEnabled: false,
     demoInstallUrl: ''
   })
   const destinations: string[] = []
@@ -297,6 +298,7 @@ test('a cold entry shows only a loading spinner until readiness is known', async
   configSpy.mockReturnValue({
     environment: 'local',
     demo: false,
+    collabEnabled: false,
     demoInstallUrl: ''
   })
   const client = new QueryClient()
