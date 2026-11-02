@@ -343,12 +343,18 @@ test('creation failures keep the ideas and retry the same operation', async () =
 })
 
 test('discovery shows reported progress and can be cancelled to start from scratch', async () => {
-  const page = await mount(true, false, true, false, undefined, async () =>
-    Response.json({ status: 'running', progress: { message: 'Reading recent email' } })
-  )
+  const pending = Promise.withResolvers<Response>()
+  const page = await mount(true, false, true, false, undefined, () => pending.promise)
   await page.click('ChatGPTOpenAI')
   await page.click('Find ideas')
-  expect(page.document.querySelector('h1')?.textContent).toBe('Finding ideas for you')
+  expect(page.document.querySelector('h1')?.textContent).toBe('Choose a starting point')
+  expect(page.document.querySelector('[role="status"]')?.textContent).toBe('Taking a first look…')
+  await act(async () => {
+    pending.resolve(
+      Response.json({ status: 'running', progress: { message: 'Reading recent email' } })
+    )
+  })
+  await page.settle()
   expect(page.document.querySelector('[role="status"]')?.textContent).toContain(
     'Reading recent email'
   )

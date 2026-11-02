@@ -4,14 +4,7 @@ import { z } from 'zod'
 
 export const discoveryProgressSchema = z
   .object({
-    message: z
-      .string()
-      .trim()
-      .min(1)
-      .max(160)
-      .describe(
-        'Brief current activity in plain language, such as Reading recent email or Putting together ideas. No private details, names, quotes, or unverified claims.'
-      )
+    message: z.string().trim().min(1).max(50)
   })
   .strict()
 export type DiscoveryProgress = z.infer<typeof discoveryProgressSchema>

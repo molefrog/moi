@@ -163,15 +163,11 @@ function DiscoveryIntro({
   return (
     <OnboardingScreen className="max-w-sm" footer={footer}>
       <div className="flex flex-col items-center gap-2 text-center">
-        <h1 className="text-xl font-medium">
-          {loading ? 'Finding ideas for you' : 'Choose a starting point'}
-        </h1>
-        {!loading && (
-          <p className="text-sm text-muted-foreground">
-            Moi can look through your recent conversations, emails, and connected apps to suggest
-            ideas for you to build
-          </p>
-        )}
+        <h1 className="text-xl font-medium">Choose a starting point</h1>
+        <p className="text-sm text-muted-foreground">
+          Moi can look through your recent conversations, emails, and connected apps to suggest
+          ideas for you to build
+        </p>
       </div>
       <div className="flex flex-col items-center gap-3">
         {loading ? (
@@ -194,12 +190,11 @@ function DiscoveryProgress({ message }: DiscoveryProgressProps) {
     <div
       role="status"
       aria-label="Finding ideas"
-      className="flex flex-col items-center justify-center gap-3"
+      className="flex h-9 max-w-full min-w-0 items-center text-sm text-muted-foreground"
     >
-      <Spinner className="size-5 text-muted-foreground" stroke={1.5} />
-      <p className="text-center text-sm text-muted-foreground">
-        {message ?? 'Checking available context…'}
-      </p>
+      <span className="shimmer truncate" title={message}>
+        {message ?? 'Taking a first look…'}
+      </span>
     </div>
   )
 }
