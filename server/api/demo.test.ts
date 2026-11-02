@@ -81,5 +81,5 @@ test('without the demo flag, creation is not blocked by the gate', async () => {
 
   // Falls through to ordinary validation instead of the demo 403.
   expect(response.status).toBe(400)
-  expect(await response.text()).toBe('Folder name is required')
+  expect(await response.text()).toBe('Workspace name is required')
 })
