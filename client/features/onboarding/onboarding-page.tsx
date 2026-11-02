@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Redirect } from 'wouter'
-import { useSaveAppSettings } from '@/client/features/settings/api'
+import { useSaveAppSettings } from '@/client/features/app-settings/api'
 import type { OnboardingHarness } from '@/lib/onboarding'
 import { useOnboardingSettings } from './api'
 import { OnboardingStatus } from './onboarding-status'

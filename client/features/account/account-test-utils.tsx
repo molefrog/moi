@@ -122,7 +122,7 @@ export async function mountAccount({
   const failures = { signOut: false, mutation: false, team: failTeam, session: failSession }
   const mutationRequest = Promise.withResolvers<void>()
   const teamResponse = Promise.withResolvers<Response>()
-  const calls: { path: string; body?: Record<string, string> }[] = []
+  const calls: { path: string; body?: Record<string, unknown> }[] = []
   const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
     Object.assign(
       async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -157,6 +157,7 @@ export async function mountAccount({
           await mutationRequest.promise
         if (failures.mutation)
           return Response.json({ error: 'Only the owner can do that.' }, { status: 403 })
+        if (path === '/api/settings') return Response.json({ autoUpdateSkills: false, ...body })
         if (path.endsWith('/profile')) {
           cloudSession = { user: { ...session!.user, name: body!.name! } }
           team.members[0]!.name = body!.name!

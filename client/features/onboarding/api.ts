@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useAppConfig } from '@/client/api/app-config'
 import { jsonRequest, requestJson } from '@/client/api/http'
-import { useAppSettings } from '@/client/features/settings/api'
+import { useAppSettings } from '@/client/features/app-settings/api'
 import type { IdeaDiscovery, OnboardingJobResult } from '@/lib/onboarding'
 
 export function useOnboardingSettings() {

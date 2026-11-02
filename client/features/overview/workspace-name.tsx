@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/client/components/ui/popover'
 import { WorkspaceIdentity } from '@/client/features/workspace/workspace-identity'
-import { useSaveWorkspaceName } from '@/client/features/settings/api'
-import { WorkspaceIconPicker } from '@/client/features/settings/workspace-icon-picker'
+import { useSaveWorkspaceName } from '@/client/features/workspace/settings/api'
+import { WorkspaceIconPicker } from '@/client/features/workspace/settings/workspace-icon-picker'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-layout-context'
 
 export function WorkspaceName() {

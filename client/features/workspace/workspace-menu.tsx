@@ -13,7 +13,7 @@ import {
 import {
   WorkspaceSettingsDialog,
   WorkspaceSettingsDialogTrigger
-} from '@/client/features/settings/workspace-settings-dialog'
+} from '@/client/features/workspace/settings/workspace-settings-dialog'
 import { useWorkspaceLayoutCtx } from './workspace-layout-context'
 
 type WorkspaceMenuProps = {

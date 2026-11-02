@@ -15,7 +15,7 @@ import { useAppletThumbnails } from '@/client/features/applets/applet-thumbnail'
 import {
   WorkspaceSettingsDialog,
   WorkspaceSettingsDialogTrigger
-} from '@/client/features/settings/workspace-settings-dialog'
+} from '@/client/features/workspace/settings/workspace-settings-dialog'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-layout-context'
 import { renderDefaultWidget } from '@/client/features/overview/default/registry'
 import { findWidgetPosition, updateStoredGridPositions } from '@/client/features/overview/grid'

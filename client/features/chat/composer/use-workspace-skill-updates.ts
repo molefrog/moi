@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import { useAppSettings, useSaveAppSettings } from '@/client/features/settings/api'
+import { useAppSettings, useSaveAppSettings } from '@/client/features/app-settings/api'
 import { useUpdateWorkspaceSkills, useWorkspaceSkills } from '@/client/features/workspace/api'
 
 import type {
