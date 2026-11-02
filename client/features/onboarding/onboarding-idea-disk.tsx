@@ -87,10 +87,10 @@ function ViewSticker({ view, index }: ViewStickerProps) {
       className={cn(
         'absolute h-8 max-w-1/2 min-w-0 gap-1.5 rounded-md border-0 bg-background px-2 py-1.5 text-xs font-normal ring-1 ring-border',
         rotation,
-        index === 0 && 'top-0 -left-4 -translate-y-1/2',
-        index === 1 && 'top-0 -right-4 -translate-y-1/2',
-        index === 2 && 'bottom-0 -left-4 translate-y-1/2',
-        index === 3 && '-right-4 bottom-0 translate-y-1/2'
+        index === 0 && 'top-0 -left-2 -translate-y-1/2',
+        index === 1 && 'top-0 -right-2 -translate-y-1/2',
+        index === 2 && 'bottom-0 -left-2 translate-y-1/2',
+        index === 3 && '-right-2 bottom-0 translate-y-1/2'
       )}
     >
       {Icon &&

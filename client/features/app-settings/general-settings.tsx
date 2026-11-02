@@ -19,7 +19,7 @@ export function GeneralSettings() {
         <Field orientation="responsive">
           <FieldContent>
             <FieldTitle>Restart onboarding</FieldTitle>
-            <FieldDescription>Set up a new workspace from the start</FieldDescription>
+            <FieldDescription>Go through the onboarding without logging out</FieldDescription>
           </FieldContent>
           <Button
             variant="secondary"
