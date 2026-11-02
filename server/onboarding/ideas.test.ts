@@ -28,12 +28,6 @@ test('accepts exactly three distinct complete ideas and assigns stable server ID
         icon: 'file' as const,
         description: 'Reading notes',
         features: ['Save takeaways']
-      },
-      {
-        name: 'Sources',
-        icon: 'book' as const,
-        description: 'Saved sources',
-        features: ['Browse sources']
       }
     ],
     widgets: [
@@ -91,12 +85,6 @@ test('rejects invented icons and incomplete applet plans', () => {
         icon: 'file' as const,
         description: 'Project notes',
         features: ['Save notes']
-      },
-      {
-        name: 'Sources',
-        icon: 'book' as const,
-        description: 'Saved sources',
-        features: ['Browse sources']
       }
     ],
     widgets: [{ name: 'Unread', description: 'Count', features: ['Show unread count'] }]
@@ -128,7 +116,7 @@ test('rejects invented icons and incomplete applet plans', () => {
   }
 })
 
-test('requires exactly four views and allows no widgets', () => {
+test('requires exactly three views and allows no widgets', () => {
   const applet = {
     name: 'Tasks',
     icon: 'calendar' as const,
@@ -147,7 +135,7 @@ test('requires exactly four views and allows no widgets', () => {
       views: Array.from({ length: count }, () => applet),
       widgets: []
     }))
-    if (count === 4) expect(parseIdeas({ options })).toHaveLength(3)
+    if (count === 3) expect(parseIdeas({ options })).toHaveLength(3)
     else expect(() => parseIdeas({ options })).toThrow()
   }
 })
@@ -179,12 +167,6 @@ test('requires distinct supported fonts and colors, with no extra customization'
         icon: 'file' as const,
         description: 'Project notes',
         features: ['Save notes']
-      },
-      {
-        name: 'Sources',
-        icon: 'book' as const,
-        description: 'Saved sources',
-        features: ['Browse sources']
       }
     ],
     widgets: [{ name: 'Tasks', description: 'Daily tasks', features: ['Complete a task'] }]

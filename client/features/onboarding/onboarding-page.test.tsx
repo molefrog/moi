@@ -99,12 +99,6 @@ async function mount(
                   icon: 'calendar' as const,
                   description: 'Finished articles',
                   features: ['Review past reading']
-                },
-                {
-                  name: 'Sources',
-                  icon: 'book' as const,
-                  description: 'Saved sources',
-                  features: ['Browse sources']
                 }
               ],
               widgets: [
@@ -193,13 +187,12 @@ test('agent selection and connection are required; building opens the workspace 
   expect([...card.querySelectorAll('[data-slot="badge"]')].map(item => item.textContent)).toEqual([
     'Library',
     'Notes',
-    'History',
-    'Sources'
+    'History'
   ])
   expect(card.querySelector('ul[aria-label="Widgets"]')).toBeNull()
-  expect(card.querySelectorAll('[data-slot="badge"] svg')).toHaveLength(4)
+  expect(card.querySelectorAll('[data-slot="badge"] svg')).toHaveLength(3)
   expect(card.textContent).not.toContain('Summary')
-  expect(page.document.querySelectorAll('[data-slot="badge"]')).toHaveLength(12)
+  expect(page.document.querySelectorAll('[data-slot="badge"]')).toHaveLength(9)
   await page.click('Build Reading list')
   expect(page.location.history?.at(-1)).toBe('/workspace/created-workspace/overview')
   expect(page.calls.find(call => call.path === '/api/settings')?.body).toEqual({

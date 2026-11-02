@@ -20,8 +20,7 @@ const ideas: OnboardingIdea[] = [
     views: [
       view('Review queue', 'code'),
       view('Visual checks', 'photo'),
-      view('Design decisions', 'bulb'),
-      view('Release notes', 'file')
+      view('Design decisions', 'bulb')
     ],
     widgets: []
   },
@@ -35,8 +34,7 @@ const ideas: OnboardingIdea[] = [
     views: [
       view('Access tracker', 'key'),
       view('Trial bench', 'flask'),
-      view('Useful patterns', 'brain'),
-      view('Tool library', 'book')
+      view('Useful patterns', 'brain')
     ],
     widgets: []
   },
@@ -50,8 +48,7 @@ const ideas: OnboardingIdea[] = [
     views: [
       view('Saved places', 'map'),
       view('Outing planner', 'calendar'),
-      view('Tickets', 'file'),
-      view('Weekend ideas', 'bulb')
+      view('Tickets', 'file')
     ],
     widgets: []
   }

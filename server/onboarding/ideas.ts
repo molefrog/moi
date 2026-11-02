@@ -47,7 +47,7 @@ const idea = z
           icon: z.enum(APP_ICON_IDS).describe('Built-in Moi icon for this view')
         })
       )
-      .length(4)
+      .length(3)
       .describe('Full-page tools, each with its own tab and build chat'),
     widgets: z.array(appletPlan).max(4).describe('Small focused cards on Overview')
   })

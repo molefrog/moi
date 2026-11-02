@@ -35,7 +35,7 @@ One or two short sentences, at most 280 characters: what the workspace does and 
 
 ### Views and widgets
 
-Include exactly four full-page views and optionally up to four focused Overview widgets. For each, provide:
+Include exactly three full-page views and optionally up to four focused Overview widgets. For each, provide:
 
 - A sentence-case name.
 - For each view, a relevant built-in Moi icon ID to use when building it. Within each option, the workspace icon and all view icons must be different from one another.

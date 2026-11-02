@@ -46,12 +46,6 @@ const options = ['Reading list', 'Weekly planner', 'Project tracker'].map((name,
       icon: 'file' as const,
       description: 'Reading notes',
       features: ['Save takeaways']
-    },
-    {
-      name: 'Sources',
-      icon: 'book' as const,
-      description: 'Saved sources',
-      features: ['Browse sources']
     }
   ],
   widgets: [
