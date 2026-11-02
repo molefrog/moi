@@ -1,4 +1,5 @@
 import { mkdir, rename, readFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { OnboardingJobResult, IdeaDiscovery, WorkspaceBuild } from '@/lib/onboarding'
 import { discoveryProgressSchema } from '@/lib/onboarding'
@@ -19,6 +20,7 @@ import { composeBuildBrief } from './brief'
 
 type Job = OnboardingJobResult & {
   stage?: 'sending' | 'accepted'
+  workspacePath?: string
 }
 const defaults = {
   directory: join(DATA_DIR, 'onboarding'),
@@ -183,9 +185,33 @@ export function createOnboardingJobs(overrides: Partial<typeof defaults> = {}) {
   }
   async function build(key: string, progress: WorkspaceBuild, job: Job) {
     const idea = progress.idea
-    // The operation ID makes the directory stable across retries and
-    // distinct from both other operations and user-chosen workspace names.
-    const path = join(deps.workspacesRoot(), `onboarding-${key}`)
+    if (!job.workspacePath) {
+      const root = deps.workspacesRoot()
+      const legacyPath = join(root, `onboarding-${key}`)
+      if (existsSync(legacyPath)) job.workspacePath = legacyPath
+      else {
+        const name =
+          idea.name
+            .normalize('NFKC')
+            .toLowerCase()
+            .replace(/[^\p{L}\p{N}]+/gu, '-')
+            .slice(0, 60)
+            .replace(/^-|-$/g, '') || 'workspace'
+        await mkdir(root, { recursive: true })
+        for (let suffix = 1; ; suffix++) {
+          const candidate = join(root, suffix === 1 ? name : `${name}-${suffix}`)
+          try {
+            await mkdir(candidate)
+            job.workspacePath = candidate
+            break
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+          }
+        }
+      }
+      await write(key, job)
+    }
+    const path = job.workspacePath
     await deps.provisionWorkspace(path, progress.harness)
     if (!job.workspaceId) {
       const layout = await deps.setWorkspaceConfig(path, {

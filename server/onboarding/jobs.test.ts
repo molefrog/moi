@@ -143,6 +143,7 @@ test('duplicate workspace requests create one workspace and submit one brief', a
     },
     registerWorkspace: async path => {
       registered++
+      expect(path).toBe(join(dir, 'reading-list'))
       return { id: 'workspace1', addedAt: new Date().toISOString(), path, type: 'claude-code' }
     },
     harnessFor: () => ({
@@ -187,6 +188,8 @@ test('duplicate workspace requests create one workspace and submit one brief', a
 test('restart reconciles an accepted first message without sending it twice', async () => {
   const dir = await directory(),
     root = join(dir, 'workspaces')
+  const existingFile = join(root, 'reading-list', 'keep.txt')
+  await Bun.write(existingFile, 'Existing workspace')
   const state: WorkspaceBuild = {
     ...progress(),
     operationId: crypto.randomUUID(),
@@ -238,11 +241,14 @@ test('restart reconciles an accepted first message without sending it twice', as
     if ((await jobs.createFromIdea(state)).status === 'failed') break
     await Bun.sleep(5)
   }
-  const workspacePath = join(root, `onboarding-${state.operationId}`)
+  const workspacePath = join(root, 'reading-list-2')
   await setWorkspaceConfig(workspacePath, { name: 'Renamed by the user' })
   const restarted = createOnboardingJobs(deps)
   // Changes to the plan must not change the message used to reconcile an earlier send.
-  const updated = { ...state, idea: { ...state.idea, description: 'A revised plan' } }
+  const updated = {
+    ...state,
+    idea: { ...state.idea, name: 'New name', description: 'A revised plan' }
+  }
   await restarted.createFromIdea(updated, true)
   const result = await settle(
     () => restarted.createFromIdea(state),
@@ -251,6 +257,7 @@ test('restart reconciles an accepted first message without sending it twice', as
   expect(result.sessionId).toBe('native-session')
   expect(sends).toBe(1)
   expect((await getWorkspaceConfig(workspacePath)).name).toBe('Renamed by the user')
+  expect(await Bun.file(existingFile).text()).toBe('Existing workspace')
 })
 
 for (const type of ['claude-code', 'codex'] as const) {
