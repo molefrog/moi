@@ -13,7 +13,7 @@ import {
 } from '@/client/components/ui/dialog'
 import { Input } from '@/client/components/ui/input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
-import { validateWorkspaceFolderName } from '@/lib/workspace-name'
+import { validateWorkspaceName } from '@/lib/workspace-name'
 import { WORKSPACE_TYPE_ORDER } from '@/lib/workspace-types'
 import type { WorkspaceType } from '@/lib/types'
 
@@ -43,7 +43,7 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
   const [name, setName] = useState('')
 
   const trimmedName = name.trim()
-  const nameError = trimmedName ? validateWorkspaceFolderName(trimmedName) : null
+  const nameError = trimmedName ? validateWorkspaceName(trimmedName) : null
   const isCreating = createMutation.isPending
   const isChecking = info.isPending || info.isFetching
   const installed = info.isError ? undefined : info.data?.installed

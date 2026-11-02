@@ -7,7 +7,7 @@ import { Hono } from 'hono'
 import { serveStatic } from 'hono/bun'
 import { createMiddleware } from 'hono/factory'
 import { existsSync } from 'node:fs'
-import { basename, join, resolve } from 'node:path'
+import { basename, resolve } from 'node:path'
 
 import { UPDATE_ACTIVE_AGENT_MESSAGE } from '@/lib/update'
 import { resolveWorkspaceTheme } from '@/lib/themes'
@@ -96,7 +96,8 @@ import {
 import { submitView, ViewStartupError } from '../sessions/view-sessions'
 import { listWidgets, serveWidget } from '../applets/widgets'
 import { getWorkspaceConfig, setWorkspaceConfig } from '../workspaces/config'
-import { provisionWorkspace, validateWorkspaceFolderName } from '../workspaces/init'
+import { createWorkspaceDirectory, provisionWorkspace } from '../workspaces/init'
+import { validateWorkspaceName } from '@/lib/workspace-name'
 import { resolveWorkspaceImportMetadata } from '../workspaces/import'
 import type { WorkspaceImportMetadata } from '../workspaces/import'
 import { getWorkspaceEnvView, parseEnvUpdate, updateWorkspaceEnv } from '../workspaces/env'
@@ -1055,23 +1056,23 @@ workspaces.post('/create', async c => {
   }
   const availability = await workspaceTypeAvailability(type)
   if (availability.status !== 'available') return c.text(availability.reason, 400)
-  let name = typeof body?.name === 'string' ? body.name.trim() : ''
-  if (body?.name === undefined) {
-    name = 'My workspace'
-    for (let suffix = 2; existsSync(join(createdWorkspacesRoot(), name)); suffix++)
-      name = `My workspace ${suffix}`
-  }
-  const invalid = validateWorkspaceFolderName(name)
+  const name =
+    body?.name === undefined
+      ? 'My workspace'
+      : typeof body.name === 'string'
+        ? body.name.trim()
+        : ''
+  const invalid = validateWorkspaceName(name)
   if (invalid) return c.text(invalid, 400)
-  const path = join(createdWorkspacesRoot(), name)
-  if (existsSync(path)) return c.text('A folder with that name already exists', 409)
+  const path = await createWorkspaceDirectory(name, createdWorkspacesRoot())
   try {
     await provisionWorkspace(path, type)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return c.text(`Could not create workspace: ${message}`, 500)
   }
-  const entry = await registerWorkspace(path, { type })
+  await setWorkspaceConfig(path, { name })
+  const entry = await registerWorkspace(path, { id: basename(path), type, name })
   // Nudge every connected client (the sidebar list) to refetch.
   publishEvent({ type: 'workspaces-list:updated' })
   return c.json(entry, 201)

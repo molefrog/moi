@@ -1,12 +1,12 @@
 import { mkdir, rename, readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import type { OnboardingJobResult, IdeaDiscovery, WorkspaceBuild } from '@/lib/onboarding'
 import { discoveryProgressSchema } from '@/lib/onboarding'
 import { DATA_DIR } from '../data-dir'
 import { createdWorkspacesRoot } from '../app-config'
-import { provisionWorkspace } from '../workspaces/init'
-import { registerWorkspace } from '../workspaces/registry'
+import { createWorkspaceDirectory, provisionWorkspace } from '../workspaces/init'
+import { getWorkspace, registerWorkspace } from '../workspaces/registry'
 import { setWorkspaceConfig } from '../workspaces/config'
 import { saveLayout } from '../workspaces/layout'
 import { resolveWorkspaceTheme } from '@/lib/themes'
@@ -27,6 +27,7 @@ const defaults = {
   workspacesRoot: createdWorkspacesRoot,
   provisionWorkspace,
   registerWorkspace,
+  getWorkspace,
   setWorkspaceConfig,
   publishEvent,
   harnessFor,
@@ -189,26 +190,7 @@ export function createOnboardingJobs(overrides: Partial<typeof defaults> = {}) {
       const root = deps.workspacesRoot()
       const legacyPath = join(root, `onboarding-${key}`)
       if (existsSync(legacyPath)) job.workspacePath = legacyPath
-      else {
-        const name =
-          idea.name
-            .normalize('NFKC')
-            .toLowerCase()
-            .replace(/[^\p{L}\p{N}]+/gu, '-')
-            .slice(0, 60)
-            .replace(/^-|-$/g, '') || 'workspace'
-        await mkdir(root, { recursive: true })
-        for (let suffix = 1; ; suffix++) {
-          const candidate = join(root, suffix === 1 ? name : `${name}-${suffix}`)
-          try {
-            await mkdir(candidate)
-            job.workspacePath = candidate
-            break
-          } catch (error) {
-            if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
-          }
-        }
-      }
+      else job.workspacePath = await createWorkspaceDirectory(idea.name, root, deps.getWorkspace)
       await write(key, job)
     }
     const path = job.workspacePath
@@ -223,7 +205,11 @@ export function createOnboardingJobs(overrides: Partial<typeof defaults> = {}) {
         path
       )
     }
-    const ws = await deps.registerWorkspace(path, { type: progress.harness, name: idea.name })
+    const ws = await deps.registerWorkspace(path, {
+      id: job.workspaceId ?? basename(path),
+      type: progress.harness,
+      name: idea.name
+    })
     job.workspaceId = ws.id
     await write(key, job)
     const briefPath = join(path, 'onboarding-brief.md')

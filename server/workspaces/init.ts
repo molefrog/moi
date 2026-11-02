@@ -7,11 +7,34 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import type { WorkspaceType } from '@/lib/types'
-export { validateWorkspaceFolderName } from '@/lib/workspace-name'
+import { workspaceIdFromName } from '@/lib/workspace-name'
+import { validateWorkspaceId } from '@/lib/ids'
+import { getWorkspace } from './registry'
 
 import { harnessFor } from '../harness/registry'
 import { createDependencyInstallLogPath, scaffoldMoiDir } from './scaffold'
 import { installBundledSkills } from '../skills/template'
+
+// Reserve a unique folder whose basename is also its workspace ID.
+export async function createWorkspaceDirectory(
+  name: string,
+  root: string,
+  lookup = getWorkspace
+): Promise<string> {
+  const base = workspaceIdFromName(name)
+  await mkdir(root, { recursive: true })
+  for (let suffix = 1; ; suffix++) {
+    const id = suffix === 1 ? base : `${base}-${suffix}`
+    if (validateWorkspaceId(id) || (await lookup(id))) continue
+    const path = join(root, id)
+    try {
+      await mkdir(path)
+      return path
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+    }
+  }
+}
 
 // Where each backend loads skills from — the harness owns the answer
 // (Claude Code: `.claude/skills/`; OpenClaw: `<workspace>/skills/`; Codex:

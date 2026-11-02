@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join, basename } from 'node:path'
 import * as appConfig from '../app-config'
 import * as init from '../workspaces/init'
+import { getWorkspaceConfig } from '../workspaces/config'
 import { DEFAULT_REGISTRY_PATH, setRegistryPath } from '../workspaces/registry'
 import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test'
 
@@ -48,7 +49,7 @@ test('creating a workspace defaults a missing provider type to Claude Code', asy
   })
 
   expect(response.status).toBe(400)
-  expect(await response.text()).toBe('Folder name is required')
+  expect(await response.text()).toBe('Workspace name is required')
 })
 
 test('creating a workspace rejects an unknown provider type', async () => {
@@ -140,14 +141,14 @@ test('creation checks installation without requiring login', async () => {
       body: JSON.stringify({ name: '', type: 'codex' })
     })
     expect(response.status).toBe(400)
-    expect(await response.text()).toBe('Folder name is required')
+    expect(await response.text()).toBe('Workspace name is required')
     expect(authSpy).not.toHaveBeenCalled()
   } finally {
     authSpy.mockRestore()
   }
 })
 
-test('unnamed workspaces get an available default name and the selected agent', async () => {
+test('creation uses a unique slug for the ID and folder while preserving the display name', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'moi-empty-workspace-'))
   setRegistryPath(join(directory, 'registry.json'))
   const root = spyOn(appConfig, 'createdWorkspacesRoot').mockReturnValue(directory)
@@ -156,18 +157,24 @@ test('unnamed workspaces get an available default name and the selected agent', 
     return { skillsDir: path, scaffold: 'exists', installLogPath: join(path, 'install.log') }
   })
   try {
-    for (const [type, name] of [
-      ['codex', 'My workspace'],
-      ['claude-code', 'My workspace 2']
-    ]) {
+    for (const [type, name, displayName] of [
+      ['codex', 'my-workspace', undefined],
+      ['claude-code', 'my-workspace-2', undefined],
+      ['codex', 'cafe-research', 'Café / Research'],
+      ['codex', 'cafe-research-2', 'Café / Research'],
+      ['codex', 'create-2', 'Create']
+    ] as const) {
       const response = await api.request('/api/workspaces/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type })
+        body: JSON.stringify({ type, name: displayName })
       })
       expect(response.status).toBe(201)
       const workspace = await response.json()
       expect(basename(workspace.path)).toBe(name)
+      expect(workspace.id).toBe(name)
+      expect(workspace.name).toBe(displayName ?? 'My workspace')
+      expect((await getWorkspaceConfig(workspace.path)).name).toBe(displayName ?? 'My workspace')
       expect(workspace.type).toBe(type)
       expect(provision).toHaveBeenCalledWith(join(directory, name!), type)
     }

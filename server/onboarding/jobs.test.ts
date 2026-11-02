@@ -141,10 +141,12 @@ test('duplicate workspace requests create one workspace and submit one brief', a
       await Bun.write(join(path, '.keep'), '')
       return { skillsDir: path, scaffold: 'exists', installLogPath: '' }
     },
-    registerWorkspace: async path => {
+    getWorkspace: async () => null,
+    registerWorkspace: async (path, input) => {
       registered++
       expect(path).toBe(join(dir, 'reading-list'))
-      return { id: 'workspace1', addedAt: new Date().toISOString(), path, type: 'claude-code' }
+      expect(input?.id).toBe('reading-list')
+      return { id: input!.id!, addedAt: new Date().toISOString(), path, type: 'claude-code' }
     },
     harnessFor: () => ({
       ...harnessFor('claude-code'),
@@ -177,7 +179,7 @@ test('duplicate workspace requests create one workspace and submit one brief', a
     () => jobs.createFromIdea(state),
     value => value.status === 'done'
   )
-  expect(result.workspaceId).toBe('workspace1')
+  expect(result.workspaceId).toBe('reading-list')
   expect(result.sessionId).toBeTruthy()
   expect(sends).toBe(1)
   expect(registered).toBe(1)
@@ -199,12 +201,16 @@ test('restart reconciles an accepted first message without sending it twice', as
   const deps = {
     directory: join(dir, 'jobs'),
     workspacesRoot: () => root,
+    getWorkspace: async (id: string) =>
+      id === 'reading-list-2'
+        ? { id, path: join(dir, 'imported'), type: 'claude-code' as const, addedAt: '' }
+        : null,
     provisionWorkspace: async (path: string) => {
       await Bun.write(join(path, '.keep'), '')
       return { skillsDir: path, scaffold: 'exists' as const, installLogPath: '' }
     },
-    registerWorkspace: async (path: string) => ({
-      id: 'workspace2',
+    registerWorkspace: async (path: string, input?: { id?: string }) => ({
+      id: input!.id!,
       path,
       type: 'claude-code' as const,
       addedAt: new Date().toISOString()
@@ -241,7 +247,7 @@ test('restart reconciles an accepted first message without sending it twice', as
     if ((await jobs.createFromIdea(state)).status === 'failed') break
     await Bun.sleep(5)
   }
-  const workspacePath = join(root, 'reading-list-2')
+  const workspacePath = join(root, 'reading-list-3')
   await setWorkspaceConfig(workspacePath, { name: 'Renamed by the user' })
   const restarted = createOnboardingJobs(deps)
   // Changes to the plan must not change the message used to reconcile an earlier send.
@@ -255,6 +261,7 @@ test('restart reconciles an accepted first message without sending it twice', as
     value => value.status === 'done'
   )
   expect(result.sessionId).toBe('native-session')
+  expect(result.workspaceId).toBe('reading-list-3')
   expect(sends).toBe(1)
   expect((await getWorkspaceConfig(workspacePath)).name).toBe('Renamed by the user')
   expect(await Bun.file(existingFile).text()).toBe('Existing workspace')
