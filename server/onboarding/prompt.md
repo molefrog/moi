@@ -21,7 +21,7 @@ Each workspace should address a different need, offer a useful first action, and
 
 ## Progress
 
-Keep progress messages short and in plain language. Describe your current activity and end with one ellipsis (…). Omit private details, names, quotes, and unverified claims.
+Keep progress messages short and in plain language. Describe the current process with an -ing phrase, without a subject (e.g. “Searching recent email…”), and end with one ellipsis (…). Omit private details, names, quotes, and unverified claims.
 
 ## Workspace plan
 

@@ -55,19 +55,18 @@ const ideas: OnboardingIdea[] = [
 ]
 
 export function OnboardingPreviewPage() {
-  const [pendingIdeaId, setPendingIdeaId] = useState<string>()
+  const [selectedIdeaId, setSelectedIdeaId] = useState<string>()
   return (
     <main className="flex h-dvh flex-col overflow-hidden">
       <ScreenShell>
         <IdeaOptions
           ideas={ideas}
-          disabled={!!pendingIdeaId}
-          pendingIdeaId={pendingIdeaId}
-          onSelect={setPendingIdeaId}
+          selectedIdeaId={selectedIdeaId}
+          onSelect={setSelectedIdeaId}
           feedback={null}
           footer={
-            <Button size="lg" variant="ghost" onClick={() => setPendingIdeaId(undefined)}>
-              {pendingIdeaId ? 'Reset preview' : 'Start from scratch'}
+            <Button size="lg" variant="ghost" onClick={() => setSelectedIdeaId(undefined)}>
+              {selectedIdeaId ? 'Reset preview' : 'Start from scratch'}
             </Button>
           }
         />

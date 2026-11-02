@@ -9,12 +9,11 @@ import type { OnboardingIdea, OnboardingViewPlan } from '@/lib/onboarding'
 
 type OnboardingIdeaDiskProps = {
   idea: OnboardingIdea
-  disabled: boolean
-  pending: boolean
+  state: 'available' | 'chosen' | 'not-chosen'
   onSelect: () => void
 }
 
-export function OnboardingIdeaDisk({ idea, disabled, pending, onSelect }: OnboardingIdeaDiskProps) {
+export function OnboardingIdeaDisk({ idea, state, onSelect }: OnboardingIdeaDiskProps) {
   const theme = resolveWorkspaceTheme(idea.theme)
   const descriptionId = useId()
 
@@ -23,8 +22,8 @@ export function OnboardingIdeaDisk({ idea, disabled, pending, onSelect }: Onboar
       type="button"
       aria-label={`Build ${idea.name}`}
       aria-describedby={descriptionId}
-      aria-busy={pending}
-      disabled={disabled}
+      aria-busy={state === 'chosen'}
+      disabled={state !== 'available'}
       onClick={onSelect}
       style={getWorkspaceThemeStyle(theme)}
       className={cn(
@@ -34,9 +33,9 @@ export function OnboardingIdeaDisk({ idea, disabled, pending, onSelect }: Onboar
         'motion-safe:transition-[translate,filter] motion-safe:duration-200 motion-safe:enabled:hover:-translate-y-1 motion-safe:enabled:active:translate-y-0',
         'lg:motion-safe:first:enabled:hover:translate-y-5 lg:motion-safe:last:enabled:hover:translate-y-4 lg:motion-safe:first:enabled:active:translate-y-3 lg:motion-safe:last:enabled:active:translate-y-3',
         'disabled:cursor-default',
-        pending &&
-          'motion-safe:animate-in motion-safe:duration-700 motion-safe:ease-in-out motion-safe:direction-alternate motion-safe:repeat-infinite motion-safe:spin-in-3',
-        disabled && !pending && 'opacity-60'
+        state === 'chosen' &&
+          'motion-safe:animate-out motion-safe:ease-in-out motion-safe:animation-duration-1500 motion-safe:direction-alternate motion-safe:repeat-infinite motion-safe:[animation-composition:add] motion-safe:spin-out-3',
+        state === 'not-chosen' && 'invisible'
       )}
     >
       <DiskBackground className="fill-primary" />
@@ -50,8 +49,8 @@ export function OnboardingIdeaDisk({ idea, disabled, pending, onSelect }: Onboar
           </span>
         </span>
       </span>
-      <span className="relative mx-2 my-2 flex flex-1 rounded-md p-1.5 inset-shadow-[0_0_2px_1px] inset-shadow-foreground/15">
-        <span className="relative flex flex-1 flex-col items-center justify-center gap-3 rounded-lg bg-background px-4 py-8 text-foreground">
+      <span className="relative mx-2 my-2 flex flex-1 rounded-lg p-1.5 inset-shadow-[0_0_2px_1px] inset-shadow-foreground/15">
+        <span className="relative flex flex-1 flex-col items-center justify-center gap-3 rounded-md bg-background px-4 py-8 text-foreground">
           <span className="flex max-w-full items-center justify-center gap-2">
             <WorkspaceIcon
               icon={{ type: 'glyph', value: idea.icon, background: 'theme' }}

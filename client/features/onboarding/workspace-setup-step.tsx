@@ -108,7 +108,7 @@ export function WorkspaceSetupStep({
       {startFromScratch.isPending ? 'Creating workspace…' : 'Start from scratch'}
     </Button>
   )
-  if (!selection && (!discovery || error))
+  if (!selection && (!discovery || error || busy))
     return (
       <DiscoveryIntro
         disabled={busy || !!emptyWorkspaceId}
@@ -122,8 +122,7 @@ export function WorkspaceSetupStep({
     return (
       <IdeaOptions
         ideas={ideas.data.ideas ?? []}
-        disabled={busy || !!selection || !!emptyWorkspaceId}
-        pendingIdeaId={selection && !error && !finishError ? selection.ideaId : undefined}
+        selectedIdeaId={selection?.ideaId}
         onSelect={select}
         feedback={feedback}
         footer={footer}
@@ -201,16 +200,14 @@ function DiscoveryProgress({ message }: DiscoveryProgressProps) {
 
 type IdeaOptionsProps = {
   ideas: OnboardingIdea[]
-  disabled: boolean
-  pendingIdeaId?: string
+  selectedIdeaId?: string
   onSelect: (id: string) => void
   feedback: ReactNode
   footer: ReactNode
 }
 export function IdeaOptions({
   ideas,
-  disabled,
-  pendingIdeaId,
+  selectedIdeaId,
   onSelect,
   feedback,
   footer
@@ -229,8 +226,9 @@ export function IdeaOptions({
           <OnboardingIdeaDisk
             key={idea.id}
             idea={idea}
-            disabled={disabled}
-            pending={pendingIdeaId === idea.id}
+            state={
+              !selectedIdeaId ? 'available' : selectedIdeaId === idea.id ? 'chosen' : 'not-chosen'
+            }
             onSelect={() => onSelect(idea.id)}
           />
         ))}

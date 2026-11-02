@@ -286,7 +286,7 @@ test('demo still bypasses onboarding until signup', async () => {
   expect(page.location.history?.at(-1)).toBe('/')
 })
 
-test('creation keeps the cards visible and blocks duplicate clicks until automatic navigation', async () => {
+test('creation keeps the card slots and blocks duplicate clicks until automatic navigation', async () => {
   const pending = Promise.withResolvers<Response>()
   const page = await mount(true, false, true, false, () => pending.promise)
   await page.click('ClaudeAnthropic')
