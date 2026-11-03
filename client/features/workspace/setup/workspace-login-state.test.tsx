@@ -23,7 +23,7 @@ function render(
   cfg.mockReturnValue({
     environment,
     demo: false,
-    collab: false,
+    experimental: { collab: false },
     demoInstallUrl: ''
   })
   const client = new QueryClient()
@@ -176,7 +176,7 @@ test('local Claude switches to manual code entry only through the trouble action
   cfg.mockReturnValue({
     environment: 'local',
     demo: false,
-    collab: false,
+    experimental: { collab: false },
     demoInstallUrl: ''
   })
   const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>')

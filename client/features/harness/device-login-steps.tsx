@@ -15,9 +15,10 @@ import { cn } from '@/client/lib/cn'
 type DeviceLoginStepsProps = {
   code: string
   url: string
+  className?: string
 }
 
-export function DeviceLoginSteps({ code, url }: DeviceLoginStepsProps) {
+export function DeviceLoginSteps({ code, url, className }: DeviceLoginStepsProps) {
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
@@ -34,7 +35,12 @@ export function DeviceLoginSteps({ code, url }: DeviceLoginStepsProps) {
   }
 
   return (
-    <ol className="mx-auto grid w-full max-w-64 gap-6 text-left text-sm lg:max-w-3xl lg:grid-cols-3 lg:text-center">
+    <ol
+      className={cn(
+        'mx-auto grid w-full max-w-64 gap-6 text-left text-sm lg:max-w-3xl lg:grid-cols-3 lg:text-center',
+        className
+      )}
+    >
       <li className="flex flex-col items-start gap-3 lg:items-center">
         <IconCircleNumber1 size={24} stroke={1.5} className="shrink-0" />
         <div className="flex min-w-0 flex-col items-start gap-3 lg:items-center">
