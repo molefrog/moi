@@ -1,7 +1,6 @@
 import { loadLayout, saveLayout } from './layout'
 import type { WorkspaceEntry, WorkspaceType } from '@/lib/types'
 import { harnessFor } from '../harness/registry'
-import { findHarnessExecutable } from '../harness/executable'
 import { harnessStore } from '../harness/auth'
 import { getWorkspaceSkillsStatus } from '../skills/update'
 import { publishEvent } from '../events'
@@ -45,8 +44,6 @@ export async function changeWorkspaceHarness(ws: WorkspaceEntry, type: Workspace
     if (type === previousType) return current
     if (harness.activeSessions().some(session => session.workspaceId === ws.id))
       throw new HarnessTransitionError('Wait for the agent to finish before changing it')
-    if (!findHarnessExecutable(type))
-      throw new HarnessTransitionError('Install this agent before selecting it')
     const layoutBefore = await loadLayout(current.path)
     const before = await updateWorkspaceState(current, state => {
       const before = structuredClone(state)

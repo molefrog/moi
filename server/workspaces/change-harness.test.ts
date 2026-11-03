@@ -26,9 +26,8 @@ beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'moi-switch-'))
   setRegistryPath(join(root, 'registry.json'))
   setWorkspaceStateRoot(join(root, 'state'))
-  const installed = spyOn(executable, 'findHarnessExecutable').mockReturnValue('/installed')
   const stop = spyOn(claudeCodeHarness, 'stopWorkspace').mockImplementation(() => {})
-  restore = [() => installed.mockRestore(), () => stop.mockRestore()]
+  restore = [() => stop.mockRestore()]
 })
 afterEach(async () => {
   restore.forEach(fn => fn())
@@ -86,15 +85,13 @@ test('rejects active sessions', async () => {
   }
 })
 
-test('unavailable target leaves selections intact', async () => {
+test('switches to an uninstalled agent so workspace setup can offer installation', async () => {
   const ws = await registerWorkspace(root, { type: 'claude-code' })
-  await updateWorkspaceState(ws, state => {
-    state.selected.overview = 'old'
-  })
   const unavailable = spyOn(executable, 'findHarnessExecutable').mockReturnValue(null)
   try {
-    await expect(changeWorkspaceHarness(ws, 'codex')).rejects.toThrow('Install')
-    expect((await readWorkspaceState(ws)).selected.overview).toBe('old')
+    const updated = await changeWorkspaceHarness(ws, 'codex')
+    expect(updated.type).toBe('codex')
+    expect((await getWorkspace(ws.id))?.type).toBe('codex')
   } finally {
     unavailable.mockRestore()
   }

@@ -27,7 +27,6 @@ import {
 } from '@/client/components/ui/dropdown-menu'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/client/components/ui/tooltip'
 import { useLive } from '@/client/features/chat/chat-store'
-import { useWorkspaceCreationInfo } from '@/client/features/workspace/add/api'
 
 import { useChangeWorkspaceHarness } from '@/client/features/workspace/api'
 import { SettingsPage, SettingsRow, SettingsSection } from './settings-layout'
@@ -119,7 +118,6 @@ function WorkspaceHarnessSetting() {
   const { demo } = useAppConfig()
   const { workspaceId, provider } = useWorkspaceLayoutCtx()
   const type = provider ?? 'claude-code'
-  const installations = useWorkspaceCreationInfo()
   const change = useChangeWorkspaceHarness(workspaceId)
   const active = useLive(state =>
     Object.entries(state.activity).some(
@@ -143,7 +141,7 @@ function WorkspaceHarnessSetting() {
               <DropdownMenu>
                 <DropdownMenuTrigger
                   render={<Button variant="outline" />}
-                  disabled={Boolean(reason) || change.isPending || !installations.data}
+                  disabled={Boolean(reason) || change.isPending}
                   aria-label="Agent"
                 >
                   <img src={harnessIcon[type]} alt="" className="size-4 shrink-0" />
@@ -156,11 +154,7 @@ function WorkspaceHarnessSetting() {
                     onValueChange={value => change.mutate(value)}
                   >
                     {(['claude-code', 'codex'] as const).map(option => (
-                      <DropdownMenuRadioItem
-                        key={option}
-                        value={option}
-                        disabled={!installations.data?.installed[option]}
-                      >
+                      <DropdownMenuRadioItem key={option} value={option}>
                         <img src={harnessIcon[option]} alt="" className="size-4 shrink-0" />
                         {harnessLabel[option]}
                       </DropdownMenuRadioItem>
