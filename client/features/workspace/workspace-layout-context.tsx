@@ -87,7 +87,10 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
       // Optimistic: the grid/theme reflects the change before the PUT lands.
       const next = { ...prev, ...update }
       qc.setQueryData<WorkspaceLayoutResponse>(key, next)
-      pendingSave.current = accumulateLayoutSave(stripMeta(next), update, pendingSave.current)
+      pendingSave.current = {
+        ...accumulateLayoutSave(stripMeta(next), update, pendingSave.current),
+        harness: next.provider ?? 'claude-code'
+      }
 
       if (timer.current) clearTimeout(timer.current)
       // Persist the value captured at call time, NOT the cache at fire time: a
@@ -116,7 +119,7 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
       setLayout,
       name: query.data?.name ?? null,
       cwd: query.data?.cwd ?? null,
-      provider: query.data?.provider ?? null,
+      provider: query.data ? (query.data.provider ?? 'claude-code') : null,
       workspaceId: id,
       isLoading: query.isLoading
     }),

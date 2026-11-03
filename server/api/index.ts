@@ -892,11 +892,16 @@ one.put('/', async c => {
   const body = await c.req.json()
   if (!body || body.version !== 1) return c.text('Bad request', 400)
   // `origin` is the writing tab's id, echoed so that tab skips its own event.
-  const { origin, ...layout } = body
+  const { origin, harness, ...layout } = body
   // Preserve server-owned identity (name/icon) across a grid/theme save so the
   // client's PUT can't erase a `moi config`-set name. See mergeLayoutForSave.
   const existing = await loadLayout(ws.path)
   const next = mergeLayoutForSave(existing, layout)
+  if (harness !== undefined && harness !== (ws.type ?? 'claude-code')) {
+    next.selectedModel = existing.selectedModel
+    next.selectedEffort = existing.selectedEffort
+    next.selectedFastMode = existing.selectedFastMode
+  }
   await saveLayout(next, ws.path)
   if (
     JSON.stringify(resolveWorkspaceTheme(existing.theme)) !==

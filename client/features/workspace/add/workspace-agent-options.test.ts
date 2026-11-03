@@ -48,7 +48,7 @@ describe('create workspace agent options', () => {
       'Run in terminal to install ChatGPT:'
     ])
     expect(options.map(option => option.disabledCommand)).toEqual([
-      'curl -fsSL https://claude.ai/install.sh | sh',
+      'curl -fsSL https://claude.ai/install.sh | bash',
       'curl -fsSL https://chatgpt.com/codex/install.sh | sh'
     ])
   })

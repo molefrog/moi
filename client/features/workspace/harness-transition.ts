@@ -14,7 +14,7 @@ export async function receiveWorkspaceHarness(
   harness: WorkspaceType
 ) {
   const cached = queryClient.getQueryData<WorkspaceLayoutResponse>(workspaceKeys.layout(id))
-  let previous = cached?.provider
+  let previous = cached ? (cached.provider ?? 'claude-code') : undefined
   try {
     const key = `moi:workspace-harness:${id}`
     previous = (sessionStorage.getItem(key) as WorkspaceType | null) ?? previous

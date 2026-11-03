@@ -623,7 +623,11 @@ export type WorkspaceTabsState = {
 
 export type { AgentTheme, ColorTheme, FontTheme, RadiusTheme, WorkspaceTheme } from './themes'
 
-export type WorkspaceLayoutSave = Omit<WorkspaceLayout, 'tabs'> & { tabs?: WorkspaceTabsState }
+export type WorkspaceLayoutSave = Omit<WorkspaceLayout, 'tabs'> & {
+  tabs?: WorkspaceTabsState
+  // Captured when the edit is made, so delayed saves cannot restore another harness's defaults.
+  harness?: WorkspaceType
+}
 
 export type WorkspaceLayout = {
   version: 1
