@@ -12,7 +12,9 @@ for (const environment of ['local', 'cloud'] as const) {
       const mocks = createSetupMocks(environment, harness, 'login')
       const base = `/api/harnesses/${harness}/auth`
       const starting = mocks.request(`${base}/login`, { method: 'POST' })
-      expect((await (await mocks.request(base)).json()).login).toEqual({ state: 'starting' })
+      expect(
+        (await (await mocks.request('/api/harnesses/status?refresh=true')).json())[harness].login
+      ).toEqual({ state: 'starting' })
       const login = await (await starting).json()
       expect(login.url).toBe(
         harness === 'claude-code' && environment === 'cloud'
@@ -37,7 +39,10 @@ for (const environment of ['local', 'cloud'] as const) {
           body: JSON.stringify({ code: 'MOCK-AUTH-CODE' })
         })
       } else mocks.complete()
-      expect((await (await mocks.request(base)).json()).availability.status).toBe('available')
+      expect(
+        (await (await mocks.request('/api/harnesses/status?refresh=true')).json())[harness]
+          .availability.status
+      ).toBe('available')
     })
   }
 }
@@ -63,9 +68,9 @@ test('missing installation and folder scenarios return the real recovery shapes'
   for (const scenario of ['install', 'missing-folder'] as const) {
     const mocks = createSetupMocks('local', 'codex', scenario)
     const data = await (
-      await mocks.request(`/api/workspaces/${PREVIEW_WORKSPACE_ID}/agent?refresh=true`)
+      await mocks.request(`/api/workspaces/${PREVIEW_WORKSPACE_ID}/harness?refresh=true`)
     ).json()
-    if (scenario === 'missing-folder') expect(data.workspaceFolderMissing).toBe(true)
+    if (scenario === 'missing-folder') expect(data.isFolderMissing).toBe(true)
     else expect(data.availability).toMatchObject({ status: 'unavailable', code: 'not-installed' })
   }
 })
@@ -74,15 +79,27 @@ for (const harness of ['claude-code', 'codex'] as const) {
   test(`${harness} installation leads into the existing mock login`, async () => {
     const mocks = createSetupMocks('local', harness, 'install')
     const base = `/api/harnesses/${harness}/auth`
-    expect((await (await mocks.request(base)).json()).availability.code).toBe('not-installed')
+    expect(
+      (await (await mocks.request('/api/harnesses/status?refresh=true')).json())[harness]
+        .availability.code
+    ).toBe('not-installed')
     const installing = mocks.request(`${base}/install`, { method: 'POST' })
-    expect((await (await mocks.request(base)).json()).availability.code).toBe('not-installed')
+    expect(
+      (await (await mocks.request('/api/harnesses/status?refresh=true')).json())[harness]
+        .availability.code
+    ).toBe('not-installed')
     expect((await installing).ok).toBe(true)
-    expect((await (await mocks.request(base)).json()).availability.status).toBe('login-required')
+    expect(
+      (await (await mocks.request('/api/harnesses/status?refresh=true')).json())[harness]
+        .availability.status
+    ).toBe('login-required')
     expect((await (await mocks.request(`${base}/login`, { method: 'POST' })).json()).url).toBe(
       MOCK_SIGN_IN_URL
     )
     mocks.complete()
-    expect((await (await mocks.request(base)).json()).availability.status).toBe('available')
+    expect(
+      (await (await mocks.request('/api/harnesses/status?refresh=true')).json())[harness]
+        .availability.status
+    ).toBe('available')
   })
 }

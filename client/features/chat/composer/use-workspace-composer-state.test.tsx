@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import * as config from '@/client/api/app-config'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { canSubmitComposerAction } from '@/client/components/shared/composer'
-import type { HarnessAvailability, WorkspaceAgent } from '@/lib/types'
+import type { HarnessAvailability, WorkspaceHarness } from '@/lib/types'
 import * as skills from './use-workspace-skill-updates'
 import { useWorkspaceComposerState } from './use-workspace-composer-state'
 
@@ -36,10 +36,10 @@ test.each([
   'composer feedback for $status, demo=$demo, failed=$failed',
   ({ status, demo, failed, message }) => {
     const client = new QueryClient()
-    const key = workspaceKeys.agent('test')
+    const key = workspaceKeys.harness('test')
     const availability: HarnessAvailability =
       status === 'available' ? { status } : { status, reason: 'Agent needs attention' }
-    client.setQueryData<WorkspaceAgent>(key, {
+    client.setQueryData<WorkspaceHarness>(key, {
       provider: 'codex',
       availability,
       models: [],

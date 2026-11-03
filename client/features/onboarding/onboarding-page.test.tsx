@@ -66,17 +66,13 @@ async function mount(
           return scratchResponses?.create
             ? scratchResponses.create()
             : Response.json({ id: 'empty-workspace', path: '/tmp/My workspace', type: body.type })
-        if (path === '/api/workspaces/create')
-          return Response.json({
-            installed: { 'claude-code': true, codex: scratchResponses?.installed ?? true }
-          })
         if (path.endsWith('/auth/login')) {
           loginStarted = true
           return Response.json({ id: 'test-login', url: 'https://example.com/login' })
         }
         if (path.endsWith('/auth/install')) return scratchResponses!.install!()
-        if (path.endsWith('/auth'))
-          return (
+        if (path.endsWith('/status?refresh=true')) {
+          const response =
             scratchResponses?.auth?.() ??
             Response.json({
               login: loginStarted
@@ -87,7 +83,9 @@ async function mount(
                   ? { status: 'unavailable', code: 'not-installed' }
                   : { status: connected ? 'available' : 'login-required' }
             })
-          )
+          const status = await response.json()
+          return Response.json({ 'claude-code': status, codex: status })
+        }
         if (path === '/api/onboarding/discover' && discoveryResponse) return discoveryResponse()
         if (path === '/api/onboarding/discover')
           return Response.json({
@@ -185,7 +183,7 @@ async function mount(
     calls,
     click,
     settle,
-    refreshAuth: () => client.refetchQueries({ queryKey: ['harness-auth'] })
+    refreshAuth: () => client.refetchQueries({ queryKey: ['harness-status'] })
   }
 }
 

@@ -20,7 +20,7 @@ import {
   getCachedWorkspaceState
 } from '@/client/features/workspace/workspace-state'
 import { useCollabEnabled } from '@/client/features/collab'
-import { useWorkspaceAgent } from '@/client/features/workspace/api'
+import { useWorkspaceHarness } from '@/client/features/workspace/api'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-layout-context'
 import {
   useCreateView,
@@ -38,7 +38,7 @@ export function useViewActions() {
   const selectionScope = collabEnabled ? 'browser-tab' : 'shared'
   const { workspaceId, layout } = useWorkspaceLayoutCtx()
   const { pinnedSessionId } = usePinnedSession()
-  const modelData = useWorkspaceAgent(workspaceId).data
+  const modelData = useWorkspaceHarness(workspaceId).data
   const createMutation = useCreateView(workspaceId)
   const saveMutation = useSaveViewDraft(workspaceId)
   const submitMutation = useSubmitView(workspaceId)

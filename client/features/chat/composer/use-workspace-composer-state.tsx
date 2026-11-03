@@ -1,4 +1,5 @@
-import { useWorkspaceAgent } from '@/client/features/workspace/api'
+import { useHarnessStatus } from '@/client/features/harness/api'
+import { useWorkspaceHarness } from '@/client/features/workspace/api'
 import { resolveAgentAvailability, type AgentAvailability } from '@/client/lib/agent-availability'
 
 import { ErrorBanner } from './banners/error-banner'
@@ -23,8 +24,15 @@ export function useWorkspaceComposerState(
   workspaceId: string,
   { chatError, onDismissChatError, chatLoadError, onRetryChatLoad }: WorkspaceComposerStateOptions
 ): WorkspaceComposerState {
-  const { data: agent, error, refetch } = useWorkspaceAgent(workspaceId)
-  const availability = agent?.availability
+  const workspace = useWorkspaceHarness(workspaceId)
+  const harness = workspace.data
+  const status = useHarnessStatus(
+    harness?.hasAuthOverrides || harness?.isFolderMissing ? undefined : harness?.provider
+  )
+  const readiness = status.isEnabled ? status : workspace
+  const error = readiness.error ?? workspace.error
+  const refetch = workspace.isError ? workspace.refetch : readiness.refetch
+  const availability = readiness.data?.availability
   const { bannerProps: skillUpdateBanner } = useWorkspaceSkillUpdates(workspaceId)
   const agentAvailability = resolveAgentAvailability(availability, Boolean(error))
   // Recovery hides chat. Only checks that leave the workspace visible need a banner.

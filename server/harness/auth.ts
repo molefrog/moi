@@ -1,3 +1,4 @@
+import { pathHarnessAvailability } from './executable'
 // Login is global per harness. Workspace readiness is checked independently
 // using each workspace’s environment.
 import type {
@@ -7,7 +8,6 @@ import type {
   WorkspaceType
 } from '@/lib/types'
 
-import { listWorkspaces } from '../workspaces/registry'
 import { publishEvent } from '../events'
 import { harnessFor } from './registry'
 import type { HarnessWorkspace, HarnessLoginAttempt } from './types'
@@ -29,7 +29,7 @@ export type HarnessStoreOptions = {
   probe: (ws: HarnessTarget) => Promise<HarnessAvailability>
   startLogin: (type: WorkspaceType) => Promise<HarnessLoginAttempt>
   publish: (event: HarnessUpdatedEvent) => void
-  onAuthChanged?: (type: WorkspaceType) => Promise<void>
+  onAuthChanged?: (type: WorkspaceType, availability: HarnessAvailability) => Promise<void>
   availabilityTtlMs?: number
   loginPollMs?: number
   loginDeadlineMs?: number
@@ -83,7 +83,7 @@ export function createHarnessStore(options: HarnessStoreOptions) {
   }
 
   async function publish(context: HarnessTarget, availability: HarnessAvailability) {
-    if (typeof context === 'string') return options.onAuthChanged?.(context)
+    if (typeof context === 'string') return options.onAuthChanged?.(context, availability)
     options.publish({
       type: 'harness:updated',
       workspaceId: context.id,
@@ -106,9 +106,9 @@ export function createHarnessStore(options: HarnessStoreOptions) {
     return value
   }
 
-  async function getAvailability(ws: HarnessTarget): Promise<HarnessAvailability> {
+  async function getAvailability(ws: HarnessTarget, fresh = false): Promise<HarnessAvailability> {
     const entry = entryFor(ws)
-    if (entry.cached && Date.now() - entry.cached.checkedAt < ttlMs) {
+    if (!fresh && entry.cached && Date.now() - entry.cached.checkedAt < ttlMs) {
       return entry.cached.value
     }
     return probeFresh(ws)
@@ -279,8 +279,9 @@ export const harnessStore = createHarnessStore({
     if (typeof context !== 'string') {
       return (await harness.availability?.(context)) ?? { status: 'available' }
     }
-    if (!harness.authStatus)
-      return { status: 'unavailable', reason: 'This agent requires terminal sign-in' }
+    if (!harness.authStatus) return pathHarnessAvailability(harness.id)
+    const runtime = await harness.availability?.()
+    if (runtime && runtime.status !== 'available') return runtime
     return harness.authStatus()
   },
   startLogin: type => {
@@ -289,15 +290,11 @@ export const harnessStore = createHarnessStore({
     return start()
   },
   publish: publishEvent,
-  onAuthChanged: async type => {
-    // Shared credentials still need an independent check in each workspace.
-    try {
-      const workspaces = await listWorkspaces()
-      await Promise.all(
-        workspaces.filter(ws => harnessFor(ws).id === type).map(ws => harnessStore.refresh(ws))
-      )
-    } catch (error) {
-      console.error('[harness-auth] could not refresh workspaces after login', error)
-    }
+  onAuthChanged: async (type, availability) => {
+    publishEvent({
+      type: 'harness-status:changed',
+      harness: type,
+      status: { availability, login: harnessStore.getLogin(type) }
+    })
   }
 })

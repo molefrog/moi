@@ -224,7 +224,9 @@ workspace's environment. Login credentials remain owned by the provider CLI.
   `account/login/start` uses browser OAuth locally and `chatgptDeviceCode` in
   cloud. Local login opens the browser; cloud returns a URL and device code.
 
-`GET /api/harnesses/:type/auth` returns cached global readiness and login state.
+`GET /api/harnesses/status` returns one status map for all harnesses, including
+installation availability and login state. Checks run concurrently.
+`?refresh=true` rechecks external sign-in/sign-out and installation changes.
 `POST /api/harnesses/:type/auth/login` starts or reuses an attempt;
 `POST /api/harnesses/:type/auth/login/:id/code` submits a manual authorization
 code. The attempt ID rejects submissions from an older login. Startup reports
@@ -232,12 +234,15 @@ code. The attempt ID rejects submissions from an older login. Startup reports
 
 During login, the server rechecks readiness until the provider confirms
 completion and readiness succeeds, or the attempt fails or reaches its
-ten-minute deadline. Shutdown cancels active attempts. Auth changes trigger
-independent readiness checks for registered workspaces using that harness,
-published as `harness:updated` events.
+ten-minute deadline. Shutdown cancels active attempts. Auth changes publish `harness-status:changed` once for all consumers. The client
+shares one status query across onboarding and workspace navigation. It
+refreshes on focus, reconnect, and authentication changes, and polls only during
+an active login.
 
-`GET /api/workspaces/:id/agent` returns workspace readiness and the model
-catalog. Adding `?refresh=true` refreshes the shell PATH and bypasses the
+`GET /api/workspaces/:id/harness` returns the workspace model catalog, capabilities,
+and folder checks. Only workspaces with credential environment overrides or gateway-backed
+harnesses probe workspace readiness; ordinary Claude and Codex workspaces use
+the shared account status. Adding `?refresh=true` refreshes the shell PATH and bypasses the
 readiness cache.
 
 ## What a harness adapter must support

@@ -480,8 +480,10 @@ export type WorkspaceSkillsUpdateFailure = WorkspaceSkillsStatus & {
 
 export type HarnessInstallations = Record<WorkspaceType, boolean>
 
-// Setup checks only runtime availability. Workspace checks may also report
-// that the provider needs a login the host can start.
+// Shared runtime/account readiness and the current sign-in attempt.
+export type HarnessStatus = { availability: HarnessAvailability; login?: HarnessLoginState }
+export type HarnessStatuses = Record<WorkspaceType, HarnessStatus>
+
 export type HarnessAvailability =
   | { status: 'available' }
   | { status: 'login-required'; reason: string }
@@ -769,11 +771,13 @@ export type Model = {
   supportsAutoMode?: boolean
 }
 
-// GET /api/workspaces/:id/agent. Model changes arrive on refetch;
+// GET /api/workspaces/:id/harness. Model changes arrive on refetch;
 // `harness:updated` events refresh availability.
-export type WorkspaceAgent = {
-  workspaceFolderMissing?: boolean
-  // The agent backend that produced this snapshot — matches the workspace
+export type WorkspaceHarness = {
+  /** Credential overrides require workspace readiness instead of shared account status. */
+  hasAuthOverrides?: boolean
+  isFolderMissing?: boolean
+  // The harness that produced this snapshot — matches the workspace
   // provider.
   provider: WorkspaceType
   // Runtime presence and provider auth state, from the server-side cache.

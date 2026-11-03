@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client'
 import { parseHTML } from 'linkedom'
 import { renderToStaticMarkup } from 'react-dom/server'
 import * as config from '@/client/api/app-config'
-import type { HarnessAuth, LoginHarness } from '@/client/features/harness/api'
+import type { HarnessStatus, LoginHarness } from '@/client/features/harness/api'
 import { WorkspaceLoginState } from './workspace-login-state'
 
 let cfg: ReturnType<typeof spyOn<typeof config, 'useAppConfig'>>
@@ -17,7 +17,7 @@ afterEach(() => cfg.mockRestore())
 function render(
   type: LoginHarness,
   environment: 'local' | 'cloud',
-  data?: HarnessAuth,
+  data?: HarnessStatus,
   checking = false
 ) {
   cfg.mockReturnValue({
@@ -27,7 +27,7 @@ function render(
     demoInstallUrl: ''
   })
   const client = new QueryClient()
-  if (data) client.setQueryData(['harness-auth', type], data)
+  if (data) client.setQueryData(['harness-status'], { [type]: data })
   const html = renderToStaticMarkup(
     <QueryClientProvider client={client}>
       <WorkspaceLoginState
@@ -192,7 +192,7 @@ test('local Claude switches to manual code entry only through the trouble action
   for (const [key, value] of Object.entries(globals))
     Object.defineProperty(globalThis, key, { configurable: true, value })
   const client = new QueryClient()
-  const auth: HarnessAuth = {
+  const auth: HarnessStatus = {
     availability: signedOut,
     login: {
       state: 'pending',
@@ -201,9 +201,11 @@ test('local Claude switches to manual code entry only through the trouble action
       codeUrl: 'https://example.com/manual'
     }
   }
-  client.setQueryData(['harness-auth', 'claude-code'], auth)
+  client.setQueryData(['harness-status'], { 'claude-code': auth })
   const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
-    Object.assign(async () => Response.json(auth), { preconnect: fetch.preconnect })
+    Object.assign(async () => Response.json({ 'claude-code': auth }), {
+      preconnect: fetch.preconnect
+    })
   )
   const root = createRoot(document.getElementById('root')!)
   try {

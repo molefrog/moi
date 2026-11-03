@@ -6,7 +6,7 @@ import { workspaceDisplayName } from '@/client/features/workspace/workspace-pres
 import type { WorkspaceType } from '@/lib/types'
 
 import { WorkspaceAgentSelector } from './workspace-agent-selector'
-import { useWorkspaceCreationInfo } from './api'
+import { useHarnessStatuses } from '@/client/features/harness/api'
 import { getWorkspaceAgentOptions } from './workspace-agent-options'
 import { WorkspaceDialogContent } from './workspace-dialog-content'
 import type { WorkspaceImportChoice } from './use-workspace-import'
@@ -29,9 +29,9 @@ export function ImportWorkspaceDialog({
   onReset
 }: ImportWorkspaceDialogProps) {
   const [open, setOpen] = useState(true)
-  const info = useWorkspaceCreationInfo()
+  const info = useHarnessStatuses()
   const isChecking = info.isPending || info.isFetching
-  const installed = info.isError ? undefined : info.data?.installed
+  const installed = info.isError ? undefined : info.data
   const options = getWorkspaceAgentOptions(installed, choice.workspace.types)
   const detectionError = !isChecking && !installed ? 'Could not check installed agents.' : undefined
   const canImport =

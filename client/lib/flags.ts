@@ -5,7 +5,7 @@
 
 // Live token-by-token streaming of assistant responses. When true, the client
 // asks the server to stream partial messages (only honored by providers whose
-// `/agent` payload reports `supportsStreaming` — Claude Code and OpenClaw;
+// `/harness` payload reports `supportsStreaming` — Claude Code and OpenClaw;
 // ignored elsewhere). When false, responses arrive as whole blocks, exactly as
 // before streaming existed.
 export const STREAM_RESPONSES = true

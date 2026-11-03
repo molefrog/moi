@@ -7,7 +7,7 @@ import { Button } from '@/client/components/ui/button'
 import { cn } from '@/client/lib/cn'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import { wsUrl } from '@/client/lib/ws-url'
-import type { Model, WorkspaceAgent, WorkspaceEntry } from '@/lib/types'
+import type { Model, WorkspaceHarness, WorkspaceEntry } from '@/lib/types'
 
 // Scratch route for driving any harness end to end: pick a workspace, fire
 // canned scenarios (or your own prompt), and watch three synchronized logs —
@@ -236,9 +236,9 @@ export function HarnessDebugPage() {
   // Model list for the selected workspace.
   useEffect(() => {
     if (!workspaceId) return
-    fetch(`/api/workspaces/${workspaceId}/agent`)
+    fetch(`/api/workspaces/${workspaceId}/harness`)
       .then(r => r.json())
-      .then((m: WorkspaceAgent) => setModels(m.models))
+      .then((m: WorkspaceHarness) => setModels(m.models))
       .catch(() => setModels([]))
   }, [workspaceId])
 

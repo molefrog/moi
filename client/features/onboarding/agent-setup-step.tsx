@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react'
 import { HarnessSelector } from '@/client/features/harness/harness-selector'
 import { HarnessLoginPanel } from '@/client/features/harness/harness-login-panel'
 import { harnessDescription } from '@/client/features/harness/harness-presentation'
-import { useWorkspaceCreationInfo } from '@/client/features/workspace/add/api'
+import { useHarnessStatuses } from '@/client/features/harness/api'
 import type { OnboardingHarness } from '@/lib/onboarding'
 import { OnboardingStatus } from './onboarding-status'
 import { OnboardingScreen } from './onboarding-screen'
@@ -22,7 +22,7 @@ type ChooseAgentProps = { onSelect: (harness: OnboardingHarness) => void }
 function ChooseAgent({ onSelect }: ChooseAgentProps) {
   const { environment, demo } = useAppConfig()
   const canInstall = environment === 'local' && !demo
-  const installed = useWorkspaceCreationInfo()
+  const installed = useHarnessStatuses()
   if (installed.isPending || installed.error)
     return (
       <OnboardingStatus
@@ -33,9 +33,9 @@ function ChooseAgent({ onSelect }: ChooseAgentProps) {
   const options = (['claude-code', 'codex'] as const).map(type => ({
     type,
     description: harnessDescription[type],
-    disabled: !canInstall && !installed.data.installed[type],
+    disabled: !canInstall && installed.data[type].availability.status === 'unavailable',
     disabledReason:
-      canInstall || installed.data.installed[type]
+      canInstall || installed.data[type].availability.status !== 'unavailable'
         ? undefined
         : 'This agent is not installed on your computer'
   }))

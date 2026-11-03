@@ -2,7 +2,7 @@ import type {
   AppEnvironment,
   HarnessAvailability,
   HarnessLoginState,
-  WorkspaceAgent
+  WorkspaceHarness
 } from '@/lib/types'
 import type { LoginHarness } from '@/client/features/harness/api'
 
@@ -52,18 +52,19 @@ export function createSetupMocks(
     }
     if (path === `/api/workspaces/${PREVIEW_WORKSPACE_ID}` && method === 'DELETE')
       return new Response(null, { status: 204 })
-    if (path === `/api/workspaces/${PREVIEW_WORKSPACE_ID}/agent` && method === 'GET') {
+    if (path === `/api/workspaces/${PREVIEW_WORKSPACE_ID}/harness` && method === 'GET') {
       return Response.json({
         provider: harness,
         availability,
         models: [],
         supportsStreaming: true,
         supportsArchiving: true,
-        workspaceFolderMissing: missingFolder
-      } satisfies WorkspaceAgent)
+        isFolderMissing: missingFolder
+      } satisfies WorkspaceHarness)
     }
     const authPath = `/api/harnesses/${harness}/auth`
-    if (path === authPath && method === 'GET') return Response.json({ availability, login })
+    if (path === '/api/harnesses/status' && method === 'GET')
+      return Response.json({ [harness]: { availability, login } })
     if (path === `${authPath}/install` && method === 'POST') {
       if (environment !== 'local')
         return new Response('Installation is local only', { status: 400 })

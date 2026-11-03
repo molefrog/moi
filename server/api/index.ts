@@ -1,7 +1,7 @@
+import { resolveWorkspaceEnv } from '../workspaces/env'
 import { changeWorkspaceHarness } from '../workspaces/change-harness'
 import { HarnessTransitionError, reserveWorkspaceOperation } from '../workspaces/harness-transition'
 import { onboarding } from './onboarding'
-import { detectInstalledHarnesses } from '../harness/executable'
 import { isMessageAttachments } from '@/lib/message-attachments'
 import { Hono } from 'hono'
 import { serveStatic } from 'hono/bun'
@@ -19,7 +19,7 @@ import type {
   HarnessAvailability,
   SelectedSessionScope,
   UploadInfo,
-  WorkspaceAgent,
+  WorkspaceHarness,
   WorkspaceEntry,
   WorkspaceType
 } from '@/lib/types'
@@ -673,10 +673,9 @@ one.post('/skills/update', async c => {
   return c.json(result.status)
 })
 
-// The workspace's agent backend in one snapshot: provider, availability
-// (runtime presence + auth), the model catalog, and capabilities.
-// Workspace readiness stays fresh via `harness:updated` events and refetches.
-one.get('/agent', async c => {
+// Workspace configuration and models. Shared account status is served by
+// /harnesses/status; only workspace overrides and gateways are probed here.
+one.get('/harness', async c => {
   const ws = c.get('ws')
   const harness = harnessFor(ws)
   const capabilities = {
@@ -687,18 +686,35 @@ one.get('/agent', async c => {
   if (!existsSync(ws.path)) {
     return c.json({
       ...capabilities,
-      workspaceFolderMissing: true,
+      isFolderMissing: true,
       availability: { status: 'unavailable', reason: 'Workspace folder not found' },
       models: []
-    } satisfies WorkspaceAgent)
+    } satisfies WorkspaceHarness)
   }
+  const authEnv =
+    harness.id === 'codex'
+      ? /^(OPENAI_|CODEX_)/
+      : /^(ANTHROPIC_|CLAUDE_|AWS_|GOOGLE_|AZURE_|CLOUD_ML_)/
+  const hasAuthOverrides =
+    harness.authStatus &&
+    Object.entries(await resolveWorkspaceEnv(ws.path)).some(
+      ([key, value]) =>
+        value !== process.env[key] &&
+        (authEnv.test(key) || /^(HOME|USERPROFILE|XDG_CONFIG_HOME)$/.test(key))
+    )
   const refresh = c.req.query('refresh') === 'true'
   if (refresh) await loginShellPath({ refresh: true })
   // A backend that can't answer (codex CLI missing, gateway down) degrades to
   // an empty catalog — the picker hides and chat surfaces the real problem via
   // workspace setup, instead of this endpoint failing on page load.
   const [availability, models] = await Promise.all([
-    refresh ? harnessStore.refresh(ws) : harnessStore.getAvailability(ws),
+    // Shared account status comes from /harnesses/status.
+    // Gateway-backed harnesses still have workspace-specific readiness.
+    harness.authStatus && !hasAuthOverrides
+      ? Promise.resolve({ status: 'available' as const })
+      : refresh
+        ? harnessStore.refresh(ws)
+        : harnessStore.getAvailability(ws),
     harness.listModels(ws).catch(err => {
       console.error(`[api] listModels failed for ${harness.id}`, err)
       return []
@@ -707,8 +723,9 @@ one.get('/agent', async c => {
   return c.json({
     ...capabilities,
     availability,
+    hasAuthOverrides: Boolean(hasAuthOverrides),
     models
-  } satisfies WorkspaceAgent)
+  } satisfies WorkspaceHarness)
 })
 
 // Workspace identity. Uploads use the image route below.
@@ -1034,12 +1051,6 @@ const CREATABLE_TYPES = new Set<WorkspaceType>(['claude-code', 'codex'])
 async function workspaceTypeAvailability(type: WorkspaceType): Promise<HarnessAvailability> {
   return (await harnessFor(type).availability?.()) ?? { status: 'available' }
 }
-
-// Both workspace dialogs only need installation facts to offer agent choices.
-workspaces.get('/create', async c => {
-  c.header('Cache-Control', 'no-store')
-  return c.json({ installed: await detectInstalledHarnesses() })
-})
 
 // Create a brand-new workspace: a fresh folder under createdWorkspacesRoot(),
 // provisioned (skills + `.moi/` scaffold) and registered.

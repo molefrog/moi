@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { IconBolt, IconBoltFilled } from '@tabler/icons-react'
 
 import { useSaveSessionConfig, useSessionState } from '../sessions/api'
-import { useWorkspaceAgent } from '@/client/features/workspace/api'
+import { useWorkspaceHarness } from '@/client/features/workspace/api'
 import {
   groupModels,
   hasEffortChoice,
@@ -277,12 +277,12 @@ type ModelPickerProps = {
 }
 
 // Model selector for composer surfaces. The workspace's available models come
-// from `/api/workspaces/:id/agent`; effort options follow the selected model.
+// from `/api/workspaces/:id/harness`; effort options follow the selected model.
 // A session id targets that chat's stored config. Null targets the workspace
 // defaults that seed new chats such as the pending view.
 export const ModelPicker = memo(function ModelPicker({ sessionId }: ModelPickerProps) {
   const { workspaceId, layout, setLayout } = useWorkspaceLayoutCtx()
-  const { data } = useWorkspaceAgent(workspaceId)
+  const { data } = useWorkspaceHarness(workspaceId)
 
   // The SDK prepends a synthetic "default" entry ("Use the default model
   // (currently …)"). Drop it and name the concrete model it resolves to.
