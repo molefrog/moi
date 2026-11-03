@@ -34,3 +34,7 @@ export function useHarnessAuth(type: WorkspaceType) {
 export function submitHarnessLoginCode(type: WorkspaceType, id: string, code: string) {
   return requestVoid(`/api/harnesses/${type}/auth/login/${id}/code`, jsonRequest('POST', { code }))
 }
+
+export function installHarness(type: LoginHarness) {
+  return requestVoid(`/api/harnesses/${type}/auth/install`, { method: 'POST' })
+}

@@ -195,7 +195,16 @@ export const app = Bun.serve<WsData>({
   },
   // Anything not matched above (the whole HTTP API + prod static assets + 404)
   // is handled by Hono.
-  fetch: req => api.fetch(req),
+  fetch: (req, server) => {
+    // Downloads can exceed the normal HTTP idle timeout; the installer has its own deadline.
+    if (
+      req.method === 'POST' &&
+      /^\/api\/harnesses\/(claude-code|codex)\/auth\/install$/.test(new URL(req.url).pathname)
+    ) {
+      server.timeout(req, 0)
+    }
+    return api.fetch(req)
+  },
   websocket: {
     open(ws) {
       if (ws.data.channel === 'collab') {

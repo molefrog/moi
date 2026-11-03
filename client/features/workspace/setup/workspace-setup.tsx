@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { useAppConfig } from '@/client/api/app-config'
 
 import { useWorkspaceAgent } from '../api'
 import {
@@ -19,6 +20,7 @@ export function useWorkspaceSetup(
   contentPending = false,
   welcome: WorkspaceWelcomeStateProps = {}
 ) {
+  const { environment, demo } = useAppConfig()
   const { data, isError, isPending, isFetching, isFetchedAfterMount, refetch } =
     useWorkspaceAgent(workspaceId)
   // A cached failure is only a hint until this visit's check has settled.
@@ -41,7 +43,11 @@ export function useWorkspaceSetup(
     const { provider, availability } = data
     if (availability.status === 'available') return undefined
     if (
-      availability.status === 'login-required' &&
+      (availability.status === 'login-required' ||
+        (environment === 'local' &&
+          !demo &&
+          availability.status === 'unavailable' &&
+          availability.code === 'not-installed')) &&
       (provider === 'claude-code' || provider === 'codex')
     ) {
       return (

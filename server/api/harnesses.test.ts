@@ -1,3 +1,4 @@
+import * as installer from '../harness/install'
 import * as shellPath from '../harness/shell-path'
 import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -148,5 +149,25 @@ test('missing workspace folder is reported before starting the harness', async (
   } finally {
     availabilitySpy.mockRestore()
     modelsSpy.mockRestore()
+  }
+})
+
+test('installation refreshes cached auth and rejects cross-origin requests', async () => {
+  const install = spyOn(installer, 'installHarness').mockResolvedValue()
+  try {
+    await harnessStore.getAvailability('codex')
+    codexHarness.authStatus = async () => ({ status: 'available' })
+    const blocked = await api.request('/api/harnesses/codex/auth/install', {
+      method: 'POST',
+      headers: { Origin: 'https://other.example' }
+    })
+    expect(blocked.status).toBe(403)
+    expect(install).not.toHaveBeenCalled()
+    const response = await api.request('/api/harnesses/codex/auth/install', { method: 'POST' })
+    expect(response.status).toBe(200)
+    expect(install).toHaveBeenCalledWith('codex')
+    expect((await harnessStore.getAvailability('codex')).status).toBe('available')
+  } finally {
+    install.mockRestore()
   }
 })

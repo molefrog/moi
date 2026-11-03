@@ -29,7 +29,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/client/components/ui/
 import { useLive } from '@/client/features/chat/chat-store'
 import { useWorkspaceCreationInfo } from '@/client/features/workspace/add/api'
 
-import { useChangeWorkspaceHarness } from '../api'
+import { useChangeWorkspaceHarness } from '@/client/features/workspace/api'
 import { SettingsPage, SettingsRow, SettingsSection } from './settings-layout'
 
 export function GeneralSettings() {

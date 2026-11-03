@@ -60,7 +60,7 @@ test('unexpected requests and real workspace IDs cannot fall through to a server
 })
 
 test('missing installation and folder scenarios return the real recovery shapes', async () => {
-  for (const scenario of ['missing-agent', 'missing-folder'] as const) {
+  for (const scenario of ['install', 'missing-folder'] as const) {
     const mocks = createSetupMocks('local', 'codex', scenario)
     const data = await (
       await mocks.request(`/api/workspaces/${PREVIEW_WORKSPACE_ID}/agent?refresh=true`)
@@ -69,3 +69,20 @@ test('missing installation and folder scenarios return the real recovery shapes'
     else expect(data.availability).toMatchObject({ status: 'unavailable', code: 'not-installed' })
   }
 })
+
+for (const harness of ['claude-code', 'codex'] as const) {
+  test(`${harness} installation leads into the existing mock login`, async () => {
+    const mocks = createSetupMocks('local', harness, 'install')
+    const base = `/api/harnesses/${harness}/auth`
+    expect((await (await mocks.request(base)).json()).availability.code).toBe('not-installed')
+    const installing = mocks.request(`${base}/install`, { method: 'POST' })
+    expect((await (await mocks.request(base)).json()).availability.code).toBe('not-installed')
+    expect((await installing).ok).toBe(true)
+    expect((await (await mocks.request(base)).json()).availability.status).toBe('login-required')
+    expect((await (await mocks.request(`${base}/login`, { method: 'POST' })).json()).url).toBe(
+      MOCK_SIGN_IN_URL
+    )
+    mocks.complete()
+    expect((await (await mocks.request(base)).json()).availability.status).toBe('available')
+  })
+}

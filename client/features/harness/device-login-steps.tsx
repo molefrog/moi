@@ -86,7 +86,7 @@ export function DeviceLoginSteps({ code, url }: DeviceLoginStepsProps) {
       <li className="flex flex-col items-start gap-3 lg:items-center">
         <IconCircleNumber3 size={24} stroke={1.5} className="shrink-0" />
         <div className="flex min-w-0 flex-col items-start gap-3 lg:items-center">
-          <p>Sign in to ChatGPT, paste the code, and then come back to Moi</p>
+          <p>Log in to ChatGPT, paste the code, then come back to Moi</p>
           <a href={url} target="_blank" rel="noopener noreferrer" className={buttonVariants()}>
             Open ChatGPT
           </a>

@@ -1,4 +1,5 @@
 import { accessSync, constants, statSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 
 import { harnessInstructionMessage } from '@/lib/harness-instructions'
@@ -19,6 +20,9 @@ type ExecutableConfig = {
 const executableConfig: Record<WorkspaceType, ExecutableConfig> = {
   'claude-code': {
     command: 'claude',
+    fallbackPaths: [
+      join(homedir(), '.local', 'bin', process.platform === 'win32' ? 'claude.exe' : 'claude')
+    ],
     unavailableReason: harnessInstructionMessage('claude-code')
   },
   codex: {
@@ -27,6 +31,7 @@ const executableConfig: Record<WorkspaceType, ExecutableConfig> = {
     // on PATH: probe the known macOS bundle locations (ChatGPT.app is the
     // current home, Codex.app the legacy standalone install).
     fallbackPaths: [
+      join(homedir(), '.local', 'bin', process.platform === 'win32' ? 'codex.exe' : 'codex'),
       '/Applications/ChatGPT.app/Contents/Resources/codex',
       '/Applications/Codex.app/Contents/Resources/codex'
     ],

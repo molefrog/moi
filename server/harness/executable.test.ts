@@ -84,7 +84,7 @@ describe('PATH harness executables', () => {
     expect(await pathHarnessAvailability('claude-code', tempDir)).toEqual({
       status: 'unavailable',
       code: 'not-installed',
-      reason: 'Run in terminal to install Claude: curl -fsSL https://claude.ai/install.sh | sh'
+      reason: 'Run in terminal to install Claude: curl -fsSL https://claude.ai/install.sh | bash'
     })
     expect(() => requireHarnessExecutable('codex', tempDir)).toThrow(
       'Run in terminal to install ChatGPT: curl -fsSL https://chatgpt.com/codex/install.sh | sh'
