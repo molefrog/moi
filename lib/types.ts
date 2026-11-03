@@ -623,7 +623,11 @@ export type WorkspaceTabsState = {
 
 export type { AgentTheme, ColorTheme, FontTheme, RadiusTheme, WorkspaceTheme } from './themes'
 
-export type WorkspaceLayoutSave = Omit<WorkspaceLayout, 'tabs'> & { tabs?: WorkspaceTabsState }
+export type WorkspaceLayoutSave = Omit<WorkspaceLayout, 'tabs'> & {
+  tabs?: WorkspaceTabsState
+  // Captured when the edit is made, so delayed saves cannot restore another harness's defaults.
+  harness?: WorkspaceType
+}
 
 export type WorkspaceLayout = {
   version: 1
@@ -653,6 +657,14 @@ export type WorkspaceLayout = {
   // Fast-mode default for new sessions. Undefined inherits the provider setting.
   selectedFastMode?: boolean
   theme?: WorkspaceTheme
+}
+
+// GET /api/workspaces/:id: layout plus the local workspace registration.
+export type WorkspaceLayoutResponse = WorkspaceLayout & {
+  cwd: string
+  name: string
+  provider?: WorkspaceType
+  agentId?: string
 }
 
 // One applet's thumbnail freshness record. Image bytes live as files in the

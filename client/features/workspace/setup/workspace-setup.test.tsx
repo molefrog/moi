@@ -50,7 +50,8 @@ async function mount(
   demo = false,
   globalConnected = false,
   contentPending = false,
-  check?: Promise<HarnessAvailability>
+  check?: Promise<HarnessAvailability>,
+  environment: 'local' | 'cloud' = 'cloud'
 ) {
   const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>')
   const globals = {
@@ -67,7 +68,7 @@ async function mount(
     Object.defineProperty(globalThis, key, { configurable: true, value })
   notifyManager.setNotifyFunction(callback => act(callback))
   const configSpy = spyOn(config, 'useAppConfig').mockReturnValue({
-    environment: 'cloud',
+    environment,
     demo,
     experimental: { collab: false },
     demoInstallUrl: ''
@@ -94,7 +95,9 @@ async function mount(
   const globalAuth = {
     availability: globalConnected
       ? { status: 'available' }
-      : { status: 'login-required', reason: 'Sign in' }
+      : status.status === 'unavailable' && status.code === 'not-installed'
+        ? status
+        : { status: 'login-required', reason: 'Sign in' }
   }
   client.setQueryData(['harness-auth', 'codex'], globalAuth)
   const requests: string[] = []
@@ -244,7 +247,7 @@ async function mount(
 test('signed-out workspace shows only its own login and no workspace content', async () => {
   const { document, contentSpy } = await mount()
   expect(contentSpy).not.toHaveBeenCalled()
-  expect(document.body.textContent).toContain('Log in to ChatGPT')
+  expect(document.body.textContent).toContain('Set up ChatGPT')
   expect(
     document.querySelector('[data-slot="workspace-pane"] [aria-label="Workspace setup"]')
   ).not.toBeNull()
@@ -274,7 +277,7 @@ test('one loading state waits for workspace content after readiness succeeds', a
 
 test('login can resolve without waiting for workspace content', async () => {
   const { document } = await mount(undefined, false, false, true)
-  expect(document.body.textContent).toContain('Log in to ChatGPT')
+  expect(document.body.textContent).toContain('Set up ChatGPT')
   expect(document.querySelector('[aria-label="Loading"]')).toBeNull()
 })
 
@@ -311,7 +314,7 @@ test('expiry unmounts content and portals, then restores stored drafts and attac
   await update({ status: 'login-required', reason: 'Expired' })
   expect(document.querySelector('[data-content]')).toBeNull()
   expect(document.querySelector('#floating-chat')).toBeNull()
-  expect(document.body.textContent).toContain('Log in to ChatGPT')
+  expect(document.body.textContent).toContain('Set up ChatGPT')
   await update({ status: 'available' })
   expect(document.querySelector('[data-content]')).not.toBeNull()
   expect(document.querySelector('[data-content]')).not.toBe(previousContent)
@@ -327,7 +330,7 @@ test('unavailable and failed status checks show recovery and retry a fresh check
     reason: 'Install Codex in your terminal'
   })
   expect(document.body.textContent).toContain('Install Codex in your terminal')
-  expect(document.body.textContent).not.toContain('Log in to ChatGPT')
+  expect(document.body.textContent).not.toContain('Set up ChatGPT')
   setFail(true)
   await click('Try again')
   expect(document.body.textContent).toContain('Could not check your agent')
@@ -344,7 +347,7 @@ test('global login success rechecks workspace readiness instead of unlocking it'
     true
   )
   expect(document.body.textContent).toContain(
-    'Signed in to ChatGPT, but this workspace still needs attention'
+    'Logged in to ChatGPT, but this workspace still needs attention'
   )
   expect(document.querySelector('[data-content]')).toBeNull()
   expect(requests).toContain('/api/workspaces/test/agent?refresh=true')
@@ -353,7 +356,7 @@ test('global login success rechecks workspace readiness instead of unlocking it'
 test('demo uses the same login recovery and readiness checks', async () => {
   const { document, requests } = await mount(undefined, true)
   expect(document.querySelector('[data-content]')).toBeNull()
-  expect(document.body.textContent).toContain('Log in to ChatGPT')
+  expect(document.body.textContent).toContain('Set up ChatGPT')
   expect(requests).toContain('/api/workspaces/test/agent?refresh=true')
 })
 
@@ -375,7 +378,7 @@ test('a working agent is reconfirmed from the server cache, a failed one re-prob
 test('a ready demo opens the workspace normally', async () => {
   const { document } = await mount({ status: 'available' }, true)
   expect(document.querySelector('[data-content]')).not.toBeNull()
-  expect(document.body.textContent).not.toContain('Log in to ChatGPT')
+  expect(document.body.textContent).not.toContain('Set up ChatGPT')
 })
 
 test('missing folder offers deletion and returns home after removing the workspace', async () => {
@@ -406,7 +409,7 @@ test('cached sign-out waits for verification without briefly showing login', asy
   const { document } = await mount(undefined, false, false, false, check.promise)
   expect(document.querySelector('[aria-label="Loading"]')).not.toBeNull()
   expect(document.querySelector('[aria-label="Workspace setup"]')).toBeNull()
-  expect(document.body.textContent).not.toContain('Log in to ChatGPT')
+  expect(document.body.textContent).not.toContain('Set up ChatGPT')
   await act(async () => {
     check.resolve({ status: 'available' })
     await Bun.sleep(20)
@@ -424,7 +427,7 @@ test('confirmed sign-out shows login and keeps it visible while retrying', async
     false,
     check.promise
   )
-  expect(document.body.textContent).not.toContain('Log in to ChatGPT')
+  expect(document.body.textContent).not.toContain('Set up ChatGPT')
   const pane = document.querySelector('[data-slot="workspace-pane"]')
   expect(pane).not.toBeNull()
   expect(document.querySelector('[aria-label="Workspace setup"]')).toBeNull()
@@ -434,14 +437,14 @@ test('confirmed sign-out shows login and keeps it visible while retrying', async
   })
   expect(document.querySelector('[data-slot="workspace-pane"]')).toBe(pane)
   expect(pane?.querySelector('[aria-label="Workspace setup"]')).not.toBeNull()
-  expect(document.body.textContent).toContain('Log in to ChatGPT')
+  expect(document.body.textContent).toContain('Set up ChatGPT')
   const retry = Promise.withResolvers<HarnessAvailability>()
   setCheck(retry.promise)
   await act(async () => {
     void client.refetchQueries({ queryKey: key })
     await Bun.sleep(20)
   })
-  expect(document.body.textContent).toContain('Log in to ChatGPT')
+  expect(document.body.textContent).toContain('Set up ChatGPT')
   expect(document.querySelector('[aria-label="Loading"]')).toBeNull()
   await act(async () => {
     retry.resolve({ status: 'login-required', reason: 'Still signed out' })
@@ -520,10 +523,10 @@ test('welcome precedes login and chat stays hidden until login is verified', asy
   welcomeNewWorkspace('test')
   const { document, update, requests } = await mount()
   expect(document.querySelector('[aria-label="Workspace welcome"]')).not.toBeNull()
-  expect(document.body.textContent).not.toContain('Log in to ChatGPT')
+  expect(document.body.textContent).not.toContain('Set up ChatGPT')
   expect(requests).toContain('/api/workspaces/test/agent?refresh=true')
   await finishWelcome()
-  expect(document.body.textContent).toContain('Log in to ChatGPT')
+  expect(document.body.textContent).toContain('Set up ChatGPT')
   expect(chatHidden(document)).toBe(true)
   await update({ status: 'available' })
   expect(document.querySelector('[data-content]')).not.toBeNull()
@@ -589,4 +592,19 @@ test('unavailable agent replaces welcome and keeps chat hidden', async () => {
   expect(document.body.textContent).toContain('Agent is missing')
   expect(chatHidden(document)).toBe(true)
   expect(document.querySelector('[data-content]')).toBeNull()
+})
+
+test('missing local agents reuse install while cloud keeps manual recovery', async () => {
+  const missing = {
+    status: 'unavailable',
+    code: 'not-installed',
+    reason: 'Install instructions'
+  } as const
+  const local = await mount(missing, false, false, false, undefined, 'local')
+  expect(local.document.body.textContent).toContain('Install ChatGPT')
+  expect(local.document.body.textContent).not.toContain('Check again')
+  await cleanup()
+  const cloud = await mount(missing)
+  expect(cloud.document.body.textContent).toContain('Install instructions')
+  expect(cloud.document.body.textContent).not.toContain('Install ChatGPT')
 })

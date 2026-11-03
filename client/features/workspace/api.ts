@@ -1,3 +1,4 @@
+import { receiveWorkspaceHarness } from './harness-transition'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
@@ -7,19 +8,15 @@ import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
 import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
 import type {
   WorkspaceAgent,
-  WorkspaceLayout,
+  WorkspaceEntry,
+  WorkspaceLayoutResponse,
   WorkspaceLayoutSave,
   WorkspaceSkillsStatus,
   WorkspaceSkillsUpdateFailure,
   WorkspaceType
 } from '@/lib/types'
 
-export type WorkspaceLayoutResponse = WorkspaceLayout & {
-  cwd: string
-  name: string
-  provider?: WorkspaceType
-  agentId?: string
-}
+export type { WorkspaceLayoutResponse } from '@/lib/types'
 
 export function useWorkspaceLayout(workspaceId: string) {
   return useQuery<WorkspaceLayoutResponse>({
@@ -137,6 +134,20 @@ export function useSaveLayout(workspaceId: string) {
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: workspaceKeys.previews })
+    }
+  })
+}
+
+export function useChangeWorkspaceHarness(workspaceId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (type: WorkspaceType) =>
+      requestJson<WorkspaceEntry>(
+        `/api/workspaces/${workspaceId}/harness`,
+        jsonRequest('PATCH', { type })
+      ),
+    onSuccess: entry => {
+      void receiveWorkspaceHarness(queryClient, workspaceId, entry.type ?? 'claude-code')
     }
   })
 }

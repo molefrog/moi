@@ -9,13 +9,7 @@ import type { LoginHarness } from '@/client/features/harness/api'
 export const PREVIEW_WORKSPACE_ID = 'setup-preview'
 export const MOCK_CODE_SIGN_IN_URL = 'https://example.invalid/moi-code-sign-in'
 export const MOCK_SIGN_IN_URL = 'https://example.invalid/moi-sign-in'
-export const SETUP_SCENARIOS = [
-  'welcome',
-  'login',
-  'missing-agent',
-  'missing-folder',
-  'loading'
-] as const
+export const SETUP_SCENARIOS = ['welcome', 'install', 'login', 'missing-folder', 'loading'] as const
 export type SetupScenario = (typeof SETUP_SCENARIOS)[number]
 
 export function createSetupMocks(
@@ -24,7 +18,7 @@ export function createSetupMocks(
   scenario: SetupScenario
 ) {
   let availability: HarnessAvailability =
-    scenario === 'missing-agent'
+    scenario === 'install'
       ? {
           status: 'unavailable',
           code: 'not-installed',
@@ -70,6 +64,13 @@ export function createSetupMocks(
     }
     const authPath = `/api/harnesses/${harness}/auth`
     if (path === authPath && method === 'GET') return Response.json({ availability, login })
+    if (path === `${authPath}/install` && method === 'POST') {
+      if (environment !== 'local')
+        return new Response('Installation is local only', { status: 400 })
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      availability = { status: 'login-required', reason: 'Log in to continue' }
+      return Response.json({ ok: true })
+    }
     if (path === `${authPath}/login` && method === 'POST') {
       login = { state: 'starting' }
       await new Promise(resolve => setTimeout(resolve, 500))

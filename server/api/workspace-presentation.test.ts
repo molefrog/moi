@@ -7,7 +7,7 @@ import type { WorkspaceEntry } from '@/lib/types'
 
 import { api } from './index'
 import { setEventServer } from '../events'
-import { loadLayout } from '../workspaces/layout'
+import { loadLayout, saveLayout } from '../workspaces/layout'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
 
 const PNG = Buffer.from(
@@ -124,4 +124,36 @@ test('theme saves broadcast changes and expose the theme in workspace lists', as
   expect(response.status).toBe(204)
   expect(published).toContain(JSON.stringify({ type: 'theme:updated' }))
   expect(list[0]?.theme).toEqual(theme)
+})
+
+test('a delayed layout save preserves the current harness defaults and unrelated edits', async () => {
+  const initial = await loadLayout(workspaceDir)
+  await saveLayout({ ...initial, selectedModel: 'new-model' }, workspaceDir)
+  const response = await api.request(`/api/workspaces/${workspaceId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ...initial,
+      harness: 'claude-code',
+      layoutMode: 'fullscreen',
+      selectedModel: 'old-model',
+      selectedEffort: 'high',
+      selectedFastMode: true
+    })
+  })
+  expect(response.status).toBe(204)
+  const saved = await loadLayout(workspaceDir)
+  expect(saved.layoutMode).toBe('fullscreen')
+  expect(saved.selectedModel).toBe('new-model')
+  expect(saved.selectedEffort).toBeUndefined()
+  expect(saved.selectedFastMode).toBeUndefined()
+  expect('harness' in saved).toBe(false)
+
+  const current = await api.request(`/api/workspaces/${workspaceId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...saved, harness: 'codex', selectedModel: 'chosen-model' })
+  })
+  expect(current.status).toBe(204)
+  expect((await loadLayout(workspaceDir)).selectedModel).toBe('chosen-model')
 })

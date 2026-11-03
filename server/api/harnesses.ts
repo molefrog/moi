@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 
 import type { WorkspaceType } from '@/lib/types'
 
+import { installHarness } from '../harness/install'
 import { harnessStore } from '../harness/auth'
 import { harnessFor, isHarnessType } from '../harness/registry'
 
@@ -25,6 +26,19 @@ harnesses.get('/:type/auth', async c => {
     availability: await harnessStore.getAvailability(context),
     login: harnessStore.getLogin(context)
   })
+})
+
+harnesses.post('/:type/auth/install', async c => {
+  const origin = c.req.header('Origin')
+  if (origin && origin !== new URL(c.req.url).origin) return c.text('Invalid origin', 403)
+  try {
+    const type = c.get('harnessType')
+    await installHarness(type)
+    await harnessStore.refresh(type)
+    return c.json({ ok: true })
+  } catch (error) {
+    return c.text(error instanceof Error ? error.message : 'Could not install agent', 400)
+  }
 })
 
 harnesses.post('/:type/auth/login', async c => {
