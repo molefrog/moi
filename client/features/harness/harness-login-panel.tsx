@@ -8,7 +8,7 @@ import { Spinner } from '@/client/components/ui/spinner'
 import { harnessLabel, harnessIcon } from './harness-presentation'
 import { DeviceLoginSteps } from './device-login-steps'
 import { useHarnessLogin } from './use-harness-login'
-import type { LoginHarness } from './api'
+import { useRetryHarnessStatus, type LoginHarness } from './api'
 
 type HarnessLoginPanelProps = {
   type: LoginHarness
@@ -33,6 +33,7 @@ export function HarnessLoginPanel({ type, onConnected, connectedContent }: Harne
     checkError,
     failure
   } = useHarnessLogin(type)
+  const retry = useRetryHarnessStatus()
   const name = harnessLabel[type]
   useEffect(() => {
     if (connected) onConnected()
@@ -47,7 +48,12 @@ export function HarnessLoginPanel({ type, onConnected, connectedContent }: Harne
 
   function renderContent() {
     if (checkError && !needsInstall && !installing) {
-      return <LoginCheckError retrying={auth.isFetching} onRetry={() => void auth.refetch()} />
+      return (
+        <LoginCheckError
+          retrying={auth.isFetching || retry.isPending}
+          onRetry={() => retry.mutate()}
+        />
+      )
     }
     if (connected) return connectedContent
     if (pending && !installing) {

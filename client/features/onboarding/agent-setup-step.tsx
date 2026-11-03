@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react'
 import { HarnessSelector } from '@/client/features/harness/harness-selector'
 import { HarnessLoginPanel } from '@/client/features/harness/harness-login-panel'
 import { harnessDescription } from '@/client/features/harness/harness-presentation'
-import { useHarnessStatuses } from '@/client/features/harness/api'
+import { useHarnessStatuses, useRetryHarnessStatus } from '@/client/features/harness/api'
 import type { OnboardingHarness } from '@/lib/onboarding'
 import { OnboardingStatus } from './onboarding-status'
 import { OnboardingScreen } from './onboarding-screen'
@@ -23,13 +23,9 @@ function ChooseAgent({ onSelect }: ChooseAgentProps) {
   const { environment, demo } = useAppConfig()
   const canInstall = environment === 'local' && !demo
   const installed = useHarnessStatuses()
+  const retry = useRetryHarnessStatus()
   if (installed.isPending || installed.error)
-    return (
-      <OnboardingStatus
-        error={installed.error ?? undefined}
-        onRetry={() => void installed.refetch()}
-      />
-    )
+    return <OnboardingStatus error={installed.error ?? undefined} onRetry={() => retry.mutate()} />
   const options = (['claude-code', 'codex'] as const).map(type => ({
     type,
     description: harnessDescription[type],

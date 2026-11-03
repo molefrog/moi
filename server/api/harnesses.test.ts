@@ -243,3 +243,25 @@ test('one response includes missing installations and signed-out accounts', asyn
   expect(statuses.codex.availability.status).toBe('login-required')
   expect(claudeAuth).not.toHaveBeenCalled()
 })
+
+test('normal status reads reuse cached availability; explicit retries bypass it', async () => {
+  let probes = 0
+  codexHarness.authStatus = async () => {
+    probes++
+    return { status: 'available' }
+  }
+  await api.request('/api/harnesses/status')
+  await api.request('/api/harnesses/status')
+  expect(probes).toBe(1)
+  codexHarness.authStatus = async () => {
+    probes++
+    return { status: 'login-required', reason: 'Signed out externally' }
+  }
+  const cached = await api.request('/api/harnesses/status')
+  expect((await cached.json()).codex.availability.status).toBe('available')
+  const fresh = await api.request('/api/harnesses/status?refresh=true')
+  expect((await fresh.json()).codex.availability.status).toBe('login-required')
+  expect(probes).toBe(2)
+  await api.request('/api/harnesses/status')
+  expect(probes).toBe(2)
+})

@@ -71,7 +71,7 @@ async function mount(
           return Response.json({ id: 'test-login', url: 'https://example.com/login' })
         }
         if (path.endsWith('/auth/install')) return scratchResponses!.install!()
-        if (path.endsWith('/status?refresh=true')) {
+        if (path.startsWith('/api/harnesses/status')) {
           const response =
             scratchResponses?.auth?.() ??
             Response.json({

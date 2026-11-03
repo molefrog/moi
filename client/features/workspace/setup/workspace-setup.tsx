@@ -1,4 +1,4 @@
-import { useHarnessStatus } from '@/client/features/harness/api'
+import { useHarnessStatus, useRetryHarnessStatus } from '@/client/features/harness/api'
 import { useCallback } from 'react'
 import { useAppConfig } from '@/client/api/app-config'
 
@@ -27,22 +27,28 @@ export function useWorkspaceSetup(
   const status = useHarnessStatus(
     data?.hasAuthOverrides || data?.isFolderMissing ? undefined : data?.provider
   )
+  const retry = useRetryHarnessStatus()
   const readiness = status.isEnabled ? status : workspace
-  const isFetching = readiness.isFetching || workspace.isFetching
+  const isFetching = readiness.isFetching || workspace.isFetching || retry.isPending
   const refetch = workspace.isError ? workspace.refetch : readiness.refetch
   const availability = readiness.data?.availability
-  const isError = readiness.isError || workspace.isError
+  const isError = readiness.isError || workspace.isError || retry.isError
   const checking = workspace.isPending || readiness.isPending
   const recheck = useCallback(() => {
     void refetch()
   }, [refetch])
+
+  const retryStatus = () => {
+    if (status.isEnabled && !workspace.isError) retry.mutate()
+    else recheck()
+  }
 
   function renderRecovery() {
     if (checking) return undefined
     // Background network failures do not invalidate a known working workspace.
     if (isError && availability?.status === 'available') return undefined
     if (isError || !data || !availability) {
-      return <WorkspaceCheckFailedState retrying={isFetching} onRetry={recheck} />
+      return <WorkspaceCheckFailedState retrying={isFetching} onRetry={retryStatus} />
     }
     if (data.isFolderMissing) {
       return <WorkspaceMissingState workspaceId={workspaceId} />
@@ -62,7 +68,8 @@ export function useWorkspaceSetup(
           type={provider}
           reason={availability.reason}
           checking={isFetching}
-          onRecheck={recheck}
+          onConnected={recheck}
+          onRecheck={retryStatus}
         />
       )
     }
@@ -71,7 +78,7 @@ export function useWorkspaceSetup(
         type={provider}
         availability={availability}
         retrying={isFetching}
-        onRetry={recheck}
+        onRetry={retryStatus}
       />
     )
   }

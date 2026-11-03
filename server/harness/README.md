@@ -226,7 +226,8 @@ workspace's environment. Login credentials remain owned by the provider CLI.
 
 `GET /api/harnesses/status` returns one status map for all harnesses, including
 installation availability and login state. Checks run concurrently.
-`?refresh=true` rechecks external sign-in/sign-out and installation changes.
+Normal reads reuse the server’s 30-second availability cache. Explicit retries use
+`?refresh=true` to recheck external sign-in/sign-out and installation changes.
 `POST /api/harnesses/:type/auth/login` starts or reuses an attempt;
 `POST /api/harnesses/:type/auth/login/:id/code` submits a manual authorization
 code. The attempt ID rejects submissions from an older login. Startup reports
@@ -236,7 +237,7 @@ During login, the server rechecks readiness until the provider confirms
 completion and readiness succeeds, or the attempt fails or reaches its
 ten-minute deadline. Shutdown cancels active attempts. Auth changes publish `harness-status:changed` once for all consumers. The client
 shares one status query across onboarding and workspace navigation. It
-refreshes on focus, reconnect, and authentication changes, and polls only during
+reads cached status on focus, reconnect, and authentication changes, and polls only during
 an active login.
 
 `GET /api/workspaces/:id/harness` returns the workspace model catalog, capabilities,

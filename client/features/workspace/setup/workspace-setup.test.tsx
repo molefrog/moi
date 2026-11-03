@@ -110,7 +110,7 @@ async function mount(
           if (fail) throw new Error('Offline')
           return Response.json(check ? { ...data, availability: await check } : data)
         }
-        if (path === '/api/harnesses/status?refresh=true') {
+        if (path.startsWith('/api/harnesses/status')) {
           if (fail) throw new Error('Offline')
           return Response.json({ codex: check ? { availability: await check } : globalAuth })
         }

@@ -13,7 +13,7 @@ import { WorkspaceEventsClient } from '@/client/runtime/workspace-events'
 import type { WorkspaceEventHandler } from '@/client/runtime/workspace-events'
 import { useWorkspaceHarness } from '@/client/features/workspace/api'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { useHarnessStatus } from './api'
+import { useHarnessStatus, useRetryHarnessStatus } from './api'
 
 let cleanup = async () => {}
 afterEach(() => cleanup())
@@ -87,7 +87,13 @@ test('workspaces and onboarding share status; auth events and harness switches u
   }
   function Onboarding() {
     const status = useHarnessStatus('claude-code')
-    return <span data-onboarding>{status.data?.availability.status}</span>
+    const retry = useRetryHarnessStatus()
+    return (
+      <>
+        <span data-onboarding>{status.data?.availability.status}</span>
+        <button onClick={() => retry.mutate()}>Retry status</button>
+      </>
+    )
   }
   function Workspace({ id }: WorkspaceProps) {
     const workspace = useWorkspaceHarness(id)
@@ -180,6 +186,50 @@ test('workspaces and onboarding share status; auth events and harness switches u
   })
   expect(requests.filter(path => path.includes('/harnesses/'))).toHaveLength(readsBeforeSwitch)
   expect(document.querySelector('[data-workspace]')?.textContent).toBe('codex:login-required')
+  expect(document.querySelector('[data-onboarding]')?.textContent).toBe('available')
+  await act(async () => {
+    for (const handler of handlers) handler({ type: 'connection:opened' })
+    await Bun.sleep(20)
+  })
+  expect(
+    requests
+      .filter(path => path.includes('/harnesses/'))
+      .every(path => path === '/api/harnesses/status')
+  ).toBe(true)
+  signedOut = true
+  await act(async () => {
+    document.querySelector('button')!.click()
+    await Bun.sleep(20)
+  })
+  expect(requests.at(-1)).toBe('/api/harnesses/status?refresh=true')
+  expect(document.querySelector('[data-onboarding]')?.textContent).toBe('login-required')
+  await act(async () => {
+    focusManager.setFocused(false)
+    focusManager.setFocused(true)
+    await Bun.sleep(20)
+  })
+  expect(requests.at(-1)).toBe('/api/harnesses/status')
+  const retryResponse = Promise.withResolvers<Response>()
+  pending = retryResponse.promise
+  await act(async () => {
+    document.querySelector('button')!.click()
+    await Bun.sleep(10)
+  })
+  await act(async () => {
+    for (const handler of handlers)
+      handler({
+        type: 'harness-status:changed',
+        harness: 'claude-code',
+        status: { availability: { status: 'available' } }
+      })
+    retryResponse.resolve(
+      Response.json({
+        'claude-code': { availability: { status: 'login-required' } },
+        codex: { availability: { status: 'login-required' } }
+      })
+    )
+    await Bun.sleep(20)
+  })
   expect(document.querySelector('[data-onboarding]')?.textContent).toBe('available')
 })
 
