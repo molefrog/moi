@@ -194,7 +194,7 @@ test('agent selection and connection are required; building opens the workspace 
   expect(page.document.body.textContent).toContain('Choose your agent')
   expect(
     [...page.document.querySelectorAll('button')].some(
-      button => button.textContent === 'Start from scratch'
+      button => button.textContent === 'Skip the onboarding'
     )
   ).toBe(false)
   expect(
@@ -230,10 +230,10 @@ for (const [agent, type] of [
   ['ClaudeAnthropic', 'claude-code'],
   ['ChatGPTOpenAI', 'codex']
 ]) {
-  test(`start from scratch creates an empty ${type} workspace and opens Overview`, async () => {
+  test(`skip the onboarding creates an empty ${type} workspace and opens Overview`, async () => {
     const page = await mount()
     await page.click(agent!)
-    await page.click('Start from scratch')
+    await page.click('Skip the onboarding')
     expect(page.location.history?.at(-1)).toBe('/workspace/empty-workspace/overview')
     expect(page.calls).toEqual([
       { path: '/api/workspaces/create', body: { type } },
@@ -257,7 +257,7 @@ test('skipping with existing workspaces completes onboarding and returns home', 
   })
   await page.click('ChatGPTOpenAI')
   await page.click('Find ideas')
-  await page.click('Start from scratch')
+  await page.click('Skip the onboarding')
   expect(page.location.history?.at(-1)).toBe('/')
   expect(page.calls.some(call => call.path === '/api/onboarding/cancel')).toBe(true)
   expect(page.calls.some(call => call.path === '/api/workspaces/create')).toBe(false)
@@ -275,13 +275,13 @@ test('a failed workspace lookup keeps onboarding open and can be retried', async
         : Response.json([{ id: 'existing-workspace' }])
   })
   await page.click('ChatGPTOpenAI')
-  await page.click('Start from scratch')
+  await page.click('Skip the onboarding')
   expect(page.document.querySelector('[role="alert"]')?.textContent).toBe(
     'Could not load workspaces'
   )
   expect(page.location.history?.at(-1)).toBe('/onboarding')
   expect(page.calls).toHaveLength(0)
-  await page.click('Start from scratch')
+  await page.click('Skip the onboarding')
   expect(page.location.history?.at(-1)).toBe('/')
   expect(page.calls).toEqual([{ path: '/api/settings', body: { showOnboarding: false } }])
 })
@@ -290,7 +290,7 @@ test('connection has no Skip or Switch agent action', async () => {
   await page.click('ClaudeAnthropic')
   expect(
     [...page.document.querySelectorAll('button')].some(
-      button => button.textContent === 'Start from scratch'
+      button => button.textContent === 'Skip the onboarding'
     )
   ).toBe(false)
   expect(page.document.body.textContent).toContain('Set up Claude')
@@ -362,7 +362,7 @@ test('creation failures keep the ideas and retry the same operation', async () =
   expect(requests[1].body.operationId).toBe(requests[0].body.operationId)
 })
 
-test('discovery shows reported progress and can be cancelled to start from scratch', async () => {
+test('discovery shows reported progress and can be cancelled to skip the onboarding', async () => {
   const pending = Promise.withResolvers<Response>()
   const page = await mount(true, false, true, false, undefined, () => pending.promise)
   await page.click('ChatGPTOpenAI')
@@ -386,7 +386,7 @@ test('discovery shows reported progress and can be cancelled to start from scrat
       button => button.textContent === 'Find ideas'
     )
   ).toBe(false)
-  await page.click('Start from scratch')
+  await page.click('Skip the onboarding')
   expect(page.calls.some(call => call.path === '/api/onboarding/cancel')).toBe(true)
   expect(page.location.history?.at(-1)).toBe('/workspace/empty-workspace/overview')
 })
@@ -397,7 +397,7 @@ test('starting from scratch blocks other actions until creation finishes', async
     create: () => pending.promise
   })
   await page.click('ChatGPTOpenAI')
-  await page.click('Start from scratch')
+  await page.click('Skip the onboarding')
   expect([...page.document.querySelectorAll('button')].every(button => button.disabled)).toBe(true)
   await page.click('Creating workspace…')
   expect(page.calls.filter(call => call.path === '/api/workspaces/create')).toHaveLength(1)
@@ -419,12 +419,12 @@ test('empty workspace creation failure keeps onboarding open and can be retried'
         : Response.json({ id: 'empty-workspace' })
   })
   await page.click('ClaudeAnthropic')
-  await page.click('Start from scratch')
+  await page.click('Skip the onboarding')
   expect(page.document.querySelector('[role="alert"]')?.textContent).toBe(
     'Could not create workspace'
   )
   expect(page.calls.some(call => call.path === '/api/settings')).toBe(false)
-  await page.click('Start from scratch')
+  await page.click('Skip the onboarding')
   expect(page.location.history?.at(-1)).toBe('/workspace/empty-workspace/overview')
 })
 
@@ -437,9 +437,9 @@ test('retrying onboarding completion reuses the empty workspace', async () => {
         : Response.json({ showOnboarding: false })
   })
   await page.click('ClaudeAnthropic')
-  await page.click('Start from scratch')
+  await page.click('Skip the onboarding')
   expect(page.document.querySelector('[role="alert"]')?.textContent).toBe('Could not save settings')
-  await page.click('Start from scratch')
+  await page.click('Skip the onboarding')
   expect(page.calls.filter(call => call.path === '/api/workspaces/create')).toHaveLength(1)
   expect(page.location.history?.at(-1)).toBe('/workspace/empty-workspace/overview')
 })
