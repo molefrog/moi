@@ -1,3 +1,4 @@
+import { useAppConfig } from '@/client/api/app-config'
 import { useCallback, useState } from 'react'
 import { HarnessSelector } from '@/client/features/harness/harness-selector'
 import { HarnessLoginPanel } from '@/client/features/harness/harness-login-panel'
@@ -14,17 +15,13 @@ export function AgentSetupStep({ onComplete }: AgentSetupStepProps) {
     if (harness) onComplete(harness)
   }, [harness, onComplete])
   if (!harness) return <ChooseAgent onSelect={setHarness} />
-  return (
-    <HarnessLoginPanel
-      type={harness}
-      connectedMessage="Come back to Moi to find your first project."
-      onConnected={onConnected}
-    />
-  )
+  return <HarnessLoginPanel type={harness} onConnected={onConnected} />
 }
 
 type ChooseAgentProps = { onSelect: (harness: OnboardingHarness) => void }
 function ChooseAgent({ onSelect }: ChooseAgentProps) {
+  const { environment, demo } = useAppConfig()
+  const canInstall = environment === 'local' && !demo
   const installed = useWorkspaceCreationInfo()
   if (installed.isPending || installed.error)
     return (
@@ -36,10 +33,11 @@ function ChooseAgent({ onSelect }: ChooseAgentProps) {
   const options = (['claude-code', 'codex'] as const).map(type => ({
     type,
     description: harnessDescription[type],
-    disabled: !installed.data.installed[type],
-    disabledReason: installed.data.installed[type]
-      ? undefined
-      : 'This agent is not installed on your computer'
+    disabled: !canInstall && !installed.data.installed[type],
+    disabledReason:
+      canInstall || installed.data.installed[type]
+        ? undefined
+        : 'This agent is not installed on your computer'
   }))
   return (
     <OnboardingScreen className="max-w-sm">

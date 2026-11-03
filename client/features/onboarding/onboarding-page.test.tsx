@@ -21,6 +21,9 @@ async function mount(
     create?: () => Promise<Response>
     save?: () => Response
     workspaces?: () => Response
+    installed?: boolean
+    install?: () => Promise<Response>
+    auth?: () => Response
   }
 ) {
   const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>')
@@ -46,6 +49,7 @@ async function mount(
   })
   const location = memoryLocation({ path: '/onboarding', record: true })
   const calls: { path: string; body: Record<string, unknown> }[] = []
+  let loginStarted = false
   const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
     Object.assign(
       async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -63,11 +67,27 @@ async function mount(
             ? scratchResponses.create()
             : Response.json({ id: 'empty-workspace', path: '/tmp/My workspace', type: body.type })
         if (path === '/api/workspaces/create')
-          return Response.json({ installed: { 'claude-code': true, codex: true } })
-        if (path.endsWith('/auth'))
           return Response.json({
-            availability: { status: connected ? 'available' : 'login-required' }
+            installed: { 'claude-code': true, codex: scratchResponses?.installed ?? true }
           })
+        if (path.endsWith('/auth/login')) {
+          loginStarted = true
+          return Response.json({ id: 'test-login', url: 'https://example.com/login' })
+        }
+        if (path.endsWith('/auth/install')) return scratchResponses!.install!()
+        if (path.endsWith('/auth'))
+          return (
+            scratchResponses?.auth?.() ??
+            Response.json({
+              login: loginStarted
+                ? { state: 'pending', id: 'test-login', url: 'https://example.com/login' }
+                : undefined,
+              availability:
+                scratchResponses?.installed === false
+                  ? { status: 'unavailable', code: 'not-installed' }
+                  : { status: connected ? 'available' : 'login-required' }
+            })
+          )
         if (path === '/api/onboarding/discover' && discoveryResponse) return discoveryResponse()
         if (path === '/api/onboarding/discover')
           return Response.json({
@@ -159,7 +179,14 @@ async function mount(
     }
   }
   await settle()
-  return { document, location, calls, click, settle }
+  return {
+    document,
+    location,
+    calls,
+    click,
+    settle,
+    refreshAuth: () => client.refetchQueries({ queryKey: ['harness-auth'] })
+  }
 }
 
 test('agent selection and connection are required; building opens the workspace automatically', async () => {
@@ -171,7 +198,7 @@ test('agent selection and connection are required; building opens the workspace 
     )
   ).toBe(false)
   expect(
-    [...page.document.querySelectorAll('button')].some(button => button.textContent === 'Continue')
+    [...page.document.querySelectorAll('button')].some(button => button.textContent === 'Log in')
   ).toBe(false)
   expect(page.document.querySelector('[aria-pressed]')).toBeNull()
   await page.click('ChatGPTOpenAI')
@@ -266,7 +293,7 @@ test('connection has no Skip or Switch agent action', async () => {
       button => button.textContent === 'Start from scratch'
     )
   ).toBe(false)
-  expect(page.document.body.textContent).toContain('Log in to Claude')
+  expect(page.document.body.textContent).toContain('Set up Claude')
   expect(
     [...page.document.querySelectorAll('button')].some(
       button => button.textContent === 'Switch agent'
@@ -415,4 +442,67 @@ test('retrying onboarding completion reuses the empty workspace', async () => {
   await page.click('Start from scratch')
   expect(page.calls.filter(call => call.path === '/api/workspaces/create')).toHaveLength(1)
   expect(page.location.history?.at(-1)).toBe('/workspace/empty-workspace/overview')
+})
+
+test('a missing local agent installs and starts login with one click', async () => {
+  let finish!: (response: Response) => void
+  let loginVisible = false
+  const setup = {
+    installed: false,
+    auth: () =>
+      Response.json({
+        availability: setup.installed
+          ? { status: 'login-required' }
+          : { status: 'unavailable', code: 'not-installed' },
+        login: loginVisible
+          ? { state: 'pending', id: 'test-login', url: 'https://example.com/login' }
+          : undefined
+      }),
+    install: () =>
+      new Promise<Response>(resolve => {
+        finish = resolve
+      })
+  }
+  const page = await mount(true, true, false, false, undefined, undefined, setup)
+  await page.click('ChatGPTOpenAI')
+  expect(page.document.body.textContent).toContain('isn’t installed on your computer yet')
+  await page.click('Install ChatGPT')
+  expect(page.document.body.textContent).toContain('Installing…')
+  expect(page.document.querySelector('button')?.disabled).toBe(true)
+  setup.installed = true
+  await act(async () => {
+    finish(Response.json({ ok: true }))
+  })
+  await page.settle()
+  // The final refresh can still carry the old status. Stay busy until polling catches up.
+  expect(page.document.body.textContent).toContain('Installing…')
+  expect(page.document.querySelector('button')?.disabled).toBe(true)
+  loginVisible = true
+  await act(async () => {
+    await page.refreshAuth()
+  })
+  await page.settle()
+  expect(page.document.body.textContent).toContain('Set up ChatGPT')
+  expect(page.document.body.textContent).toContain('Open ChatGPT')
+  expect(page.calls.filter(call => call.path.endsWith('/auth/login'))).toHaveLength(1)
+  expect(page.calls.filter(call => call.path.endsWith('/auth/install'))).toHaveLength(1)
+})
+
+test('a failed status check after installation does not start login', async () => {
+  let installed = false
+  const page = await mount(true, true, false, false, undefined, undefined, {
+    installed: false,
+    install: async () => {
+      installed = true
+      return Response.json({ ok: true })
+    },
+    auth: () => {
+      if (installed) throw new Error('Could not check agent status')
+      return Response.json({ availability: { status: 'unavailable', code: 'not-installed' } })
+    }
+  })
+  await page.click('ChatGPTOpenAI')
+  await page.click('Install ChatGPT')
+  expect(page.document.body.textContent).toContain('Could not check agent status')
+  expect(page.calls.some(call => call.path.endsWith('/auth/login'))).toBe(false)
 })
