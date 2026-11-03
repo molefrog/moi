@@ -120,7 +120,7 @@ function WorkspaceHarnessSetting() {
   const { workspaceId, provider } = useWorkspaceLayoutCtx()
   const type = provider ?? 'claude-code'
   const installations = useWorkspaceCreationInfo()
-  const change = useChangeWorkspaceHarness(workspaceId, type)
+  const change = useChangeWorkspaceHarness(workspaceId)
   const active = useLive(state =>
     Object.entries(state.activity).some(
       ([key, activity]) => key.startsWith(`${workspaceId}:`) && activity !== 'idle'

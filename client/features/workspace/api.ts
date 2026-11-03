@@ -138,13 +138,13 @@ export function useSaveLayout(workspaceId: string) {
   })
 }
 
-export function useChangeWorkspaceHarness(workspaceId: string, expectedType: WorkspaceType) {
+export function useChangeWorkspaceHarness(workspaceId: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (type: WorkspaceType) =>
       requestJson<WorkspaceEntry>(
         `/api/workspaces/${workspaceId}/harness`,
-        jsonRequest('PATCH', { type, expectedType })
+        jsonRequest('PATCH', { type })
       ),
     onSuccess: entry => {
       void receiveWorkspaceHarness(queryClient, workspaceId, entry.type ?? 'claude-code')

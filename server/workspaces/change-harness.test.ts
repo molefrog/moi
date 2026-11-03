@@ -48,22 +48,23 @@ test('switches in place and preserves metadata while resetting selections and pe
       buildSessionId: 'old'
     }
   })
-  const next = await changeWorkspaceHarness(ws, 'codex', 'claude-code')
+  const next = await changeWorkspaceHarness(ws, 'codex')
   expect(next).toMatchObject({ id: ws.id, path: root, name: ws.name, type: 'codex' })
   const state = await readWorkspaceState(ws)
   expect(state.selected).toEqual({})
   expect(state.pinnedSessionId).toBeUndefined()
   expect(state.sessions.old?.config?.model).toBe('old-model')
   expect(state.pendingViews.view).toEqual({ requirements: 'A dashboard', status: 'draft' })
-  await changeWorkspaceHarness(next, 'claude-code', 'codex')
+  // A later choice wins even when its caller still holds the original registration.
+  await changeWorkspaceHarness(ws, 'claude-code')
+  expect((await getWorkspace(ws.id))?.type).toBe('claude-code')
   expect((await listWorkspaces()).map(entry => entry.id)).toEqual([ws.id])
 })
-test('rejects stale choices and reserved startup without changing registration', async () => {
+test('rejects reserved startup without changing registration', async () => {
   const ws = await registerWorkspace(root, { type: 'claude-code' })
-  await expect(changeWorkspaceHarness(ws, 'codex', 'codex')).rejects.toThrow('another tab')
   const release = reserveWorkspaceOperation(ws.id)
   try {
-    await expect(changeWorkspaceHarness(ws, 'codex', 'claude-code')).rejects.toThrow('busy')
+    await expect(changeWorkspaceHarness(ws, 'codex')).rejects.toThrow('busy')
   } finally {
     release()
   }
@@ -71,7 +72,7 @@ test('rejects stale choices and reserved startup without changing registration',
 })
 test('rejects provider-owned workspaces', async () => {
   const ws = await registerWorkspace(root, { type: 'hermes' })
-  await expect(changeWorkspaceHarness(ws, 'codex', 'hermes')).rejects.toThrow('cannot be changed')
+  await expect(changeWorkspaceHarness(ws, 'codex')).rejects.toThrow('cannot be changed')
 })
 test('rejects active sessions', async () => {
   const ws = await registerWorkspace(root, { type: 'claude-code' })
@@ -79,7 +80,7 @@ test('rejects active sessions', async () => {
     { workspaceId: ws.id, sessionId: 'running', activity: 'running' }
   ])
   try {
-    await expect(changeWorkspaceHarness(ws, 'codex', 'claude-code')).rejects.toThrow('finish')
+    await expect(changeWorkspaceHarness(ws, 'codex')).rejects.toThrow('finish')
   } finally {
     active.mockRestore()
   }
@@ -92,7 +93,7 @@ test('unavailable target leaves selections intact', async () => {
   })
   const unavailable = spyOn(executable, 'findHarnessExecutable').mockReturnValue(null)
   try {
-    await expect(changeWorkspaceHarness(ws, 'codex', 'claude-code')).rejects.toThrow('Install')
+    await expect(changeWorkspaceHarness(ws, 'codex')).rejects.toThrow('Install')
     expect((await readWorkspaceState(ws)).selected.overview).toBe('old')
   } finally {
     unavailable.mockRestore()
@@ -110,7 +111,7 @@ test('restores selection when registration persistence fails', async () => {
     new Error('Disk failure')
   )
   try {
-    await expect(changeWorkspaceHarness(ws, 'codex', 'claude-code')).rejects.toThrow('Disk failure')
+    await expect(changeWorkspaceHarness(ws, 'codex')).rejects.toThrow('Disk failure')
     expect((await getWorkspace(ws.id))?.type).toBe('claude-code')
     const state = await readWorkspaceState(ws)
     expect(state.selected.overview).toBe('kept')
@@ -130,9 +131,7 @@ test('restores session selections even when layout rollback also fails', async (
   const save = spyOn(layout, 'saveLayout').mockRejectedValue(new Error('Layout unavailable'))
   const log = spyOn(console, 'error').mockImplementation(() => {})
   try {
-    await expect(changeWorkspaceHarness(ws, 'codex', 'claude-code')).rejects.toThrow(
-      'Layout unavailable'
-    )
+    await expect(changeWorkspaceHarness(ws, 'codex')).rejects.toThrow('Layout unavailable')
     const state = await readWorkspaceState(ws)
     expect(state.selected.overview).toBe('kept')
     expect(state.pinnedSessionId).toBe('kept')

@@ -31,17 +31,12 @@ export function prepareWorkspaceHarness(ws: WorkspaceEntry): Promise<void> {
   return pending
 }
 
-export async function changeWorkspaceHarness(
-  ws: WorkspaceEntry,
-  type: WorkspaceType,
-  expectedType: WorkspaceType
-) {
+export async function changeWorkspaceHarness(ws: WorkspaceEntry, type: WorkspaceType) {
   return withHarnessTransition(ws, async () => {
     const current = await getWorkspace(ws.id)
-    const previousType = current?.type ?? 'claude-code'
-    const harness = harnessFor(current ?? ws)
-    if (!current || previousType !== expectedType)
-      throw new HarnessTransitionError('Agent changed in another tab. Try again')
+    if (!current) throw new HarnessTransitionError('Workspace not found')
+    const previousType = current.type ?? 'claude-code'
+    const harness = harnessFor(current)
     if (
       !['claude-code', 'codex'].includes(previousType) ||
       !['claude-code', 'codex'].includes(type)

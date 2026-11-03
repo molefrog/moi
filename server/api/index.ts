@@ -184,10 +184,10 @@ one.use('*', withWorkspace)
 one.patch('/harness', async c => {
   if (getAppConfig().demo) return c.text('Changing agents is unavailable in the demo', 403)
   const body = await c.req.json().catch(() => null)
-  if (!body || !['claude-code', 'codex'].includes(body.type) || !isHarnessType(body.expectedType))
+  if (!body || !['claude-code', 'codex'].includes(body.type))
     return c.text('Invalid agent selection', 400)
   try {
-    return c.json(await changeWorkspaceHarness(c.get('ws'), body.type, body.expectedType))
+    return c.json(await changeWorkspaceHarness(c.get('ws'), body.type))
   } catch (error) {
     if (error instanceof HarnessTransitionError) return c.text(error.message, 409)
     throw error
