@@ -11,10 +11,10 @@ import {
   CollapsibleTrigger
 } from '@/client/components/ui/collapsible'
 import { MarkdownContent } from '@/client/features/chat/messages/markdown-content'
+import { UserMessageBubble } from './user-message-bubble'
 import { ToolCallGroup } from '@/client/features/chat/messages/tool-group/tool-call-group'
 import { formatDuration } from '@/client/features/chat/messages/tool-group/format'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-layout-context'
-import { cn } from '@/client/lib/cn'
 
 // A part either folds into a tool-group "run" (reasoning + tool calls — including
 // subagents and skills, which render as their own timeline rows) or stands alone
@@ -182,16 +182,7 @@ export const TurnView = memo(function TurnView({ turn, processing = false }: Tur
         {fileParts.map((p, i) => (
           <FilePart key={i} mediaType={p.mediaType} previewUrl={p.previewUrl} label={p.label} />
         ))}
-        {text && (
-          <div
-            className={cn(
-              'max-w-full min-w-0 rounded-lg bg-primary px-3 py-2 text-sm leading-normal wrap-anywhere text-primary-foreground',
-              'inset-shadow-[0_0_10px_color-mix(in_oklab,var(--color-white)_30%,transparent)]'
-            )}
-          >
-            <MarkdownContent content={text} />
-          </div>
-        )}
+        {text && <UserMessageBubble content={text} />}
       </div>
     )
   }
