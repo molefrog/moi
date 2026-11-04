@@ -22,11 +22,11 @@ const tabs = (open: WorkspaceTabsState['open'], active: WorkspaceTabsState['acti
 describe('normalizeWorkspaceTabs', () => {
   test('falls back to defaults on missing/empty state', () => {
     expect(normalizeWorkspaceTabs(undefined)).toEqual({
-      open: ['overview', 'scratchpad'],
+      open: ['overview'],
       active: 'overview'
     })
     expect(normalizeWorkspaceTabs(tabs([], 'scratchpad'))).toEqual({
-      open: ['overview', 'scratchpad'],
+      open: ['overview'],
       active: 'overview'
     })
   })
@@ -62,10 +62,7 @@ describe('effectiveOpenTabs', () => {
   })
 
   test('falls back to the default open set when nothing survives', () => {
-    expect(effectiveOpenTabs(tabs(['views/gone'], 'views/gone'), [])).toEqual([
-      'overview',
-      'scratchpad'
-    ])
+    expect(effectiveOpenTabs(tabs(['views/gone'], 'views/gone'), [])).toEqual(['overview'])
   })
 })
 

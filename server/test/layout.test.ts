@@ -76,7 +76,7 @@ describe('loadLayout', () => {
       expect(loaded.layoutMode).toBe('split')
       expect(loaded.widgetGrid).toEqual([{ i: DEFAULT_VIEWS_WIDGET.id, x: 0, y: 0 }])
       expect(loaded.tabs).toEqual({
-        open: ['overview', 'scratchpad'],
+        open: ['overview'],
         active: 'overview'
       })
     } finally {
@@ -89,7 +89,7 @@ describe('loadLayout', () => {
       const loaded = await loadLayout(dir)
       expect(loaded.layoutMode).toBe('split')
       expect(loaded.tabs).toEqual({
-        open: ['overview', 'scratchpad'],
+        open: ['overview'],
         active: 'overview'
       })
     })
@@ -128,7 +128,7 @@ describe('loadLayout', () => {
       async dir => {
         const loaded = await loadLayout(dir)
         expect(loaded.tabs).toEqual({
-          open: ['overview', 'scratchpad'],
+          open: ['overview'],
           active: 'overview'
         })
       }
@@ -173,7 +173,7 @@ describe('loadLayout', () => {
       },
       async dir => {
         expect((await loadLayout(dir)).tabs).toEqual({
-          open: ['overview', 'scratchpad'],
+          open: ['overview'],
           active: 'overview'
         })
       }

@@ -3,7 +3,7 @@ import type { WorkspaceLayout, WorkspaceTabsState } from './types'
 import { isWorkspaceTabId } from './workspace-tabs'
 
 export function createDefaultWorkspaceTabs(): WorkspaceTabsState {
-  return { open: ['overview', 'scratchpad'], active: 'overview' }
+  return { open: ['overview'], active: 'overview' }
 }
 
 export function normalizeWorkspaceTabs(value: unknown): WorkspaceTabsState {
