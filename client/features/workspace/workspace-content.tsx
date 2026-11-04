@@ -495,6 +495,7 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
                   : undefined
               }
               chatDocked={mode === 'split'}
+              chatOpen={mode === 'split' || floatingChatOpen}
               workspaceId={workspaceId}
               onEditingStart={() => {
                 if (mode === 'fullscreen') setFloatingChatOpen(false)

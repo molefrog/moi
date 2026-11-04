@@ -31,6 +31,7 @@ type PendingViewScreenProps = {
   running: boolean
   sketchSessionId?: string
   chatDocked: boolean
+  chatOpen?: boolean
   workspaceId: string
   onEditingStart: () => void
   onContinueInChat: () => void
@@ -45,6 +46,7 @@ export function PendingViewScreen({
   running,
   sketchSessionId,
   chatDocked,
+  chatOpen = false,
   workspaceId,
   onEditingStart,
   onContinueInChat,
@@ -77,6 +79,7 @@ export function PendingViewScreen({
     <PendingViewScreenSketchSurface
       active={active}
       chatDocked={chatDocked}
+      chatOpen={chatOpen}
       error={pendingView.error}
       sketch={sketch}
       displayStatus={displayStatus}
@@ -98,17 +101,25 @@ function PendingViewScreenStarting() {
 }
 
 type PendingViewScreenFailedProps = {
+  chatOpen?: boolean
   error?: string
   onOpenChat: () => void
   onDiscard: () => void
 }
 
-function PendingViewScreenFailed({ error, onOpenChat, onDiscard }: PendingViewScreenFailedProps) {
+function PendingViewScreenFailed({
+  error,
+  chatOpen,
+  onOpenChat,
+  onDiscard
+}: PendingViewScreenFailedProps) {
   return (
     <PendingViewScreenStatusLayout>
       <div className="pointer-events-auto flex max-w-md flex-col items-center gap-4 bg-radial from-background from-50% to-transparent to-75% p-8 text-center">
         <p className="text-sm text-muted-foreground">{error}</p>
-        <Button onClick={onOpenChat}>Open chat</Button>
+        <Button variant={chatOpen ? 'secondary' : 'default'} onClick={onOpenChat}>
+          {chatOpen ? 'Go to chat' : 'Open chat'}
+        </Button>
         <Button variant="secondary" onClick={onDiscard}>
           Discard view
         </Button>
@@ -120,6 +131,7 @@ function PendingViewScreenFailed({ error, onOpenChat, onDiscard }: PendingViewSc
 type PendingViewScreenSketchSurfaceProps = {
   active: boolean
   chatDocked: boolean
+  chatOpen?: boolean
   error?: string
   sketch: ViewSketchController
   displayStatus: 'draft' | 'starting' | 'building' | 'waiting' | 'failed'
@@ -130,6 +142,7 @@ type PendingViewScreenSketchSurfaceProps = {
 function PendingViewScreenSketchSurface({
   active,
   chatDocked,
+  chatOpen = false,
   error,
   sketch,
   displayStatus,
@@ -176,12 +189,18 @@ function PendingViewScreenSketchSurface({
       {displayStatus === 'waiting' && (
         <PendingViewScreenWaitingState
           error={error}
+          chatOpen={chatOpen}
           onDiscard={onDiscard}
           onOpenChat={onOpenChat}
         />
       )}
       {displayStatus === 'failed' && (
-        <PendingViewScreenFailed error={error} onOpenChat={onOpenChat} onDiscard={onDiscard} />
+        <PendingViewScreenFailed
+          chatOpen={chatOpen}
+          error={error}
+          onOpenChat={onOpenChat}
+          onDiscard={onDiscard}
+        />
       )}
     </div>
   )
@@ -223,6 +242,7 @@ function PendingViewScreenSketchBackground({
 }
 
 type PendingViewScreenWaitingStateProps = {
+  chatOpen?: boolean
   error?: string
   onDiscard: () => void
   onOpenChat: () => void
@@ -230,6 +250,7 @@ type PendingViewScreenWaitingStateProps = {
 
 function PendingViewScreenWaitingState({
   error,
+  chatOpen,
   onDiscard,
   onOpenChat
 }: PendingViewScreenWaitingStateProps) {
@@ -239,11 +260,13 @@ function PendingViewScreenWaitingState({
         <div className="flex flex-col gap-1">
           <h1 className="font-medium">The view needs your attention</h1>
           <p className="text-sm text-muted-foreground">
-            {error ?? 'Open the chat to answer or ask the agent to continue'}
+            {error ?? 'Use the chat to work through the issue and continue'}
           </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={onOpenChat}>Open chat</Button>
+          <Button variant={chatOpen ? 'secondary' : 'default'} onClick={onOpenChat}>
+            {chatOpen ? 'Go to chat' : 'Open chat'}
+          </Button>
           <Button variant="secondary" onClick={onDiscard}>
             Discard view
           </Button>
