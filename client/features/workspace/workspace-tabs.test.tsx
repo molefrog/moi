@@ -7,6 +7,32 @@ import { describe, expect, test } from 'bun:test'
 import { WorkspaceTabs } from '@/client/features/workspace/workspace-tabs'
 
 describe('WorkspaceTabs', () => {
+  test('announces attention only when the tab is not running', () => {
+    for (const loading of [false, true]) {
+      const html = renderToStaticMarkup(
+        createElement(WorkspaceTabs, {
+          tabs: [
+            {
+              key: 'views/test',
+              Icon: IconMessages,
+              label: 'Test view',
+              needsAttention: true,
+              loading
+            }
+          ],
+          active: 'overview',
+          createItems: [],
+          onSelect: () => undefined,
+          onClose: () => undefined,
+          onReorder: () => undefined
+        })
+      )
+      expect(html.includes('aria-label="Test view: needs attention"')).toBe(!loading)
+      expect(html.includes('title="Needs attention"')).toBe(!loading)
+      expect(html.includes('data-slot="spinner"')).toBe(loading)
+    }
+  })
+
   test('renders Overview without drag attributes and keeps other tabs reorderable', () => {
     const html = renderToStaticMarkup(
       createElement(WorkspaceTabs, {

@@ -107,7 +107,11 @@ function tabItemFor(
         label: getViewLabel(view),
         closable: closable || view.status !== 'compiled',
         loading:
-          view.status !== 'compiled' && !!view.buildSessionId && viewRunning(view.buildSessionId)
+          view.status !== 'compiled' && !!view.buildSessionId && viewRunning(view.buildSessionId),
+        needsAttention:
+          view.status === 'failed' ||
+          (view.status === 'submitted' &&
+            (!view.buildSessionId || !viewRunning(view.buildSessionId)))
       }
     : null
 }

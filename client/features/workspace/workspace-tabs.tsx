@@ -22,6 +22,7 @@ export type WorkspaceTabItem = {
   closable?: boolean
   reorderable?: boolean
   loading?: boolean
+  needsAttention?: boolean
 }
 
 export type CreateWorkspaceTabItem = {
@@ -117,7 +118,7 @@ function WorkspaceTab(props: WorkspaceTabProps) {
     <button
       type="button"
       aria-hidden={preview || undefined}
-      aria-label={tab.label}
+      aria-label={tab.needsAttention && !tab.loading ? `${tab.label}: needs attention` : tab.label}
       disabled={preview}
       tabIndex={preview ? -1 : undefined}
       onClick={props.preview ? undefined : () => props.onSelect(tab.key)}
@@ -137,7 +138,26 @@ function WorkspaceTab(props: WorkspaceTabProps) {
         {tab.loading ? (
           <Spinner data-icon="inline-start" className="shrink-0" />
         ) : (
-          <tab.Icon data-icon="inline-start" stroke={2} className="size-4 shrink-0" />
+          <span
+            className="relative size-4 shrink-0"
+            title={tab.needsAttention ? 'Needs attention' : undefined}
+          >
+            <tab.Icon
+              data-icon="inline-start"
+              stroke={1.75}
+              className={cn(
+                'size-4',
+                tab.needsAttention &&
+                  '[mask-image:radial-gradient(circle_at_calc(100%_-_0.1875rem)_0.1875rem,transparent_0.3125rem,black_0.3125rem)]'
+              )}
+            />
+            {tab.needsAttention && (
+              <span
+                aria-hidden="true"
+                className="absolute top-0 right-0 size-1.5 rounded-full bg-primary"
+              />
+            )}
+          </span>
         )}
         <span
           className={cn(
