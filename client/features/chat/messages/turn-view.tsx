@@ -163,7 +163,7 @@ export const TurnView = memo(function TurnView({ turn, processing = false }: Tur
   const cwd = useWorkspaceLayoutCtx().cwd
 
   if (turn.role === 'user' && turn.origin.kind === 'user-input') {
-    // Plain user input — right-aligned. Attachments (images/files) stack above
+    // User input — right-aligned. Attachments (images/files) stack above
     // the text bubble.
     const fileParts = turn.parts.filter(
       (p): p is Extract<Part, { type: 'file-attachment' }> => p.type === 'file-attachment'
@@ -183,14 +183,14 @@ export const TurnView = memo(function TurnView({ turn, processing = false }: Tur
           <FilePart key={i} mediaType={p.mediaType} previewUrl={p.previewUrl} label={p.label} />
         ))}
         {text && (
-          <p
+          <div
             className={cn(
-              'max-w-full min-w-0 rounded-lg bg-primary px-3 py-2 text-sm leading-normal wrap-anywhere whitespace-pre-wrap text-primary-foreground',
+              'max-w-full min-w-0 rounded-lg bg-primary px-3 py-2 text-sm leading-normal wrap-anywhere text-primary-foreground',
               'inset-shadow-[0_0_10px_color-mix(in_oklab,var(--color-white)_30%,transparent)]'
             )}
           >
-            {text}
-          </p>
+            <MarkdownContent content={text} />
+          </div>
         )}
       </div>
     )

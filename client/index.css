@@ -9,6 +9,8 @@
 
 @plugin '@tailwindcss/typography';
 
+@config './tailwind-config.ts';
+
 @custom-variant dark (&:is(.dark *));
 @custom-variant dark-or-vivid (&:is(.dark *, [data-vivid], [data-vivid] *));
 
