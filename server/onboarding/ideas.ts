@@ -5,51 +5,31 @@ import type { OnboardingIdea } from '@/lib/onboarding'
 
 const appletPlan = z
   .object({
-    name: z.string().trim().min(1).max(100).describe('Short name in sentence case'),
-    description: z.string().trim().min(1).max(500).describe('Purpose and main content'),
-    features: z
-      .array(z.string().trim().min(1).max(500))
-      .min(1)
-      .max(6)
-      .describe('Concrete content, actions, behavior, data sources, and saved state to implement')
+    name: z.string().trim().min(1).max(100),
+    description: z.string().trim().min(1).max(500),
+    features: z.array(z.string().trim().min(1).max(500)).min(1).max(6)
   })
   .strict()
 
 const idea = z
   .object({
-    name: z
-      .string()
-      .trim()
-      .min(1)
-      .max(100)
-      .describe('Workspace name in sentence case, preserving proper nouns'),
-    icon: z.enum(APP_ICON_IDS).describe('One built-in Moi icon, rendered on the theme background'),
+    name: z.string().trim().min(1).max(100),
+    icon: z.enum(APP_ICON_IDS),
     theme: z
       .object({
         font: z.enum(Object.keys(FONT_THEMES) as FontTheme[]),
         color: z.enum(Object.keys(COLOR_THEMES) as ColorTheme[])
       })
-      .strict()
-      .describe(
-        'Workspace customization. Choose a different font and a different color for each option.'
-      ),
-    description: z
-      .string()
-      .trim()
-      .min(1)
-      .max(280)
-      .describe(
-        'One or two short sentences: what the workspace does and why it fits this person. Refer broadly to relevant context; omit dates, meeting titles, names, and research details.'
-      ),
+      .strict(),
+    description: z.string().trim().min(1).max(200),
     views: z
       .array(
         appletPlan.extend({
-          icon: z.enum(APP_ICON_IDS).describe('Built-in Moi icon for this view')
+          icon: z.enum(APP_ICON_IDS)
         })
       )
-      .length(3)
-      .describe('Full-page tools, each with its own tab and build chat'),
-    widgets: z.array(appletPlan).max(4).describe('Small focused cards on Overview')
+      .length(3),
+    widgets: z.array(appletPlan).max(4)
   })
   .strict()
 
