@@ -13,7 +13,7 @@ const appletPlan = z
 
 const idea = z
   .object({
-    name: z.string().trim().min(1).max(100),
+    name: z.string().trim().min(1).max(24),
     icon: z.enum(APP_ICON_IDS),
     theme: z
       .object({

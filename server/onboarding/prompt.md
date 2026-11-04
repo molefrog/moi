@@ -29,7 +29,7 @@ Return each option using the provided schema:
 
 Use sentence case for workspace, view, and widget names, preserving proper nouns.
 
-- **Name and icon:** a short sentence-case name and a relevant built-in Moi icon ID. Moi supplies the icon background.
+- **Name and icon:** a name of at most 24 characters, aiming for two or three words, and a relevant built-in Moi icon ID. Moi supplies the icon background.
 - **Theme:** font and color preset IDs from the schema. Each option must have a different font and color.
 - **Description:** one short sentence, at most 200 characters, explaining the workspace's main use and benefit. This appears on a small card, so skip background context and lists of features. Put supporting details in the view and widget plans. Omit exact dates, meeting titles, people's names, quotes, and research details.
 

@@ -47,6 +47,16 @@ test('accepts exactly three distinct complete ideas and assigns stable server ID
   expect(result[0].views[0].icon).toBe('book')
   expect(
     parseIdeas({
+      options: options.map((option, index) => ({ ...option, name: `${index}${'a'.repeat(23)}` }))
+    })
+  ).toHaveLength(3)
+  expect(() =>
+    parseIdeas({
+      options: options.map((option, index) => ({ ...option, name: `${index}${'a'.repeat(24)}` }))
+    })
+  ).toThrow()
+  expect(
+    parseIdeas({
       options: options.map(option => ({ ...option, description: 'a'.repeat(200) }))
     })
   ).toHaveLength(3)
