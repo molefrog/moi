@@ -198,7 +198,7 @@ export function useSaveSessionConfig(workspaceId: string) {
     optimistic: (draft, { sessionId, patch }) => {
       const session = (draft.sessions[sessionId] ??= {})
       const config: SessionConfig = { ...session.config }
-      for (const key of ['model', 'effort', 'fastMode'] as const) {
+      for (const key of ['model', 'effort', 'speedMode'] as const) {
         const value = patch[key]
         if (value === null) delete config[key]
         else if (value !== undefined) Object.assign(config, { [key]: value })

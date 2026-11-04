@@ -81,11 +81,11 @@ export function useViewActions() {
     )
 
     const config = getCachedWorkspaceState(queryClient, workspaceId)?.sessions[sessionId]?.config
-    const { model, effort, fastMode, stream } = resolveChatRunOptions(
+    const { model, effort, speedMode, stream } = resolveChatRunOptions(
       modelData,
       config?.model ?? layout.selectedModel,
       config?.effort ?? layout.selectedEffort,
-      config?.fastMode ?? layout.selectedFastMode
+      config?.speedMode ?? layout.selectedSpeedMode
     )
 
     changeWorkspaceStateCache(queryClient, workspaceId, draft => {
@@ -108,7 +108,7 @@ export function useViewActions() {
           : {}),
         model,
         effort,
-        fastMode,
+        speedMode,
         stream
       })
       moveChatDraft(workspaceId, sessionId, result.sessionId)

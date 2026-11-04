@@ -61,7 +61,7 @@ export async function changeWorkspaceHarness(ws: WorkspaceEntry, type: Workspace
       const layout = { ...layoutBefore }
       delete layout.selectedModel
       delete layout.selectedEffort
-      delete layout.selectedFastMode
+      delete layout.selectedSpeedMode
       await saveLayout(layout, current.path)
       updated = await updateWorkspaceHarness(ws.id, type)
     } catch (error) {

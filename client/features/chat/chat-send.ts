@@ -1,4 +1,4 @@
-import type { FastMode } from '@/lib/types'
+import type { SpeedMode } from '@/lib/types'
 import type {
   AttachmentInput,
   AttachmentOrigin,
@@ -17,7 +17,7 @@ import { changeWorkspaceStateCache } from '@/client/features/workspace/workspace
 import { attachmentKey, liveStore } from '@/client/features/chat/chat-store'
 import { useUiStore } from '@/client/store/ui'
 import type { StagedAttachment } from '@/client/features/chat/composer/attachments/types'
-import { resolveFastMode, resolveSelectedModel } from '@/client/features/chat/composer/model-order'
+import { resolveSpeedMode, resolveSelectedModel } from '@/client/features/chat/composer/model-order'
 import type { MoiUserMessageOptions } from '@/client/features/workspace/moi-context'
 import { STREAM_RESPONSES } from '@/client/lib/flags'
 import { formatChatTitle } from '@/lib/chat-title'
@@ -198,8 +198,8 @@ export function resolveChatRunOptions(
   modelsData: WorkspaceHarness | undefined,
   pickedModel: string | undefined,
   pickedEffort: string | undefined,
-  pickedFastMode?: FastMode
-): { model?: string; effort?: string; fastMode?: FastMode; stream?: true } {
+  pickedSpeedMode?: SpeedMode
+): { model?: string; effort?: string; speedMode?: SpeedMode; stream?: true } {
   const models = modelsData?.models
   const savedModel =
     !pickedModel || !models || models.some(candidate => candidate.value === pickedModel)
@@ -220,15 +220,12 @@ export function resolveChatRunOptions(
     pickedEffort && (!modelInfo || (modelInfo.supportedEffortLevels ?? []).includes(pickedEffort))
       ? pickedEffort
       : undefined
-  const fastMode =
-    modelInfo && (pickedFastMode !== undefined || modelsData?.provider === 'codex')
-      ? resolveFastMode(modelInfo, pickedFastMode)
-      : pickedFastMode
+  const speedMode = modelInfo ? resolveSpeedMode(modelInfo, pickedSpeedMode) : pickedSpeedMode
   const stream = STREAM_RESPONSES && modelsData?.supportsStreaming ? true : undefined
   return {
     model,
     effort,
-    ...(fastMode !== undefined ? { fastMode } : {}),
+    ...(speedMode !== undefined ? { speedMode } : {}),
     stream
   }
 }

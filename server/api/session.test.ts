@@ -84,17 +84,17 @@ test('changing chat settings keeps the chat’s tab and fork history', async () 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     })
-  const saved = await patch({ model: 'sonnet', fastMode: false })
+  const saved = await patch({ model: 'sonnet', speedMode: 'normal' })
   expect(saved.status).toBe(200)
   expect((await saved.json()).sessions.child).toEqual({
     ...entry,
-    config: { model: 'sonnet', fastMode: false }
+    config: { model: 'sonnet', speedMode: 'normal' }
   })
-  const ultrafast = await patch({ fastMode: 'ultrafast' })
+  const ultrafast = await patch({ speedMode: 'ultrafast' })
   expect(ultrafast.status).toBe(200)
-  expect((await ultrafast.json()).sessions.child.config.fastMode).toBe('ultrafast')
-  expect((await patch({ fastMode: 'turbo' })).status).toBe(400)
-  expect((await (await patch({ model: null, fastMode: null })).json()).sessions.child).toEqual(
+  expect((await ultrafast.json()).sessions.child.config.speedMode).toBe('ultrafast')
+  expect((await patch({ speedMode: 'turbo' })).status).toBe(400)
+  expect((await (await patch({ model: null, speedMode: null })).json()).sessions.child).toEqual(
     entry
   )
 })

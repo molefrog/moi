@@ -1,4 +1,4 @@
-import type { FastMode } from '@/lib/types'
+import type { SpeedMode } from '@/lib/types'
 import type { MessageAttachment } from '@/lib/types'
 import { attachmentLabel } from '@/lib/moi-attachments'
 // Live state per (workspaceId, sessionId): display history, native lifecycle,
@@ -24,7 +24,7 @@ import {
   type CodexTokenUsage,
   type CodexTurn,
   type SubagentReplay,
-  codexServiceTierForFastMode,
+  codexServiceTierForSpeedMode,
   codexItemToNotice,
   codexItemToTurn,
   codexThreadToEvents,
@@ -906,7 +906,7 @@ type CodexSendInput = {
   optimisticId?: string
   model?: string
   effort?: string
-  fastMode?: FastMode
+  speedMode?: SpeedMode
   stream?: boolean
   // Rendered through native additionalContext or the legacy text envelope.
   context?: MoiContext
@@ -937,7 +937,7 @@ async function sendMessage(
     : undefined
   const userInput = buildUserInput(prepared)
   const { parts } = prepared
-  const serviceTier = codexServiceTierForFastMode(input.fastMode)
+  const serviceTier = codexServiceTierForSpeedMode(input.speedMode)
 
   let rec: SessionRecord
   try {
@@ -949,7 +949,7 @@ async function sendMessage(
         cwd: input.workspacePath,
         ...CODEX_THREAD_ACCESS,
         ...(input.model ? { model: input.model } : {}),
-        ...(serviceTier !== undefined ? { serviceTier } : {})
+        serviceTier
       })
       const realId = started.thread.id
       if (realId !== input.sessionId) {
@@ -971,13 +971,13 @@ async function sendMessage(
       })
       rec.model = started.model ?? input.model
       if (
-        (input.model || input.effort || input.fastMode !== undefined) &&
+        (input.model || input.effort || input.speedMode !== undefined) &&
         !(await hasSessionConfig({ id: input.workspaceId, path: input.workspacePath }, realId))
       ) {
         await saveSessionConfig({ id: input.workspaceId, path: input.workspacePath }, realId, {
           model: input.model,
           effort: input.effort,
-          fastMode: input.fastMode
+          speedMode: input.speedMode
         })
       }
     } else {
@@ -1075,7 +1075,7 @@ async function sendMessage(
       summary: 'detailed',
       ...(input.model ? { model: input.model } : {}),
       ...(input.effort ? { effort: input.effort } : {}),
-      ...(serviceTier !== undefined ? { serviceTier } : {})
+      serviceTier
     }
     if (rec.activeTurnId) {
       try {

@@ -13,7 +13,7 @@ import type {
   Turn
 } from '@/lib/format'
 import { stripMoiContextLoose } from '@/lib/moi-context'
-import type { FastMode, McpServer, Model, SessionSummary } from '@/lib/types'
+import type { SpeedMode, McpServer, Model, SessionSummary } from '@/lib/types'
 
 import type { WorkspaceActivityPreview } from '../types'
 
@@ -133,12 +133,11 @@ export function withCodexTurnDuration(turn: Turn, durationMs: number | null | un
 
 const CODEX_FAST_SERVICE_TIER = 'priority'
 
-export function codexServiceTierForFastMode(
-  fastMode: FastMode | undefined
-): typeof CODEX_FAST_SERVICE_TIER | 'ultrafast' | null | undefined {
-  if (fastMode === undefined) return undefined
-  if (fastMode === 'ultrafast') return 'ultrafast'
-  return fastMode ? CODEX_FAST_SERVICE_TIER : null
+export function codexServiceTierForSpeedMode(
+  speedMode: SpeedMode | undefined
+): typeof CODEX_FAST_SERVICE_TIER | 'ultrafast' | null {
+  if (speedMode === 'ultrafast') return 'ultrafast'
+  return speedMode === 'fast' ? CODEX_FAST_SERVICE_TIER : null
 }
 
 // Legacy context can be cut mid-envelope in a thread/list preview.
@@ -186,7 +185,7 @@ export function selectCodexWorkspacePreview(
   }
 }
 
-export function codexModelToModel(m: CodexModel, configuredServiceTier?: string | null): Model {
+export function codexModelToModel(m: CodexModel): Model {
   const efforts = (m.supportedReasoningEfforts ?? []).map(e => e.reasoningEffort)
   const displayName = m.displayName.replace(/^GPT-/, '').replaceAll('-', ' ')
   const supportsFastMode =
@@ -197,9 +196,6 @@ export function codexModelToModel(m: CodexModel, configuredServiceTier?: string 
     m.serviceTiers !== undefined
       ? m.serviceTiers.some(tier => tier.id === 'ultrafast')
       : (m.additionalSpeedTiers ?? []).includes('ultrafast')
-  // The effective user/project config governs omitted wire values. A null
-  // config value leaves the model catalog's default in charge.
-  const defaultServiceTier = configuredServiceTier ?? m.defaultServiceTier
   return {
     value: m.id,
     resolvedModel: m.model,
@@ -214,16 +210,7 @@ export function codexModelToModel(m: CodexModel, configuredServiceTier?: string 
       ? { defaultEffort: m.defaultReasoningEffort }
       : {}),
     ...(supportsUltrafastMode ? { supportsUltrafastMode: true } : {}),
-    ...(supportsFastMode || supportsUltrafastMode
-      ? {
-          ...(supportsFastMode ? { supportsFastMode: true } : {}),
-          defaultFastMode:
-            supportsUltrafastMode && defaultServiceTier === 'ultrafast'
-              ? 'ultrafast'
-              : supportsFastMode &&
-                (defaultServiceTier === CODEX_FAST_SERVICE_TIER || defaultServiceTier === 'fast')
-        }
-      : {})
+    ...(supportsFastMode ? { supportsFastMode: true } : {})
   }
 }
 
@@ -258,7 +245,7 @@ export function codexMcpServerToServer(server: {
 
 export function codexModelsToModels(models: CodexModel[], config: CodexConfig): Model[] {
   const mapped = models.map(model => {
-    const row = codexModelToModel(model, config.service_tier)
+    const row = codexModelToModel(model)
     // Apply configured effort to every model that supports it, even with an
     // explicit model override. Otherwise retain the catalog default.
     if (

@@ -1,4 +1,4 @@
-import { isFastMode } from '@/lib/fast-mode'
+import { isSpeedMode } from '@/lib/speed-mode'
 import { mkdir, rename, rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
@@ -62,11 +62,11 @@ function normalizeSession(value: unknown): WorkspaceSessionState {
   const session: WorkspaceSessionState = {}
   if (isWorkspaceTabId(value.tabId)) session.tabId = value.tabId
   if (isRecord(value.config)) {
-    const { model, effort, fastMode } = value.config
+    const { model, effort, speedMode } = value.config
     const config = {
       ...(typeof model === 'string' ? { model } : {}),
       ...(typeof effort === 'string' ? { effort } : {}),
-      ...(isFastMode(fastMode) ? { fastMode } : {})
+      ...(isSpeedMode(speedMode) ? { speedMode } : {})
     }
     if (Object.keys(config).length) session.config = config
   }

@@ -59,8 +59,9 @@ while Moi keeps running, changing which models are available.
   survives planned subprocess replacement.
 - Settings apply immediately before dispatch. Rejected setters fail the send.
   Model uses `setModel`; effort and fast mode use `applyFlagSettings` together.
-  An absent effort or fast-mode value clears that flag with `null`, restoring
-  provider defaults.
+  An absent effort clears that flag with `null`, restoring the provider default.
+  Moi speed mode maps to the SDK boolean: Fast is `true`; Normal, unset, and
+  unsupported Ultrafast are `false`.
 - Background jobs retain their subprocess. Messages requiring a replacement
   wait in Moi until those jobs finish, including replacements for streaming
   changes. `background_tasks_changed` replaces the complete task set, including

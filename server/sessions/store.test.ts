@@ -28,13 +28,13 @@ const rename = (from: string, to: string) =>
 
 test('concurrent config and tab updates share one entry', async () => {
   await Promise.all([
-    saveSessionConfig(ws, 's1', { model: 'sonnet', fastMode: false }),
+    saveSessionConfig(ws, 's1', { model: 'sonnet', speedMode: 'normal' }),
     updateSessionEntry(ws, 's1', { tabId: 'scratchpad' })
   ])
   expect((await Bun.file(path).json()).sessions).toEqual({
-    s1: { config: { model: 'sonnet', fastMode: false }, tabId: 'scratchpad' }
+    s1: { config: { model: 'sonnet', speedMode: 'normal' }, tabId: 'scratchpad' }
   })
-  await saveSessionConfig(ws, 's1', { model: null, fastMode: null })
+  await saveSessionConfig(ws, 's1', { model: null, speedMode: null })
   expect(await getSessionConfig(ws, 's1')).toEqual({})
   expect(await getSessionEntry(ws, 's1')).toEqual({ tabId: 'scratchpad' })
 })

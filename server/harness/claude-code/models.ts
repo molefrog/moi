@@ -1,4 +1,4 @@
-import { query, resolveSettings } from '@anthropic-ai/claude-agent-sdk'
+import { query } from '@anthropic-ai/claude-agent-sdk'
 import type { ModelInfo } from '@anthropic-ai/claude-agent-sdk'
 
 import type { Model } from '@/lib/types'
@@ -97,24 +97,6 @@ const catalog = createClaudeCatalog({ probe: probeClaudeCli, fetch: fetchClaudeM
 export const onClaudeCliChanged = catalog.onCliChanged
 export const lastProbedClaudeCli = catalog.current
 
-export function withClaudeFastModeDefault(
-  models: readonly ModelInfo[],
-  defaultFastMode: boolean
-): Model[] {
-  return models.map(model =>
-    model.supportsFastMode ? { ...model, defaultFastMode } : { ...model }
-  )
-}
-
 export async function getClaudeModels(cwd: string): Promise<Model[]> {
-  const executable = requireHarnessExecutable('claude-code')
-  const [models, settings] = await Promise.all([
-    catalog.models(cwd, executable),
-    resolveSettings({ cwd, settingSources: ['user', 'project'] })
-  ])
-  const defaultFastMode =
-    settings.effective.fastModePerSessionOptIn === true
-      ? false
-      : settings.effective.fastMode === true
-  return withClaudeFastModeDefault(models, defaultFastMode)
+  return catalog.models(cwd, requireHarnessExecutable('claude-code'))
 }

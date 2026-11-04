@@ -154,6 +154,7 @@ describe('resolveChatRunOptions', () => {
     expect(resolveChatRunOptions(models, 'sonnet', 'high')).toEqual({
       model: 'sonnet',
       effort: 'high',
+      speedMode: 'normal',
       stream: true
     })
   })
@@ -162,6 +163,7 @@ describe('resolveChatRunOptions', () => {
     expect(resolveChatRunOptions(models, 'sonnet', undefined)).toEqual({
       model: 'sonnet',
       effort: undefined,
+      speedMode: 'normal',
       stream: true
     })
   })
@@ -178,45 +180,46 @@ describe('resolveChatRunOptions', () => {
     expect(resolveChatRunOptions(models, 'sonnet', 'medium')).toEqual({
       model: 'sonnet',
       effort: undefined,
+      speedMode: 'normal',
       stream: true
     })
   })
 
   test('keeps enabled and explicitly disabled Fast mode for a supported model', () => {
-    expect(resolveChatRunOptions(models, 'sonnet', 'high', true)).toEqual({
+    expect(resolveChatRunOptions(models, 'sonnet', 'high', 'fast')).toEqual({
       model: 'sonnet',
       effort: 'high',
-      fastMode: true,
+      speedMode: 'fast',
       stream: true
     })
-    expect(resolveChatRunOptions(models, 'sonnet', 'high', false)).toEqual({
+    expect(resolveChatRunOptions(models, 'sonnet', 'high', 'normal')).toEqual({
       model: 'sonnet',
       effort: 'high',
-      fastMode: false,
+      speedMode: 'normal',
       stream: true
     })
   })
 
   test('disables Fast mode for a known unsupported model without dropping the preference', () => {
-    expect(resolveChatRunOptions(models, 'haiku', 'high', true)).toEqual({
+    expect(resolveChatRunOptions(models, 'haiku', 'high', 'fast')).toEqual({
       model: 'haiku',
       effort: 'high',
-      fastMode: false,
+      speedMode: 'normal',
       stream: true
     })
   })
 
   test('keeps Fast mode for a stale model that the client cannot validate', () => {
-    expect(resolveChatRunOptions(models, 'removed-model', 'high', true)).toEqual({
+    expect(resolveChatRunOptions(models, 'removed-model', 'high', 'fast')).toEqual({
       model: undefined,
       effort: 'high',
-      fastMode: true,
+      speedMode: 'fast',
       stream: true
     })
   })
 
-  test('omits Fast mode when no moi preference exists', () => {
-    expect(resolveChatRunOptions(models, 'sonnet', 'high')).not.toHaveProperty('fastMode')
+  test('uses normal when no Moi preference exists', () => {
+    expect(resolveChatRunOptions(models, 'sonnet', 'high')).toHaveProperty('speedMode', 'normal')
   })
 })
 
@@ -242,40 +245,40 @@ describe('Codex model selection', () => {
       ...catalog,
       models: catalog.models.map(model => ({ ...model, supportsUltrafastMode: true }))
     }
-    expect(resolveChatRunOptions(data, 'gpt-5.6-sol', 'low', 'ultrafast').fastMode).toBe(
+    expect(resolveChatRunOptions(data, 'gpt-5.6-sol', 'low', 'ultrafast').speedMode).toBe(
       'ultrafast'
     )
-    expect(resolveChatRunOptions(catalog, 'gpt-5.6-sol', 'low', 'ultrafast').fastMode).toBe(true)
-    expect(resolveChatRunOptions(catalog, 'gpt-5.6-luna', 'low', 'ultrafast').fastMode).toBe(false)
+    expect(resolveChatRunOptions(catalog, 'gpt-5.6-sol', 'low', 'ultrafast').speedMode).toBe('fast')
+    expect(resolveChatRunOptions(catalog, 'gpt-5.6-luna', 'low', 'ultrafast').speedMode).toBe(
+      'normal'
+    )
   })
 
   test('sends the displayed Codex default and clears inherited tiers on unsupported models', () => {
     const data = {
       ...catalog,
       models: catalog.models.map(model =>
-        model.value === 'gpt-5.6-sol'
-          ? { ...model, supportsUltrafastMode: true, defaultFastMode: 'ultrafast' as const }
-          : model
+        model.value === 'gpt-5.6-sol' ? { ...model, supportsUltrafastMode: true } : model
       )
     }
-    expect(resolveChatRunOptions(data, 'gpt-5.6-sol', 'low').fastMode).toBe('ultrafast')
-    expect(resolveChatRunOptions(data, 'gpt-5.6-luna', 'low').fastMode).toBe(false)
+    expect(resolveChatRunOptions(data, 'gpt-5.6-sol', 'low').speedMode).toBe('normal')
+    expect(resolveChatRunOptions(data, 'gpt-5.6-luna', 'low').speedMode).toBe('normal')
   })
 
   for (const pick of [undefined, 'default', 'gpt-6-astra', 'gpt-5.6-sol']) {
     test(`sends the displayed Sol model for ${pick ?? 'an implicit default'}`, () => {
       const displayed = resolveSelectedModel(catalog.models, pick)
-      const run = resolveChatRunOptions(catalog, pick, 'xhigh', true)
+      const run = resolveChatRunOptions(catalog, pick, 'xhigh', 'fast')
       expect(displayed?.displayName).toBe('5.6 Sol')
-      expect(run).toMatchObject({ model: displayed?.value, effort: 'xhigh', fastMode: true })
+      expect(run).toMatchObject({ model: displayed?.value, effort: 'xhigh', speedMode: 'fast' })
     })
   }
 
   test('an explicit choice overrides the configured default and validates its capabilities', () => {
-    expect(resolveChatRunOptions(catalog, 'gpt-5.6-luna', 'xhigh', true)).toMatchObject({
+    expect(resolveChatRunOptions(catalog, 'gpt-5.6-luna', 'xhigh', 'fast')).toMatchObject({
       model: 'gpt-5.6-luna',
       effort: undefined,
-      fastMode: false
+      speedMode: 'normal'
     })
   })
 

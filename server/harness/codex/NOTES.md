@@ -123,21 +123,16 @@ otherwise the adapter uses its advertised default. Fast mode is available when
 to `additionalSpeedTiers: ["fast"]`. Ultrafast uses the same capability check for
 `ultrafast`, including the legacy fallback only when `serviceTiers` is missing.
 The picker cycles regular → fast → ultrafast → regular, skipping unavailable
-tiers. Existing boolean preferences remain valid; the third value is
-`"ultrafast"`. A non-null configured tier takes precedence
-over the catalog default. Both `fast` and `priority` config values select Fast;
-outgoing requests use the canonical `priority` tier.
+tiers. Moi stores `speedMode` as `normal`, `fast`, or `ultrafast`.
 
-| Moi fast-mode setting | Native `serviceTier`                     |
-| --------------------- | ---------------------------------------- |
-| Regular (`false`)     | `null`                                   |
-| Fast (`true`)         | `"priority"`                             |
-| Ultrafast             | `"ultrafast"`                            |
-| Unset                 | Omitted; inherits the config/thread tier |
+| Moi speed mode  | Native `serviceTier` |
+| --------------- | -------------------- |
+| Normal or unset | `null`               |
+| Fast            | `"priority"`         |
+| Ultrafast       | `"ultrafast"`        |
 
-When the catalog is available, UI sends resolve the speed just like the model:
-they send the displayed default explicitly, clearing an inherited tier when the
-selected model does not support it.
+When the catalog is available, UI sends resolve speed against model capabilities.
+Unsupported Ultrafast falls back to Fast when supported, otherwise Normal.
 
 Model, effort, and tier changes apply on the next **new turn**. `turn/steer`
 has no fields for changing them during an active turn. Moi uses the persistent

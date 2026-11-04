@@ -2,8 +2,8 @@ import { resolveWorkspaceEnv } from '../workspaces/env'
 import { changeWorkspaceHarness } from '../workspaces/change-harness'
 import { HarnessTransitionError, reserveWorkspaceOperation } from '../workspaces/harness-transition'
 import { onboarding } from './onboarding'
-import type { FastMode } from '@/lib/types'
-import { isFastMode } from '@/lib/fast-mode'
+import type { SpeedMode } from '@/lib/types'
+import { isSpeedMode } from '@/lib/speed-mode'
 import { isMessageAttachments } from '@/lib/message-attachments'
 import { Hono } from 'hono'
 import { serveStatic } from 'hono/bun'
@@ -292,7 +292,7 @@ one.post('/views/:viewId/submit', async c => {
     selectedSessionScope?: SelectedSessionScope
     model?: string
     effort?: string
-    fastMode?: FastMode
+    speedMode?: SpeedMode
     stream?: boolean
     attachments?: unknown
   }>()
@@ -328,7 +328,7 @@ one.post('/views/:viewId/submit', async c => {
       optimisticId: body.optimisticId,
       model: typeof body.model === 'string' ? body.model : undefined,
       effort: typeof body.effort === 'string' ? body.effort : undefined,
-      fastMode: isFastMode(body.fastMode) ? body.fastMode : undefined,
+      speedMode: isSpeedMode(body.speedMode) ? body.speedMode : undefined,
       stream: body.stream === true ? true : undefined
     })
     return c.json(result)
@@ -574,12 +574,12 @@ one.patch('/sessions/:sessionId/config', async c => {
     }
     patch[key] = value
   }
-  if ('fastMode' in record) {
-    const value = record.fastMode
-    if (value !== null && !isFastMode(value)) {
-      return c.text('fastMode must be a boolean, "ultrafast", or null', 400)
+  if ('speedMode' in record) {
+    const value = record.speedMode
+    if (value !== null && !isSpeedMode(value)) {
+      return c.text('speedMode must be "normal", "fast", "ultrafast", or null', 400)
     }
-    patch.fastMode = value
+    patch.speedMode = value
   }
   const ws = c.get('ws')
   await saveSessionConfig(ws, c.req.param('sessionId'), patch)
@@ -921,7 +921,7 @@ one.put('/', async c => {
   if (harness !== undefined && harness !== (ws.type ?? 'claude-code')) {
     next.selectedModel = existing.selectedModel
     next.selectedEffort = existing.selectedEffort
-    next.selectedFastMode = existing.selectedFastMode
+    next.selectedSpeedMode = existing.selectedSpeedMode
   }
   await saveLayout(next, ws.path)
   if (
