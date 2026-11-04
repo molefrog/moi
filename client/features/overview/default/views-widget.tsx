@@ -33,7 +33,7 @@ import { useDeleteView, useRenameView } from '@/client/features/views/api'
 import { getViewIcon, getViewLabel } from '@/client/features/views/view-presentation'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-layout-context'
 import { cn } from '@/client/lib/cn'
-import type { CompiledView } from '@/lib/types'
+import type { ViewInfo } from '@/lib/types'
 
 type NewViewButtonProps = {
   outlined: boolean
@@ -74,7 +74,7 @@ function NewViewButton({ outlined, onClick }: NewViewButtonProps) {
 }
 
 type ViewItemProps = {
-  view: CompiledView
+  view: ViewInfo
   Icon: TablerIcon
   onOpen: () => void
 }
@@ -206,14 +206,15 @@ function ViewItem({ view, Icon, onOpen }: ViewItemProps) {
 }
 
 type ViewsWidgetProps = {
-  views: CompiledView[]
+  views: ViewInfo[]
   onOpenView: (viewId: string) => void
   onCreateView: () => void
   showOnboarding: boolean
 }
 
 export function ViewsWidget({ views, onOpenView, onCreateView, showOnboarding }: ViewsWidgetProps) {
-  const empty = views.length === 0
+  const visibleViews = views.filter(view => view.status !== 'draft')
+  const empty = visibleViews.length === 0
 
   return (
     <div className="relative no-scrollbar flex size-full items-center overflow-hidden bg-muted">
@@ -225,7 +226,7 @@ export function ViewsWidget({ views, onOpenView, onCreateView, showOnboarding }:
       )}
       <h2 className="relative pr-6 pl-12 text-2xl font-semibold text-foreground">Views</h2>
       <div className="relative no-scrollbar flex scroll-fade-x gap-2 overflow-x-auto px-6 pt-4 [--scroll-fade-reveal:16px]">
-        {views.map(view => (
+        {visibleViews.map(view => (
           <ViewItem
             key={view.id}
             view={view}

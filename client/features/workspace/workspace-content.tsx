@@ -458,7 +458,7 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
                 setWidgetMode(customizing ? 'customizing' : 'idle')
               }
               widgets={widgets}
-              views={views}
+              views={allViews}
               onOpenView={viewId => openTab(viewTabId(viewId))}
               onCreateView={createView}
               onCreateWidget={() => {

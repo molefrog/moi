@@ -24,7 +24,7 @@ import { WidgetShell } from '@/client/features/applets/widget-shell'
 import { Button } from '@/client/components/ui/button'
 import { cn } from '@/client/lib/cn'
 import { useUiStore } from '@/client/store/ui'
-import type { CompiledView, WidgetInfo } from '@/lib/types'
+import type { ViewInfo, WidgetInfo } from '@/lib/types'
 import { isDefaultWidget } from '@/lib/default-widgets'
 
 import { HiddenPanel } from './hidden-panel'
@@ -175,7 +175,7 @@ type OverviewProps = {
   onCustomizingChange: (customizing: boolean) => void
   // Authoritative widget set from useWidgets; positions come from layout.
   widgets: WidgetInfo[]
-  views: CompiledView[]
+  views: ViewInfo[]
 }
 
 export function Overview({

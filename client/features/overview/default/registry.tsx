@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react'
 
-import type { CompiledView } from '@/lib/types'
+import type { ViewInfo } from '@/lib/types'
 import { DEFAULT_VIEWS_WIDGET, isDefaultWidget, type DefaultWidgetId } from '@/lib/default-widgets'
 
 import { ViewsWidget } from './views-widget'
 
 export type DefaultWidgetRenderContext = {
-  views: CompiledView[]
+  views: ViewInfo[]
   onOpenView: (viewId: string) => void
   onCreateView: () => void
   showOnboarding: boolean

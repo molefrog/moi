@@ -5,13 +5,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 import { WorkspaceLayoutContext } from '@/client/features/workspace/workspace-layout-context'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
-import type { CompiledView } from '@/lib/types'
+import type { ViewInfo } from '@/lib/types'
 
 import { ViewsWidget } from './views-widget'
 
 const noop = () => {}
 
-function render(views: CompiledView[], showOnboarding = true): string {
+function render(views: ViewInfo[], showOnboarding = true): string {
   const queryClient = new QueryClient()
   return renderToStaticMarkup(
     createElement(
@@ -42,6 +42,21 @@ function render(views: CompiledView[], showOnboarding = true): string {
 }
 
 describe('ViewsWidget', () => {
+  test('shows started builds and failed views while excluding unused drafts', () => {
+    const html = render([
+      { id: 'draft', status: 'draft', title: 'Unused draft', requirements: '' },
+      { id: 'starting', status: 'starting', title: 'Starting view', requirements: 'Build' },
+      { id: 'building', status: 'submitted', title: 'Building view', requirements: 'Build' },
+      { id: 'failed', status: 'failed', title: 'Failed view', requirements: 'Build' }
+    ])
+
+    expect(html).not.toContain('Unused draft')
+    for (const title of ['Starting view', 'Building view', 'Failed view']) {
+      expect(html).toContain(`aria-label="Open ${title}"`)
+    }
+    expect(html).not.toContain('Create new views when you need separate pages for focused tasks')
+  })
+
   test('renders view launchers in the supplied order', () => {
     const html = render([
       { id: 'roadmap', status: 'compiled', title: 'Roadmap', icon: 'calendar' },
