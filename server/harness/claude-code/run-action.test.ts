@@ -8,7 +8,8 @@ import { canReadTool, runClaudeAction } from './run-action'
 async function expectToolPermission(
   hook: sdk.HookCallback,
   toolName: string,
-  decision: 'allow' | 'deny'
+  decision: 'allow' | 'deny',
+  mcpServer?: string
 ) {
   const result = await hook(
     {
@@ -18,6 +19,7 @@ async function expectToolPermission(
       cwd: '/tmp',
       tool_use_id: 'test-tool-use',
       tool_name: toolName,
+      ...(mcpServer ? { mcp_server: { name: mcpServer, source: 'claudeai' } } : {}),
       tool_input: { progress: { count: 2 } }
     },
     'test-tool-use',
@@ -53,10 +55,41 @@ for (const enabled of [false, true]) {
         close: () => {
           closed = true
         },
-        mcpServerStatus: async () => [],
+        mcpServerStatus: async () => [
+          {
+            name: 'claude.ai Granola',
+            status: 'connected',
+            tools: [
+              { name: 'search', annotations: { readOnly: true } },
+              { name: 'nested__read', annotations: { readOnly: true } },
+              { name: 'delete', annotations: { readOnly: true, destructive: true } },
+              { name: 'unknown' }
+            ]
+          }
+        ],
         async *[Symbol.asyncIterator]() {
           const hook = options?.hooks?.PreToolUse?.[0]?.hooks[0]
           expect(hook).toBeDefined()
+          for (const [tool, decision] of [
+            ['search', 'allow'],
+            ['nested__read', 'allow'],
+            ['delete', 'deny'],
+            ['unknown', 'deny']
+          ] as const) {
+            await expectToolPermission(
+              hook!,
+              `mcp__claude_ai_Granola__${tool}`,
+              decision,
+              'claude.ai Granola'
+            )
+          }
+          await expectToolPermission(hook!, 'mcp__claude_ai_Granola__search', 'deny')
+          await expectToolPermission(
+            hook!,
+            'mcp__claude_ai_Granola__search',
+            'deny',
+            'another server'
+          )
           await expectToolPermission(
             hook!,
             'mcp__moi_action__report_progress',

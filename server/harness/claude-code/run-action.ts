@@ -65,15 +65,15 @@ async function claudeAction(input: ActionExecution): Promise<unknown> {
                     (!!input.progressUrl &&
                       event.tool_name ===
                         `mcp__${actionProgressServerName}__${actionProgressToolName}`)
-                  if (!allowed && event.tool_name.startsWith('mcp__') && run) {
+                  if (!allowed && event.mcp_server && run) {
                     const servers = await run.mcpServerStatus()
-                    allowed = servers.some(server =>
-                      server.tools?.some(
+                    const server = servers.find(server => server.name === event.mcp_server?.name)
+                    const toolName = event.tool_name.split('__').slice(2).join('__')
+                    allowed =
+                      server?.tools?.some(
                         tool =>
-                          `mcp__${server.name}__${tool.name}` === event.tool_name &&
-                          canReadTool(event.tool_name, tool.annotations)
-                      )
-                    )
+                          tool.name === toolName && canReadTool(event.tool_name, tool.annotations)
+                      ) ?? false
                   }
                   return {
                     hookSpecificOutput: {
