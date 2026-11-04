@@ -105,7 +105,7 @@ export function WorkspaceSetupStep({
   const footer = !selection && (
     <Button size="lg" variant="ghost" disabled={busy} onClick={() => startFromScratch.mutate()}>
       {startFromScratch.isPending && <Spinner stroke={1.5} />}
-      {startFromScratch.isPending ? 'Creating workspace…' : 'I’ll start on my own'}
+      {startFromScratch.isPending ? 'Creating workspace…' : 'Skip onboarding'}
     </Button>
   )
   if (!selection && (!discovery || error || busy))
