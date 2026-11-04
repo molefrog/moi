@@ -257,9 +257,8 @@ export type ClientMessage =
       // Omitted means the provider default. Harnesses apply changes before the
       // next send (see server/harness/claude-code/session.ts).
       effort?: string
-      // Opt into the selected model's faster processing mode. Omitted inherits
-      // the provider configuration; false explicitly disables a stored default.
-      fastMode?: FastMode
+      // Select processing speed. Omitted uses normal, overriding provider defaults.
+      speedMode?: SpeedMode
       // Opt into live token-by-token streaming for this turn. Omitted/false runs
       // the current whole-block behavior. Only honored for providers that report
       // `supportsStreaming` (Claude Code); ignored otherwise. Like effort, a
@@ -290,16 +289,16 @@ export type SessionSummary = {
   flavor?: 'chat' | 'cron' | 'subagent'
 }
 
-// Keep existing boolean preferences: false is regular, true is fast.
-export type FastMode = boolean | 'ultrafast'
+// Missing speed mode behaves as normal.
+export type SpeedMode = 'normal' | 'fast' | 'ultrafast'
 
 // Per-chat agent settings, overriding the workspace defaults in
-// `.moi/.workspace.json`. A chat reopens with the model/effort/Fast mode it
+// `.moi/.workspace.json`. A chat reopens with the model/effort/speed mode it
 // last ran with; a brand-new chat is seeded from the workspace defaults.
 export type SessionConfig = {
   model?: string
   effort?: string
-  fastMode?: FastMode
+  speedMode?: SpeedMode
 }
 
 export type SessionFork = {
@@ -649,15 +648,15 @@ export type WorkspaceLayout = {
   // the transcript records the *resolved* id (e.g. `claude-sonnet-4-6`), which
   // doesn't map back to these aliases — hence we persist the pick here.
   //
-  // This (with `selectedEffort` and `selectedFastMode`) is the *workspace
+  // This (with `selectedEffort` and `selectedSpeedMode`) is the *workspace
   // default*: the value the picker edits when no session is open, and the seed a
   // brand-new session copies. Once a session exists it carries its own per-session
   // override (see `SessionConfig`).
   selectedModel?: string
   // Reasoning-effort default for new sessions (a `supportedEffortLevels` value).
   selectedEffort?: string
-  // Fast-mode default for new sessions. Undefined inherits the provider setting.
-  selectedFastMode?: FastMode
+  // Speed default for new sessions. Undefined behaves as normal.
+  selectedSpeedMode?: SpeedMode
   theme?: WorkspaceTheme
 }
 
@@ -770,8 +769,6 @@ export type Model = {
   supportsAdaptiveThinking?: boolean
   supportsFastMode?: boolean
   supportsUltrafastMode?: boolean
-  // Provider-resolved default when moi has no stored Fast-mode preference.
-  defaultFastMode?: FastMode
   supportsAutoMode?: boolean
 }
 

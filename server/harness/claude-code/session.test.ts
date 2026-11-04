@@ -172,7 +172,7 @@ describe('Claude session message queue', () => {
       model: 'new-model',
       effort: 'high',
       stream: true,
-      fastMode: true
+      speedMode: 'fast'
     })
     retireCCSessionsOnCliChange()
     await settle()
@@ -236,7 +236,7 @@ describe('Claude session message queue', () => {
   test('queued effort changes apply live, including max and returning to the default', async () => {
     await send({ effort: 'high' })
     const d = drivers[0]!
-    const next = send({ effort: 'max', fastMode: true })
+    const next = send({ effort: 'max', speedMode: 'fast' })
     await settle()
     expect(d.flags).toEqual([])
     d.emit(result)
@@ -247,7 +247,7 @@ describe('Claude session message queue', () => {
     d.emit(result)
     await send()
     expect(drivers).toHaveLength(1)
-    expect(d.flags.at(-1)).toEqual({ effortLevel: null, fastMode: null })
+    expect(d.flags.at(-1)).toEqual({ effortLevel: null, fastMode: false })
     expect(getCCDebugSnapshot().sessions[0]?.effort).toBeUndefined()
     d.emit(result)
     await send()
@@ -426,7 +426,7 @@ describe('Claude session message queue', () => {
     d.emit(result)
     await until(() => getCCActiveSessions().length === 0)
     d.flagError = new Error('Fast mode unavailable')
-    await expect(send({ fastMode: true })).rejects.toThrow('Fast mode unavailable')
+    await expect(send({ speedMode: 'fast' })).rejects.toThrow('Fast mode unavailable')
     expect(d.inputs).toHaveLength(1)
   })
 
@@ -556,7 +556,7 @@ describe('Claude session message queue', () => {
     await until(() => getCCActiveSessions().length === 0)
     const gate = Promise.withResolvers<void>()
     d.beforeFlags = () => gate.promise
-    const cancelled = send({ effort: 'max', fastMode: true })
+    const cancelled = send({ effort: 'max', speedMode: 'fast' })
     await until(() => d.flags.length === 1)
     await interruptCCSession(input.workspaceId, input.sessionId)
     gate.resolve()
@@ -567,7 +567,7 @@ describe('Claude session message queue', () => {
     expect(drivers).toHaveLength(1)
     expect(d.flags).toEqual([
       { effortLevel: 'max', fastMode: true },
-      { effortLevel: 'low', fastMode: null }
+      { effortLevel: 'low', fastMode: false }
     ])
     expect(d.inputs).toHaveLength(2)
   })

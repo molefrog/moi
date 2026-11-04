@@ -158,12 +158,12 @@ export function useChat(address: WorkspaceTabAddress) {
       // Validate effort and Fast mode against that same resolved row.
       const pickedModel = sessionConfig?.model ?? layout.selectedModel
       const pickedEffort = sessionConfig?.effort ?? layout.selectedEffort
-      const pickedFastMode = sessionConfig?.fastMode ?? layout.selectedFastMode
-      const { model, effort, fastMode, stream } = resolveChatRunOptions(
+      const pickedSpeedMode = sessionConfig?.speedMode ?? layout.selectedSpeedMode
+      const { model, effort, speedMode, stream } = resolveChatRunOptions(
         modelsData,
         pickedModel,
         pickedEffort,
-        pickedFastMode
+        pickedSpeedMode
       )
       sendMessage({
         type: 'chat',
@@ -175,7 +175,7 @@ export function useChat(address: WorkspaceTabAddress) {
         optimisticId,
         model,
         effort,
-        fastMode,
+        speedMode,
         stream,
         context: buildMoiContext(options),
         ...(attachments.length > 0 ? { attachments } : {})
@@ -193,11 +193,11 @@ export function useChat(address: WorkspaceTabAddress) {
       qc,
       layout.selectedModel,
       layout.selectedEffort,
-      layout.selectedFastMode,
+      layout.selectedSpeedMode,
       buildMoiContext,
       sessionConfig?.model,
       sessionConfig?.effort,
-      sessionConfig?.fastMode,
+      sessionConfig?.speedMode,
       selectSession,
       collabEnabled,
       modelsData

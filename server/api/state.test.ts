@@ -117,10 +117,10 @@ describe('workspace state API', () => {
   test('chat settings patch merges fields and null clears one', async () => {
     await state(call('/sessions/s1/config', 'PATCH', { model: 'sonnet', effort: 'high' }))
     const patched = await state(
-      call('/sessions/s1/config', 'PATCH', { effort: null, fastMode: true })
+      call('/sessions/s1/config', 'PATCH', { effort: null, speedMode: 'fast' })
     )
-    expect(patched.sessions.s1).toEqual({ config: { model: 'sonnet', fastMode: true } })
-    expect((await call('/sessions/s1/config', 'PATCH', { fastMode: 'yes' })).status).toBe(400)
+    expect(patched.sessions.s1).toEqual({ config: { model: 'sonnet', speedMode: 'fast' } })
+    expect((await call('/sessions/s1/config', 'PATCH', { speedMode: 'yes' })).status).toBe(400)
   })
 
   test('every write publishes the new state', async () => {

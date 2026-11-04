@@ -1,4 +1,4 @@
-import { isFastMode } from '@/lib/fast-mode'
+import { isSpeedMode } from '@/lib/speed-mode'
 import type { SessionConfig } from '@/lib/types'
 import { updateWorkspaceState, type WorkspaceRef } from '../workspace-state'
 import { getSessionEntry } from './store'
@@ -7,7 +7,7 @@ import { getSessionEntry } from './store'
 export type SessionConfigPatch = {
   model?: string | null
   effort?: string | null
-  fastMode?: SessionConfig['fastMode'] | null
+  speedMode?: SessionConfig['speedMode'] | null
 }
 
 export async function getSessionConfig(
@@ -29,12 +29,12 @@ export async function saveSessionConfig(
   return updateWorkspaceState(ws, state => {
     const session = (state.sessions[sessionId] ??= {})
     const config: SessionConfig = { ...session.config }
-    for (const key of ['model', 'effort', 'fastMode'] as const) {
+    for (const key of ['model', 'effort', 'speedMode'] as const) {
       if (patch[key] === null) delete config[key]
     }
     if (typeof patch.model === 'string') config.model = patch.model
     if (typeof patch.effort === 'string') config.effort = patch.effort
-    if (isFastMode(patch.fastMode)) config.fastMode = patch.fastMode
+    if (isSpeedMode(patch.speedMode)) config.speedMode = patch.speedMode
     if (Object.keys(config).length) session.config = config
     else delete session.config
     return config

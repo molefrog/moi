@@ -403,7 +403,7 @@ test.each(allHarnesses().map(harness => harness.id))(
       sessionEvents: target.sessionEvents,
       activeSessions: target.activeSessions
     }
-    const config = { model: 'model', effort: 'high', fastMode: false }
+    const config = { model: 'model', effort: 'high', speedMode: 'normal' as const }
     const workspace = { ...ws, type, agentId: 'agent' }
     await saveSessionConfig(ws, 'source', config)
     target.listSessions = harness.listSessions

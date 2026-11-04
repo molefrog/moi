@@ -138,7 +138,7 @@ test('a delayed layout save preserves the current harness defaults and unrelated
       layoutMode: 'fullscreen',
       selectedModel: 'old-model',
       selectedEffort: 'high',
-      selectedFastMode: true
+      selectedSpeedMode: 'fast'
     })
   })
   expect(response.status).toBe(204)
@@ -146,7 +146,7 @@ test('a delayed layout save preserves the current harness defaults and unrelated
   expect(saved.layoutMode).toBe('fullscreen')
   expect(saved.selectedModel).toBe('new-model')
   expect(saved.selectedEffort).toBeUndefined()
-  expect(saved.selectedFastMode).toBeUndefined()
+  expect(saved.selectedSpeedMode).toBeUndefined()
   expect('harness' in saved).toBe(false)
 
   const current = await api.request(`/api/workspaces/${workspaceId}`, {

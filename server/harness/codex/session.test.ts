@@ -496,7 +496,7 @@ describe('Codex live session lifecycle', () => {
     f.handlers.set('turn/steer', () => {
       throw new CodexRpcError('No active turn', -32600)
     })
-    await f.send('next', { fastMode: false })
+    await f.send('next', { speedMode: 'normal' })
     expect(f.calls.filter(call => call.method === 'turn/start')).toHaveLength(2)
     expect(f.calls.at(-1)?.params.serviceTier).toBeNull()
   })
@@ -519,13 +519,13 @@ describe('Codex live session lifecycle', () => {
 
   test('fast mode is sent per turn and can be explicitly disabled', async () => {
     const f = fixture()
-    await f.send('fast', { fastMode: true, effort: 'low' })
+    await f.send('fast', { speedMode: 'fast', effort: 'low' })
     expect(f.calls.at(-1)?.params).toMatchObject({ serviceTier: 'priority', effort: 'low' })
     f.emit('turn/completed', { turn: { id: 'turn-1', status: 'completed', items: [] } })
-    await f.send('ultrafast', { fastMode: 'ultrafast' })
+    await f.send('ultrafast', { speedMode: 'ultrafast' })
     expect(f.calls.at(-1)?.params.serviceTier).toBe('ultrafast')
     f.emit('turn/completed', { turn: { id: 'turn-2', status: 'completed', items: [] } })
-    await f.send('normal', { fastMode: false })
+    await f.send('normal', { speedMode: 'normal' })
     expect(f.calls.at(-1)?.params.serviceTier).toBeNull()
   })
 

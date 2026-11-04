@@ -1,4 +1,5 @@
 import { join } from 'path'
+import { isSpeedMode } from '@/lib/speed-mode'
 
 import type {
   AppletKind,
@@ -18,6 +19,8 @@ function normalizeLayout(parsed: Record<string, unknown>): WorkspaceLayout {
     layout.layoutMode = defaults.layoutMode
   }
   layout.tabs = normalizeWorkspaceTabs(layout.tabs)
+  if (!isSpeedMode(layout.selectedSpeedMode)) delete layout.selectedSpeedMode
+  delete layout.selectedFastMode
   if (typeof layout.icon === 'string') {
     layout.icon = { type: 'upload', value: layout.icon }
   } else if (layout.icon !== undefined && !isWorkspaceIcon(layout.icon)) {

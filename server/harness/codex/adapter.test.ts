@@ -10,7 +10,7 @@ import {
   codexModelToModel,
   codexModelsToModels,
   codexMcpServerToServer,
-  codexServiceTierForFastMode,
+  codexServiceTierForSpeedMode,
   codexThreadToEvents,
   codexThreadToSessionInfo,
   withCodexTurnDuration
@@ -28,10 +28,9 @@ test('Ultrafast follows advertised capabilities and configured defaults', () => 
       { id: 'ultrafast', name: 'Ultrafast', description: '' }
     ]
   }
-  expect(codexModelToModel(model, 'ultrafast')).toMatchObject({
+  expect(codexModelToModel(model)).toMatchObject({
     supportsFastMode: true,
-    supportsUltrafastMode: true,
-    defaultFastMode: 'ultrafast'
+    supportsUltrafastMode: true
   })
   expect(
     codexModelToModel({
@@ -44,11 +43,7 @@ test('Ultrafast follows advertised capabilities and configured defaults', () => 
     codexModelToModel({ ...model, serviceTiers: [], additionalSpeedTiers: ['ultrafast'] })
       .supportsUltrafastMode
   ).toBeUndefined()
-  expect(
-    codexModelToModel({ ...model, serviceTiers: [model.serviceTiers[0]] }, 'ultrafast')
-      .defaultFastMode
-  ).toBe(false)
-  expect(codexServiceTierForFastMode('ultrafast')).toBe('ultrafast')
+  expect(codexServiceTierForSpeedMode('ultrafast')).toBe('ultrafast')
 })
 
 test('current service tiers take precedence over deprecated speed tiers', () => {
@@ -118,8 +113,7 @@ test('Codex picker defaults follow configured model, effort and service tier', (
   expect(rows[0]).toMatchObject({
     value: 'default',
     resolvedModel: 'second',
-    defaultEffort: 'high',
-    defaultFastMode: true
+    defaultEffort: 'high'
   })
   expect(rows[1].defaultEffort).toBe('high')
   expect(codexModelsToModels(models, {})[0]).toMatchObject({
@@ -526,78 +520,22 @@ describe('discovery mappings', () => {
       displayName: 'Legacy',
       additionalSpeedTiers: ['fast']
     })
-    const unsupported = codexModelToModel(
-      {
-        id: 'unsupported',
-        model: 'unsupported',
-        displayName: 'Unsupported',
-        serviceTiers: [{ id: 'flex', name: 'Flex', description: 'Flexible processing' }],
-        additionalSpeedTiers: ['slow']
-      },
-      'priority'
-    )
+    const unsupported = codexModelToModel({
+      id: 'unsupported',
+      model: 'unsupported',
+      displayName: 'Unsupported',
+      serviceTiers: [{ id: 'flex', name: 'Flex', description: 'Flexible processing' }],
+      additionalSpeedTiers: ['slow']
+    })
 
     expect(current.supportsFastMode).toBe(true)
-    expect(current.defaultFastMode).toBe(true)
     expect(legacy.supportsFastMode).toBe(true)
-    expect(legacy.defaultFastMode).toBe(false)
     expect(unsupported.supportsFastMode).toBeUndefined()
-    expect(unsupported.defaultFastMode).toBeUndefined()
-  })
-
-  test('uses the configured service tier before the catalog default', () => {
-    const configuredFast = codexModelToModel(
-      {
-        id: 'configured-fast',
-        model: 'configured-fast',
-        displayName: 'Configured Fast',
-        serviceTiers: [{ id: 'priority', name: 'Fast', description: 'Faster responses' }],
-        defaultServiceTier: null
-      },
-      'priority'
-    )
-    const configuredDefault = codexModelToModel(
-      {
-        id: 'configured-default',
-        model: 'configured-default',
-        displayName: 'Configured Default',
-        serviceTiers: [{ id: 'priority', name: 'Fast', description: 'Faster responses' }],
-        defaultServiceTier: 'priority'
-      },
-      'default'
-    )
-    const configuredUnknown = codexModelToModel(
-      {
-        id: 'configured-unknown',
-        model: 'configured-unknown',
-        displayName: 'Configured Unknown',
-        serviceTiers: [{ id: 'priority', name: 'Fast', description: 'Faster responses' }],
-        defaultServiceTier: 'priority'
-      },
-      'renamed-tier'
-    )
-
-    expect(configuredFast.defaultFastMode).toBe(true)
-    expect(configuredDefault.defaultFastMode).toBe(false)
-    expect(configuredUnknown.defaultFastMode).toBe(false)
-  })
-
-  test('falls back to the catalog service tier without a configured value', () => {
-    const catalogDefault = {
-      id: 'catalog-default',
-      model: 'catalog-default',
-      displayName: 'Catalog Default',
-      serviceTiers: [{ id: 'priority', name: 'Fast', description: 'Faster responses' }],
-      defaultServiceTier: 'priority'
-    }
-
-    expect(codexModelToModel(catalogDefault).defaultFastMode).toBe(true)
-    expect(codexModelToModel(catalogDefault, null).defaultFastMode).toBe(true)
   })
 
   test('maps Fast preference to Codex service tier wire values', () => {
-    expect(codexServiceTierForFastMode(true)).toBe('priority')
-    expect(codexServiceTierForFastMode(false)).toBeNull()
-    expect(codexServiceTierForFastMode(undefined)).toBeUndefined()
+    expect(codexServiceTierForSpeedMode('fast')).toBe('priority')
+    expect(codexServiceTierForSpeedMode('normal')).toBeNull()
+    expect(codexServiceTierForSpeedMode(undefined)).toBeNull()
   })
 })

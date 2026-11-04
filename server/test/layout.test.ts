@@ -10,6 +10,7 @@ import {
   getLayoutPath,
   getWorkspacePreview,
   loadLayout,
+  saveLayout,
   mergeLayoutForSave
 } from '../workspaces/layout'
 import { getThumbnailsDir } from '../applets/thumbnails'
@@ -282,14 +283,14 @@ describe('mergeLayoutForSave', () => {
       layoutMode: 'split',
       tabs: { open: ['scratchpad', 'overview'], active: 'scratchpad' },
       selectedModel: 'sonnet',
-      selectedFastMode: false,
+      selectedSpeedMode: 'normal',
       theme: { font: 'sans', color: 'rose', radius: 'square', agent: 'dorito' }
     }
     const merged = mergeLayoutForSave(existing, body)
     expect(merged.layoutMode).toBe('split')
     expect(merged.tabs).toEqual({ open: ['overview', 'scratchpad'], active: 'scratchpad' })
     expect(merged.selectedModel).toBe('sonnet')
-    expect(merged.selectedFastMode).toBe(false)
+    expect(merged.selectedSpeedMode).toBe('normal')
     expect(merged.theme).toEqual({
       font: 'sans',
       color: 'rose',
@@ -527,5 +528,27 @@ describe('getWorkspacePreview', () => {
         })
       ).toEqual({ thumbnails: [] })
     })
+  })
+})
+
+test.each([
+  { saved: { selectedFastMode: true }, expected: undefined },
+  { saved: { selectedFastMode: false }, expected: undefined },
+  { saved: { selectedFastMode: 'ultrafast' }, expected: undefined },
+  { saved: { selectedSpeedMode: false }, expected: undefined },
+  { saved: { selectedSpeedMode: 'normal', selectedFastMode: true }, expected: 'normal' },
+  { saved: { selectedSpeedMode: 'fast' }, expected: 'fast' },
+  { saved: { selectedSpeedMode: 'ultrafast' }, expected: 'ultrafast' },
+  { saved: {}, expected: undefined },
+  { saved: { selectedSpeedMode: 'unknown' }, expected: undefined }
+])('loads and rewrites workspace speed settings: $saved', async ({ saved, expected }) => {
+  await withWorkspaceFile({ ...base, ...saved }, async dir => {
+    const layout = await loadLayout(dir)
+    expect(layout.selectedSpeedMode).toBe(expected)
+    expect(layout).not.toHaveProperty('selectedFastMode')
+    await saveLayout(layout, dir)
+    const stored = await Bun.file(getLayoutPath(dir)).json()
+    expect(stored.selectedSpeedMode).toBe(expected)
+    expect(stored).not.toHaveProperty('selectedFastMode')
   })
 })

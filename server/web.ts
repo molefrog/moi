@@ -1,4 +1,4 @@
-import { isFastMode } from '@/lib/fast-mode'
+import { isSpeedMode } from '@/lib/speed-mode'
 import type { UserProfile } from '@/lib/collab/types'
 import { isMessageAttachments } from '@/lib/message-attachments'
 import type { ClientMessage, StatusSnapshotMessage } from '@/lib/types'
@@ -60,7 +60,7 @@ function isClientMessage(value: unknown): value is ClientMessage {
     optimisticId?: unknown
     model?: unknown
     effort?: unknown
-    fastMode?: unknown
+    speedMode?: unknown
     stream?: unknown
     context?: unknown
     attachments?: unknown
@@ -78,7 +78,7 @@ function isClientMessage(value: unknown): value is ClientMessage {
       (v.optimisticId === undefined || typeof v.optimisticId === 'string') &&
       (v.model === undefined || typeof v.model === 'string') &&
       (v.effort === undefined || typeof v.effort === 'string') &&
-      (v.fastMode === undefined || isFastMode(v.fastMode)) &&
+      (v.speedMode === undefined || isSpeedMode(v.speedMode)) &&
       (v.stream === undefined || typeof v.stream === 'boolean') &&
       (v.context === undefined || isMoiContext(v.context)) &&
       (v.attachments === undefined || isMessageAttachments(v.attachments))
@@ -253,7 +253,7 @@ export const app = Bun.serve<WsData>({
             optimisticId: data.optimisticId,
             model: data.model,
             effort: data.effort,
-            fastMode: data.fastMode,
+            speedMode: data.speedMode,
             stream: data.stream,
             context: data.context,
             agentId: workspace.agentId

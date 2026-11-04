@@ -24,7 +24,11 @@ test.each(['gpt-6.1-sol', undefined])(
     const clientSpy = spyOn(clients, 'getCodexClient').mockResolvedValue(client)
     try {
       expect(
-        await harnessFor(ws).forkSession!(ws, 'source', { model, effort: 'high', fastMode: false })
+        await harnessFor(ws).forkSession!(ws, 'source', {
+          model,
+          effort: 'high',
+          speedMode: 'normal'
+        })
       ).toBe('child')
       expect(calls).toEqual([
         { method: 'thread/fork', params: { threadId: 'source', ...(model ? { model } : {}) } }

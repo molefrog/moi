@@ -38,7 +38,7 @@ import { requireHarnessExecutable } from '../executable'
 import type { SendMessageInput } from '../types'
 
 // Claude supports only the original two speed modes.
-type ClaudeSendMessageInput = Omit<SendMessageInput, 'fastMode'> & { fastMode?: boolean }
+type ClaudeSendMessageInput = Omit<SendMessageInput, 'speedMode'> & { fastMode: boolean }
 
 // Media types Claude vision accepts; uploads.ts guarantees every image upload is
 // normalized to one of these, so the cast on `media_type` below is sound.
@@ -132,8 +132,8 @@ type LiveSession = {
   // the SDK does not guarantee their ordering relative to snapshots.
   sawBackgroundSnapshot: boolean
   model: string | undefined
-  // Live flag settings; undefined inherits provider defaults.
-  fastMode: boolean | undefined
+  // Live flag settings; undefined effort inherits the provider default.
+  fastMode: boolean
   effort: string | undefined
   // `includePartialMessages` is fixed at creation, so changes require resume.
   stream: boolean
@@ -192,7 +192,7 @@ export type CCDebugSession = {
   workspaceId: string
   sessionId: string
   model: string | undefined
-  fastMode: boolean | undefined
+  fastMode: boolean
   effort: string | undefined
   stream: boolean
   queuedMessages: number
@@ -431,14 +431,11 @@ async function consume(s: LiveSession) {
         }
         startClaudeSessionTitleJob(s)
         // Seed explicit startup settings only when no saved picker choice exists.
-        if (
-          (s.model || s.effort || s.fastMode !== undefined) &&
-          !(await hasSessionConfig({ id: s.workspaceId, path: s.workspacePath }, s.sessionId))
-        ) {
+        if (!(await hasSessionConfig({ id: s.workspaceId, path: s.workspacePath }, s.sessionId))) {
           await saveSessionConfig({ id: s.workspaceId, path: s.workspacePath }, s.sessionId, {
             model: s.model,
             effort: s.effort,
-            fastMode: s.fastMode
+            speedMode: s.fastMode ? 'fast' : 'normal'
           })
         }
       }
@@ -594,7 +591,7 @@ function createLiveSession(input: {
   isNew: boolean
   model: string | undefined
   effort: string | undefined
-  fastMode: boolean | undefined
+  fastMode: boolean
   stream: boolean
   // Resolved workspace env, fixed for the lifetime of the subprocess.
   workspaceEnv: Record<string, string>
@@ -617,7 +614,7 @@ function createLiveSession(input: {
     // Harness-neutral settings are strings; the picker supplies this model's
     // supported effort levels from the SDK catalog.
     ...(input.effort ? { effort: input.effort as Options['effort'] } : {}),
-    ...(input.fastMode !== undefined ? { settings: { fastMode: input.fastMode } } : {}),
+    settings: { fastMode: input.fastMode },
     // Partial frames enable the opt-in live preview.
     includePartialMessages: input.stream,
     permissionMode: 'auto',
@@ -666,7 +663,7 @@ function createLiveSession(input: {
   sessions.set(recKey(session.workspaceId, session.sessionId), session)
   input.messages.live = session
   debug(
-    `cc create ${input.isNew ? 'new' : 'resume'} ws=${input.workspaceId} session=${input.sessionId} model=${input.model ?? 'default'} effort=${input.effort ?? 'default'} fast=${input.fastMode ?? 'default'} live=${sessions.size}`
+    `cc create ${input.isNew ? 'new' : 'resume'} ws=${input.workspaceId} session=${input.sessionId} model=${input.model ?? 'default'} effort=${input.effort ?? 'default'} fast=${input.fastMode} live=${sessions.size}`
   )
   void consume(session)
   return session
@@ -677,7 +674,7 @@ function createLiveSession(input: {
 export async function sendCCMessage(incoming: SendMessageInput): Promise<void> {
   const input: ClaudeSendMessageInput = {
     ...incoming,
-    fastMode: incoming.fastMode === 'ultrafast' ? false : incoming.fastMode
+    fastMode: incoming.speedMode === 'fast'
   }
   const prepared = prepareAttachmentMessage(input.workspaceId, input.content, input.attachments)
   if (!prepared.text) return
@@ -807,7 +804,7 @@ async function dispatchNextMessage(messages: SessionMessages): Promise<void> {
           ...(input.effort !== s.effort
             ? { effortLevel: (input.effort as Options['effort']) ?? null }
             : {}),
-          ...(input.fastMode !== s.fastMode ? { fastMode: input.fastMode ?? null } : {})
+          ...(input.fastMode !== s.fastMode ? { fastMode: input.fastMode } : {})
         })
         if (!s.closed) {
           s.effort = input.effort

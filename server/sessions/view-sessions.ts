@@ -36,7 +36,7 @@ export class ViewStartupError extends Error {
 }
 type BuildSendOptions = Pick<
   SendMessageInput,
-  'attachments' | 'optimisticId' | 'model' | 'effort' | 'fastMode' | 'stream'
+  'attachments' | 'optimisticId' | 'model' | 'effort' | 'speedMode' | 'stream'
 > & { selectedSessionScope?: SelectedSessionScope }
 export type SubmitViewInput = BuildSendOptions & { requirements: string; sessionId?: string }
 

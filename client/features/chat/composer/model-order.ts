@@ -1,4 +1,4 @@
-import type { FastMode, Model, WorkspaceType } from '@/lib/types'
+import type { SpeedMode, Model, WorkspaceType } from '@/lib/types'
 
 export const DEFAULT_EFFORT = 'high'
 
@@ -79,10 +79,13 @@ export function hasEffortChoice(levels: readonly string[]): boolean {
   return levels.length > 1
 }
 
-export function resolveFastMode(model: Model, selectedFastMode: FastMode | undefined): FastMode {
-  const mode = selectedFastMode ?? model.defaultFastMode ?? false
+export function resolveSpeedMode(
+  model: Model,
+  selectedSpeedMode: SpeedMode | undefined
+): SpeedMode {
+  const mode = selectedSpeedMode ?? 'normal'
   if (mode === 'ultrafast' && model.supportsUltrafastMode) return mode
-  return Boolean(mode && model.supportsFastMode)
+  return mode !== 'normal' && model.supportsFastMode ? 'fast' : 'normal'
 }
 
 export function sortModelsByProviderOrder(models: Model[], provider: WorkspaceType): Model[] {

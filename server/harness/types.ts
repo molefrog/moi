@@ -1,4 +1,4 @@
-import type { FastMode } from '@/lib/types'
+import type { SpeedMode } from '@/lib/types'
 // The harness contract: what an agent backend must implement to be drivable
 // by moi. See README.md in this folder for the full checklist and the
 // message-type layers; each harness's index.ts exports one Harness object
@@ -22,7 +22,7 @@ import type {
 // The superset of what any backend needs to accept a user message; harnesses
 // ignore fields they don't support. OpenClaw honors model + effort (applied via
 // sessions.patch) and stream (token previews), but has no Fast-mode setting so
-// it ignores fastMode; agentId is OpenClaw-only (the gateway agent that owns
+// it ignores speedMode; agentId is OpenClaw-only (the gateway agent that owns
 // the workspace).
 export type HarnessLoginAttempt = HarnessLogin & {
   completed?: Promise<void>
@@ -41,7 +41,7 @@ export type SendMessageInput = {
   optimisticId?: string
   model?: string
   effort?: string
-  fastMode?: FastMode
+  speedMode?: SpeedMode
   stream?: boolean
   // Structured moi context (lib/moi-context.ts). Each harness renders and
   // injects it its own way: Claude Code as a leading system-reminder text

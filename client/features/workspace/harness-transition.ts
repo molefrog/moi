@@ -46,7 +46,7 @@ export async function receiveWorkspaceHarness(
           provider: harness,
           selectedModel: undefined,
           selectedEffort: undefined,
-          selectedFastMode: undefined
+          selectedSpeedMode: undefined
         }
       : previous
   )
