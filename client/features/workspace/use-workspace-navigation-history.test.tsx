@@ -305,7 +305,7 @@ for (const collab of [false, true]) {
       }
     )
     test.each(['chat', 'chats/source'])(
-      'navigation immediately followed by %s keeps the new page and parameters',
+      'navigation immediately followed by %s resolves the chat destination',
       async path => {
         const fixture = mountNavigation('scratchpad', collab)
         await fixture.render()
@@ -316,9 +316,12 @@ for (const collab of [false, true]) {
           await opening
         })
         await fixture.waitForReveal()
-        expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/views/orders')
-        expect(new URLSearchParams(fixture.window.location.search).get('order')).toBe('o-3')
-        if (path.startsWith('chats/')) await fixture.waitForNavigation('views/orders')
+        if (path.startsWith('chats/')) {
+          await fixture.waitForNavigation('scratchpad')
+        } else {
+          expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/views/orders')
+          expect(new URLSearchParams(fixture.window.location.search).get('order')).toBe('o-3')
+        }
       }
     )
     test.each(['chats', 'chats/%', 'chats/a/b'])(
@@ -417,7 +420,7 @@ for (const collab of [false, true]) {
     )
 
     test.each(['chat', 'chats/source'])(
-      'a direct %s URL restores the last view regardless of the chat home tab',
+      'a direct %s URL resolves the current chat or the linked chat owning tab',
       async path => {
         const fixture = mountNavigation(path, collab, {
           open: ['overview', 'scratchpad', 'views/orders'],
@@ -425,13 +428,16 @@ for (const collab of [false, true]) {
         })
         await fixture.render()
         await fixture.waitForReveal()
-        expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/views/orders')
-        expect(fixture.document.getElementById('active-tab')?.textContent).toBe('views/orders')
-        if (path.startsWith('chats/')) await fixture.waitForNavigation('views/orders')
+        if (path.startsWith('chats/')) {
+          await fixture.waitForNavigation('scratchpad')
+        } else {
+          expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/views/orders')
+          expect(fixture.document.getElementById('active-tab')?.textContent).toBe('views/orders')
+        }
       }
     )
 
-    test.each(['chat', 'native-chat', 'source', 'native'])(
+    test.each(['chat', 'native-chat'])(
       'clicking a %s link preserves the current view and its parameters',
       async kind => {
         const fixture = mountNavigation('views/orders?order=o-2&literal=%252F', collab)
@@ -446,7 +452,30 @@ for (const collab of [false, true]) {
         const params = new URLSearchParams(fixture.window.location.search)
         expect(params.get('order')).toBe('o-2')
         expect(params.get('literal')).toBe('%2F')
-        if (kind === 'source' || kind === 'native') await fixture.waitForNavigation('views/orders')
+      }
+    )
+
+    test.each(['source', 'native'])(
+      'opening a generic parent through %s switches from the child view to Overview',
+      async kind => {
+        const fixture = mountNavigation('views/orders?order=o-2', collab)
+        fixture.setState({
+          pinnedSessionId: undefined,
+          sessions: { child: { tabId: 'views/orders' } },
+          selected: { 'views/orders': 'child' }
+        })
+        await fixture.render()
+        await act(async () => {
+          const click = new fixture.window.Event('click', { bubbles: true, cancelable: true })
+          Object.assign(click, { button: 0 })
+          fixture.document.querySelector(`a[data-link="${kind}"]`)!.dispatchEvent(click)
+        })
+        await fixture.waitForNavigation('overview')
+        expect(fixture.cachedState()?.selected['views/orders']).toBe('child')
+        expect(fixture.cachedState()?.sessions).toEqual({ child: { tabId: 'views/orders' } })
+        await act(async () => fixture.window.history.back())
+        expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/views/orders')
+        expect(fixture.window.location.search).toBe('?order=o-2')
       }
     )
 
@@ -461,8 +490,8 @@ for (const collab of [false, true]) {
           fixture.document.querySelector(`a[data-link="${kind}"]`)!.dispatchEvent(click)
         })
         expect(click.defaultPrevented).toBe(true)
-        await fixture.waitForNavigation('overview')
-        expect(fixture.history.filter(entry => entry.kind === 'push')).toHaveLength(0)
+        await fixture.waitForNavigation('scratchpad')
+        expect(fixture.history.filter(entry => entry.kind === 'push')).toHaveLength(1)
         await act(async () => fixture.window.history.back())
         expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/overview')
       }

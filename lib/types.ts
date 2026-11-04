@@ -1,6 +1,5 @@
 import type { PreviewBlock, StreamEvent } from './format'
 import type { AppIconId } from './app-icons'
-import type { ExperimentalFeatures } from './experimental'
 import type { MoiContext } from './moi-context'
 import type { WorkspaceTheme } from './themes'
 import type { AttachmentInput, WidgetConfig } from 'moi'
@@ -338,27 +337,25 @@ export type SessionInfo = SessionSummary & { tabId?: WorkspaceTabId }
 // dir and exposed via GET/PATCH /api/settings. Every key has a default, so
 // GET always returns a complete object.
 export type AppSettings = {
+  showOnboarding: boolean
   // Apply bundled workspace-skill updates automatically when a workspace
   // with outdated skills is opened, instead of prompting each time.
   autoUpdateSkills: boolean
 }
 
 // Client-safe startup config, served by GET /api/config. Deployment settings
-// come from config.json and MOI_* env overrides; experimental flags come from
-// explicit CLI options. See server/app-config.ts.
+// come from config.json and MOI_* env overrides. See server/app-config.ts.
 export type AppEnvironment = 'local' | 'cloud'
 
 export type ClientAppConfig = {
   environment: AppEnvironment
+  collab: boolean
   // Demo mode: workspace creation is blocked; the UI offers the
   // cloud-demo promo dialog instead.
   demo: boolean
-  experimental: ExperimentalFeatures
   // Link target for the cloud-demo promo dialog.
   demoInstallUrl: string
 }
-
-export type { ExperimentalFeatures } from './experimental'
 
 export type UpdateStatus = {
   runningVersion: string
@@ -483,8 +480,10 @@ export type WorkspaceSkillsUpdateFailure = WorkspaceSkillsStatus & {
 
 export type HarnessInstallations = Record<WorkspaceType, boolean>
 
-// Setup checks only runtime availability. Workspace checks may also report
-// that the provider needs a login the host can start.
+// Shared runtime/account readiness and the current sign-in attempt.
+export type HarnessStatus = { availability: HarnessAvailability; login?: HarnessLoginState }
+export type HarnessStatuses = Record<WorkspaceType, HarnessStatus>
+
 export type HarnessAvailability =
   | { status: 'available' }
   | { status: 'login-required'; reason: string }
@@ -772,11 +771,13 @@ export type Model = {
   supportsAutoMode?: boolean
 }
 
-// GET /api/workspaces/:id/agent. Model changes arrive on refetch;
+// GET /api/workspaces/:id/harness. Model changes arrive on refetch;
 // `harness:updated` events refresh availability.
-export type WorkspaceAgent = {
-  workspaceFolderMissing?: boolean
-  // The agent backend that produced this snapshot — matches the workspace
+export type WorkspaceHarness = {
+  /** Credential overrides require workspace readiness instead of shared account status. */
+  hasAuthOverrides?: boolean
+  isFolderMissing?: boolean
+  // The harness that produced this snapshot — matches the workspace
   // provider.
   provider: WorkspaceType
   // Runtime presence and provider auth state, from the server-side cache.

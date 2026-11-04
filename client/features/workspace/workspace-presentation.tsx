@@ -1,19 +1,11 @@
 import { workspaceProviderIcon } from '@/client/components/shared/workspace-icon'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
 
-export const workspaceTypeLabel: Record<WorkspaceType, string> = {
-  'claude-code': 'Claude',
-  openclaw: 'OpenClaw',
-  codex: 'ChatGPT',
-  hermes: 'Hermes'
-}
-
-export const workspaceTypeDescription: Record<WorkspaceType, string> = {
-  'claude-code': 'Anthropic',
-  codex: 'OpenAI',
-  openclaw: 'Open-source',
-  hermes: 'Nous Research'
-}
+import { harnessLabel as workspaceTypeLabel } from '@/client/features/harness/harness-presentation'
+export {
+  harnessLabel as workspaceTypeLabel,
+  harnessDescription as workspaceTypeDescription
+} from '@/client/features/harness/harness-presentation'
 
 type WorkspaceAgentIconsProps = {
   types: WorkspaceType[]

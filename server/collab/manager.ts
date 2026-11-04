@@ -108,7 +108,10 @@ export class CollabManager {
     binding.workspacePaths.add(canonicalPath)
     if (binding.closed) throw new CollabRuntimeError('unavailable', 'Collab connection closed')
     if (!(await (this.options.enabled ?? isCollabEnabled)(canonicalPath))) {
-      throw new CollabRuntimeError('unavailable', 'Start Moi with --experimental-collab')
+      throw new CollabRuntimeError(
+        'unavailable',
+        'Collaboration is only available in the cloud environment'
+      )
     }
     if (this.closed || binding.closed)
       throw new CollabRuntimeError('unavailable', 'Collab connection closed')

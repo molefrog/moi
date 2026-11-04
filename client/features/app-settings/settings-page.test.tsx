@@ -14,11 +14,12 @@ import type { AccountFixtureOptions } from '../account/account-test-utils'
 import { ProfileSettings } from './profile-settings'
 import { UsersSettings } from './users-settings'
 import { SettingsPage } from './settings-page'
+import { appSettingsKey } from './api'
 import { toast, Toaster } from '@/client/components/ui/toast'
 
 afterEach(cleanupAccount)
 
-type FixtureOptions = AccountFixtureOptions & { mode?: 'users' | 'profile' | 'page' }
+type FixtureOptions = AccountFixtureOptions & { mode?: 'users' | 'profile' | 'combined' | 'page' }
 function mountSettings({ mode = 'users', ...options }: FixtureOptions = {}) {
   return mountAccount({
     ...options,
@@ -27,7 +28,10 @@ function mountSettings({ mode = 'users', ...options }: FixtureOptions = {}) {
         {mode === 'page' ? (
           <SettingsPage />
         ) : (
-          <AccountProbe>{mode === 'users' ? <UsersSettings /> : <ProfileSettings />}</AccountProbe>
+          <AccountProbe>
+            {mode !== 'users' && <ProfileSettings />}
+            {mode !== 'profile' && <UsersSettings />}
+          </AccountProbe>
         )}
       </Toaster>
     )
@@ -228,7 +232,8 @@ test('inviting a user sends the trimmed email and refreshes invitations', async 
 test('local settings show Profile without Email or Users and respect supplied identity', async () => {
   const ui = await mountSettings({ mode: 'page', environment: 'local' })
   expect([...ui.document.querySelectorAll('h2')].map(heading => heading.textContent)).toEqual([
-    'Profile'
+    'Profile',
+    'General'
   ])
   expect(ui.document.querySelector('input')?.value).toBe('Alex')
   expect(ui.document.querySelector('input')?.hasAttribute('readOnly')).toBe(true)
@@ -236,15 +241,49 @@ test('local settings show Profile without Email or Users and respect supplied id
   expect(ui.calls).toEqual([])
 })
 
-test('registered cloud settings show Profile, read-only Email, and Users', async () => {
+test('registered cloud settings show Profile and Email without collaboration controls', async () => {
   const ui = await mountSettings({ mode: 'page' })
   expect([...ui.document.querySelectorAll('h2')].map(heading => heading.textContent)).toEqual([
     'Profile',
-    'Users'
+    'General'
   ])
+  expect(ui.document.querySelector('#invite-email')).toBeNull()
   expect(ui.document.querySelector('#profile-email')?.getAttribute('readOnly')).toBe('')
   expect(ui.document.querySelector('input')?.hasAttribute('readOnly')).toBe(false)
-  expect(ui.document.body.textContent).toContain('Ada')
+  expect(ui.document.body.textContent).not.toContain('Ada')
+})
+
+test.each(['local', 'cloud'] as const)(
+  'restart onboarding saves before navigating in %s',
+  async environment => {
+    const ui = await mountSettings({ mode: 'page', environment, pendingMutation: true })
+    await ui.click('Restart onboarding')
+    expect(ui.calls.find(call => call.path === '/api/settings')?.body).toEqual({
+      showOnboarding: true
+    })
+    expect(ui.location.history).not.toContain('/onboarding')
+    expect(
+      [...ui.document.querySelectorAll('button')].find(button => button.textContent === 'Opening…')
+        ?.disabled
+    ).toBe(true)
+    await act(async () => ui.mutationRequest.resolve())
+    await ui.settle()
+    expect(ui.qc.getQueryData(appSettingsKey)).toMatchObject({ showOnboarding: true })
+    expect(ui.location.history.at(-1)).toBe('/onboarding')
+  }
+)
+
+test('failed onboarding restart stays in settings and can be retried', async () => {
+  const ui = await mountSettings({ mode: 'page' })
+  ui.failures.mutation = true
+  await ui.click('Restart onboarding')
+  expect(ui.location.history).not.toContain('/onboarding')
+  expect(ui.document.querySelector('[role="alert"]')?.textContent).toContain(
+    'Couldn’t restart onboarding'
+  )
+  ui.failures.mutation = false
+  await ui.click('Restart onboarding')
+  expect(ui.location.history.at(-1)).toBe('/onboarding')
 })
 
 test.each([{ demo: true }, { anonymous: true }])(
@@ -298,7 +337,7 @@ test('user controls stay disabled until a mutation finishes', async () => {
 test.each([{ loadingTeam: true }, { failTeam: true }])(
   'session resolves the account without an injected profile or a working team request: %j',
   async options => {
-    const ui = await mountSettings({ mode: 'page', injected: false, ...options })
+    const ui = await mountSettings({ mode: 'combined', injected: false, ...options })
     await ui.settle()
     expect(getCurrentUser()).toMatchObject({ id: 'me', name: 'Alex', email: 'alex@example.com' })
     expect(ui.document.querySelector('input')?.value).toBe('Alex')
@@ -329,7 +368,7 @@ test('a name response cannot overwrite an account that changed id while saving',
 })
 
 test('a failed name save leaves the pending team request able to finish', async () => {
-  const ui = await mountSettings({ mode: 'page', loadingTeam: true })
+  const ui = await mountSettings({ mode: 'combined', loadingTeam: true })
   ui.failures.mutation = true
   expect(ui.document.querySelector('[aria-label="Loading users"]')).not.toBeNull()
   const input = ui.document.querySelector('input')!

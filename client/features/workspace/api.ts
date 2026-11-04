@@ -7,7 +7,7 @@ import { workspaceKeys } from '@/client/api/workspace-keys'
 import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
 import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
 import type {
-  WorkspaceAgent,
+  WorkspaceHarness,
   WorkspaceEntry,
   WorkspaceLayoutResponse,
   WorkspaceLayoutSave,
@@ -26,49 +26,34 @@ export function useWorkspaceLayout(workspaceId: string) {
   })
 }
 
-// The workspace's agent backend in one snapshot: availability (runtime
-// presence + auth), the model catalog, and capabilities.
-// `harness:updated` events refresh availability;
-// focus refetches pick up model changes after a CLI update.
-export function useWorkspaceAgent(workspaceId: string) {
+// Workspace models, capabilities, and readiness for credential overrides or gateways.
+export function useWorkspaceHarness(workspaceId: string) {
   const queryClient = useQueryClient()
   useWorkspaceEvent(event => {
     if (event.type === 'harness:updated' && event.workspaceId === workspaceId) {
-      queryClient.setQueryData<WorkspaceAgent>(workspaceKeys.agent(workspaceId), prev =>
+      void queryClient.cancelQueries({ queryKey: workspaceKeys.harness(workspaceId) })
+      queryClient.setQueryData<WorkspaceHarness>(workspaceKeys.harness(workspaceId), prev =>
         prev ? { ...prev, availability: event.availability } : prev
       )
     }
     // Env can swap credentials; the server dropped its cache — refetch.
     if (event.type === 'env:updated' && event.workspaceId === workspaceId) {
-      queryClient.invalidateQueries({ queryKey: workspaceKeys.agent(workspaceId) })
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.harness(workspaceId) })
     }
   })
-  return useQuery<WorkspaceAgent>({
-    queryKey: workspaceKeys.agent(workspaceId),
+  return useQuery<WorkspaceHarness>({
+    queryKey: workspaceKeys.harness(workspaceId),
     queryFn: async ({ signal }) => {
-      const key = workspaceKeys.agent(workspaceId)
-      const previous = queryClient.getQueryData<WorkspaceAgent>(key)
-      // `refresh=true` makes the server re-probe the CLI (three child
-      // processes, seconds) instead of answering from its 30s cache. Only
-      // worth it when the last snapshot was a failure: the user may have
-      // signed in or installed the agent since, and that is also the only
-      // state with a "check again" button. A working agent is reconfirmed
-      // from the cache.
-      const refresh = previous !== undefined && previous.availability.status !== 'available'
-      const result = await requestJson<WorkspaceAgent>(
-        `/api/workspaces/${workspaceId}/agent${refresh ? '?refresh=true' : ''}`,
+      const previous = queryClient.getQueryData<WorkspaceHarness>(
+        workspaceKeys.harness(workspaceId)
+      )
+      const refresh = previous?.hasAuthOverrides && previous.availability.status !== 'available'
+      return requestJson<WorkspaceHarness>(
+        `/api/workspaces/${workspaceId}/harness${refresh ? '?refresh=true' : ''}`,
         { signal }
       )
-      // A live auth event received during this request is newer than its snapshot.
-      const current = queryClient.getQueryData<WorkspaceAgent>(key)
-      return current && current !== previous
-        ? { ...result, availability: current.availability }
-        : result
     },
     staleTime: 30_000,
-    // Reconfirm cached failures on entry; a recent successful check can be reused.
-    refetchOnMount: query =>
-      query.state.data?.availability.status === 'available' ? true : 'always',
     refetchOnWindowFocus: true
   })
 }

@@ -1,3 +1,4 @@
+import { OnboardingRoute } from './routes/onboarding-route'
 import { Suspense, lazy, useEffect } from 'react'
 
 import { Redirect, Route, Switch, useLocation } from 'wouter'
@@ -44,6 +45,7 @@ export function AppRouter() {
     <Switch>
       <Route path="/dev/*?" component={DevLazy} />
       <Route path="/" component={HomeRoute} />
+      <Route path="/onboarding" component={OnboardingRoute} />
       <Route path="/settings" component={SettingsRoute} />
       {/* The wildcard is the destination path (`views/orders`, `overview`, …) —
           the URL is the tab address, read downstream with `useParams`. This

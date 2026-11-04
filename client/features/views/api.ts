@@ -59,6 +59,13 @@ const selectPendingViews = (state: WorkspaceState) => state.pendingViews
 export function useViews(workspaceId: string) {
   const queryClient = useQueryClient()
   useWorkspaceEvent(event => {
+    if (event.type === 'view-layout:updated' && event.workspaceId === workspaceId) {
+      const queryKey = workspaceKeys.views(workspaceId)
+      // The event is newer than an in-flight list request. Apply it immediately
+      // so the following state:changed can safely remove the pending view.
+      void queryClient.cancelQueries({ queryKey })
+      queryClient.setQueryData(queryKey, event.views)
+    }
     if (event.type === 'view:deleted' && event.workspaceId === workspaceId) {
       void queryClient.invalidateQueries({ queryKey: workspaceKeys.views(workspaceId) })
       void queryClient.invalidateQueries({ queryKey: workspaceKeys.sessions(workspaceId) })

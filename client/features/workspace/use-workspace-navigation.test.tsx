@@ -472,35 +472,49 @@ for (const collab of [false, true]) {
     )
 
     test.each([
-      ['a general chat', 'general', undefined],
-      ['a Scratchpad chat', 'notes', undefined],
-      ['a view chat and unpins another chat', 'orders', 'other'],
-      ['a pending view chat and preserves its pin', 'draft', 'draft'],
-      ['a chat whose original view was removed', 'gone', undefined]
-    ] as const)('opens %s on the current tab', async (_name, id, pinned) => {
-      const { setState, cachedState, selectedIn, navigate, routed, revealed, writes, storage } =
-        fixture
-      setState({ pinnedSessionId: pinned })
-      await navigate(`moi:/chats/${id}`)
-      expect(routed).toEqual([])
-      expect(revealed).toEqual([true])
-      expect(cachedState()?.pinnedSessionId).toBe(pinned === id ? id : undefined)
-      if (pinned === id) {
-        expect(writes).toEqual([])
-        return
+      ['a general chat', 'general', undefined, 'overview'],
+      ['a Scratchpad chat', 'notes', undefined, 'scratchpad'],
+      ['a view chat and unpins another chat', 'orders', 'other', 'views/orders'],
+      ['a pending view chat and preserves its pin', 'draft', 'draft', 'scratchpad'],
+      ['a chat whose original view was removed', 'gone', undefined, 'views/gone']
+    ] as const)(
+      'opens %s on its owning tab unless pinned',
+      async (_name, id, pinned, destination) => {
+        const { setState, cachedState, selectedIn, navigate, routed, revealed, writes, storage } =
+          fixture
+        setState({ pinnedSessionId: pinned })
+        await navigate(`moi:/chats/${id}`)
+        expect(routed.map(route => ({ ...route, path: route.path.split('?')[0] }))).toEqual(
+          destination === 'scratchpad'
+            ? []
+            : [{ path: `/prefix/workspace/abc/${destination}`, replace: false }]
+        )
+        expect(revealed).toEqual([true])
+        expect(cachedState()?.pinnedSessionId).toBe(pinned === id ? id : undefined)
+        if (pinned === id) {
+          expect(writes).toEqual([])
+          return
+        }
+        expect(selectedIn(destination)).toBe(id)
+        expect(writes).toEqual([
+          ...(pinned ? [{ method: 'DELETE', url: pinUrl(pinned), body: undefined }] : []),
+          ...(collab
+            ? []
+            : [
+                {
+                  method: 'PUT',
+                  url: selectionUrl(id),
+                  body: {
+                    tabId: destination,
+                    ifMatch: destination === 'overview' ? 'previous' : null
+                  }
+                }
+              ])
+        ])
+        if (collab)
+          expect(JSON.parse(storage.get('moi:collab:abc:session')!).selected[destination]).toBe(id)
       }
-      expect(selectedIn('scratchpad')).toBe(id)
-      expect(writes).toEqual([
-        ...(pinned ? [{ method: 'DELETE', url: pinUrl(pinned), body: undefined }] : []),
-        ...(collab
-          ? []
-          : [
-              { method: 'PUT', url: selectionUrl(id), body: { tabId: 'scratchpad', ifMatch: null } }
-            ])
-      ])
-      if (collab)
-        expect(JSON.parse(storage.get('moi:collab:abc:session')!).selected.scratchpad).toBe(id)
-    })
+    )
 
     test('waits for pin state on a direct load before selecting', async () => {
       const { queryClient, responses, initial, navigate, writes, routed, revealed } = fixture
@@ -526,9 +540,9 @@ for (const collab of [false, true]) {
         { sessionId: 'outside', summary: 'Started in a terminal', lastModified: 1 }
       ])
       await navigate('moi:/chats/outside')
-      expect(routed).toEqual([])
+      expect(routed).toEqual([{ path: '/prefix/workspace/abc/overview', replace: false }])
       expect(revealed).toEqual([true])
-      expect(selectedIn('scratchpad')).toBe('outside')
+      expect(selectedIn('overview')).toBe('outside')
     })
 
     test('failed unpinning stops before selection or redirect', async () => {
@@ -560,11 +574,11 @@ for (const collab of [false, true]) {
           Response.json({
             ...initial,
             revision: 2,
-            selected: { ...initial.selected, scratchpad: 'general' }
+            selected: { ...initial.selected, overview: 'general' }
           })
         )
         await opening
-        expect(routed).toEqual([])
+        expect(routed).toEqual([{ path: '/prefix/workspace/abc/overview', replace: false }])
         expect(revealed).toEqual([true])
       })
 

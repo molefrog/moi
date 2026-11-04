@@ -71,7 +71,7 @@ while Moi keeps running, changing which models are available.
   chat busy.
 - Stop cancels queued messages and waits for interrupt acknowledgement and
   turn completion. An unexpected process exit rejects pending sends.
-- The picker gets the new lineup on the client's next `/agent` refetch (window
+- The picker gets the new lineup on the client's next `/harness` refetch (window
   focus, reconnect). `moi status` prints the version the catalog was probed
   for next to the executable path.
 

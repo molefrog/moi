@@ -1,14 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { jsonRequest, requestJson } from '@/client/api/http'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useUiStore } from '@/client/store/ui'
-import type {
-  DiscoveredWorkspace,
-  HarnessInstallations,
-  WorkspaceEntry,
-  WorkspaceType
-} from '@/lib/types'
+import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
 
 export function upsertWorkspaceEntry(
   entries: WorkspaceEntry[] | undefined,
@@ -42,23 +37,8 @@ export type ImportWorkspaceInput = {
   type: WorkspaceType
 }
 
-export type WorkspaceCreationInfo = {
-  installed: HarnessInstallations
-}
-
-export function useWorkspaceCreationInfo() {
-  return useQuery<WorkspaceCreationInfo>({
-    queryKey: workspaceKeys.creationInfo,
-    // Installations can change while the app is open (the user installs the
-    // agent CLI) — refetch on mount instead of caching forever.
-    queryFn: () => requestJson('/api/workspaces/create'),
-    staleTime: 30_000,
-    refetchOnMount: 'always'
-  })
-}
-
 export type CreateWorkspaceInput = {
-  name: string
+  name?: string
   type: WorkspaceType
 }
 

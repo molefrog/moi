@@ -5,8 +5,11 @@ import { Skeleton } from '@/client/components/ui/skeleton'
 import { useAccount } from '../account/account-provider'
 import { ProfileSettings } from './profile-settings'
 import { UsersSettings } from './users-settings'
+import { useAppConfig } from '@/client/api/app-config'
+import { GeneralSettings } from './general-settings'
 
 export function SettingsPage() {
+  const { collab } = useAppConfig()
   const account = useAccount()
   useEffect(() => {
     if (account.cloud && !account.demo && account.status === 'signed-out') {
@@ -35,7 +38,8 @@ export function SettingsPage() {
         ) : (
           <div className="flex w-full max-w-xl min-w-0 flex-col gap-4">
             <ProfileSettings />
-            {account.registered && <UsersSettings />}
+            {collab && account.registered && <UsersSettings />}
+            <GeneralSettings />
           </div>
         )}
       </div>

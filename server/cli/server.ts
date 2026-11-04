@@ -21,15 +21,10 @@ export function assertDevRuntime(version = Bun.version): void {
 export function spawnServer(
   cwd: string,
   env: Record<string, string | undefined> = process.env,
-  experimentalFlags: string[] = []
+  args: string[] = []
 ): ReturnType<typeof Bun.spawn> {
   // Keep the checked runtime instead of resolving a different Bun on PATH.
-  const argv = [
-    process.execPath,
-    join(PACKAGE_ROOT, 'server', 'cli.ts'),
-    'start',
-    ...experimentalFlags
-  ]
+  const argv = [process.execPath, join(PACKAGE_ROOT, 'server', 'cli.ts'), 'start', ...args]
   return Bun.spawn(argv, {
     stdin: 'inherit',
     stdout: 'inherit',
@@ -49,12 +44,11 @@ export function spawnServer(
 // (closing servers + killing function workers), so restarts leak nothing.
 export async function runDevSupervisor(
   projectRoot: string,
-  env: Record<string, string | undefined>,
-  experimentalFlags: string[]
+  env: Record<string, string | undefined>
 ): Promise<void> {
   const { watch } = await import('node:fs')
 
-  let child = spawnServer(projectRoot, env, experimentalFlags)
+  let child = spawnServer(projectRoot, env)
   let restarting = false
   let debounce: ReturnType<typeof setTimeout> | undefined
 
@@ -73,7 +67,7 @@ export async function runDevSupervisor(
     await child.exited
     clearTimeout(sigkill)
     restarting = false
-    child = spawnServer(projectRoot, env, experimentalFlags)
+    child = spawnServer(projectRoot, env)
   }
 
   for (const dir of ['server', 'lib']) {

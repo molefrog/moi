@@ -137,7 +137,7 @@ export const init = defineCommand({
       default: false,
       description: 'Start the web server if not already running'
     },
-    'experimental-collab': {
+    collab: {
       type: 'boolean',
       default: false,
       description: 'Include the optional collaboration guide and applet types'
@@ -204,10 +204,10 @@ export const init = defineCommand({
     // package.json + bun install). An existing `.moi/` is left untouched.
     console.log()
     const { scaffold, skillsDir, installLogPath } = await provisionWorkspace(target, type)
-    if (args['experimental-collab']) {
+    if (args['collab']) {
       const { referencePath } = await installCollabSkill(target, type)
       console.log(pc.dim('  Collaboration guide installed to ' + referencePath))
-      console.log(pc.dim('  Live presence requires moi start --experimental-collab'))
+      console.log(pc.dim('  Live presence is available in the cloud environment'))
     }
     if (scaffold !== 'exists') {
       if (scaffold === 'installing') {

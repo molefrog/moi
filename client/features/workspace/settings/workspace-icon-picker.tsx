@@ -11,7 +11,7 @@ import {
 import { Button } from '@/client/components/ui/button'
 import { Checkbox } from '@/client/components/ui/checkbox'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/client/components/ui/tabs'
-import { useUpdateWorkspaceIcon } from '@/client/features/settings/api'
+import { useUpdateWorkspaceIcon } from '@/client/features/workspace/settings/api'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-layout-context'
 import { APP_ICON_CHOICES } from '@/client/lib/app-icon-registry'
 import { cn } from '@/client/lib/cn'

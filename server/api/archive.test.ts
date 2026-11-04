@@ -139,8 +139,8 @@ test('every provider supports archiving, openclaw via gateway patch', async () =
   }
 
   const [claudeAgent, codexAgent, openclawArchive] = await Promise.all([
-    api.request(`/api/workspaces/${claude.id}/agent`),
-    api.request(`/api/workspaces/${codex.id}/agent`),
+    api.request(`/api/workspaces/${claude.id}/harness`),
+    api.request(`/api/workspaces/${codex.id}/harness`),
     api.request(`/api/workspaces/${openclaw.id}/sessions/chat/archive`, { method: 'POST' })
   ])
 

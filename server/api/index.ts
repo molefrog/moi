@@ -1,12 +1,13 @@
+import { resolveWorkspaceEnv } from '../workspaces/env'
 import { changeWorkspaceHarness } from '../workspaces/change-harness'
 import { HarnessTransitionError, reserveWorkspaceOperation } from '../workspaces/harness-transition'
-import { detectInstalledHarnesses } from '../harness/executable'
+import { onboarding } from './onboarding'
 import { isMessageAttachments } from '@/lib/message-attachments'
 import { Hono } from 'hono'
 import { serveStatic } from 'hono/bun'
 import { createMiddleware } from 'hono/factory'
 import { existsSync } from 'node:fs'
-import { basename, join, resolve } from 'node:path'
+import { basename, resolve } from 'node:path'
 
 import { UPDATE_ACTIVE_AGENT_MESSAGE } from '@/lib/update'
 import { resolveWorkspaceTheme } from '@/lib/themes'
@@ -18,7 +19,7 @@ import type {
   HarnessAvailability,
   SelectedSessionScope,
   UploadInfo,
-  WorkspaceAgent,
+  WorkspaceHarness,
   WorkspaceEntry,
   WorkspaceType
 } from '@/lib/types'
@@ -95,7 +96,8 @@ import {
 import { submitView, ViewStartupError } from '../sessions/view-sessions'
 import { listWidgets, serveWidget } from '../applets/widgets'
 import { getWorkspaceConfig, setWorkspaceConfig } from '../workspaces/config'
-import { provisionWorkspace, validateWorkspaceFolderName } from '../workspaces/init'
+import { createWorkspaceDirectory, provisionWorkspace } from '../workspaces/init'
+import { validateWorkspaceName } from '@/lib/workspace-name'
 import { resolveWorkspaceImportMetadata } from '../workspaces/import'
 import type { WorkspaceImportMetadata } from '../workspaces/import'
 import { getWorkspaceEnvView, parseEnvUpdate, updateWorkspaceEnv } from '../workspaces/env'
@@ -671,10 +673,9 @@ one.post('/skills/update', async c => {
   return c.json(result.status)
 })
 
-// The workspace's agent backend in one snapshot: provider, availability
-// (runtime presence + auth), the model catalog, and capabilities.
-// Workspace readiness stays fresh via `harness:updated` events and refetches.
-one.get('/agent', async c => {
+// Workspace configuration and models. Shared account status is served by
+// /harnesses/status; only workspace overrides and gateways are probed here.
+one.get('/harness', async c => {
   const ws = c.get('ws')
   const harness = harnessFor(ws)
   const capabilities = {
@@ -685,18 +686,35 @@ one.get('/agent', async c => {
   if (!existsSync(ws.path)) {
     return c.json({
       ...capabilities,
-      workspaceFolderMissing: true,
+      isFolderMissing: true,
       availability: { status: 'unavailable', reason: 'Workspace folder not found' },
       models: []
-    } satisfies WorkspaceAgent)
+    } satisfies WorkspaceHarness)
   }
+  const authEnv =
+    harness.id === 'codex'
+      ? /^(OPENAI_|CODEX_)/
+      : /^(ANTHROPIC_|CLAUDE_|AWS_|GOOGLE_|AZURE_|CLOUD_ML_)/
+  const hasAuthOverrides =
+    harness.authStatus &&
+    Object.entries(await resolveWorkspaceEnv(ws.path)).some(
+      ([key, value]) =>
+        value !== process.env[key] &&
+        (authEnv.test(key) || /^(HOME|USERPROFILE|XDG_CONFIG_HOME)$/.test(key))
+    )
   const refresh = c.req.query('refresh') === 'true'
   if (refresh) await loginShellPath({ refresh: true })
   // A backend that can't answer (codex CLI missing, gateway down) degrades to
   // an empty catalog — the picker hides and chat surfaces the real problem via
   // workspace setup, instead of this endpoint failing on page load.
   const [availability, models] = await Promise.all([
-    refresh ? harnessStore.refresh(ws) : harnessStore.getAvailability(ws),
+    // Shared account status comes from /harnesses/status.
+    // Gateway-backed harnesses still have workspace-specific readiness.
+    harness.authStatus && !hasAuthOverrides
+      ? Promise.resolve({ status: 'available' as const })
+      : refresh
+        ? harnessStore.refresh(ws)
+        : harnessStore.getAvailability(ws),
     harness.listModels(ws).catch(err => {
       console.error(`[api] listModels failed for ${harness.id}`, err)
       return []
@@ -705,8 +723,9 @@ one.get('/agent', async c => {
   return c.json({
     ...capabilities,
     availability,
+    hasAuthOverrides: Boolean(hasAuthOverrides),
     models
-  } satisfies WorkspaceAgent)
+  } satisfies WorkspaceHarness)
 })
 
 // Workspace identity. Uploads use the image route below.
@@ -1033,12 +1052,6 @@ async function workspaceTypeAvailability(type: WorkspaceType): Promise<HarnessAv
   return (await harnessFor(type).availability?.()) ?? { status: 'available' }
 }
 
-// Both workspace dialogs only need installation facts to offer agent choices.
-workspaces.get('/create', async c => {
-  c.header('Cache-Control', 'no-store')
-  return c.json({ installed: await detectInstalledHarnesses() })
-})
-
 // Create a brand-new workspace: a fresh folder under createdWorkspacesRoot(),
 // provisioned (skills + `.moi/` scaffold) and registered.
 workspaces.post('/create', async c => {
@@ -1054,18 +1067,23 @@ workspaces.post('/create', async c => {
   }
   const availability = await workspaceTypeAvailability(type)
   if (availability.status !== 'available') return c.text(availability.reason, 400)
-  const name = typeof body?.name === 'string' ? body.name.trim() : ''
-  const invalid = validateWorkspaceFolderName(name)
+  const name =
+    body?.name === undefined
+      ? 'My workspace'
+      : typeof body.name === 'string'
+        ? body.name.trim()
+        : ''
+  const invalid = validateWorkspaceName(name)
   if (invalid) return c.text(invalid, 400)
-  const path = join(createdWorkspacesRoot(), name)
-  if (existsSync(path)) return c.text('A folder with that name already exists', 409)
+  const path = await createWorkspaceDirectory(name, createdWorkspacesRoot())
   try {
     await provisionWorkspace(path, type)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return c.text(`Could not create workspace: ${message}`, 500)
   }
-  const entry = await registerWorkspace(path, { type })
+  await setWorkspaceConfig(path, { name })
+  const entry = await registerWorkspace(path, { id: basename(path), type, name })
   // Nudge every connected client (the sidebar list) to refetch.
   publishEvent({ type: 'workspaces-list:updated' })
   return c.json(entry, 201)
@@ -1081,6 +1099,7 @@ export const api = new Hono()
 
 api.route('/api/workspaces', workspaces)
 api.route('/api/harnesses', harnesses)
+api.route('/api/onboarding', onboarding)
 
 // Startup config (config.json in the data dir + MOI_* env), client-safe
 // subset. Immutable for the process lifetime — clients cache it forever.

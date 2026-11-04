@@ -5,13 +5,13 @@ import {
   installHarness,
   startHarnessLogin,
   submitHarnessLoginCode,
-  useHarnessAuth,
+  useHarnessStatus,
   type LoginHarness
 } from './api'
 
 export function useHarnessLogin(type: LoginHarness) {
   const { environment, demo } = useAppConfig()
-  const auth = useHarnessAuth(type)
+  const auth = useHarnessStatus(type)
   const queryClient = useQueryClient()
   const [code, setCode] = useState('')
   const [manualLogin, setManualLogin] = useState(false)
@@ -37,7 +37,7 @@ export function useHarnessLogin(type: LoginHarness) {
         setCode('')
       }
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['harness-auth'] })
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['harness-status'] })
   })
   const needsInstall =
     environment === 'local' &&

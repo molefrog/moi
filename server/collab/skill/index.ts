@@ -27,7 +27,7 @@ async function writeChanged(path: string, contents: string): Promise<void> {
   await Bun.write(path, contents)
 }
 
-// Only an explicit `moi init --experimental-collab` installs the guide and types.
+// Only an explicit `moi init --collab` installs the guide and types.
 export async function installCollabSkill(
   workspacePath: string,
   type?: WorkspaceType

@@ -19,7 +19,7 @@ import type {
   SessionSummary,
   UploadInfo,
   ViewState,
-  WorkspaceAgent,
+  WorkspaceHarness,
   WorkspaceState
 } from '@/lib/types'
 import { resolveSelectedModel } from './composer/model-order'
@@ -131,7 +131,7 @@ describe('startOptimisticSession', () => {
 })
 
 describe('resolveChatRunOptions', () => {
-  const models: WorkspaceAgent = {
+  const models: WorkspaceHarness = {
     provider: 'claude-code',
     availability: { status: 'available' },
     supportsStreaming: true,
@@ -221,7 +221,7 @@ describe('resolveChatRunOptions', () => {
 })
 
 describe('Codex model selection', () => {
-  const catalog: WorkspaceAgent = {
+  const catalog: WorkspaceHarness = {
     provider: 'codex',
     availability: { status: 'available' },
     models: [

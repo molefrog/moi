@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 
-import { WorkspaceSetupPanel } from './setup/workspace-setup-panel'
-import { WorkspaceFrame, WorkspacePane, useWorkspaceFrame } from './workspace-frame'
+import { ScreenShell } from '@/client/components/shared/screen-shell'
+import { WorkspacePane } from './workspace-frame'
 
 type WorkspacePendingScreenProps = {
   setupRequired?: boolean
@@ -12,15 +12,15 @@ export function WorkspacePendingScreen({
   setupRequired = false,
   children
 }: WorkspacePendingScreenProps) {
-  const frame = useWorkspaceFrame(setupRequired)
   return (
-    <WorkspaceFrame
-      frame={frame}
-      workspace={
-        <WorkspacePane mode={frame.mode}>
-          {setupRequired ? <WorkspaceSetupPanel>{children}</WorkspaceSetupPanel> : children}
+    <div className="relative flex h-full min-h-0 flex-1 flex-col font-sans text-foreground">
+      {setupRequired ? (
+        <WorkspacePane mode="fullscreen">
+          <ScreenShell aria-label="Workspace setup">{children}</ScreenShell>
         </WorkspacePane>
-      }
-    />
+      ) : (
+        children
+      )}
+    </div>
   )
 }

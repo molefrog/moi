@@ -16,7 +16,10 @@ export type AppSettingsPatch = Partial<AppSettings>
 // Whitelist of fields the API may update. Type validation is NOT duplicated
 // here — `saveAppSettings` validates the merged store against the conf schema
 // before anything is written, so a bad value throws with nothing persisted.
-const API_UPDATABLE = ['autoUpdateSkills'] as const satisfies readonly (keyof AppSettings)[]
+const API_UPDATABLE = [
+  'autoUpdateSkills',
+  'showOnboarding'
+] as const satisfies readonly (keyof AppSettings)[]
 
 // Pick the API-updatable fields out of an untrusted body; unknown keys are
 // dropped. Values are intentionally unchecked — the conf schema rejects wrong
@@ -44,7 +47,8 @@ function store(): Conf<AppSettings> {
     cwd: _dir,
     configName: 'settings',
     schema: {
-      autoUpdateSkills: { type: 'boolean', default: false }
+      autoUpdateSkills: { type: 'boolean', default: false },
+      showOnboarding: { type: 'boolean', default: true }
     }
   })
   return _store

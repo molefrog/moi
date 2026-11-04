@@ -1,5 +1,5 @@
 import { SidebarLayout } from '@/client/app/shell/sidebar-layout'
-import { SettingsPage } from '@/client/features/settings/settings-page'
+import { SettingsPage } from '@/client/features/app-settings/settings-page'
 
 export function SettingsRoute() {
   return (

@@ -202,10 +202,7 @@ function WelcomeState({
     <EmptyStateFrame agent={agent} className="@container w-full max-w-md min-w-0">
       <div className="mt-2 flex flex-col gap-4">
         <div className="prose prose-sm min-w-0 wrap-anywhere prose-inherit">
-          <p>
-            Moi is the personal workspace built for you by your agent. It grows and adapts to your
-            needs.
-          </p>
+          <p>Moi is the personal workspace that grows and adapts to your needs.</p>
           <p>
             Ask the agent to build widgets on the{' '}
             <WelcomeTerm Icon={IconLayout2} destination="overview" onNavigate={onNavigate}>

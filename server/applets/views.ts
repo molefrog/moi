@@ -203,17 +203,21 @@ export async function handleBundleViews(
   // superseded by a successful rebuild (see docs/self-correction.md).
   syncAppletLogAfterBuild(workspacePath, 'view', results)
 
-  const identityChanged = results.some(
-    r =>
-      r.status === 'built' &&
-      ((before.config[r.name]?.title ?? '') !== (r.config?.title ?? '') ||
-        (before.config[r.name]?.icon ?? '') !== (r.config?.icon ?? ''))
-  )
   const orderChanged = before.order.join('\0') !== after.order.join('\0')
   const membershipChanged =
     beforeBuilt.size !== afterBuilt.size ||
     [...beforeBuilt].some(n => !afterBuilt.has(n)) ||
     [...afterBuilt].some(n => !beforeBuilt.has(n))
+
+  // Install compiled views in the browser before removing their pending entries.
+  // Otherwise tab cleanup can mistake the handoff for a deleted view.
+  if (results.some(r => r.status === 'built') || orderChanged || membershipChanged) {
+    publish({
+      type: 'view-layout:updated',
+      workspaceId,
+      views: await listCompiledViews(workspacePath)
+    })
+  }
 
   const changedServerModules = new Set<string>()
   for (const r of results) {
@@ -226,11 +230,6 @@ export async function handleBundleViews(
 
   if (changedServerModules.size > 0) {
     reloadModules([...changedServerModules], workspacePath)
-  }
-
-  const views = await listCompiledViews(workspacePath)
-  if (identityChanged || orderChanged || membershipChanged) {
-    publish({ type: 'view-layout:updated', views })
   }
 
   return results

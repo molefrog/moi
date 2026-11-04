@@ -1,6 +1,6 @@
 import { workspaceTypeDescription } from '@/client/features/workspace/workspace-presentation'
 import { HARNESS_INSTRUCTIONS } from '@/lib/harness-instructions'
-import type { HarnessInstallations, WorkspaceType } from '@/lib/types'
+import type { HarnessStatuses, WorkspaceType } from '@/lib/types'
 import { WORKSPACE_TYPE_ORDER } from '@/lib/workspace-types'
 
 type WorkspaceAgentConfig = {
@@ -14,25 +14,24 @@ const workspaceAgents: Record<WorkspaceType, WorkspaceAgentConfig> = {
   hermes: { importOnly: true }
 }
 
-export type WorkspaceAgentOption = {
-  type: WorkspaceType
-  description: string
-  disabled: boolean
-  disabledReason?: string
-  disabledCommand?: string
-}
+export type { HarnessOption as WorkspaceAgentOption } from '@/client/features/harness/harness-selector'
+import type { HarnessOption as WorkspaceAgentOption } from '@/client/features/harness/harness-selector'
 
 export function getWorkspaceAgentOptions(
-  installed?: HarnessInstallations,
+  statuses?: HarnessStatuses,
   detectedTypes: WorkspaceType[] = []
 ): WorkspaceAgentOption[] {
-  if (!installed) return []
+  if (!statuses) return []
+  const installed = (type: WorkspaceType) => {
+    const availability = statuses[type].availability
+    return availability.status !== 'unavailable' || availability.code !== 'not-installed'
+  }
   return WORKSPACE_TYPE_ORDER.filter(
-    type => installed[type] || !workspaceAgents[type].importOnly
+    type => installed(type) || !workspaceAgents[type].importOnly
   ).map(type => {
     const config = workspaceAgents[type]
     const instruction = HARNESS_INSTRUCTIONS[type]
-    const disabled = !installed[type] || (config.importOnly && !detectedTypes.includes(type))
+    const disabled = !installed(type) || (config.importOnly && !detectedTypes.includes(type))
     return {
       type,
       description: workspaceTypeDescription[type],

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 import { mkdir, mkdtemp, realpath, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -11,6 +11,7 @@ import { clientAppConfig, initializeAppConfig, resetAppConfig } from '../app-con
 import { DEFAULT_REGISTRY_PATH, setRegistryPath } from '../workspaces/registry'
 import { collabManager, type ClientSocket } from './manager'
 import { collabSkillReferencePath } from './skill'
+import * as collabConfig from './config'
 
 let fixtureRoot: string
 let directory: string
@@ -18,7 +19,8 @@ let canonicalPath: string
 let registryPath: string
 let workspace: WorkspaceEntry
 let savedEnv: Record<string, string | undefined>
-const envKeys = ['MOI_COLLAB', 'MOI_DEV']
+let restorePresence = () => {}
+const envKeys = ['MOI_COLLAB', 'MOI_DEV', 'MOI_ENVIRONMENT']
 
 async function until(predicate: () => boolean) {
   const deadline = Date.now() + 5000
@@ -31,6 +33,7 @@ async function until(predicate: () => boolean) {
 beforeEach(async () => {
   savedEnv = Object.fromEntries(envKeys.map(key => [key, process.env[key]]))
   for (const key of envKeys) delete process.env[key]
+  process.env.MOI_ENVIRONMENT = 'local'
   resetAppConfig()
   fixtureRoot = await mkdtemp(join(tmpdir(), 'moi-collab-http-'))
   directory = join(fixtureRoot, 'workspace')
@@ -56,6 +59,7 @@ afterEach(async () => {
     if (savedEnv[key] === undefined) delete process.env[key]
     else process.env[key] = savedEnv[key]
   }
+  restorePresence()
   resetAppConfig()
   setRegistryPath(DEFAULT_REGISTRY_PATH)
   await rm(fixtureRoot, { recursive: true, force: true })
@@ -73,29 +77,71 @@ function command(command: unknown, id = 'agent') {
   return post('/collab/command', { actor: { id, kind: 'agent' }, command })
 }
 
-function enable() {
-  initializeAppConfig({ collab: true })
-  expect(clientAppConfig().experimental.collab).toBe(true)
+function useCloudConfig() {
+  process.env.MOI_ENVIRONMENT = 'cloud'
+  initializeAppConfig()
+  expect(clientAppConfig().environment === 'cloud').toBe(true)
+}
+
+function enablePresenceForTest() {
+  useCloudConfig()
+  const enabled = spyOn(collabConfig, 'isCollabEnabled').mockReturnValue(true)
+  restorePresence = () => enabled.mockRestore()
 }
 
 describe('collab HTTP integration', () => {
+  test.each(['local', 'cloud'])(
+    '%s deployments reject presence joins without starting a worker',
+    async environment => {
+      process.env.MOI_ENVIRONMENT = environment
+      initializeAppConfig()
+      const messages: CollabServerMessage[] = []
+      const socket: ClientSocket = {
+        send(data) {
+          messages.push(JSON.parse(data) as CollabServerMessage)
+          return data.length
+        },
+        close() {}
+      }
+      collabManager.open(socket, directory)
+      collabManager.message(
+        socket,
+        JSON.stringify({
+          type: 'join',
+          version: 1,
+          profile: { id: 'anna', name: 'Anna', color: 'blue' }
+        })
+      )
+      try {
+        await until(() => messages.some(message => message.type === 'error'))
+        expect(messages).toContainEqual(
+          expect.objectContaining({ type: 'error', code: 'unavailable' })
+        )
+        expect(messages.some(message => message.type === 'welcome')).toBe(false)
+        expect(collabManager.debugSnapshot()).toEqual([])
+      } finally {
+        collabManager.close(socket)
+      }
+    }
+  )
+
   test('ordinary and dev starts remain disabled without creating data', async () => {
-    expect(clientAppConfig().experimental.collab).toBe(false)
+    expect(clientAppConfig().environment === 'cloud').toBe(false)
     expect((await command({ type: 'snapshot', scope: 'board' })).status).toBe(404)
     process.env.MOI_DEV = '1'
     resetAppConfig()
-    expect(clientAppConfig().experimental.collab).toBe(false)
+    expect(clientAppConfig().environment === 'cloud').toBe(false)
     expect((await command({ type: 'snapshot', scope: 'board' })).status).toBe(404)
     expect(await Bun.file(collabSkillReferencePath(directory, workspace.type)).exists()).toBe(false)
     expect(await Bun.file(join(directory, '.moi', 'data', 'collab.sqlite')).exists()).toBe(false)
   })
 
-  test('runtime flag does not install documents, profile or workspace configuration', async () => {
+  test('cloud startup does not install documents, profile or workspace configuration', async () => {
     const referencePath = collabSkillReferencePath(directory, workspace.type)
     const defaultSkillPath = join(dirname(dirname(referencePath)), 'SKILL.md')
     const defaultSkill = '# Moi workspace\nExisting workspace instructions.\n'
     await Bun.write(defaultSkillPath, defaultSkill)
-    enable()
+    useCloudConfig()
     expect(await Bun.file(join(directory, '.moi', '.workspace.json')).exists()).toBe(false)
     expect(await Bun.file(defaultSkillPath).text()).toBe(defaultSkill)
     expect(await Bun.file(referencePath).exists()).toBe(false)
@@ -107,9 +153,9 @@ describe('collab HTTP integration', () => {
     const workspaceUrl = `/api/workspaces/${workspace.id}`
     const referencePath = collabSkillReferencePath(directory, workspace.type)
     for (const enabled of [false, true]) {
-      if (enabled) enable()
+      if (enabled) useCloudConfig()
       const startup = await api.request('/api/config')
-      expect((await startup.json()).experimental.collab).toBe(enabled)
+      expect((await startup.json()).environment === 'cloud').toBe(enabled)
       const response = await api.request(workspaceUrl)
       expect(response.status).toBe(200)
       const info = await response.json()
@@ -117,7 +163,8 @@ describe('collab HTTP integration', () => {
     }
     await Bun.write(referencePath, '# Manually installed guide')
     expect(await (await api.request(workspaceUrl)).json()).not.toHaveProperty('collabReference')
-    initializeAppConfig({ collab: false })
+    process.env.MOI_ENVIRONMENT = 'local'
+    initializeAppConfig()
     expect(await (await api.request(workspaceUrl)).json()).not.toHaveProperty('collabReference')
   })
 
@@ -128,8 +175,8 @@ describe('collab HTTP integration', () => {
     expect(await response.json()).toEqual({})
   })
 
-  test('persistent commands remain absent even when presence is enabled', async () => {
-    enable()
+  test('persistent commands remain absent in cloud', async () => {
+    useCloudConfig()
     for (const commandType of ['snapshot', 'mutate', 'receipts', 'export']) {
       expect((await command({ type: commandType, scope: 'board' })).status).toBe(404)
     }
@@ -140,7 +187,7 @@ describe('collab HTTP integration', () => {
   test.each(['existing', 'missing-directory', 'missing-symlink'])(
     'removing a workspace closes joined sockets and stops its worker (%s)',
     async state => {
-      enable()
+      enablePresenceForTest()
       if (state === 'missing-symlink') {
         workspace.path = join(fixtureRoot, 'workspace-link')
         await symlink(directory, workspace.path, 'dir')
@@ -205,7 +252,7 @@ describe('collab HTTP integration', () => {
   })
 
   test('stopping presence preserves installed guides and any existing database file', async () => {
-    enable()
+    enablePresenceForTest()
     const referencePath = collabSkillReferencePath(directory, workspace.type)
     const databasePath = join(directory, '.moi', 'data', 'collab.sqlite')
     const previousDatabase = new Uint8Array([83, 81, 76, 105, 116, 101, 0, 1, 2, 3])
@@ -233,7 +280,8 @@ describe('collab HTTP integration', () => {
     )
     await until(() => messages.some(message => message.type === 'welcome'))
     await collabManager.stopWorkspace(directory)
-    initializeAppConfig({ collab: false })
+    process.env.MOI_ENVIRONMENT = 'local'
+    initializeAppConfig()
     expect(closed).toBe(true)
     expect(await Bun.file(referencePath).text()).toBe('# Manually installed guide')
     expect(new Uint8Array(await Bun.file(databasePath).arrayBuffer())).toEqual(previousDatabase)

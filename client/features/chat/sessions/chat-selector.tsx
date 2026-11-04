@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { IconArchive, IconEdit, IconHistory, IconPin, IconPinFilled } from '@tabler/icons-react'
 
 import { useArchiveWorkspaceSession, useWorkspaceSessions } from './api'
-import { useWorkspaceAgent } from '@/client/features/workspace/api'
+import { useWorkspaceHarness } from '@/client/features/workspace/api'
 import { useWorkspaceId } from '@/client/features/workspace/workspace-context'
 import {
   useSelectedSession,
@@ -315,7 +315,7 @@ function SessionSelector({ className, sessions }: SessionSelectorProps) {
   const tabId = useCurrentTabId()
   const [selectedSessionId, selectSession] = useSelectedSession()
   const [confirmingSessionId, setConfirmingSessionId] = useState<string | null>(null)
-  const canArchive = useWorkspaceAgent(workspaceId).data?.supportsArchiving === true
+  const canArchive = useWorkspaceHarness(workspaceId).data?.supportsArchiving === true
   const archiveSession = useArchiveWorkspaceSession(workspaceId)
   const sessionGroups = groupSessionsForTab(sessions, tabId)
 

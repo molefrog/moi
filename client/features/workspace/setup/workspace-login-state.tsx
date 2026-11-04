@@ -8,18 +8,20 @@ type WorkspaceLoginStateProps = {
   reason: string
   checking: boolean
   onRecheck: () => void
+  onConnected?: () => void
 }
 
 export function WorkspaceLoginState({
   type,
   reason,
   checking,
-  onRecheck
+  onRecheck,
+  onConnected = onRecheck
 }: WorkspaceLoginStateProps) {
   return (
     <HarnessLoginPanel
       type={type}
-      onConnected={onRecheck}
+      onConnected={onConnected}
       connectedContent={
         <WorkspaceAccessState
           name={harnessLabel[type]}

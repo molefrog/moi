@@ -1,8 +1,9 @@
 import type { NavigationRequest } from '@/lib/navigation'
 import type {
   AppSettings,
+  CompiledView,
   HarnessAvailability,
-  ViewInfo,
+  HarnessStatus,
   WidgetInfo,
   WorkspaceType,
   WorkspaceState
@@ -10,14 +11,19 @@ import type {
 
 export type WorkspaceEvent =
   | { type: 'connection:opened' }
-  | { type: 'workspace-harness:changed'; workspaceId: string; harness: WorkspaceType }
+  | {
+      type: 'harness-status:changed'
+      harness: WorkspaceType
+      status: HarnessStatus
+    }
+  | { type: 'workspace-harness:switched'; workspaceId: string; harness: WorkspaceType }
   | { type: 'widget:updated'; name: string }
   | { type: 'widget-layout:updated'; widgets: WidgetInfo[] }
   // `moi refresh` — cache-bust and re-fetch applets without a rebuild. `only`
   // narrows to one kind; absent means both widgets and views.
   | { type: 'applets:refresh'; only?: 'widgets' | 'views' }
   | { type: 'view:updated'; name: string }
-  | { type: 'view-layout:updated'; views: ViewInfo[] }
+  | { type: 'view-layout:updated'; workspaceId: string; views: CompiledView[] }
   | { type: 'view:deleted'; workspaceId: string; name: string }
   // A workspace's chat state changed (pin, selection, chat settings, views
   // being built). Carries the whole state, so caches update without a refetch.

@@ -2,13 +2,30 @@ import { Hono } from 'hono'
 
 import type { WorkspaceType } from '@/lib/types'
 
+import { loginShellPath } from '../harness/shell-path'
 import { installHarness } from '../harness/install'
 import { harnessStore } from '../harness/auth'
-import { harnessFor, isHarnessType } from '../harness/registry'
+import { allHarnesses, harnessFor, isHarnessType } from '../harness/registry'
 
 export const harnesses = new Hono<{ Variables: { harnessType: WorkspaceType } }>()
 
-harnesses.use('/:type/auth/*', async (c, next) => {
+harnesses.get('/status', async c => {
+  c.header('Cache-Control', 'no-store')
+  const fresh = c.req.query('refresh') === 'true'
+  if (fresh) await loginShellPath({ refresh: true })
+  const statuses = await Promise.all(
+    allHarnesses().map(async ({ id }) => [
+      id,
+      {
+        availability: await harnessStore.getAvailability(id, fresh),
+        login: harnessStore.getLogin(id)
+      }
+    ])
+  )
+  return c.json(Object.fromEntries(statuses))
+})
+
+harnesses.use('/:type/*', async (c, next) => {
   const type = c.req.param('type')
   if (!isHarnessType(type)) return c.text('Unknown agent', 404)
   const harness = harnessFor(type)
@@ -18,14 +35,6 @@ harnesses.use('/:type/auth/*', async (c, next) => {
   c.set('harnessType', type)
   c.header('Cache-Control', 'no-store')
   await next()
-})
-
-harnesses.get('/:type/auth', async c => {
-  const context = c.get('harnessType')
-  return c.json({
-    availability: await harnessStore.getAvailability(context),
-    login: harnessStore.getLogin(context)
-  })
 })
 
 harnesses.post('/:type/auth/install', async c => {

@@ -1,7 +1,6 @@
 import { useSyncExternalStore } from 'react'
 
 import type { ClientAppConfig } from '@/lib/types'
-import { EXPERIMENTAL_DEFAULTS } from '@/lib/experimental'
 
 import { requestJson } from './http'
 
@@ -13,8 +12,8 @@ import { requestJson } from './http'
 
 const DEFAULTS: ClientAppConfig = {
   environment: 'local',
+  collab: false,
   demo: false,
-  experimental: { ...EXPERIMENTAL_DEFAULTS },
   demoInstallUrl: 'https://moi.computer'
 }
 

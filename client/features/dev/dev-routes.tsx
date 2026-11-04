@@ -9,6 +9,7 @@ import { HarnessDebugPage } from './harness-debug-page'
 import { TextureLabPage } from './texture-lab-page'
 import { ToolCallsPage } from './tool-calls-page'
 import { UiComponentsPage } from './ui-components/ui-components-page'
+import { OnboardingPreviewPage } from './onboarding-preview-page'
 
 // All /dev/* routes live with their pages here and load only in development;
 // see the dynamic import in AppRouter. /dev itself is the index; list new
@@ -20,6 +21,7 @@ const CollabPage = lazy(() =>
 export default function DevRoutes() {
   return (
     <Switch>
+      <Route path="/dev/onboarding" component={OnboardingPreviewPage} />
       <Route path="/dev/collab-kit">
         <Redirect to="/dev/collab" />
       </Route>

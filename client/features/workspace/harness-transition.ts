@@ -28,7 +28,6 @@ export async function receiveWorkspaceHarness(
     workspaceKeys.layout(id),
     workspaceKeys.state(id),
     workspaceKeys.sessions(id),
-    workspaceKeys.agent(id),
     workspaceKeys.mcp(id),
     workspaceKeys.skills(id),
     workspaceKeys.views(id),
@@ -38,6 +37,8 @@ export async function receiveWorkspaceHarness(
     predicate: (query: Query) => keys.some(queryKey => matchQuery({ queryKey }, query))
   }
   await queryClient.cancelQueries(affected)
+  // Discard the old provider snapshot before rendering the new harness status.
+  void queryClient.resetQueries({ queryKey: workspaceKeys.harness(id), exact: true })
   queryClient.setQueryData<WorkspaceLayoutResponse>(workspaceKeys.layout(id), previous =>
     previous
       ? {
@@ -80,7 +81,7 @@ export function useWorkspaceHarnessChanges(id: string, harness: WorkspaceType | 
   useWorkspaceEvent(event => {
     if (event.type === 'connection:opened') {
       void queryClient.invalidateQueries({ queryKey: workspaceKeys.layout(id) })
-    } else if (event.type === 'workspace-harness:changed' && event.workspaceId === id) {
+    } else if (event.type === 'workspace-harness:switched' && event.workspaceId === id) {
       void receiveWorkspaceHarness(queryClient, id, event.harness)
     }
   })

@@ -7,7 +7,6 @@ import * as router from 'wouter'
 
 import * as config from '@/client/api/app-config'
 import * as dialog from '@/client/components/ui/dialog'
-import { workspaceKeys } from '@/client/api/workspace-keys'
 import * as api from './api'
 import { CreateWorkspaceDialog } from './create-workspace-dialog'
 import { WorkspaceDialogContent } from './workspace-dialog-content'
@@ -29,12 +28,22 @@ test('create blocks dismissal while submitting and permits it again after failur
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
   })
-  const installed = { 'claude-code': true, codex: true, openclaw: false, hermes: false }
-  client.setQueryData(workspaceKeys.creationInfo, { installed })
+  const statuses = Object.fromEntries(
+    ['claude-code', 'codex', 'openclaw', 'hermes'].map(type => [
+      type,
+      {
+        availability:
+          type === 'claude-code' || type === 'codex'
+            ? { status: 'available' }
+            : { status: 'unavailable', code: 'not-installed' }
+      }
+    ])
+  )
+  client.setQueryData(['harness-status'], statuses)
   const configSpy = spyOn(config, 'useAppConfig').mockReturnValue({
     environment: 'local',
     demo: false,
-    experimental: { collab: false },
+    collab: false,
     demoInstallUrl: ''
   })
   const locationSpy = spyOn(router, 'useLocation').mockReturnValue(['/', () => {}])
@@ -42,7 +51,7 @@ test('create blocks dismissal while submitting and permits it again after failur
   const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
     Object.assign(
       async (_input: RequestInfo | URL, init?: RequestInit) =>
-        init?.method === 'POST' ? response.promise : Response.json({ installed }),
+        init?.method === 'POST' ? response.promise : Response.json(statuses),
       { preconnect: fetch.preconnect }
     )
   )

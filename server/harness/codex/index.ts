@@ -1,5 +1,6 @@
 // Codex as a Harness. Thin wiring over this folder's modules — see
 // ../types.ts for the contract and ../README.md for the architecture.
+import { runCodexAction } from './run-action'
 import type { Harness } from '../types'
 import { ForkUnsupportedError } from '../fork'
 import { CodexRpcError } from './transport'
@@ -31,6 +32,7 @@ import { formatCodexStatusLines } from './status'
 
 export const codexHarness: Harness = {
   id: 'codex',
+  runAction: runCodexAction,
   capabilities: {
     supportsStreaming: true, // app-server always streams deltas; moi gates forwarding
     imagesInline: 'data-url',

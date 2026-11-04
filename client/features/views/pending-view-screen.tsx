@@ -262,7 +262,7 @@ function PendingViewScreenBuildingState({ controls }: PendingViewScreenBuildingS
 
   return (
     <PendingViewScreenStatusLayout>
-      {!hasStrokes && <Spinner className="size-6 text-muted-foreground" />}
+      {!hasStrokes && <Spinner className="size-8 text-muted-foreground" stroke={0.75} />}
     </PendingViewScreenStatusLayout>
   )
 }

@@ -120,16 +120,18 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
         const targetPath = target.slice(prefix.length).split('?', 1)[0]
         if (targetPath === 'chat' || targetPath.startsWith('chats/')) {
           const { tab, href } = currentPage()
-          const shouldOpenChat =
+          const destination =
             targetPath === 'chat'
-              ? true
+              ? tab
               : await selectLinkedChat(
                   decodeURIComponent(targetPath.slice('chats/'.length)),
                   tab,
                   controller.signal
                 )
-          commit(resolveUrl(href, { workspaceId, base }))
-          if (shouldOpenChat) latest.current.onOpenChat()
+          const destinationHref =
+            destination && destination !== tab ? tabUrl(remembered, destination) : href
+          commit(resolveUrl(destinationHref, { workspaceId, base }))
+          if (destination) latest.current.onOpenChat()
           return
         }
 
@@ -151,7 +153,17 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
         if (navigationRequest.current?.controller === controller) navigationRequest.current = null
       }
     },
-    [base, currentPage, latest, prefix, queryClient, selectLinkedChat, setLocation, workspaceId]
+    [
+      base,
+      currentPage,
+      latest,
+      prefix,
+      queryClient,
+      remembered,
+      selectLinkedChat,
+      setLocation,
+      workspaceId
+    ]
   )
 
   useEffect(() => {

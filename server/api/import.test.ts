@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import type { WorkspaceAgent, WorkspaceEntry } from '@/lib/types'
+import type { WorkspaceHarness, WorkspaceEntry } from '@/lib/types'
 
 import { api } from './index'
 import { harnessStore } from '../harness/auth'
@@ -12,6 +12,7 @@ import { codexHarness } from '../harness/codex'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
 
 let tempDir: string
+const originalClaudeAuthStatus = claudeCodeHarness.authStatus
 const originalClaudeAvailability = claudeCodeHarness.availability
 const originalCodexAvailability = codexHarness.availability
 const originalCodexAuthStatus = codexHarness.authStatus
@@ -22,16 +23,19 @@ const originalCodexListModels = codexHarness.listModels
 beforeEach(async () => {
   tempDir = await mkdtemp(join(tmpdir(), 'moi-api-import-'))
   setRegistryPath(join(tempDir, 'workspaces.json'))
+  claudeCodeHarness.authStatus = async () => ({ status: 'available' })
   claudeCodeHarness.availability = async () => ({ status: 'available' })
   codexHarness.availability = async () => ({ status: 'available' })
   codexHarness.authStatus = async () => ({ status: 'login-required', reason: 'Signed out' })
   harnessStore.invalidate('codex')
-  // /agent bundles the model catalog; keep the probe out of these tests.
+  // /harness bundles the model catalog; keep the probe out of these tests.
   claudeCodeHarness.listModels = async () => []
   codexHarness.listModels = async () => []
 })
 
 afterEach(async () => {
+  claudeCodeHarness.authStatus = originalClaudeAuthStatus
+  harnessStore.invalidate('claude-code')
   claudeCodeHarness.availability = originalClaudeAvailability
   codexHarness.availability = originalCodexAvailability
   harnessStore.invalidate('codex')
@@ -118,12 +122,14 @@ describe('workspace import provider', () => {
     await mkdir(join(tempDir, type))
     const entry = await registerWorkspace(join(tempDir, type), { type })
 
-    const response = await api.request(`/api/workspaces/${entry.id}/agent`)
+    const response = await api.request(`/api/workspaces/${entry.id}/harness`)
 
     expect(response.status).toBe(200)
-    const agent = (await response.json()) as WorkspaceAgent
-    expect(agent.provider).toBe(type)
-    expect(agent.availability).toEqual({ status: 'unavailable', reason })
+    const snapshot = (await response.json()) as WorkspaceHarness
+    expect(snapshot.provider).toBe(type)
+    expect(snapshot.hasAuthOverrides).toBe(false)
+    const status = await api.request('/api/harnesses/status?refresh=true')
+    expect((await status.json())[type].availability).toEqual({ status: 'unavailable', reason })
   })
 
   test('reports a signed-out workspace and starts its login', async () => {
@@ -138,11 +144,8 @@ describe('workspace import provider', () => {
     await mkdir(join(tempDir, 'codex-login'))
     const entry = await registerWorkspace(join(tempDir, 'codex-login'), { type: 'codex' })
 
-    const response = await api.request(`/api/workspaces/${entry.id}/agent`)
-    expect(((await response.json()) as WorkspaceAgent).availability).toEqual({
-      status: 'login-required',
-      reason: 'Codex is signed out. Sign in to send messages'
-    })
+    const response = await api.request('/api/harnesses/status')
+    expect((await response.json()).codex.availability.status).toBe('login-required')
 
     const login = await api.request(`/api/harnesses/codex/auth/login`, {
       method: 'POST'
@@ -154,10 +157,10 @@ describe('workspace import provider', () => {
       method: 'POST'
     })
     expect(await rejoin.json()).toEqual({ id: 'attempt', url: 'https://example.com/login' })
-    const pending = await api.request(`/api/workspaces/${entry.id}/agent`)
+    const pending = await api.request(`/api/workspaces/${entry.id}/harness`)
     expect(await pending.json()).not.toHaveProperty('login')
-    const auth = await api.request('/api/harnesses/codex/auth')
-    expect((await auth.json()).login).toEqual({
+    const auth = await api.request('/api/harnesses/status')
+    expect((await auth.json()).codex.login).toEqual({
       state: 'pending',
       id: 'attempt',
       url: 'https://example.com/login'

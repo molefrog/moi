@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useSessionState, useSessionView } from '@/client/features/chat/sessions/api'
-import { useWorkspaceAgent } from '@/client/features/workspace/api'
+import { useWorkspaceHarness } from '@/client/features/workspace/api'
 import { useSelectedSession } from '@/client/features/chat/sessions/use-selected-session'
 import { useCollabEnabled } from '@/client/features/collab'
 import {
@@ -54,7 +54,7 @@ export function useChat(address: WorkspaceTabAddress) {
   const { layout } = useWorkspaceLayoutCtx()
   const [selectedSession, selectSession] = useSelectedSession(address.activeTab)
   const collabEnabled = useCollabEnabled()
-  const modelsData = useWorkspaceAgent(workspaceId).data
+  const modelsData = useWorkspaceHarness(workspaceId).data
   // A newly forked/native session can precede the provider's session listing.
   // Archive explicitly clears selection; a stale catalog must not do so.
   const selectedSessionId = selectedSession ?? null

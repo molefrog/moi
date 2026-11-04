@@ -83,7 +83,7 @@ export async function changeWorkspaceHarness(ws: WorkspaceEntry, type: Workspace
       console.error('Could not stop previous workspace runtime', error)
     }
     harnessStore.invalidate(current)
-    publishEvent({ type: 'workspace-harness:changed', workspaceId: ws.id, harness: type })
+    publishEvent({ type: 'workspace-harness:switched', workspaceId: ws.id, harness: type })
     return updated
   })
 }

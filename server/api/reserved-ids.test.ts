@@ -44,7 +44,7 @@ test('a reserved id is refused before it can shadow its route', async () => {
     // Without the check, this request would return the static route's payload
     // instead of the workspace — the failure mode the reservation prevents.
     const response = await api.request('/api/workspaces/create')
-    expect(await response.json()).not.toHaveProperty('id', 'create')
+    expect(response.status).toBe(404)
   } finally {
     setRegistryPath(DEFAULT_REGISTRY_PATH)
     await rm(tempDir, { recursive: true, force: true })

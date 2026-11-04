@@ -2,7 +2,8 @@ import { type FormEvent, type ReactElement, useState } from 'react'
 
 import { useLocation } from 'wouter'
 
-import { useCreateWorkspace, useWorkspaceCreationInfo } from '@/client/features/workspace/add/api'
+import { useCreateWorkspace } from '@/client/features/workspace/add/api'
+import { useHarnessStatuses } from '@/client/features/harness/api'
 import { useAppConfig } from '@/client/api/app-config'
 import { Button } from '@/client/components/ui/button'
 import {
@@ -13,7 +14,7 @@ import {
 } from '@/client/components/ui/dialog'
 import { Input } from '@/client/components/ui/input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
-import { validateWorkspaceFolderName } from '@/lib/workspace-name'
+import { validateWorkspaceName } from '@/lib/workspace-name'
 import { WORKSPACE_TYPE_ORDER } from '@/lib/workspace-types'
 import type { WorkspaceType } from '@/lib/types'
 
@@ -34,7 +35,7 @@ const DEFAULT_WORKSPACE_TYPE = WORKSPACE_TYPE_ORDER[0]
 export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
   const [, navigate] = useLocation()
   const appConfig = useAppConfig()
-  const info = useWorkspaceCreationInfo()
+  const info = useHarnessStatuses()
   const createMutation = useCreateWorkspace()
 
   const [open, setOpen] = useState(false)
@@ -43,10 +44,10 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
   const [name, setName] = useState('')
 
   const trimmedName = name.trim()
-  const nameError = trimmedName ? validateWorkspaceFolderName(trimmedName) : null
+  const nameError = trimmedName ? validateWorkspaceName(trimmedName) : null
   const isCreating = createMutation.isPending
   const isChecking = info.isPending || info.isFetching
-  const installed = info.isError ? undefined : info.data?.installed
+  const installed = info.isError ? undefined : info.data
   const options = getWorkspaceAgentOptions(installed)
   const selectedAvailable = options.some(option => option.type === type && !option.disabled)
   const detectionError = !isChecking && !installed ? 'Could not check installed agents.' : undefined

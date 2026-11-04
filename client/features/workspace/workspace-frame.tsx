@@ -28,7 +28,8 @@ type WorkspaceFrameProps = {
   onClick?: MouseEventHandler<HTMLDivElement>
 }
 
-// Loading and ready content share the same pane geometry and saved chat width.
+// Ready content uses the saved pane geometry and chat width. Loading and setup
+// render separately so unresolved readiness never mounts the split layout.
 export function WorkspaceFrame({ frame, workspace, chat, children, onClick }: WorkspaceFrameProps) {
   const { ref, canUseSplit, constraints, mode, setMode, chatWidth, setChatWidth } = frame
   return (

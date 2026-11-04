@@ -1,3 +1,4 @@
+import type { HarnessStatuses, WorkspaceType } from '@/lib/types'
 import { describe, expect, test } from 'bun:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -6,7 +7,7 @@ import { parseHTML } from 'linkedom'
 import { Dialog } from '@/client/components/ui/dialog'
 import type { HarnessInstallations } from '@/lib/types'
 import { WorkspaceAgentSelector } from './workspace-agent-selector'
-import { getWorkspaceAgentOptions } from './workspace-agent-options'
+import { getWorkspaceAgentOptions as optionsFromStatuses } from './workspace-agent-options'
 
 const missing: HarnessInstallations = {
   'claude-code': false,
@@ -85,3 +86,22 @@ test('locks agent choices while pending and enables them again when idle', () =>
   const idle = renderStep(installed)
   expect(idle.querySelector('fieldset[aria-label="Agent"]')?.hasAttribute('disabled')).toBe(false)
 })
+
+function getWorkspaceAgentOptions(
+  installed?: HarnessInstallations,
+  detectedTypes: WorkspaceType[] = []
+) {
+  const statuses =
+    installed &&
+    (Object.fromEntries(
+      Object.entries(installed).map(([type, present]) => [
+        type,
+        {
+          availability: present
+            ? { status: 'available' }
+            : { status: 'unavailable', code: 'not-installed', reason: 'Not installed' }
+        }
+      ])
+    ) as HarnessStatuses | undefined)
+  return optionsFromStatuses(statuses, detectedTypes)
+}

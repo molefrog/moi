@@ -88,7 +88,7 @@ export function HomePage() {
       {count > 0 ? (
         <section className="mb-12">
           <div className="mb-4 flex items-center justify-between gap-2">
-            <h1 className="text-sm font-medium text-foreground">My workspaces</h1>
+            <h1 className="text-sm font-medium text-foreground">Workspaces</h1>
             <CreateWorkspaceDialog
               trigger={
                 <Button variant="outline" size="sm">
@@ -107,15 +107,15 @@ export function HomePage() {
         </section>
       ) : (
         <div className="mb-10 flex flex-col items-center gap-4 px-8 pt-8 pb-16 text-center">
-          <IconEggCracked size={32} stroke={1.5} className="text-muted-foreground" />
+          <IconEggCracked size={56} stroke={0.75} className="text-muted-foreground" />
           <div className="flex flex-col gap-1.5">
-            <h2 className="font-medium">Let’s start with creating your first workspace</h2>
+            <h2 className="font-medium">Create your first workspace</h2>
             <p className="mx-auto max-w-sm text-sm text-muted-foreground">
-              Workspace is a place for all the chats, widgets, and views that share the same
-              context. Create a new one or import an existing folder you&rsquo;ve worked in before.
+              Workspace is a place for all views and widgets that share the same context. Create a
+              new one or import an existing folder you&rsquo;ve worked in before.
             </p>
           </div>
-          <CreateWorkspaceDialog trigger={<Button>Create workspace</Button>} />
+          <CreateWorkspaceDialog trigger={<Button>New workspace</Button>} />
         </div>
       )}
 
@@ -133,7 +133,7 @@ export function HomePage() {
                 'text-muted-foreground group-data-open:text-foreground hover:text-foreground'
               )}
             >
-              <span className="text-sm font-medium">Import from this computer</span>
+              <span className="text-sm font-medium">Import other workspaces</span>
               <IconChevronRight
                 size={16}
                 stroke={2}

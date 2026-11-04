@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { useUpdateEnv, useWorkspaceEnv } from '@/client/features/settings/api'
+import { useUpdateEnv, useWorkspaceEnv } from '@/client/features/workspace/settings/api'
 import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
 
 // Workspace env state in one hook: the masked env view (query), the patch

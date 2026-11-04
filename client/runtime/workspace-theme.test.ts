@@ -26,6 +26,8 @@ describe('getWorkspaceThemeStyle', () => {
     expect(style['--mono']).toBeUndefined()
     expect(style['--primary']).toBeUndefined()
     expect(style['--radius']).toBeUndefined()
+    expect(style['--secondary']).toBeUndefined()
+    expect(style['--secondary-foreground']).toBeUndefined()
   })
 
   test('inherits stylesheet fonts for an invalid font preset', () => {
@@ -63,6 +65,8 @@ describe('getWorkspaceThemeStyle', () => {
       '--foreground': colors.foreground,
       '--accent': colors.accent,
       '--accent-foreground': colors.accentForeground,
+      '--secondary': 'var(--accent)',
+      '--secondary-foreground': 'var(--accent-foreground)',
       '--border': colors.border,
       '--ring': colors.ring,
       '--radius': RADIUS_THEMES.squishy.radius

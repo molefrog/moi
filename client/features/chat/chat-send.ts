@@ -22,7 +22,7 @@ import { STREAM_RESPONSES } from '@/client/lib/flags'
 import { formatChatTitle } from '@/lib/chat-title'
 import { applyEvent, emptyViewState } from '@/lib/format'
 import { messageAttachmentLimitError } from '@/lib/message-attachments'
-import type { Part, SessionSummary, ViewState, WorkspaceAgent, WorkspaceTabId } from '@/lib/types'
+import type { Part, SessionSummary, ViewState, WorkspaceHarness, WorkspaceTabId } from '@/lib/types'
 
 // Explicit attachments belong to this send, independently of the user's draft.
 export type PreparedAttachments = {
@@ -194,7 +194,7 @@ export function startOptimisticSession({
 }
 
 export function resolveChatRunOptions(
-  modelsData: WorkspaceAgent | undefined,
+  modelsData: WorkspaceHarness | undefined,
   pickedModel: string | undefined,
   pickedEffort: string | undefined,
   pickedFastMode?: boolean
