@@ -137,9 +137,16 @@ function SpeedModeToggle({
         : supportsFastMode
           ? 'fast'
           : 'ultrafast'
-  const label = speedMode === 'ultrafast' ? 'Ultrafast' : speedMode === 'fast' ? 'Fast' : 'Regular'
-  const nextLabel =
-    nextMode === 'ultrafast' ? 'ultrafast' : nextMode === 'fast' ? 'fast' : 'regular'
+  const actionLabel =
+    nextMode === 'normal'
+      ? `Disable ${speedMode === 'ultrafast' ? 'ultrafast' : 'fast'} mode`
+      : `Enable ${nextMode} mode`
+  const description =
+    nextMode === 'normal'
+      ? 'Normal usage'
+      : nextMode === 'ultrafast'
+        ? 'Much more usage'
+        : 'More usage'
   return (
     <Tooltip>
       <TooltipTrigger
@@ -148,7 +155,7 @@ function SpeedModeToggle({
             type="button"
             variant="ghost"
             size="icon-sm"
-            aria-label={`Speed: ${label}. Switch to ${nextLabel}`}
+            aria-label={actionLabel}
             aria-pressed={speedMode !== 'normal'}
             onClick={() => onChange(nextMode)}
             className="-my-1 -mr-1"
@@ -164,10 +171,8 @@ function SpeedModeToggle({
         }
       />
       <TooltipContent align="center" className="flex-col gap-0">
-        <span>{label} mode</span>
-        <span className="font-normal text-muted-foreground">
-          {speedMode !== 'normal' ? 'More usage · ' : ''}Switch to {nextLabel}
-        </span>
+        <span>{actionLabel}</span>
+        <span className="font-normal text-muted-foreground">{description}</span>
       </TooltipContent>
     </Tooltip>
   )
@@ -219,9 +224,9 @@ function EffortPicker({
             label={displayedLabel}
             leadingIcon={
               speedMode === 'ultrafast' ? (
-                <IconUltrafast className="text-primary" stroke={1.5} />
+                <IconUltrafast className="text-muted-foreground" stroke={1.5} />
               ) : speedMode === 'fast' ? (
-                <IconBolt stroke={1.5} />
+                <IconBoltFilled className="text-muted-foreground" stroke={1.5} />
               ) : undefined
             }
             aria-label={`Effort: ${displayedLabel}`}
