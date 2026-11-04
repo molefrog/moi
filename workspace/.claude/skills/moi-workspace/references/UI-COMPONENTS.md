@@ -55,6 +55,9 @@ element, also pass `nativeButton={false}`.
 Use the installed portal and stacking behavior; don't add a second portal or z-index overrides.
 `applet-portal.tsx` preserves applet styles for portalled content. Never edit or remove it.
 
+A custom overlay must use the closest `[data-applet]` root to keep applet scope and theme. Give
+it a minimal z-index only when document order and a scoped portal cannot resolve the overlap.
+
 ## Styling and icons
 
 - Use semantic theme tokens and built-in variants. Reserve `className` for layout;
