@@ -68,7 +68,7 @@ export function WorkspaceSetupStep({
     build.error?.message ??
     build.data?.error ??
     (discoveryError
-      ? 'We couldn’t find ideas this time. Try again, or skip the onboarding.'
+      ? 'We couldn’t find ideas this time. Try again, or start on your own.'
       : undefined)
   function findIdeas() {
     startFromScratch.reset()
@@ -105,7 +105,7 @@ export function WorkspaceSetupStep({
   const footer = !selection && (
     <Button size="lg" variant="ghost" disabled={busy} onClick={() => startFromScratch.mutate()}>
       {startFromScratch.isPending && <Spinner stroke={1.5} />}
-      {startFromScratch.isPending ? 'Creating workspace…' : 'Skip the onboarding'}
+      {startFromScratch.isPending ? 'Creating workspace…' : 'I’ll start on my own'}
     </Button>
   )
   if (!selection && (!discovery || error || busy))

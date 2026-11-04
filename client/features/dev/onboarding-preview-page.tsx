@@ -66,7 +66,7 @@ export function OnboardingPreviewPage() {
           feedback={null}
           footer={
             <Button size="lg" variant="ghost" onClick={() => setSelectedIdeaId(undefined)}>
-              {selectedIdeaId ? 'Reset preview' : 'Skip the onboarding'}
+              {selectedIdeaId ? 'Reset preview' : 'I’ll start on my own'}
             </Button>
           }
         />
