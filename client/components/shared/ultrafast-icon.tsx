@@ -1,10 +1,9 @@
 /**
- * Existing Ultrafast glyph from bb's Codex provider, adapted to the Tabler component API.
- * Source: https://github.com/get-bb/bb/blob/main/plugins/provider-codex/icons/ultrafast.svg
+ * Two scaled copies of Tabler’s filled bolt.
  *
  * MIT License
  *
- * Copyright (c) 2026 Michael Yong
+ * Copyright (c) 2020-2026 Paweł Kuna
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,23 +23,39 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-import { createReactComponent } from '@tabler/icons-react'
+import { createReactComponent, type IconProps } from '@tabler/icons-react'
+import { useId } from 'react'
 
-export const IconUltrafast = createReactComponent('outline', 'ultrafast', 'Ultrafast', [
-  [
-    'path',
-    {
-      d: 'M11.983 12.593L11.579 12.593C10.273 12.593 9.62 12.593 9.342 12.162C9.064 11.732 9.329 11.132 9.859 9.933L11.453 6.327C11.936 5.236 12.177 4.691 12.644 4.386C13.112 4.08 13.706 4.08 14.893 4.08L16.731 4.08C18.174 4.08 18.895 4.08 19.167 4.551C19.439 5.022 19.081 5.652 18.365 6.91L17.422 8.57C17.066 9.195 16.889 9.508 16.891 9.764C16.894 10.097 17.071 10.404 17.357 10.572C17.577 10.701 17.936 10.701 18.653 10.701C19.559 10.701 20.012 10.701 20.248 10.858C20.555 11.062 20.715 11.426 20.659 11.792C20.616 12.073 20.311 12.41 19.701 13.084L14.83 18.47C13.873 19.528 13.395 20.057 13.074 19.89C12.753 19.722 12.907 19.024 13.215 17.629L13.82 14.895C14.055 13.832 14.172 13.301 13.89 12.947C13.607 12.593 13.066 12.593 11.983 12.593Z',
-      fill: 'currentColor',
-      key: 'bolt-0'
-    }
-  ],
-  [
-    'path',
-    {
-      d: 'M6.115 12.593L6.04 11.471L6.31 10.166L8.96 4.08L7.171 4.171L6.644 4.386L6.281 4.722L5.728 5.714L3.355 11.151L3.244 11.584L3.247 11.931L3.379 12.214L3.625 12.411L4.371 12.57ZM7.788 15.039L6.919 19.124L6.932 19.714L7.158 19.917L7.459 19.831L7.86 19.505L10.051 17.121L10.348 15.774L9.117 15.609L8.359 15.351Z',
-      fill: 'currentColor',
-      key: 'bolt-1'
-    }
-  ]
-])
+const boltPath =
+  'M13 2l.018 .001l.016 .001l.083 .005l.011 .002h.011l.038 .009l.052 .008l.016 .006l.011 .001l.029 .011l.052 .014l.019 .009l.015 .004l.028 .014l.04 .017l.021 .012l.022 .01l.023 .015l.031 .017l.034 .024l.018 .011l.013 .012l.024 .017l.038 .034l.022 .017l.008 .01l.014 .012l.036 .041l.026 .027l.006 .009c.12 .147 .196 .322 .218 .513l.001 .012l.002 .041l.004 .064v6h5a1 1 0 0 1 .868 1.497l-.06 .091l-8 11c-.568 .783 -1.808 .38 -1.808 -.588v-6h-5a1 1 0 0 1 -.868 -1.497l.06 -.091l8 -11l.01 -.013l.018 -.024l.033 -.038l.018 -.022l.009 -.008l.013 -.014l.04 -.036l.028 -.026l.008 -.006a1 1 0 0 1 .402 -.199l.011 -.001l.027 -.005l.074 -.013l.011 -.001l.041 -.002z'
+
+const UltrafastSvg = createReactComponent('filled', 'ultrafast', 'Ultrafast', [])
+const frontTransform = 'translate(5 2.4) scale(.8)'
+const backTransform = 'translate(-1 2.4) scale(.8)'
+
+type IconUltrafastProps = IconProps
+
+export function IconUltrafast(props: IconUltrafastProps) {
+  const maskId = useId()
+  return (
+    <UltrafastSvg {...props}>
+      <defs>
+        <mask id={maskId} x="0" y="0" width="24" height="24" maskUnits="userSpaceOnUse">
+          <rect width="24" height="24" fill="white" />
+          <path
+            d={boltPath}
+            transform={frontTransform}
+            fill="black"
+            stroke="black"
+            strokeWidth="4"
+            strokeLinejoin="round"
+          />
+        </mask>
+      </defs>
+      <g mask={`url(#${maskId})`}>
+        <path d={boltPath} transform={backTransform} />
+      </g>
+      <path d={boltPath} transform={frontTransform} />
+    </UltrafastSvg>
+  )
+}
