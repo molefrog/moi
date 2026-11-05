@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { createRoot } from 'react-dom/client'
 import { Router } from 'wouter'
 
@@ -10,7 +10,7 @@ import { AccountProvider } from '@/client/features/account/account-provider'
 import { AppProvider } from './app/app-provider'
 import { AppRouter } from './app/app-router'
 
-const queryClient = new QueryClient()
+import { queryClient } from './api/query-client'
 
 // Open the single app-wide chat WebSocket once and hand it the query client so
 // live frames fold into the RQ transcript cache. Lives for the page's lifetime.
