@@ -79,7 +79,7 @@ beforeAll(async () => {
     'server',
     'client',
     'lib',
-    'workspace',
+    'skill',
     'package.json',
     'bunfig.toml',
     'tsconfig.json',
