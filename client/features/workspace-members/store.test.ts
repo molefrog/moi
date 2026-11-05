@@ -54,7 +54,7 @@ test('invalid snapshot publishes nothing', () => {
   expect(() => parseWorkspaceMembers({ members: [alex, alex], invitations: [] })).toThrow()
   expect(getWorkspaceDirectory('one')).toBeUndefined()
 })
-test('all-workspace snapshots replace members and remove deleted workspaces', () => {
+test('sharing snapshots replace members and omitted workspaces become owner-only', () => {
   setIdentity(alex)
   setAllWorkspaceMembers([
     { id: 'one', members: [alex, bot], invitations: [] },
@@ -64,7 +64,8 @@ test('all-workspace snapshots replace members and remove deleted workspaces', ()
   expect(getWorkspaceDirectory('two')).toHaveLength(1)
   const before = getWorkspaceMembersRevision()
   setAllWorkspaceMembers([{ id: 'two', members: [alex, bot], invitations: [] }])
-  expect(getWorkspaceDirectory('one')).toBeUndefined()
+  expect(getWorkspaceDirectory('one')?.map(user => user.id)).toEqual(['alex'])
+  expect(queryClient.getQueryData(workspaceMembersKey('one'))).toBeUndefined()
   expect(getWorkspaceDirectory('two')).toHaveLength(2)
   expect(getWorkspaceMembersRevision()).toBeGreaterThan(before)
   expect(() =>
@@ -75,7 +76,17 @@ test('all-workspace snapshots replace members and remove deleted workspaces', ()
   ).toThrow()
   expect(getWorkspaceDirectory('two')).toHaveLength(2)
   setAllWorkspaceMembers([])
-  expect(getWorkspaceDirectory('two')).toBeUndefined()
+  expect(getWorkspaceDirectory('two')?.map(user => user.id)).toEqual(['alex'])
+})
+test('an empty sharing snapshot still lets the owner use local workspaces', () => {
+  setIdentity(alex)
+  expect(getWorkspaceDirectory('local')).toBeUndefined()
+  const before = getWorkspaceMembersRevision()
+  setAllWorkspaceMembers([])
+  expect(getWorkspaceMembersRevision()).toBeGreaterThan(before)
+  expect(getWorkspaceDirectory('local')?.map(user => user.id)).toEqual(['alex'])
+  setAllWorkspaceMembers([{ id: 'local', members: [], invitations: [] }])
+  expect(getWorkspaceDirectory('local')).toEqual([])
 })
 test('optimistic pending actions are derived over the newest snapshot without mutating it', () => {
   const current = { members: [alex, { ...bot, membershipId: 'bot' }], invitations: [] }
