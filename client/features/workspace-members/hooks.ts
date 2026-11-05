@@ -1,7 +1,7 @@
 import { useMutation, useMutationState, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getIdentityGeneration } from '../identity/store'
 import { useIdentity } from '../identity/use-identity'
-import { workspaceMembersKey } from './store'
+import { workspaceMembersKey, ownerOnlyWorkspaceMembers } from './store'
 import {
   fetchWorkspaceMembers,
   inviteWorkspaceMember,
@@ -42,6 +42,7 @@ export function useWorkspaceMembers(workspaceId: string | undefined) {
   const mutationKey = ['workspace-members-action', generation, workspaceId]
   const query = useQuery({
     queryKey: workspaceMembersKey(workspaceId ?? ''),
+    initialData: ownerOnlyWorkspaceMembers,
     queryFn: async ({ signal }) => {
       const snapshot = await fetchWorkspaceMembers(workspaceId!, signal)
       if (signal.aborted || generation !== getIdentityGeneration())

@@ -17,9 +17,9 @@ The same profile format can describe a person or an agent. Agent sign-in is a la
 
 ## How Moi receives it
 
-When a Moi page opens, the cloud loads the machine's workspace list and includes the current identity plus members and pending invitations for every workspace. Moi reads this complete snapshot before React mounts. Switching workspaces uses data that is already loaded.
+When a Moi page opens, the cloud includes the current identity and all stored workspace memberships and pending invitations. Moi reads this snapshot before React mounts. The cloud does not ask the machine which workspaces exist; Moi matches the supplied IDs to its own workspaces. Entries for workspaces that no longer exist are harmless.
 
-Each update replaces the previous member list for that workspace. There is no organization-wide or app-wide people list. A missing member list never falls back to another workspace or to profiles received through a socket.
+A workspace with no sharing record belongs only to the machine's owner. Each update replaces the stored sharing collection. There is no organization-wide or app-wide people list. A missing member list never falls back to another workspace or to profiles received through a socket.
 
 The cloud also keeps a WebSocket connection open. When a name, avatar, invitation, or membership changes, Moi receives fresh information. Other open tabs update too.
 
@@ -27,17 +27,18 @@ The cloud also keeps a WebSocket connection open. When a name, avatar, invitatio
 
 Cloud URLs use the same host as Moi. For example, on Moi Run they start with `https://run.moi.computer`.
 
-| Purpose                              | URL                                                                   |
-| ------------------------------------ | --------------------------------------------------------------------- |
-| Open a workspace                     | `/workspace/:workspaceId`                                             |
-| Sign in                              | `/cloud/login`                                                        |
-| Read who I am                        | `GET /cloud/api/identity`                                             |
-| Update my name or avatar             | `POST /cloud/api/auth/profile`                                        |
-| Read members and pending invitations | `GET /cloud/api/workspaces/:workspaceId/members`                      |
-| Invite someone                       | `POST /cloud/api/workspaces/:workspaceId/invitations`                 |
-| Revoke an invitation                 | `DELETE /cloud/api/workspaces/:workspaceId/invitations/:invitationId` |
-| Remove a member                      | `DELETE /cloud/api/workspaces/:workspaceId/members/:membershipId`     |
-| Receive live updates                 | `/cloud/api/events` — WebSocket                                       |
+| Purpose                               | URL                                                                   |
+| ------------------------------------- | --------------------------------------------------------------------- |
+| Open a workspace                      | `/workspace/:workspaceId`                                             |
+| Sign in                               | `/cloud/login`                                                        |
+| Read identity and all sharing records | `GET /cloud/api/bootstrap`                                            |
+| Read who I am                         | `GET /cloud/api/identity`                                             |
+| Update my name or avatar              | `POST /cloud/api/auth/profile`                                        |
+| Read members and pending invitations  | `GET /cloud/api/workspaces/:workspaceId/members`                      |
+| Invite someone                        | `POST /cloud/api/workspaces/:workspaceId/invitations`                 |
+| Revoke an invitation                  | `DELETE /cloud/api/workspaces/:workspaceId/invitations/:invitationId` |
+| Remove a member                       | `DELETE /cloud/api/workspaces/:workspaceId/members/:membershipId`     |
+| Receive live updates                  | `/cloud/api/events` — WebSocket                                       |
 
 An invitation link opens `/cloud/invite/:invitationId`. The cloud handles sign-in and acceptance from there.
 
@@ -64,7 +65,7 @@ window.moi.workspaceMembers.remove(workspaceId)
 window.moi.workspaceMembers.clear()
 ```
 
-`setAll()` replaces the full collection and removes workspaces no longer in the list. `set()` replaces the complete member list for one workspace. `remove()` forgets one workspace's list; `clear()` forgets all of them. These methods update what the frontend knows; they do not change access on the server.
+`setAll()` replaces the full sharing collection. Workspaces omitted from it have no invited members; the machine owner still has access. `set()` replaces the complete member list for one workspace. `remove()` forgets one workspace's list; `clear()` forgets all of them. These methods update what the frontend knows; they do not change access on the server.
 
 People and agents use the same basic profile: ID, type, name, and avatar. People can also have an email. Invited members have a separate `membershipId`, used when removing their access. The owner has no membership record.
 
