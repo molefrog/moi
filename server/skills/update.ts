@@ -7,7 +7,12 @@ import { syncAppletDeclarations } from '../applets/declarations'
 import { isBehind, skillStatuses, skillStatusesForLocations } from './version'
 import { installBundledSkill } from './template'
 import { resolveSkillLocations } from './locations'
-import { installWorkspaceSkills, usesSharedWorkspaceSkill } from './workspace'
+import {
+  installWorkspaceSkillFiles,
+  usesSharedWorkspaceSkill,
+  workspaceSkillLockPath
+} from './workspace'
+import { withSkillLock } from './lock'
 
 export type WorkspaceSkillUpdateResult = {
   before: WorkspaceSkillStatus[]
@@ -35,11 +40,20 @@ export async function updateWorkspaceSkills(
   workspaceRoot: string,
   type: WorkspaceType = 'claude-code'
 ): Promise<WorkspaceSkillUpdateResult> {
+  return withSkillLock(workspaceSkillLockPath(workspaceRoot, type), () =>
+    updateWorkspaceSkillFiles(workspaceRoot, type)
+  )
+}
+
+async function updateWorkspaceSkillFiles(
+  workspaceRoot: string,
+  type: WorkspaceType
+): Promise<WorkspaceSkillUpdateResult> {
   const locations = await resolveSkillLocations(workspaceRoot, type)
   const before = await skillStatusesForLocations(locations)
   let changedSkillPaths: string[]
   if (usesSharedWorkspaceSkill(type)) {
-    changedSkillPaths = await installWorkspaceSkills(workspaceRoot, type)
+    changedSkillPaths = await installWorkspaceSkillFiles(workspaceRoot, type)
   } else {
     for (const location of locations) {
       if (location.brokenLink) {
