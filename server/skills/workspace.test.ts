@@ -73,6 +73,43 @@ for (const directory of ['.claude', '.agents']) {
   })
 }
 
+for (const existing of [false, true]) {
+  test(`supports .claude pointing to .agents with ${existing ? 'an existing' : 'a new'} skill`, async () => {
+    const { workspace, canonical, claude } = await fixture()
+    await mkdir(join(workspace, '.agents'), { recursive: true })
+    await symlink('.agents', join(workspace, '.claude'), 'dir')
+    if (existing) await Bun.write(join(canonical, 'local.md'), 'discard')
+    await Bun.write(join(workspace, '.agents', 'skills', 'custom', 'SKILL.md'), 'keep')
+
+    await updateWorkspaceSkills(workspace)
+    expect(await readlink(join(workspace, '.claude'))).toBe('.agents')
+    expect((await lstat(claude)).isDirectory()).toBe(true)
+    expect(await realpath(claude)).toBe(await realpath(canonical))
+    expect(await Bun.file(join(canonical, 'local.md')).exists()).toBe(false)
+    expect(await Bun.file(join(workspace, '.claude', 'skills', 'custom', 'SKILL.md')).text()).toBe(
+      'keep'
+    )
+    for (const type of ['claude-code', 'codex'] as const) {
+      expect((await getWorkspaceSkillsStatus(workspace, type)).updateAvailable).toBe(false)
+      expect((await updateWorkspaceSkills(workspace, type)).changedSkills).toEqual([])
+    }
+  })
+}
+
+test('rejects an external .claude parent before changing either installed skill', async () => {
+  const { root, workspace, canonical, claude } = await fixture()
+  const external = join(root, 'external-claude')
+  await Bun.write(join(canonical, 'SKILL.md'), 'existing canonical skill')
+  await Bun.write(join(external, 'skills', 'moi-workspace', 'SKILL.md'), 'existing Claude skill')
+  await symlink(external, join(workspace, '.claude'), 'dir')
+
+  await expect(updateWorkspaceSkills(workspace)).rejects.toThrow('use a real .claude directory')
+  expect(await Bun.file(join(canonical, 'SKILL.md')).text()).toBe('existing canonical skill')
+  expect(await Bun.file(join(claude, 'SKILL.md')).text()).toBe('existing Claude skill')
+  expect((await lstat(claude)).isDirectory()).toBe(true)
+  expect(await readlink(join(workspace, '.claude'))).toBe(external)
+})
+
 test('resets conflicting local files and collab guidance in both copies', async () => {
   const { workspace, canonical, claude } = await fixture()
   for (const path of [canonical, claude]) {

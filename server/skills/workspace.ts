@@ -48,12 +48,17 @@ async function resetWorkspaceSkill(workspaceRoot: string): Promise<string[]> {
     await checkSkillsDirectory(dirname(claude))
     await mkdir(dirname(canonical), { recursive: true })
     await mkdir(dirname(claude), { recursive: true })
-    if ((await realpath(dirname(canonical))) === (await realpath(dirname(claude)))) {
-      throw new Error('Claude and agent skills directories must be separate directories')
+    const sharedDirectory =
+      (await realpath(dirname(canonical))) === (await realpath(dirname(claude)))
+    if (!sharedDirectory && (await entryAt(join(root, '.claude')))?.isSymbolicLink()) {
+      throw new Error(
+        'The .claude directory is a symlink; point it to .agents or use a real .claude directory'
+      )
     }
     const linkTarget = relative(dirname(claude), canonical)
     const claudeEntry = await entryAt(claude)
-    const linked = claudeEntry?.isSymbolicLink() && (await readlink(claude)) === linkTarget
+    const linked =
+      sharedDirectory || (claudeEntry?.isSymbolicLink() && (await readlink(claude)) === linkTarget)
     const matches = await matchesBundledSkill(SKILL_NAME, canonical)
     if (matches && linked) return []
 
@@ -64,7 +69,20 @@ async function resetWorkspaceSkill(workspaceRoot: string): Promise<string[]> {
       const skill = join(staging, SKILL_NAME)
       const link = join(staging, 'claude-link')
       if (!matches) await installBundledSkill(SKILL_NAME, skill)
-      if (!linked) await symlink(linkTarget, link, 'dir')
+      if (!linked) {
+        try {
+          await symlink(linkTarget, link, 'dir')
+        } catch (cause) {
+          const code = (cause as NodeJS.ErrnoException).code
+          if (process.platform === 'win32' && (code === 'EPERM' || code === 'EACCES')) {
+            throw new Error(
+              'Windows could not create the workspace skill symlink; enable Developer Mode or run Moi as administrator, then retry',
+              { cause }
+            )
+          }
+          throw cause
+        }
+      }
       if (!matches) {
         await rm(canonical, { recursive: true, force: true })
         await rename(skill, canonical)
