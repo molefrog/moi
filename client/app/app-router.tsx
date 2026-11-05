@@ -13,16 +13,12 @@ import { WorkspaceRoute } from './routes/workspace-route'
 // Dev-only playground routes: colocated in features/dev and loaded as a
 // separate lazy chunk. The NODE_ENV gate is statically false in the prod
 // build (scripts/build-client.ts defines it), so the bundler drops the
-// dynamic import and these general playgrounds are omitted from dist.
-// In production /dev redirects home, except the explicit cloud prototype below.
+// dynamic import and none of features/dev is emitted into dist at all.
+// In production /dev redirects home.
 const DevRoutes =
   process.env.NODE_ENV === 'development'
     ? lazy(() => import('@/client/features/dev/dev-routes'))
     : null
-
-const CloudPage = lazy(() =>
-  import('@/client/features/dev/cloud-page').then(module => ({ default: module.CloudPage }))
-)
 
 function DevLazy() {
   if (!DevRoutes) return <Redirect to="/" />
@@ -47,11 +43,6 @@ export function AppRouter() {
 
   return (
     <Switch>
-      <Route path="/dev/cloud">
-        <Suspense fallback={null}>
-          <CloudPage />
-        </Suspense>
-      </Route>
       <Route path="/dev/*?" component={DevLazy} />
       <Route path="/" component={HomeRoute} />
       <Route path="/onboarding" component={OnboardingRoute} />

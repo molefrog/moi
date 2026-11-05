@@ -111,4 +111,4 @@ Cloud collaboration waits until the current identity appears in the workspace's 
 
 Collaboration is off by default. An experimental image can enable it with `collab: true` in the machine configuration or `MOI_COLLAB=1`. Local Moi keeps its local profile; it does not invent a cloud member list. Being a member and being online remain different things.
 
-The code lives in [identity](../client/features/identity/store.ts), [the frontend API](../client/features/identity/host-api.ts), and [workspace member hooks](../client/features/workspace-members/hooks.ts). The sharing page at `/dev/cloud` is a small working example.
+The code lives in [identity](../client/features/identity/store.ts), [the frontend API](../client/features/identity/host-api.ts), and [workspace member hooks](../client/features/workspace-members/hooks.ts). The sharing page at `/dev/cloud` is a small working example available in development builds, alongside the other dev routes. Production builds exclude it.
