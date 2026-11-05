@@ -1,0 +1,55 @@
+name: Visual tests
+
+# Captures the design system's components and uploads them to UI Verify, which diffs them
+# against main and posts a "UI Verify: moi-computer" check on the commit. A push to main
+# accepts its captures as the new baseline. A pull request from a fork gets no secrets, so
+# it captures but doesn't upload.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: visual-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  visual:
+    name: Visual tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # UI Verify finds each commit's baseline through the git history.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - run: bun install --frozen-lockfile
+
+      # Bun.WebView drives the Chrome already installed on the runner.
+      - run: bun run test:visual
+
+      # The uiverify CLI needs Node 24.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # The "UI Verify: moi-computer" check is the gate for visual changes, so this job
+      # passes when there are some.
+      - name: Upload to UI Verify
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          FLAGS="--static-dir uiverify-archive --exit-zero-on-changes"
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then FLAGS="$FLAGS --auto-accept-changes"; fi
+          npx --yes uiverify@1.8.1 upload $FLAGS
+        env:
+          UIVERIFY_API_KEY: ${{ secrets.UIVERIFY_API_KEY }}

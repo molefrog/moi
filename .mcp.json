@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "uiverify": {
+      "type": "http",
+      "url": "https://uiverify.ai/mcp"
+    }
+  }
+}
