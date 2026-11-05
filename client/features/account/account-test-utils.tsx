@@ -5,41 +5,22 @@ import * as layoutEffect from '@base-ui/utils/useIsoLayoutEffect'
 import { Router } from 'wouter'
 import { memoryLocation } from 'wouter/memory-location'
 import { parseHTML } from 'linkedom'
-import { QueryClient, QueryClientProvider, notifyManager } from '@tanstack/react-query'
+import { QueryClientProvider, notifyManager } from '@tanstack/react-query'
 import * as config from '@/client/api/app-config'
-import { publishUsers } from '@/client/features/collab/host-state'
+import { setExternalUser } from '@/client/features/collab/host-state'
 import { AccountProvider, useAccount } from './account-provider'
-import { sessionQuery, teamQuery } from './api'
-import type { CloudSession, CloudTeam } from './api'
+import { queryClient } from '@/client/api/query-client'
+import type { WorkspaceMembers } from '../workspace-members/types'
+import { setIdentity } from '../identity/store'
+import type { Identity } from '../identity/types'
 
-const session: CloudSession = {
-  user: { id: 'me', name: 'Alex', email: 'alex@example.com', isAnonymous: false }
-}
-export const ownerTeam: CloudTeam = {
-  id: 'team',
-  name: 'Team',
-  role: 'owner',
-  members: [
-    {
-      id: 'member-me',
-      userId: 'me',
-      name: 'Alex',
-      email: 'alex@example.com',
-      role: 'owner',
-      me: true
-    },
-    {
-      id: 'member-ada',
-      userId: 'ada',
-      name: 'Ada',
-      email: 'ada@example.com',
-      role: 'admin',
-      me: false
-    }
-  ],
-  invitations: [
-    { id: 'invite-1', email: 'grace@example.com', role: 'admin', expiresAt: '2030-01-01' }
-  ]
+const session: Identity = {
+  id: 'me',
+  type: 'user',
+  name: 'Alex',
+  email: 'alex@example.com',
+  isAnonymous: false,
+  avatar: 'https://example.com/avatar.png'
 }
 let cleanup = async () => {}
 export const cleanupAccount = () => cleanup()
@@ -61,18 +42,15 @@ export type AccountFixtureOptions = {
 }
 export async function mountAccount({
   children = <AccountProbe />,
-  role = 'owner',
   anonymous = false,
   signedOut = false,
   demo = false,
-  failTeam = false,
   environment = 'cloud',
   failSession = false,
   loadingSession = false,
   pendingMutation = false,
   pendingMutationPaths = [],
-  injected = true,
-  loadingTeam = false
+  injected = true
 }: AccountFixtureOptions = {}) {
   const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>')
   Object.defineProperty(document, 'oninput', { value: null, configurable: true })
@@ -88,6 +66,7 @@ export async function mountAccount({
     window,
     document,
     HTMLElement: window.HTMLElement,
+    CustomEvent: window.CustomEvent,
     Element: window.Element,
     requestAnimationFrame: (callback: FrameRequestCallback) =>
       Number(setTimeout(() => callback(performance.now()), 0)),
@@ -115,34 +94,41 @@ export async function mountAccount({
     collab: false,
     demoInstallUrl: '/'
   })
-  let cloudSession: CloudSession = signedOut
+  let cloudSession: Identity | null = signedOut
     ? null
-    : { user: { ...session!.user, isAnonymous: anonymous } }
-  let team: CloudTeam = structuredClone({ ...ownerTeam, role })
-  const failures = { signOut: false, mutation: false, team: failTeam, session: failSession }
+    : { ...session, type: 'user', email: 'alex@example.com', isAnonymous: anonymous }
+  const failures = { signOut: false, mutation: false, session: failSession }
   const mutationRequest = Promise.withResolvers<void>()
-  const teamResponse = Promise.withResolvers<Response>()
+  let membership: WorkspaceMembers = {
+    members: [{ ...session, membershipId: 'member-me' }],
+    invitations: []
+  }
   const calls: { path: string; body?: Record<string, unknown> }[] = []
   const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
     Object.assign(
       async (input: RequestInfo | URL, init?: RequestInit) => {
         const path = String(input)
         const body = init?.body
-          ? (JSON.parse(String(init.body)) as Record<string, string>)
+          ? init.body instanceof FormData
+            ? {}
+            : (JSON.parse(String(init.body)) as Record<string, string>)
           : undefined
         calls.push({ path, body })
-        if (path.endsWith('/get-session')) {
+        if (path === '/api/workspaces')
+          return Response.json([
+            { id: 'one', name: 'First workspace' },
+            { id: 'two', name: 'Second workspace' }
+          ])
+        if (path.endsWith('/me') && (!init?.method || init.method === 'GET')) {
           if (loadingSession) return new Promise<Response>(() => {})
           return failures.session
             ? Response.json({ error: 'Session unavailable' }, { status: 503 })
-            : Response.json(cloudSession)
+            : cloudSession
+              ? Response.json(cloudSession)
+              : Response.json({ error: 'No session' }, { status: 401 })
         }
-        if (path.endsWith('/organization')) {
-          if (loadingTeam) return teamResponse.promise
-          return failures.team
-            ? Response.json({ error: 'Team unavailable' }, { status: 503 })
-            : Response.json(team)
-        }
+        if (path.endsWith('/members') && (!init?.method || init.method === 'GET'))
+          return Response.json(membership)
         if (path.endsWith('/sign-out')) {
           if (failures.signOut)
             return Response.json({ error: 'Try signing out again.' }, { status: 503 })
@@ -157,48 +143,69 @@ export async function mountAccount({
           await mutationRequest.promise
         if (failures.mutation)
           return Response.json({ error: 'Only the owner can do that.' }, { status: 403 })
-        if (path === '/api/settings') return Response.json({ autoUpdateSkills: false, ...body })
-        if (path.endsWith('/profile')) {
-          cloudSession = { user: { ...session!.user, name: body!.name! } }
-          team.members[0]!.name = body!.name!
-          return Response.json({ success: true, name: body!.name })
+        if (init?.method === 'DELETE' && path.includes('/members/')) {
+          membership = {
+            ...membership,
+            members: membership.members.filter(
+              member => member.membershipId !== path.split('/').at(-1)
+            )
+          }
+          return new Response(null, { status: 204 })
         }
-        if (path.endsWith('/members/remove'))
-          team.members = team.members.filter(member => member.id !== body!.memberId)
-        if (path.endsWith('/cancel')) team.invitations = []
-        if (path.endsWith('/invite'))
-          team.invitations.push({
-            id: 'invite-new',
-            email: body!.email!,
-            role: 'admin',
-            expiresAt: '2030-01-01'
-          })
+        if (init?.method === 'DELETE' && path.includes('/invitations/')) {
+          membership = {
+            ...membership,
+            invitations: membership.invitations.filter(
+              invitation => invitation.id !== path.split('/').at(-1)
+            )
+          }
+          return new Response(null, { status: 204 })
+        }
+        if (path.endsWith('/invitations')) {
+          membership = {
+            ...membership,
+            invitations: [
+              ...membership.invitations,
+              { id: 'invite-new', email: body!.email!, expiresAt: '2030-01-01' }
+            ]
+          }
+          return Response.json({ invitation: membership.invitations.at(-1) }, { status: 201 })
+        }
+        if (path === '/api/settings') return Response.json({ autoUpdateSkills: false, ...body })
+        if ((path.endsWith('/me') || path.endsWith('/me/avatar')) && cloudSession) {
+          cloudSession = {
+            ...cloudSession,
+            ...(body?.name ? { name: body.name } : {}),
+            ...(path.endsWith('/avatar')
+              ? { avatar: init?.method === 'DELETE' ? undefined : 'https://example.com/new.png' }
+              : {})
+          }
+          membership = {
+            ...membership,
+            members: membership.members.map(member =>
+              member.id === cloudSession!.id ? { ...member, ...cloudSession! } : member
+            )
+          }
+          return Response.json(cloudSession)
+        }
         return Response.json({ success: true })
       },
       { preconnect: fetch.preconnect }
     )
   )
-  const qc = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
-  })
-  if (!failSession && !loadingSession)
-    qc.setQueryData(sessionQuery.queryKey, structuredClone(cloudSession))
-  if (!failTeam && !loadingTeam)
-    qc.setQueryData(teamQuery(cloudSession?.user.id).queryKey, structuredClone(team))
-  publishUsers({ users: [] })
+  const qc = queryClient
+  qc.clear()
+  qc.setDefaultOptions({ queries: { retry: false }, mutations: { retry: false } })
+  setIdentity(null)
+  setExternalUser(undefined)
+  if (!loadingSession && !failSession && environment === 'cloud') setIdentity(cloudSession)
   if (injected)
-    publishUsers({
-      me: 'me',
-      users: [
-        {
-          id: 'me',
-          name: 'Alex',
-          email: 'alex@example.com',
-          color: 'blue',
-          avatar: 'https://example.com/avatar.png'
-        },
-        { id: 'ada', name: 'Ada', email: 'ada@example.com', color: 'cyan' }
-      ]
+    setExternalUser({
+      id: 'me',
+      name: 'Alex',
+      email: 'alex@example.com',
+      color: 'blue',
+      avatar: 'https://example.com/avatar.png'
     })
   const { createRoot } = await import('react-dom/client')
   const root = createRoot(document.getElementById('root')!)
@@ -221,9 +228,14 @@ export async function mountAccount({
     })
   }
   cleanup = async () => {
-    await act(async () => root.unmount())
+    await qc.cancelQueries()
+    await act(async () => {
+      root.unmount()
+      await new Promise(resolve => setTimeout(resolve, 20))
+    })
     qc.clear()
-    publishUsers({ users: [] })
+    setIdentity(null)
+    setExternalUser(undefined)
     layoutEffectSpy.mockRestore()
     configSpy.mockRestore()
     fetchSpy.mockRestore()
@@ -239,14 +251,17 @@ export async function mountAccount({
     calls,
     failures,
     mutationRequest,
-    teamResponse,
     qc,
+    setMembership: (next: WorkspaceMembers) => {
+      membership = next
+    },
     navigations,
     location,
     settle,
     async click(label: string) {
       const button = [...document.querySelectorAll<HTMLElement>('button, [role="menuitem"]')].find(
-        button => button.getAttribute('aria-label') === label || button.textContent === label
+        button =>
+          button.getAttribute('aria-label') === label || button.textContent?.trim() === label
       )
       expect(button).toBeDefined()
       await act(async () => {

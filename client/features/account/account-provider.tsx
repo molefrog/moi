@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState, useSyncExternalStore } from 'react'
+import { useIdentity } from '../identity/use-identity'
+import { createContext, useContext, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAppConfig } from '@/client/api/app-config'
@@ -6,19 +7,20 @@ import {
   getCurrentUser,
   getCurrentUserSource,
   setLocalUser,
-  subscribeCurrentUserStore,
-  publishUsers
+  subscribeCurrentUserStore
 } from '@/client/features/collab/host-state'
+import { getIdentity, setIdentity, getIdentityGeneration } from '../identity/store'
+import { identityKey } from '../identity/types'
+import type { Identity } from '../identity/types'
+import { workspaceMembersPrefix } from '../workspace-members/store'
 import {
   accountKeys,
-  CloudApiError,
-  sessionQuery,
-  teamQuery,
-  updateCloudName,
+  identityQuery,
+  updateCloudProfile,
+  uploadCloudAvatar,
+  removeCloudAvatar,
   signOutCloud
 } from './api'
-import type { CloudSession } from './api'
-import { syncCloudIdentity } from './identity'
 
 function useAccountState() {
   const { environment, demo } = useAppConfig()
@@ -29,105 +31,82 @@ function useAccountState() {
     getCurrentUserSource,
     getCurrentUserSource
   )
+  const identity = useIdentity()
   const qc = useQueryClient()
-  const session = useQuery({ ...sessionQuery, enabled: cloud && !demo })
-  const registered = cloud && !demo && !!session.data && !session.data.user.isAnonymous
-  const team = useQuery({ ...teamQuery(session.data?.user.id), enabled: registered })
-  const [removingMemberIds, setRemovingMemberIds] = useState<string[]>([])
-
+  const query = useQuery({ ...identityQuery, enabled: cloud && !demo })
+  const registered = cloud && !demo && identity?.type === 'user' && !identity.isAnonymous
   const signOut = useMutation({
     mutationFn: signOutCloud,
     onSuccess: async () => {
       await qc.cancelQueries({ queryKey: accountKeys.all })
-      publishUsers({ users: [] })
-      qc.setQueryData(accountKeys.session, null)
-      qc.removeQueries({ queryKey: accountKeys.team })
+      setIdentity(null)
+      qc.setQueryData(accountKeys.identity, null)
       window.location.assign('/cloud/login')
     }
   })
-  useEffect(() => {
-    if (!cloud || demo || !session.isSuccess || signOut.isPending || signOut.isSuccess) return
-    syncCloudIdentity(session.data, registered ? team.data : undefined)
-  }, [
-    cloud,
-    demo,
-    session.data,
-    session.isSuccess,
-    registered,
-    team.data,
-    signOut.isPending,
-    signOut.isSuccess
-  ])
-  useEffect(() => {
-    if (team.error instanceof CloudApiError && team.error.status === 401)
-      void qc.invalidateQueries({ queryKey: accountKeys.session })
-  }, [team.error, qc])
-
+  async function saveProfile(field: 'name' | 'avatar', update: () => Promise<Identity>) {
+    const before = getIdentity()
+    const generation = getIdentityGeneration()
+    if (!before || before.type !== 'user' || before.isAnonymous)
+      throw new Error('Sign in to change your profile')
+    const saved = await update()
+    const current = getIdentity()
+    if (
+      generation !== getIdentityGeneration() ||
+      !current ||
+      current.type !== 'user' ||
+      current.id !== before.id
+    )
+      throw new Error('Your account changed. Reload Moi to try again.')
+    // A newer server-pushed value wins. Apply only fields still equal to their original value.
+    setIdentity({
+      ...current,
+      ...(field === 'name' && current.name === before.name ? { name: saved.name } : {}),
+      ...(field === 'avatar' && current.avatar === before.avatar ? { avatar: saved.avatar } : {})
+    })
+    // Our identity write can supersede the event bridge's in-flight snapshot.
+    // Refresh active lists now and mark inactive lists stale for their next mount.
+    if (generation === getIdentityGeneration())
+      await qc.invalidateQueries({ queryKey: [...workspaceMembersPrefix, identityKey(current)] })
+  }
   async function saveName(value: string) {
     const name = value.trim()
     if (!name || name.length > 80) throw new Error('Enter a name of up to 80 characters')
     if (cloud) {
-      if (!registered) throw new Error('Sign in to change your name')
-      await qc.cancelQueries({ queryKey: accountKeys.session })
-      await updateCloudName(name).catch(error => {
-        if (error instanceof CloudApiError && error.status === 401)
-          void qc.invalidateQueries({ queryKey: accountKeys.session })
-        throw error
-      })
-      const latestSession = qc.getQueryData<CloudSession>(accountKeys.session)
-      if (
-        !latestSession ||
-        latestSession.user.id !== session.data!.user.id ||
-        latestSession.user.isAnonymous
-      )
-        throw new Error('Your account changed. Reload Moi to try again.')
-      const next: CloudSession = { user: { ...latestSession.user, name } }
-      qc.setQueryData(accountKeys.session, next)
-      syncCloudIdentity(next, team.data)
-      void qc.invalidateQueries({ queryKey: accountKeys.team })
+      await saveProfile('name', () => updateCloudProfile({ name }))
       return name
     }
-    const localProfile = getCurrentUser()
-    if (getCurrentUserSource() !== 'local' || !localProfile || localProfile.id !== profile?.id)
+    const local = getCurrentUser()
+    if (getCurrentUserSource() !== 'local' || !local || local.id !== profile?.id)
       throw new Error('This profile is managed by your sign-in provider')
-    setLocalUser({ ...localProfile, name })
+    setLocalUser({ ...local, name })
     return name
   }
-
+  async function saveAvatar(file: File | null) {
+    await saveProfile('avatar', () => (file ? uploadCloudAvatar(file) : removeCloudAvatar()))
+  }
   function getStatus() {
     if (demo) return 'signed-out'
     if (!cloud) return profile ? 'ready' : 'error'
-    if (session.isPending) return 'loading'
-    if (session.isError) return 'error'
-    if (!registered) return 'signed-out'
-    if (profile?.id === session.data?.user.id && source === 'external') return 'ready'
-    return 'loading'
+    if (identity === undefined) return query.isError ? 'error' : 'loading'
+    if (!identity || (identity.type === 'user' && identity.isAnonymous)) return 'signed-out'
+    return 'ready'
   }
-
   return {
     cloud,
-    demo: demo || (cloud && session.data?.user.isAnonymous === true),
+    demo: demo || (identity?.type === 'user' && identity.isAnonymous),
     profile,
+    identity,
     status: getStatus(),
-    email: registered ? session.data?.user.email : undefined,
+    email: registered && identity?.type === 'user' ? identity.email : undefined,
     canEdit: cloud ? registered : source === 'local',
     registered,
-    team,
-    removingMemberIds,
-    setRemovingMemberIds,
     saveName,
+    saveAvatar,
     signOut,
-    retry: () => {
-      if (!cloud) {
-        window.location.reload()
-        return
-      }
-      void session.refetch()
-      if (registered) void team.refetch()
-    }
+    retry: () => (cloud ? void query.refetch() : window.location.reload())
   }
 }
-
 type AccountState = ReturnType<typeof useAccountState>
 const AccountContext = createContext<AccountState | undefined>(undefined)
 type AccountProviderProps = { children: ReactNode }

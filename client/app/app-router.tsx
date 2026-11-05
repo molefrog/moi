@@ -14,7 +14,7 @@ import { WorkspaceRoute } from './routes/workspace-route'
 // separate lazy chunk. The NODE_ENV gate is statically false in the prod
 // build (scripts/build-client.ts defines it), so the bundler drops the
 // dynamic import and none of features/dev is emitted into dist at all.
-// In prod /dev redirects home.
+// In production /dev redirects home.
 const DevRoutes =
   process.env.NODE_ENV === 'development'
     ? lazy(() => import('@/client/features/dev/dev-routes'))

@@ -4,11 +4,9 @@ import './structured-clone-shim'
 import 'blobatar/motion.css'
 import './index.css'
 
-import {
-  initializeLocalUser,
-  installHostApi,
-  subscribeLocalProfileStorage
-} from './features/collab/host-state'
+import { initializeLocalUser, subscribeLocalProfileStorage } from './features/collab/host-state'
+
+import { installIdentityHostApi } from './features/identity/host-api'
 
 import { startHmrWatchdog } from './runtime/hmr-watchdog'
 
@@ -27,10 +25,8 @@ if (import.meta.hot) {
   startHmrWatchdog()
 }
 
-// Installed while this module evaluates, not inside `init`: an outer host's
-// script runs right after this bundle and calls `window.moi.collab.publishUsers`
-// straight away, before the async startup below has finished.
-installHostApi()
+// A host can call this API after the entry chunk and before #moi-start mounts React.
+installIdentityHostApi()
 subscribeLocalProfileStorage()
 
 export async function init(el: HTMLElement) {

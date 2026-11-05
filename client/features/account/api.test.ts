@@ -1,179 +1,81 @@
 import { afterEach, expect, spyOn, test } from 'bun:test'
 import { QueryClient } from '@tanstack/react-query'
-import {
-  accountKeys,
-  CloudApiError,
-  cloudRequest,
-  cancelInvitation,
-  inviteMember,
-  removeMember,
-  sessionQuery,
-  signOutCloud,
-  teamQuery,
-  updateCloudName
-} from './api'
-import type { CloudTeam } from './api'
-
-const user = { id: 'alex', name: 'Alex', email: 'alex@example.com', isAnonymous: false }
-const member = {
-  id: 'membership',
-  userId: user.id,
-  name: user.name,
-  email: user.email,
-  role: 'owner',
-  me: true
-}
-const invitation = {
-  id: 'invite',
-  email: 'ada@example.com',
-  role: 'member',
-  expiresAt: '2026-11-01T00:00:00Z'
-}
-const team = { id: 'org', name: 'Moi', role: 'owner', members: [member], invitations: [invitation] }
-const originalFetch = globalThis.fetch
-const clients: QueryClient[] = []
-
+import { identityQuery, updateCloudProfile, uploadCloudAvatar, removeCloudAvatar } from './api'
+import { getIdentity, setIdentity } from '../identity/store'
+import { parseIdentity } from '../identity/types'
+let cleanup = () => {}
 afterEach(() => {
-  globalThis.fetch = originalFetch
-  for (const client of clients) client.clear()
-  clients.length = 0
+  cleanup()
+  setIdentity(null)
 })
-
-function respond(value: unknown) {
-  spyOn(globalThis, 'fetch').mockResolvedValue(Response.json(value))
+const human = {
+  id: 'alex',
+  type: 'user',
+  name: 'Alex',
+  email: 'alex@example.com',
+  isAnonymous: false
+} as const
+function fetchResponse(response: Response | Promise<Response>) {
+  const mock = spyOn(globalThis, 'fetch').mockImplementation(
+    Object.assign(async () => response, { preconnect: fetch.preconnect })
+  )
+  cleanup = () => mock.mockRestore()
+  return mock
 }
-
-function createClient() {
+test('identity endpoint supports human and agent identity shapes', async () => {
+  expect(parseIdentity(human)).toEqual(human)
+  expect(
+    parseIdentity({ id: 'bot', type: 'agent', name: 'Helper', avatar: 'https://example.com/a.png' })
+      .type
+  ).toBe('agent')
+  expect(() => parseIdentity({ ...human, avatar: 'javascript:alert(1)' })).toThrow()
+  expect(() => parseIdentity({ ...human, type: 'robot' })).toThrow()
+})
+test('401 clears identity while a temporary API failure does not sign out', async () => {
+  setIdentity(human)
+  fetchResponse(Response.json({ error: 'No session' }, { status: 401 }))
   const client = new QueryClient()
-  clients.push(client)
-  return client
-}
-
-test.each([
-  { body: { error: 'Sign in first', code: 'UNAUTHORIZED' }, message: 'Sign in first' },
-  { body: { message: 'Session expired', code: 'SESSION_EXPIRED' }, message: 'Session expired' },
-  { body: { error: 'Gateway error', message: 'Provider error' }, message: 'Gateway error' },
-  { body: { error: null, message: 'Provider error' }, message: 'Provider error' },
-  { body: { error: ' ', message: 'Provider error' }, message: 'Provider error' },
-  { body: { message: '' }, message: 'Couldn’t complete this request. Try again.' },
-  { body: { message: 42 }, message: 'Couldn’t complete this request. Try again.' }
-])('reads cloud error messages: %j', async ({ body, message }) => {
-  spyOn(globalThis, 'fetch').mockResolvedValue(Response.json(body, { status: 401 }))
-  const error = await cloudRequest('get-session').catch((error: unknown) => error)
-  expect(error).toBeInstanceOf(CloudApiError)
-  expect(error).toMatchObject({ message, status: 401 })
+  expect(await client.fetchQuery(identityQuery)).toBeNull()
+  expect(getIdentity()).toBeNull()
+  client.clear()
 })
-
-test('uses the fallback for non-JSON errors and preserves the status', async () => {
-  spyOn(globalThis, 'fetch').mockResolvedValue(new Response('Bad gateway', { status: 502 }))
-  const error = await cloudRequest('sign-out', { method: 'POST' }).catch((error: unknown) => error)
-  expect(error).toBeInstanceOf(CloudApiError)
-  expect(error).toMatchObject({
-    message: 'Couldn’t complete this request. Try again.',
-    status: 502
+test('an old identity response cannot overwrite a newer host announcement', async () => {
+  const pending = Promise.withResolvers<Response>()
+  fetchResponse(pending.promise)
+  const client = new QueryClient()
+  const request = client.fetchQuery(identityQuery)
+  setIdentity({ ...human, id: 'new', name: 'New account' })
+  pending.resolve(Response.json(human))
+  await request
+  expect(getIdentity()?.id).toBe('new')
+  client.clear()
+})
+test('profile updates use PATCH me and return the full profile', async () => {
+  const saved = { ...human, name: 'New name', avatar: 'https://example.com/avatar.png' }
+  const mock = fetchResponse(Response.json(saved))
+  expect(await updateCloudProfile({ name: 'New name' })).toEqual(saved)
+  expect(mock.mock.calls[0]?.[0]).toBe('/cloud/api/me')
+  expect(mock.mock.calls[0]?.[1]).toMatchObject({
+    credentials: 'same-origin',
+    method: 'PATCH',
+    body: JSON.stringify({ name: 'New name' })
   })
 })
 
-test('accepts signed-out, anonymous, and registered sessions, including an empty name', async () => {
-  for (const value of [null, { user }, { user: { ...user, name: '', isAnonymous: true } }]) {
-    respond(value)
-    const client = createClient()
-    expect(await client.fetchQuery(sessionQuery)).toEqual(value)
-  }
+test('avatar upload sends a file to the dedicated route and returns the full profile', async () => {
+  const saved = { ...human, avatar: 'https://example.com/avatar.png' }
+  const mock = fetchResponse(Response.json(saved))
+  const file = new File(['test'], 'test.png', { type: 'image/png' })
+  expect(await uploadCloudAvatar(file)).toEqual(saved)
+  expect(mock.mock.calls[0]?.[0]).toBe('/cloud/api/me/avatar')
+  const init = mock.mock.calls[0]?.[1]
+  expect(init).toMatchObject({ method: 'PUT', credentials: 'same-origin' })
+  expect((init!.body as FormData).get('file')).toBeInstanceOf(File)
 })
 
-test.each([
-  {},
-  { user: null },
-  { user: { ...user, id: '' } },
-  { user: { ...user, id: ' alex ' } },
-  { user: { ...user, name: null } },
-  { user: { ...user, email: null } },
-  { user: { ...user, email: 'a'.repeat(321) } },
-  { user: { ...user, name: 'a'.repeat(257) } },
-  { user: { ...user, isAnonymous: 'false' } }
-])('rejects malformed sessions as query errors: %j', async value => {
-  respond(value)
-  const client = createClient()
-  await expect(client.fetchQuery(sessionQuery)).rejects.toThrow('Invalid account response')
-  expect(client.getQueryState(accountKeys.session)?.status).toBe('error')
-  expect(client.getQueryData(accountKeys.session)).toBeUndefined()
+test('avatar removal uses DELETE and returns the profile without an avatar', async () => {
+  const mock = fetchResponse(Response.json(human))
+  expect(await removeCloudAvatar()).toEqual(human)
+  expect(mock.mock.calls[0]?.[0]).toBe('/cloud/api/me/avatar')
+  expect(mock.mock.calls[0]?.[1]).toMatchObject({ method: 'DELETE', credentials: 'same-origin' })
 })
-
-test('accepts users with empty names and an empty users list', async () => {
-  for (const value of [
-    team,
-    { ...team, members: [{ ...member, name: '' }] },
-    { ...team, members: [], invitations: [] }
-  ]) {
-    respond(value)
-    const client = createClient()
-    expect(await client.fetchQuery(teamQuery(user.id))).toEqual(value)
-  }
-})
-
-test.each([
-  null,
-  {},
-  { ...team, members: null },
-  { ...team, members: [null] },
-  { ...team, members: [{ ...member, name: null }] },
-  { ...team, members: [{ ...member, email: null }] },
-  { ...team, members: [{ ...member, email: 'a'.repeat(321) }] },
-  { ...team, members: [member, { ...member, id: 'another-membership' }] },
-  { ...team, members: [member, { ...member, userId: 'ada' }] },
-  { ...team, invitations: null },
-  { ...team, invitations: [null] },
-  { ...team, invitations: [{ ...invitation, email: null }] },
-  { ...team, invitations: [{ ...invitation, expiresAt: 'invalid' }] },
-  { ...team, invitations: [invitation, invitation] }
-])('rejects malformed users as query errors: %j', async value => {
-  respond(value)
-  const client = createClient()
-  const query = teamQuery(user.id)
-  await expect(client.fetchQuery(query)).rejects.toThrow('Invalid users response')
-  expect(client.getQueryState(query.queryKey)?.status).toBe('error')
-  expect(client.getQueryData(query.queryKey)).toBeUndefined()
-})
-
-test('a malformed refresh preserves the last valid users response', async () => {
-  respond(null)
-  const client = createClient()
-  const query = teamQuery(user.id)
-  client.setQueryData(query.queryKey, team)
-  await client.invalidateQueries({ queryKey: query.queryKey })
-  await expect(client.fetchQuery(query)).rejects.toThrow('Invalid users response')
-  expect(client.getQueryData<CloudTeam>(query.queryKey)).toEqual(team)
-})
-
-test.each([
-  { path: 'profile', action: () => updateCloudName('Ada'), body: { name: 'Ada' } },
-  { path: 'sign-out', action: signOutCloud, body: undefined },
-  {
-    path: 'invite',
-    action: () => inviteMember('ada@example.com'),
-    body: { email: 'ada@example.com' }
-  },
-  {
-    path: 'invitation/invite%2Fid/cancel',
-    action: () => cancelInvitation('invite/id'),
-    body: undefined
-  },
-  { path: 'members/remove', action: () => removeMember('member'), body: { memberId: 'member' } }
-])(
-  'commands use HTTP status without requiring a response body: $path',
-  async ({ path, action, body }) => {
-    const fetch = spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }))
-    await action()
-    expect(fetch).toHaveBeenCalledWith(
-      `/cloud/api/auth/${path}`,
-      expect.objectContaining({
-        method: 'POST',
-        credentials: 'same-origin',
-        body: JSON.stringify(body)
-      })
-    )
-    fetch.mockResolvedValue(Response.json({ message: 'Permission denied' }, { status: 403 }))
-    await expect(action()).rejects.toThrow('Permission denied')
-  }
-)
