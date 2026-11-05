@@ -12,7 +12,7 @@ export const TEMPLATE_DIR = join(import.meta.dir, '..', '..', 'workspace')
 // The folder holding the skill packages this CLI ships. Each subdirectory is
 // one skill (e.g. `moi-workspace/`) with its own `SKILL.md`. Source of truth
 // for what `moi skill update` copies and what versions it compares against.
-export const BUNDLED_SKILLS_DIR = join(TEMPLATE_DIR, '.claude', 'skills')
+export const BUNDLED_SKILLS_DIR = join(TEMPLATE_DIR, '.agents', 'skills')
 
 export async function bundledSkillNames(): Promise<string[]> {
   const entries = await readdir(BUNDLED_SKILLS_DIR, { withFileTypes: true })
