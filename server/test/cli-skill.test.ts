@@ -3,7 +3,7 @@ import { mkdtemp, readlink, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { BUNDLED_SKILLS_DIR } from '../skills/template'
+import { bundledSkillDirectory } from '../skills/template'
 import { readSkillVersion } from '../skills/version'
 
 let root = ''
@@ -56,7 +56,9 @@ describe('skill CLI', () => {
       const before = await runSkill()
       expect(before.match(/update available/g)).toHaveLength(2)
       const updated = await runSkill([command])
-      const bundled = await readSkillVersion(join(BUNDLED_SKILLS_DIR, 'moi-workspace', 'SKILL.md'))
+      const bundled = await readSkillVersion(
+        join(bundledSkillDirectory('moi-workspace'), 'SKILL.md')
+      )
       for (const directory of ['.claude', '.agents']) {
         const path = join(directory, 'skills', 'moi-workspace')
         expect(updated.split('\n').find(line => line.includes(path))).toContain('0.13.0')

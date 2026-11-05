@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path'
 
 import { provisionWorkspace } from '../workspaces/init'
 import { getWorkspaceSkillsStatus, updateWorkspaceSkills } from './update'
-import { BUNDLED_SKILLS_DIR } from './template'
+import { bundledSkillDirectory } from './template'
 
 const roots: string[] = []
 
@@ -121,7 +121,7 @@ test('resets conflicting local files and collab guidance in both copies', async 
   await updateWorkspaceSkills(workspace)
   for (const path of [canonical, claude]) {
     expect(await Bun.file(join(path, 'SKILL.md')).text()).toBe(
-      await Bun.file(join(BUNDLED_SKILLS_DIR, 'moi-workspace', 'SKILL.md')).text()
+      await Bun.file(join(bundledSkillDirectory('moi-workspace'), 'SKILL.md')).text()
     )
     expect(await Bun.file(join(path, 'local.md')).exists()).toBe(false)
     expect(await Bun.file(join(path, 'references', 'COLLAB.md')).exists()).toBe(false)

@@ -54,6 +54,6 @@ moi scratch clear
     "marked / selected / special" without going fully opaque.
   - `solid` — fully opaque fill in the color (interior matches the outline). Use for solid blocks,
     legend keys, or a label chip; anything behind it is hidden.
-  A rect's outline is always a rough (hand-drawn) stroke, matching what the toolbar draws. Default
-  fill is `semi`; pass `--fill none` for an outline-only box or `--fill solid` for an opaque block.
+    A rect's outline is always a rough (hand-drawn) stroke, matching what the toolbar draws. Default
+    fill is `semi`; pass `--fill none` for an outline-only box or `--fill solid` for an opaque block.
 - Coordinates are tldraw canvas space (origin top-left, y down).

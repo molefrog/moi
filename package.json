@@ -33,7 +33,7 @@
     "server",
     "client",
     "lib",
-    "workspace",
+    "skill",
     "registry.json",
     "ui-components",
     "bunfig.toml",
@@ -41,10 +41,7 @@
     "dist",
     "!**/*.test.ts",
     "!**/*.test.tsx",
-    "!server/test",
-    "!workspace/.env",
-    "!workspace/.claude/settings.local.json",
-    "!workspace/.moi"
+    "!server/test"
   ],
   "scripts": {
     "dev": "bun server/cli.ts start --dev --debug",

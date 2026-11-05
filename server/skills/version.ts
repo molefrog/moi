@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import type { WorkspaceSkillStatus, WorkspaceType } from '@/lib/types'
 
 import { findWorkspaceForPath, liftToWorkspaceRoot, listWorkspaces } from '../workspaces/registry'
-import { BUNDLED_SKILLS_DIR } from './template'
+import { bundledSkillDirectory } from './template'
 import { displaySkillPath, resolveSkillLocations } from './locations'
 import type { SkillLocation } from './locations'
 
@@ -86,7 +86,7 @@ export async function skillStatusesForLocations(
     locations.map(async ({ name, path, brokenLink }) => ({
       name,
       path,
-      bundled: await readSkillVersion(join(BUNDLED_SKILLS_DIR, name, 'SKILL.md')),
+      bundled: await readSkillVersion(join(bundledSkillDirectory(name), 'SKILL.md')),
       installed: brokenLink ? null : await readSkillVersion(join(path, 'SKILL.md'))
     }))
   )

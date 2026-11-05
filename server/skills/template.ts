@@ -5,26 +5,19 @@
 import { cp, lstat, mkdir, readFile, readdir, readlink } from 'node:fs/promises'
 import { join } from 'node:path'
 
-// Source directory for shipped templates. Resolved relative to this file so
-// symlinked CLI binaries still find the source tree.
-export const TEMPLATE_DIR = join(import.meta.dir, '..', '..', 'workspace')
+// Resolve relative to this file so source checkouts and published installs agree.
+const BUNDLED_SKILL_DIR = join(import.meta.dir, '..', '..', 'skill')
 
-// The folder holding the skill packages this CLI ships. Each subdirectory is
-// one skill (e.g. `moi-workspace/`) with its own `SKILL.md`. Source of truth
-// for what `moi skill update` copies and what versions it compares against.
-export const BUNDLED_SKILLS_DIR = join(TEMPLATE_DIR, '.agents', 'skills')
-
-export async function bundledSkillNames(): Promise<string[]> {
-  const entries = await readdir(BUNDLED_SKILLS_DIR, { withFileTypes: true })
-  return entries.filter(entry => entry.isDirectory()).map(entry => entry.name)
+export function bundledSkillDirectory(name: string): string {
+  if (name !== 'moi-workspace') throw new Error(`Unknown bundled skill: ${name}`)
+  return BUNDLED_SKILL_DIR
 }
 
-export const COLLAB_REFERENCE_SOURCE_PATH = join(
-  BUNDLED_SKILLS_DIR,
-  'moi-workspace',
-  'references',
-  'COLLAB.md'
-)
+export async function bundledSkillNames(): Promise<string[]> {
+  return ['moi-workspace']
+}
+
+export const COLLAB_REFERENCE_SOURCE_PATH = join(BUNDLED_SKILL_DIR, 'references', 'COLLAB.md')
 
 // The guide lives beside the other references, but only explicit collab init installs it.
 function isDefaultSkillFile(source: string): boolean {
@@ -62,7 +55,7 @@ async function matchesBundledPath(source: string, target: string, exact = false)
 }
 
 export function matchesBundledSkill(name: string, target: string): Promise<boolean> {
-  return matchesBundledPath(join(BUNDLED_SKILLS_DIR, name), target, true)
+  return matchesBundledPath(bundledSkillDirectory(name), target, true)
 }
 
 // Copy changed shipped skill folders into `targetSkillsDir`. Leaves identical
@@ -85,7 +78,7 @@ export async function installBundledSkills(targetSkillsDir: string): Promise<str
 
 // Update one resolved destination without installing other skills beside it.
 export async function installBundledSkill(name: string, target: string): Promise<boolean> {
-  const source = join(BUNDLED_SKILLS_DIR, name)
+  const source = bundledSkillDirectory(name)
   if (await matchesBundledPath(source, target)) return false
   // Publish the version only after all references copied successfully, so a
   // partial update cannot hide an outdated installation behind a fresh marker.

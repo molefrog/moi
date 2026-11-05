@@ -8,7 +8,7 @@ import type { WorkspaceSkillsStatus } from '@/lib/types'
 import { api } from './index'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
 import { readSkillVersion } from '../skills/version'
-import { BUNDLED_SKILLS_DIR, installBundledSkills } from '../skills/template'
+import { bundledSkillDirectory, installBundledSkills } from '../skills/template'
 import { skillsDirFor } from '../workspaces/init'
 
 let tempRoot = ''
@@ -69,7 +69,7 @@ describe('workspace skills API', () => {
     // Read the shipped version rather than pinning it — the assertion is that
     // an outdated install reports an update, not what today's version happens
     // to be. Pinning it means every skill bump breaks this test.
-    const bundled = await readSkillVersion(join(BUNDLED_SKILLS_DIR, 'moi-workspace', 'SKILL.md'))
+    const bundled = await readSkillVersion(join(bundledSkillDirectory('moi-workspace'), 'SKILL.md'))
 
     expect(response.status).toBe(200)
     expect(status.updateAvailable).toBe(true)
