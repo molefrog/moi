@@ -36,6 +36,7 @@ import {
   useRevokeInvitation
 } from '../workspace-members/hooks'
 import type { WorkspaceMember } from '../workspace-members/types'
+import { CloudAvatarUpload } from './cloud-avatar-upload'
 
 export function CloudPage() {
   const { environment } = useAppConfig()
@@ -226,7 +227,13 @@ function SharingMembers({ workspaceId, workspaceName }: SharingMembersProps) {
                   key={`${member.type}:${member.id}`}
                   className="flex min-w-0 items-center gap-3 py-3"
                 >
-                  <MemberAvatar member={member} />
+                  {isMe && identity?.type === 'user' ? (
+                    <CloudAvatarUpload>
+                      <MemberAvatar member={{ ...member, ...identity }} />
+                    </CloudAvatarUpload>
+                  ) : (
+                    <MemberAvatar member={member} />
+                  )}
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">
                       {displayName}
