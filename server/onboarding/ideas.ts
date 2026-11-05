@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { APP_ICON_IDS } from '@/lib/app-icons'
+import { IDENTITY_ICON_IDS } from '@/lib/identity-icons'
 import { COLOR_THEMES, FONT_THEMES, type ColorTheme, type FontTheme } from '@/lib/themes'
 import type { OnboardingIdea } from '@/lib/onboarding'
 
@@ -14,7 +14,7 @@ const appletPlan = z
 const idea = z
   .object({
     name: z.string().trim().min(1).max(24),
-    icon: z.enum(APP_ICON_IDS),
+    icon: z.enum(IDENTITY_ICON_IDS),
     theme: z
       .object({
         font: z.enum(Object.keys(FONT_THEMES) as FontTheme[]),
@@ -25,7 +25,7 @@ const idea = z
     views: z
       .array(
         appletPlan.extend({
-          icon: z.enum(APP_ICON_IDS)
+          icon: z.enum(IDENTITY_ICON_IDS)
         })
       )
       .length(3),

@@ -22,7 +22,6 @@ import {
   IconDatabase,
   IconDeviceGamepad2,
   IconDiamond,
-  IconDots,
   IconFeather,
   IconFile,
   IconFlame,
@@ -50,7 +49,6 @@ import {
   IconPlug,
   IconRobot,
   IconRocket,
-  IconSettings,
   IconShield,
   IconShoppingCart,
   IconSnowflake,
@@ -66,16 +64,16 @@ import {
   IconWorld
 } from '@tabler/icons-react'
 
-import { APP_ICON_IDS, isAppIconId, type AppIconId } from '@/lib/app-icons'
+import { IDENTITY_ICON_IDS, isIdentityIconId, type IdentityIconId } from '@/lib/identity-icons'
 
-export type AppIconChoice = {
-  id: AppIconId
+export type IdentityIconChoice = {
+  id: IdentityIconId
   Icon: TablerIcon
 }
 
-// UI component for every shared app icon id. Record<> keeps this map in sync
+// UI component for every shared identity icon id. Record<> keeps this map in sync
 // with the server-safe list used by builder and bundle validation.
-const appIconById: Record<AppIconId, TablerIcon> = {
+const identityIconById: Record<IdentityIconId, TablerIcon> = {
   rocket: IconRocket,
   sparkles: IconSparkles,
   bolt: IconBolt,
@@ -100,8 +98,6 @@ const appIconById: Record<AppIconId, TablerIcon> = {
   hexagon: IconHexagon,
   plug: IconPlug,
   tool: IconTool,
-  settings: IconSettings,
-  dots: IconDots,
   bug: IconBug,
   activity: IconActivity,
   chart: IconChartBar,
@@ -142,13 +138,13 @@ const appIconById: Record<AppIconId, TablerIcon> = {
   chef: IconChefHat
 }
 
-export const APP_ICON_CHOICES: AppIconChoice[] = APP_ICON_IDS.map(id => ({
+export const IDENTITY_ICON_CHOICES: IdentityIconChoice[] = IDENTITY_ICON_IDS.map(id => ({
   id,
-  Icon: appIconById[id]
+  Icon: identityIconById[id]
 }))
 
-export { APP_ICON_IDS }
+export { IDENTITY_ICON_IDS }
 
-export function resolveAppIcon(id: string | undefined): TablerIcon | null {
-  return id && isAppIconId(id) ? appIconById[id] : null
+export function resolveIdentityIcon(id: string | undefined): TablerIcon | null {
+  return id && isIdentityIconId(id) ? identityIconById[id] : null
 }

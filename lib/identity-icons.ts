@@ -1,4 +1,5 @@
-export const APP_ICON_IDS = [
+// Identity glyphs for workspaces and views. UI controls use Tabler icons directly.
+export const IDENTITY_ICON_IDS = [
   'rocket',
   'sparkles',
   'bolt',
@@ -23,8 +24,6 @@ export const APP_ICON_IDS = [
   'hexagon',
   'plug',
   'tool',
-  'settings',
-  'dots',
   'bug',
   'activity',
   'chart',
@@ -65,10 +64,10 @@ export const APP_ICON_IDS = [
   'chef'
 ] as const
 
-export type AppIconId = (typeof APP_ICON_IDS)[number]
+export type IdentityIconId = (typeof IDENTITY_ICON_IDS)[number]
 
-const appIconIds = new Set<string>(APP_ICON_IDS)
+const identityIconIds = new Set<string>(IDENTITY_ICON_IDS)
 
-export function isAppIconId(id: string): id is AppIconId {
-  return appIconIds.has(id)
+export function isIdentityIconId(id: string): id is IdentityIconId {
+  return identityIconIds.has(id)
 }

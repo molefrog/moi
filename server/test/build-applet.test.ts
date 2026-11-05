@@ -453,7 +453,7 @@ describe('extractViewConfig', () => {
     expect(await extractViewConfig(join(FIXTURES, 'with-config.tsx'))).toEqual({})
   })
 
-  test('rejects an icon outside the app icon registry', async () => {
+  test('rejects an icon outside the identity icon registry', async () => {
     await expect(extractViewConfig(join(FIXTURES, 'with-invalid-view-icon.tsx'))).rejects.toThrow(
       'Unknown view icon id "piano-keyboard"'
     )
@@ -466,7 +466,7 @@ describe("buildApplet kind='view'", () => {
     expect(result.config).toEqual({ title: 'My View', icon: 'chart', requiredEnv: ['API_KEY'] })
   })
 
-  test('fails the view build for an icon outside the app icon registry', async () => {
+  test('fails the view build for an icon outside the identity icon registry', async () => {
     await expect(
       buildApplet(join(FIXTURES, 'with-invalid-view-icon.tsx'), undefined, 'view')
     ).rejects.toThrow('Unknown view icon id "piano-keyboard"')

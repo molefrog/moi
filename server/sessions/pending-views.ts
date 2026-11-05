@@ -1,4 +1,4 @@
-import { isAppIconId } from '@/lib/app-icons'
+import { isIdentityIconId } from '@/lib/identity-icons'
 import { newViewId } from '@/lib/ids'
 import type { PendingView, WorkspaceEntry, WorkspaceState } from '@/lib/types'
 import { readWorkspaceState, updateWorkspaceState, type WorkspaceRef } from '../workspace-state'
@@ -86,7 +86,7 @@ export async function updatePendingView(
   id: string,
   input: { requirements?: string; title?: string; icon?: string }
 ) {
-  if (input.icon !== undefined && !isAppIconId(input.icon))
+  if (input.icon !== undefined && !isIdentityIconId(input.icon))
     throw new PendingViewError(`Unknown view icon id "${input.icon}"`)
   return updateWorkspaceState(ws, state => {
     const view = state.pendingViews[id]

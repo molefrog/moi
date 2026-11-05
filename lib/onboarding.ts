@@ -1,4 +1,4 @@
-import type { AppIconId } from './app-icons'
+import type { IdentityIconId } from './identity-icons'
 import type { WorkspaceTheme } from './themes'
 import { z } from 'zod'
 
@@ -15,11 +15,11 @@ export type OnboardingAppletPlan = {
   description: string
   features: string[]
 }
-export type OnboardingViewPlan = OnboardingAppletPlan & { icon: AppIconId }
+export type OnboardingViewPlan = OnboardingAppletPlan & { icon: IdentityIconId }
 export type OnboardingIdea = {
   id: string
   name: string
-  icon: AppIconId
+  icon: IdentityIconId
   theme: Pick<WorkspaceTheme, 'font' | 'color'>
   description: string
   views: OnboardingViewPlan[]

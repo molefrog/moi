@@ -1,5 +1,5 @@
 import type { PreviewBlock, StreamEvent } from './format'
-import type { AppIconId } from './app-icons'
+import type { IdentityIconId } from './identity-icons'
 import type { MoiContext } from './moi-context'
 import type { WorkspaceTheme } from './themes'
 import type { AttachmentInput, WidgetConfig } from 'moi'
@@ -508,7 +508,7 @@ export type HarnessLoginState =
 
 export type WorkspaceIcon =
   | { type: 'emoji'; value: string; background?: 'theme' }
-  | { type: 'glyph'; value: AppIconId; background?: 'theme' }
+  | { type: 'glyph'; value: IdentityIconId; background?: 'theme' }
   | { type: 'upload'; value: string }
 
 // One MCP server's connection status, as surfaced by GET /api/workspaces/:id/mcp

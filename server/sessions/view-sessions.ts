@@ -1,5 +1,5 @@
 import { HarnessTransitionError, reserveWorkspaceOperation } from '../workspaces/harness-transition'
-import { APP_ICON_IDS } from '@/lib/app-icons'
+import { IDENTITY_ICON_IDS } from '@/lib/identity-icons'
 import { viewBuildDirectives } from '@/lib/view-build-directives'
 import { viewIdFromTab, viewTabId } from '@/lib/workspace-tabs'
 import type { PendingView, SelectedSessionScope, WorkspaceEntry, WorkspaceTabId } from '@/lib/types'
@@ -100,7 +100,7 @@ export async function sendWorkspaceMessage(
         ...(collabReference ? { collabReference } : {}),
         directives: [
           ...(input.context?.directives ?? []),
-          ...(isBuildRequest ? viewBuildDirectives(pending.id, APP_ICON_IDS) : []),
+          ...(isBuildRequest ? viewBuildDirectives(pending.id, IDENTITY_ICON_IDS) : []),
           ...(isBuildRequest && record.fork
             ? [
                 'Inherited conversation is background. Work on the current request; do not resume unrelated earlier tasks.'
@@ -216,7 +216,7 @@ export async function createViewFromSession(
     return {
       viewId: view.id,
       mode: 'in-place' as const,
-      buildInstructions: viewBuildDirectives(view.id, APP_ICON_IDS)
+      buildInstructions: viewBuildDirectives(view.id, IDENTITY_ICON_IDS)
     }
   }
   if (!fromSessionId) throw new Error('Session id cannot be empty')

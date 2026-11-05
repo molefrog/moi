@@ -1,4 +1,4 @@
-import { isAppIconId } from './app-icons'
+import { isIdentityIconId } from './identity-icons'
 import type { WorkspaceIcon } from './types'
 
 export function isWorkspaceIcon(value: unknown): value is WorkspaceIcon {
@@ -11,7 +11,7 @@ export function isWorkspaceIcon(value: unknown): value is WorkspaceIcon {
     case 'emoji':
       return icon.value.length > 0 && icon.value.length <= 64
     case 'glyph':
-      return isAppIconId(icon.value)
+      return isIdentityIconId(icon.value)
     case 'upload':
       return icon.background === undefined
     default:

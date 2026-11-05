@@ -2,10 +2,10 @@ import { parse } from '@babel/parser'
 import type { ObjectExpression, ObjectProperty, StringLiteral } from '@babel/types'
 import { basename } from 'node:path'
 
-import { APP_ICON_IDS, isAppIconId } from '@/lib/app-icons'
+import { IDENTITY_ICON_IDS, isIdentityIconId } from '@/lib/identity-icons'
 import type { ViewConfig, WidgetConfig } from '@/lib/types'
 
-const APP_ICON_NAMES: readonly string[] = APP_ICON_IDS
+const IDENTITY_ICON_NAMES: readonly string[] = IDENTITY_ICON_IDS
 
 const DEFAULT_CONFIG: WidgetConfig = { rowSpan: 1, colSpan: 2 }
 const VALID_SPANS = [1, 2, 3, 4] as const
@@ -108,7 +108,7 @@ export async function extractWidgetConfig(srcPath: string): Promise<WidgetConfig
   return { ...DEFAULT_CONFIG, ...result }
 }
 
-// A view's config: `title` + app icon registry id + advisory `requiredEnv`.
+// A view's config: `title` + identity icon registry id + advisory `requiredEnv`.
 // No sizing — views are full-screen. Returns null when no `config` export is present.
 export async function extractViewConfig(srcPath: string): Promise<ViewConfig | null> {
   const source = await Bun.file(srcPath).text()
@@ -131,9 +131,9 @@ export async function extractViewConfig(srcPath: string): Promise<ViewConfig | n
     if (key === 'icon') {
       if (prop.value.type === 'StringLiteral') {
         const icon = prop.value.value
-        if (!isAppIconId(icon)) {
+        if (!isIdentityIconId(icon)) {
           throw new Error(
-            `Unknown view icon id "${icon}". Use one of: ${APP_ICON_NAMES.join(', ')}`
+            `Unknown view icon id "${icon}". Use one of: ${IDENTITY_ICON_NAMES.join(', ')}`
           )
         }
         result.icon = icon

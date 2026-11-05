@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { WorkspaceIdentity, type WorkspaceIdentityProps } from '../workspace-identity'
-import { APP_ICON_IDS } from '@/client/lib/app-icon-registry'
+import { IDENTITY_ICON_IDS } from '@/client/lib/identity-icon-registry'
 
 const greetings = [
   'Welcome to',
@@ -43,7 +43,7 @@ export function WorkspaceWelcomeState({
 }: WorkspaceWelcomeStateProps) {
   const [greeting] = useState(() => greetings[Math.floor(Math.random() * greetings.length)])
   const [icons] = useState(() => {
-    const choices = [...APP_ICON_IDS]
+    const choices = [...IDENTITY_ICON_IDS]
     return Array.from(
       { length: 4 },
       () => choices.splice(Math.floor(Math.random() * choices.length), 1)[0]!

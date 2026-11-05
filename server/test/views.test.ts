@@ -94,7 +94,7 @@ describe('listViews', () => {
     expect((await views())[0]).toMatchObject({ title: 'CRM', requiredEnv: ['K'] })
   })
 
-  test('passes through the app icon id', async () => {
+  test('passes through the identity icon id', async () => {
     seed(['crm'], { config: { crm: { title: 'CRM', icon: 'briefcase' } }, order: ['crm'] })
     expect((await views())[0]).toMatchObject({ title: 'CRM', icon: 'briefcase' })
   })

@@ -13,7 +13,7 @@ import { Checkbox } from '@/client/components/ui/checkbox'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/client/components/ui/tabs'
 import { useUpdateWorkspaceIcon } from '@/client/features/workspace/settings/api'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-layout-context'
-import { APP_ICON_CHOICES } from '@/client/lib/app-icon-registry'
+import { IDENTITY_ICON_CHOICES } from '@/client/lib/identity-icon-registry'
 import { cn } from '@/client/lib/cn'
 import type { WorkspaceIcon } from '@/lib/types'
 import { EMOJI_FONT, FAVORITE_EMOJI } from './icon-picker-options'
@@ -241,7 +241,7 @@ export function WorkspaceIconPicker() {
         className="scrollbar-thin h-72 overflow-y-auto rounded-xl border border-border bg-background p-1.5"
       >
         <PickerItems>
-          {APP_ICON_CHOICES.map(({ id, Icon }) => (
+          {IDENTITY_ICON_CHOICES.map(({ id, Icon }) => (
             <PickerItem
               key={id}
               aria-label={id}

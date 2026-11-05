@@ -1,7 +1,7 @@
 import { createElement, useId, useState } from 'react'
 import { Badge } from '@/ui-components/badge'
 import { cn } from '@/client/lib/cn'
-import { resolveAppIcon } from '@/client/lib/app-icon-registry'
+import { resolveIdentityIcon } from '@/client/lib/identity-icon-registry'
 import { resolveWorkspaceTheme } from '@/lib/themes'
 import { getWorkspaceThemeStyle } from '@/client/runtime/workspace-theme'
 import { WorkspaceIcon } from '@/client/components/shared/workspace-icon'
@@ -74,7 +74,7 @@ export function OnboardingIdeaDisk({ idea, state, onSelect }: OnboardingIdeaDisk
 type ViewStickerProps = { view: OnboardingViewPlan; index: number }
 
 function ViewSticker({ view, index }: ViewStickerProps) {
-  const Icon = resolveAppIcon(view.icon)
+  const Icon = resolveIdentityIcon(view.icon)
   const [rotation] = useState(() => {
     const angles = ['-rotate-3', '-rotate-2', '-rotate-1', 'rotate-1', 'rotate-2', 'rotate-3']
     return angles[Math.floor(Math.random() * angles.length)]
