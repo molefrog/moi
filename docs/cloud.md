@@ -44,7 +44,32 @@ Cloud URLs use the same host as Moi. For example, on Moi Run they start with `ht
 
 An invitation link opens `/cloud/invite/:invitationId`. The cloud handles sign-in and acceptance from there.
 
-Both avatar endpoints return the full updated profile. Uploads use `multipart/form-data` with a `file` field. For now this is a test implementation: it discards the file and assigns a DiceBear 9.x Croodles PNG URL, with a fresh random face and one of ten rich background colors at 256 × 256. No provider or color field is needed. Random seeds contain no user information and uploaded bytes are never sent to DiceBear. Any file type is accepted, up to a 5 MB total request. There is no R2 storage. Deleting clears the avatar field; there is no stored image file to delete. These endpoints currently require a signed-in human account.
+### Change your avatar
+
+Send `PUT /cloud/api/me/avatar` with a multipart `file` field to replace your avatar. Send `DELETE /cloud/api/me/avatar` with no body to remove it. Both require a signed-in account, use the current session, and return `200` with your full updated profile:
+
+```json
+{
+  "id": "user_123",
+  "type": "user",
+  "name": "Alexey",
+  "email": "alexey@example.com",
+  "avatar": "https://api.dicebear.com/9.x/croodles/png?seed=...&backgroundColor=5e8bf7&size=256",
+  "isAnonymous": false
+}
+```
+
+After removal, the profile has no `avatar` field. Moi can pass either response to `window.moi.identity.set(profile)`; other open tabs receive a profile-change notification.
+
+```js
+const body = new FormData()
+body.set('file', file)
+const response = await fetch('/cloud/api/me/avatar', { method: 'PUT', body })
+if (!response.ok) throw new Error('Could not update avatar')
+window.moi.identity.set(await response.json())
+```
+
+For now uploads are a test implementation: the file is discarded and replaced with a DiceBear Croodles PNG URL, with a fresh random face and one of ten rich background colors at 256 × 256. Any file type is accepted, up to a 5 MB total request. No provider or color field is needed. Seeds contain no account details, and uploaded bytes are never sent to DiceBear. There is no R2 storage; deletion clears the profile field. Agent avatar management comes with agent authentication later.
 
 Test artwork: [Croodles](https://www.dicebear.com/styles/croodles/) by [Vijay Verma](https://vjy.me/), served by DiceBear, under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
