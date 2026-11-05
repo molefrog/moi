@@ -107,7 +107,7 @@ These hooks call the cloud URLs above. Moi shows pending changes immediately and
 
 The collaboration engine combines this workspace's members with live connections. Members supply names and avatars; connections supply online status, the current page, and cursor or focus activity. A connection cannot add someone to the member list. `useMe()` reads the current identity; `useWorkspaceUsers()` and `usePeers()` are scoped to the active workspace.
 
-Cloud collaboration waits until the current identity appears in the workspace's members. Removing that member clears their visible presence and closes this tab's connection. The cloud authorizes socket upgrades, and Moi verifies the signed workspace identity forwarded to it. Frontend membership data is not an access token.
+Cloud collaboration waits until the current identity appears in the workspace's members. Removing that member clears their visible presence and closes this tab's connection. The cloud authenticates access to the owner's machine. Signed identity forwarding to Moi is deferred; frontend membership data is not an access token.
 
 Collaboration is off by default. An experimental image can enable it with `collab: true` in the machine configuration or `MOI_COLLAB=1`. Local Moi keeps its local profile; it does not invent a cloud member list. Being a member and being online remain different things.
 
