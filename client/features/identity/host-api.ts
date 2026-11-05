@@ -32,18 +32,3 @@ export function installIdentityHostApi() {
     getRevision: getWorkspaceMembersRevision
   }
 }
-
-export function consumeCloudBootstrap() {
-  if (typeof window === 'undefined') return
-  const host = window as Window & {
-    __MOI_CLOUD_BOOTSTRAP__?: {
-      identity: Identity
-      workspaces: WorkspaceMembersSnapshot[]
-    }
-  }
-  const bootstrap = host.__MOI_CLOUD_BOOTSTRAP__
-  if (!bootstrap) return
-  setIdentity(bootstrap.identity)
-  setAllWorkspaceMembers(bootstrap.workspaces)
-  delete host.__MOI_CLOUD_BOOTSTRAP__
-}
