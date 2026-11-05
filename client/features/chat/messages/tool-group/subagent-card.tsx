@@ -24,6 +24,7 @@ const SPORT_ICONS = [IconPlayBasketball, IconPlayVolleyball, IconPlayFootball]
 function RunningSportNode() {
   const [i, setI] = useState(0)
   useEffect(() => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
     const t = setInterval(() => setI(n => (n + 1) % SPORT_ICONS.length), 600)
     return () => clearInterval(t)
   }, [])
