@@ -92,7 +92,7 @@ describe('installBundledSkills', () => {
       expect(result.changedSkills).toEqual(['moi-workspace'])
       expect(await Bun.file(skillMd).text()).toContain('### Styling and UI components')
       expect(await Bun.file(join(skillsDir, CHEAT_SHEET)).exists()).toBe(true)
-      expect(await Bun.file(collabGuide).text()).toBe(installedGuide)
+      expect(await Bun.file(collabGuide).exists()).toBe(false)
     })
   })
 })

@@ -13,7 +13,7 @@ import { getWorkspace } from './registry'
 
 import { harnessFor } from '../harness/registry'
 import { createDependencyInstallLogPath, scaffoldMoiDir } from './scaffold'
-import { installBundledSkills } from '../skills/template'
+import { installWorkspaceSkills } from '../skills/workspace'
 
 // Reserve a unique folder whose basename is also its workspace ID.
 export async function createWorkspaceDirectory(
@@ -55,9 +55,9 @@ export type ProvisionResult = {
   installLogPath: string
 }
 
-// Lay down everything a workspace needs: create the folder, copy the bundled
-// skills into the backend's skills dir, and bootstrap `.moi/`. Idempotent —
-// re-running refreshes skills and leaves an existing `.moi/` untouched.
+// Lay down everything a workspace needs: reset Claude/Codex's shared skill
+// (or copy skills to other backends' own destinations), and bootstrap `.moi/`.
+// Re-running refreshes skills and leaves an existing `.moi/` untouched.
 // Registration in the workspace registry is a separate, caller-owned step.
 export async function provisionWorkspace(
   workspaceRoot: string,
@@ -65,7 +65,7 @@ export async function provisionWorkspace(
 ): Promise<ProvisionResult> {
   const skillsDir = skillsDirFor(workspaceRoot, type)
   await mkdir(workspaceRoot, { recursive: true })
-  await installBundledSkills(skillsDir)
+  await installWorkspaceSkills(workspaceRoot, type)
   const installLogPath = createDependencyInstallLogPath()
   const scaffold = await scaffoldMoiDir(workspaceRoot, undefined, undefined, installLogPath)
   return { skillsDir, scaffold, installLogPath }

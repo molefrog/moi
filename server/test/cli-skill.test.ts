@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readlink, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -52,7 +52,7 @@ async function runSkill(args: string[] = []) {
 
 describe('skill CLI', () => {
   for (const command of ['update', 'install']) {
-    test(`${command} refreshes both copies and reports each path`, async () => {
+    test(`${command} resets the shared skill and reports each path`, async () => {
       const before = await runSkill()
       expect(before.match(/update available/g)).toHaveLength(2)
       const updated = await runSkill([command])
@@ -65,6 +65,9 @@ describe('skill CLI', () => {
           expect(await Bun.file(join(workspace, path, 'references', reference)).exists()).toBe(true)
         }
       }
+      expect(await readlink(join(workspace, '.claude', 'skills', 'moi-workspace'))).toBe(
+        '../../.agents/skills/moi-workspace'
+      )
       const after = await runSkill()
       expect(after.match(/up to date/g)).toHaveLength(2)
       expect(after).not.toContain('update available')
@@ -72,21 +75,21 @@ describe('skill CLI', () => {
     })
   }
 
-  test('matches before/after and file changes to the correct copy', async () => {
+  test('reports shared file changes through both agent paths', async () => {
     await runSkill(['update'])
     const codex = join(workspace, '.agents', 'skills', 'moi-workspace')
     await rm(join(codex, 'references', 'INTENTS.md'))
     const output = await runSkill(['update'])
     expect(
       output.split('\n').find(line => line.includes('.claude/skills/moi-workspace'))
-    ).toContain('(no change)')
+    ).toContain('(files changed)')
     expect(
       output.split('\n').find(line => line.includes('.agents/skills/moi-workspace'))
     ).toContain('(files changed)')
     await Bun.write(join(codex, 'SKILL.md'), '<moi-skill version="0.13.0" />\n')
     const stale = await runSkill()
     expect(stale.split('\n').find(line => line.includes('.claude/skills/moi-workspace'))).toContain(
-      'up to date'
+      'update available'
     )
     expect(stale.split('\n').find(line => line.includes('.agents/skills/moi-workspace'))).toContain(
       'update available'
@@ -96,7 +99,7 @@ describe('skill CLI', () => {
       '0.13.0'
     )
     expect(fixed.split('\n').find(line => line.includes('.claude/skills/moi-workspace'))).toContain(
-      '(no change)'
+      '0.13.0'
     )
   })
 })

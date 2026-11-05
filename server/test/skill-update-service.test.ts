@@ -99,7 +99,7 @@ describe('workspace skill update service', () => {
 
         const result = await updateWorkspaceSkills(tempRoot, primary)
         expect(result.changedSkills).toEqual(['moi-workspace'])
-        expect(result.changedSkillPaths).toEqual([stalePath])
+        expect(result.changedSkillPaths).toContain(stalePath)
         expect(result.status.updateAvailable).toBe(false)
         for (const skill of result.status.skills) expect(skill.installed).toBe(skill.bundled)
         for (const reference of ['INTENTS.md', 'UI-COMPONENTS.md']) {
@@ -109,25 +109,25 @@ describe('workspace skill update service', () => {
             ).text()
           )
         }
-        expect(await Bun.file(join(stalePath, 'local.md')).text()).toBe('keep this')
-        expect(await Bun.file(join(stalePath, 'references', 'COLLAB.md')).text()).toBe('opted in')
+        expect(await exists(join(stalePath, 'local.md'))).toBe(false)
+        expect(await exists(join(stalePath, 'references', 'COLLAB.md'))).toBe(false)
       })
     }
   }
 
   for (const primary of ['claude-code', 'codex'] as const) {
-    test(`restores missing ${primary} primary without installing absent secondary skills`, async () => {
+    test(`installs the shared skill for a missing ${primary} workspace`, async () => {
       tempRoot = await mkdtemp(join(tmpdir(), 'moi-skill-missing-'))
       const otherDirectory = primary === 'codex' ? '.claude' : '.agents'
       const otherSkills = join(tempRoot, otherDirectory, 'skills')
       await Bun.write(join(otherSkills, 'custom', 'SKILL.md'), 'custom')
       const before = await getWorkspaceSkillsStatus(tempRoot, primary)
-      expect(before.skills).toHaveLength(1)
+      expect(before.skills).toHaveLength(2)
       expect(before.skills[0].installed).toBeNull()
       expect(before.updateAvailable).toBe(true)
       const result = await updateWorkspaceSkills(tempRoot, primary)
       expect(result.status.updateAvailable).toBe(false)
-      expect(await exists(join(otherSkills, 'moi-workspace'))).toBe(false)
+      expect(await exists(join(otherSkills, 'moi-workspace'))).toBe(true)
       expect(await Bun.file(join(otherSkills, 'custom', 'SKILL.md')).text()).toBe('custom')
     })
   }
@@ -145,7 +145,7 @@ describe('workspace skill update service', () => {
   })
 
   for (const level of ['skills', 'skill'] as const) {
-    test(`preserves shared ${level} symlinks and leaves a second update untouched`, async () => {
+    test(`migrates reverse ${level} symlinks and leaves a second update untouched`, async () => {
       tempRoot = await mkdtemp(join(tmpdir(), 'moi-skill-symlink-'))
       await writeInstalledVersion(tempRoot, 'claude-code', '0.13.0')
       const claude = join(tempRoot, '.claude', 'skills', 'moi-workspace')
@@ -157,11 +157,19 @@ describe('workspace skill update service', () => {
         { recursive: true }
       )
       await symlink(target, link, 'dir')
+      if (level === 'skills') {
+        await expect(updateWorkspaceSkills(tempRoot, 'codex')).rejects.toThrow(
+          'use a real skills directory'
+        )
+        expect(await readlink(link)).toBe(target)
+        return
+      }
       const result = await updateWorkspaceSkills(tempRoot, 'codex')
       expect(result.changedSkillPaths.sort()).toEqual([claude, codex].sort())
       expect(result.status.skills).toHaveLength(2)
       expect(result.status.updateAvailable).toBe(false)
-      expect(await readlink(link)).toBe(target)
+      expect((await lstat(codex)).isDirectory()).toBe(true)
+      expect(await readlink(claude)).toBe('../../.agents/skills/moi-workspace')
       const marker = join(claude, 'SKILL.md')
       const fixedTime = new Date('2000-01-01T00:00:00.000Z')
       await utimes(marker, fixedTime, fixedTime)
@@ -170,10 +178,10 @@ describe('workspace skill update service', () => {
       expect(second.changedSkills).toEqual([])
       expect(second.changedSkillPaths).toEqual([])
       expect((await stat(marker)).mtimeMs).toBe(before)
-      expect((await lstat(link)).isSymbolicLink()).toBe(true)
+      expect((await lstat(claude)).isSymbolicLink()).toBe(true)
     })
 
-    test(`reports a broken ${level} symlink as stale and refuses to replace it`, async () => {
+    test(`recovers a broken ${level} symlink`, async () => {
       tempRoot = await mkdtemp(join(tmpdir(), 'moi-skill-broken-link-'))
       await installBundledSkills(join(tempRoot, '.claude', 'skills'))
       const secondary = join(tempRoot, '.agents', 'skills', 'moi-workspace')
@@ -183,12 +191,17 @@ describe('workspace skill update service', () => {
         { recursive: true }
       )
       await symlink('missing-target', link, 'dir')
+      if (level === 'skills') {
+        await expect(updateWorkspaceSkills(tempRoot)).rejects.toThrow('use a real skills directory')
+        expect(await readlink(link)).toBe('missing-target')
+        return
+      }
       const before = await getWorkspaceSkillsStatus(tempRoot)
       expect(before.updateAvailable).toBe(true)
       expect(before.skills.find(skill => skill.path === secondary)?.installed).toBeNull()
-      await expect(updateWorkspaceSkills(tempRoot)).rejects.toThrow(secondary)
-      expect(await readlink(link)).toBe('missing-target')
-      expect((await getWorkspaceSkillsStatus(tempRoot)).updateAvailable).toBe(true)
+      await updateWorkspaceSkills(tempRoot)
+      expect((await lstat(secondary)).isDirectory()).toBe(true)
+      expect((await getWorkspaceSkillsStatus(tempRoot)).updateAvailable).toBe(false)
     })
   }
 
@@ -202,12 +215,14 @@ describe('workspace skill update service', () => {
         const secondary = join(tempRoot, '.agents', 'skills', 'moi-workspace')
         const readOnly = blocked === 'skill' ? secondary : join(secondary, 'references')
         await mkdir(readOnly, { recursive: true })
+        await Bun.write(join(readOnly, 'locked.md'), 'Cannot remove this entry')
         await chmod(readOnly, 0o555)
         try {
           await expect(updateWorkspaceSkills(tempRoot)).rejects.toThrow(secondary)
           const status = await getWorkspaceSkillsStatus(tempRoot)
           expect(status.updateAvailable).toBe(true)
-          expect(status.skills.find(skill => skill.path === secondary)?.installed).toBe('0.13.0')
+          const failed = status.skills.find(skill => skill.path === secondary)
+          expect(failed?.installed).not.toBe(failed?.bundled)
         } finally {
           await chmod(readOnly, 0o755)
         }
@@ -221,6 +236,9 @@ describe('workspace skill update service', () => {
       const workspace = join(tempRoot, 'workspace')
       for (const harness of [type, 'claude-code', 'codex'] as const) {
         await writeInstalledVersion(workspace, harness, '0.13.0')
+        const path = join(skillsDirFor(workspace, harness), 'moi-workspace')
+        await Bun.write(join(path, 'local.md'), 'keep')
+        await Bun.write(join(path, 'references', 'COLLAB.md'), 'keep collab')
       }
       const primaryPath =
         type === 'hermes'
@@ -233,6 +251,13 @@ describe('workspace skill update service', () => {
       expect(await readSkillVersion(join(primaryPath, 'SKILL.md'))).toBe(
         result.status.skills[0].bundled
       )
+      for (const skill of result.status.skills) {
+        expect((await lstat(skill.path)).isDirectory()).toBe(true)
+        expect(await Bun.file(join(skill.path, 'local.md')).text()).toBe('keep')
+        expect(await Bun.file(join(skill.path, 'references', 'COLLAB.md')).text()).toBe(
+          'keep collab'
+        )
+      }
     })
   }
 
@@ -253,7 +278,7 @@ describe('workspace skill update service', () => {
 
   test('reports no skill changes when installed files already match', async () => {
     tempRoot = await mkdtemp(join(tmpdir(), 'moi-skill-unchanged-'))
-    await installBundledSkills(skillsDirFor(tempRoot, 'codex'))
+    await updateWorkspaceSkills(tempRoot, 'codex')
 
     const result = await updateWorkspaceSkills(tempRoot, 'codex')
 
