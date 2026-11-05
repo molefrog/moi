@@ -64,7 +64,7 @@ export function GeneralSettings() {
         <SettingsSection label="Danger zone">
           <SettingsRow
             title="Remove space"
-            description="Remove this space from Moi. Its folder and sessions stay on disk."
+            description="Removes this space from Moi, its folder and chats stay on disk"
             control={
               <AlertDialog>
                 <AlertDialogTrigger
@@ -135,6 +135,7 @@ function WorkspaceHarnessSetting() {
     <>
       <SettingsRow
         title="Agent"
+        description="Changing the agent changes which chats you see in this space"
         control={
           <Tooltip disabled={!reason}>
             <TooltipTrigger render={<span tabIndex={reason ? 0 : undefined} aria-label={reason} />}>
