@@ -1,17 +1,25 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { requestJson } from '@/client/api/http'
+import { readConnectors } from './read-connectors'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import type { McpServer } from '@/lib/types'
 
 export function useWorkspaceMcp(workspaceId: string, enabled: boolean) {
+  const queryClient = useQueryClient()
   return useQuery<McpServer[]>({
     queryKey: workspaceKeys.mcp(workspaceId),
-    queryFn: () => requestJson(`/api/workspaces/${workspaceId}/mcp`),
+    queryFn: async ({ signal }) =>
+      readConnectors(
+        await fetch(`/api/workspaces/${workspaceId}/mcp?stream=true`, { signal }),
+        connectors => {
+          if (!signal.aborted) queryClient.setQueryData(workspaceKeys.mcp(workspaceId), connectors)
+        }
+      ),
+    retry: false,
     enabled,
     staleTime: Infinity,
     gcTime: Infinity,
-    refetchOnMount: false,
+    refetchOnMount: 'always',
     refetchOnWindowFocus: false
   })
 }

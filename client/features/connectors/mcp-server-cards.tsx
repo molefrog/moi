@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 
 import { IconAlertCircleFilled } from '@tabler/icons-react'
 
@@ -15,16 +15,18 @@ function statusLabel(status: McpServer['status']): string {
 type McpServerIconProps = {
   name: string
   status: McpServer['status']
+  iconUrl?: string
 }
 
-function McpServerIcon({ name, status }: McpServerIconProps) {
-  const icon = getMcpIcon(name)
+function McpServerIcon({ name, status, iconUrl }: McpServerIconProps) {
+  const [failedIcon, setFailedIcon] = useState<string>()
+  const icon = iconUrl ?? getMcpIcon(name)
   const className = 'size-full rounded-lg ring-2 ring-background'
 
   return (
     <span className="relative size-10 shrink-0">
-      {icon ? (
-        <img src={icon} alt="" className={className} />
+      {icon && icon !== failedIcon ? (
+        <img src={icon} alt="" className={className} onError={() => setFailedIcon(icon)} />
       ) : (
         <span className="flex size-full items-center justify-center rounded-lg bg-muted text-muted-foreground ring-2 ring-background">
           <IconMcp className="size-5" />
@@ -68,9 +70,17 @@ function McpServerCardLayout({ icon, children }: McpServerCardLayoutProps) {
 
 export function McpServerCard({ server }: McpServerCardProps) {
   return (
-    <McpServerCardLayout icon={<McpServerIcon name={server.name} status={server.status} />}>
+    <McpServerCardLayout
+      icon={
+        <McpServerIcon
+          name={server.displayName ?? server.name}
+          status={server.status}
+          iconUrl={server.iconUrl}
+        />
+      }
+    >
       <div className="truncate text-sm font-medium text-foreground">
-        {formatMcpServerName(server.name)}
+        {server.displayName ?? formatMcpServerName(server.name)}
       </div>
       <span className="text-sm text-muted-foreground">{statusLabel(server.status)}</span>
     </McpServerCardLayout>

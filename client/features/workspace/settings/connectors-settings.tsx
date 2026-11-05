@@ -33,7 +33,7 @@ function ConnectorsContent({ connectors }: ConnectorsContentProps) {
     )
   }
 
-  if (connectors.isError) {
+  if (connectors.isError && !connectors.data?.length) {
     return (
       <ConnectorsState>
         <p className="text-sm text-muted-foreground">Could not load connectors</p>
@@ -44,7 +44,7 @@ function ConnectorsContent({ connectors }: ConnectorsContentProps) {
     )
   }
 
-  if (connectors.data.length === 0) {
+  if (connectors.data.length === 0 && !connectors.isFetching) {
     return (
       <ConnectorsState>
         <IconPlugConnected size={24} stroke={1.5} className="text-muted-foreground" />
@@ -54,11 +54,26 @@ function ConnectorsContent({ connectors }: ConnectorsContentProps) {
   }
 
   return (
-    <McpServerGrid>
-      {sortMcpServers(connectors.data).map(connector => (
-        <McpServerCard key={connector.name} server={connector} />
-      ))}
-    </McpServerGrid>
+    <>
+      <McpServerGrid>
+        {sortMcpServers(connectors.data).map(connector => (
+          <McpServerCard key={connector.name} server={connector} />
+        ))}
+      </McpServerGrid>
+      {connectors.isFetching && (
+        <p role="status" className="text-sm text-muted-foreground">
+          Loading connectors…
+        </p>
+      )}
+      {connectors.isError && (
+        <ConnectorsState>
+          <p className="text-sm text-muted-foreground">Couldn’t load all connectors</p>
+          <Button variant="outline" size="sm" onClick={() => connectors.refetch()}>
+            Retry
+          </Button>
+        </ConnectorsState>
+      )}
+    </>
   )
 }
 
@@ -68,20 +83,26 @@ type ConnectorsStateProps = {
 
 function ConnectorsState({ children }: ConnectorsStateProps) {
   return (
-    <div className="flex min-h-48 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border px-8 py-12 text-center">
+    <div className="flex min-h-48 flex-col items-center justify-center gap-3 px-8 py-12 text-center">
       {children}
     </div>
   )
 }
 
 export function ConnectorsSettings() {
-  const { workspaceId } = useWorkspaceLayoutCtx()
+  const { workspaceId, provider } = useWorkspaceLayoutCtx()
   const connectors = useWorkspaceMcp(workspaceId, true)
 
   return (
     <SettingsPage
       title="Connectors"
-      description="Connectors available to the agent in this workspace"
+      description={
+        provider === 'codex'
+          ? 'Manage your connectors in the ChatGPT app'
+          : provider === 'claude-code'
+            ? 'Manage your connectors in the Claude app'
+            : 'Manage your connectors in your agent’s settings'
+      }
     >
       <ConnectorsContent connectors={connectors} />
     </SettingsPage>

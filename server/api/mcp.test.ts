@@ -54,3 +54,36 @@ test('the removed global connector endpoint is not available', async () => {
 
   expect(response.status).toBe(404)
 })
+
+test('streams connector progress before discovery completes', async () => {
+  const release = Promise.withResolvers<void>()
+  codexHarness.mcpStatus = async (_ws, onProgress) => {
+    onProgress?.([{ name: 'first', status: 'connected' }])
+    await release.promise
+    return [
+      { name: 'first', status: 'connected' },
+      { name: 'second', status: 'connected' }
+    ]
+  }
+  const ws = await registerWorkspace(join(tempDir, 'stream'), { type: 'codex' })
+  const response = await api.request(`/api/workspaces/${ws.id}/mcp?stream=true`)
+  const reader = response.body!.pipeThrough(new TextDecoderStream()).getReader()
+  try {
+    const first = await reader.read()
+    expect(JSON.parse(first.value!)).toEqual({
+      connectors: [{ name: 'first', status: 'connected' }]
+    })
+    release.resolve()
+    const last = await reader.read()
+    expect(JSON.parse(last.value!)).toMatchObject({
+      done: true,
+      connectors: [
+        { name: 'first', status: 'connected' },
+        { name: 'second', status: 'connected' }
+      ]
+    })
+  } finally {
+    release.resolve()
+    await reader.cancel()
+  }
+})

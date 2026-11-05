@@ -81,7 +81,8 @@ export const codexHarness: Harness = {
     }
   },
   listModels: ws => getCodexModels(ws.path),
-  mcpStatus: ws => getCodexMcpStatus(ws.path, getLatestCodexSessionId(ws.id)),
+  mcpStatus: (ws, onProgress) =>
+    getCodexMcpStatus(ws.path, getLatestCodexSessionId(ws.id), onProgress),
   discoverWorkspaces: registeredPaths => discoverCodexWorkspaces(registeredPaths),
   availability: async ws => {
     const runtime = await pathHarnessAvailability('codex')

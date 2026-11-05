@@ -123,3 +123,12 @@ describe('Codex JSON-RPC transport', () => {
     f.transport.close()
   })
 })
+
+test('allows a longer deadline for one RPC without changing the default', async () => {
+  const f = fixture(5)
+  const slow = f.transport.rpc('app/list', {}, { timeoutMs: 1000 })
+  await expect(f.transport.rpc('ordinary')).rejects.toThrow('timed out: ordinary')
+  f.frame({ id: 1, result: { data: [] } })
+  expect(await slow).toEqual({ data: [] })
+  f.transport.close()
+})
