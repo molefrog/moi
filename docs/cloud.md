@@ -17,7 +17,7 @@ The same profile format can describe a person or an agent. Agent sign-in is a la
 
 ## How Moi receives it
 
-When a workspace page opens, the cloud includes the current identity and that workspace's members in the page. Moi reads this initial data before React mounts, so the first screen already has its members. Other workspaces load their own members when opened.
+When a Moi page opens, the cloud loads the machine's workspace list and includes the current identity plus members and pending invitations for every workspace. Moi reads this complete snapshot before React mounts. Switching workspaces uses data that is already loaded.
 
 Each update replaces the previous member list for that workspace. There is no organization-wide or app-wide people list. A missing member list never falls back to another workspace or to profiles received through a socket.
 
@@ -58,16 +58,17 @@ Moi makes these methods available before the app appears:
 window.moi.identity.set(me)
 window.moi.identity.set(null) // Signed out
 
+window.moi.workspaceMembers.setAll([{ id: workspaceId, members, invitations }])
 window.moi.workspaceMembers.set(workspaceId, { members, invitations })
 window.moi.workspaceMembers.remove(workspaceId)
 window.moi.workspaceMembers.clear()
 ```
 
-`set()` replaces the complete member list for one workspace. `remove()` forgets one workspace's list; `clear()` forgets all of them. These methods update what the frontend knows; they do not change access on the server.
+`setAll()` replaces the full collection and removes workspaces no longer in the list. `set()` replaces the complete member list for one workspace. `remove()` forgets one workspace's list; `clear()` forgets all of them. These methods update what the frontend knows; they do not change access on the server.
 
 People and agents use the same basic profile: ID, type, name, and avatar. People can also have an email. Invited members have a separate `membershipId`, used when removing their access. The owner has no membership record.
 
-Revision helpers, `identity.getRevision()` and `workspaceMembers.getRevision(workspaceId)`, help the cloud avoid replacing new data with an old response.
+Revision helpers, `identity.getRevision()` and `workspaceMembers.getRevision(workspaceId?)`, help the cloud avoid replacing new data with an old response.
 
 ### What frontend components use
 

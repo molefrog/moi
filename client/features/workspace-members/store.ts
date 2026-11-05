@@ -4,7 +4,7 @@ import { collabIdentityId, identityKey } from '../identity/types'
 import { normalizeUserProfile } from '../collab/host-state'
 import type { UserProfile } from '@/lib/collab/types'
 import { parseWorkspaceMembers, validWorkspaceId } from './types'
-import type { WorkspaceMembers } from './types'
+import type { WorkspaceMembers, WorkspaceMembersSnapshot } from './types'
 
 export const workspaceMembersPrefix = ['workspace-members'] as const
 export const workspaceMembersKey = (workspaceId: string) =>
@@ -22,7 +22,8 @@ queryClient.getQueryCache().subscribe(event => {
     if (typeof workspaceId === 'string') revisions.set(workspaceId, ++revision)
   }
 })
-export const getWorkspaceMembersRevision = (workspaceId: string) => revisions.get(workspaceId) ?? 0
+export const getWorkspaceMembersRevision = (workspaceId?: string) =>
+  workspaceId === undefined ? revision : (revisions.get(workspaceId) ?? 0)
 const directoryCache = new WeakMap<WorkspaceMembers, readonly UserProfile[]>()
 export function setWorkspaceMembers(workspaceId: string, value: WorkspaceMembers): void {
   validWorkspaceId(workspaceId)
@@ -30,6 +31,23 @@ export function setWorkspaceMembers(workspaceId: string, value: WorkspaceMembers
   // A push supersedes any older in-flight GET for this snapshot.
   void queryClient.cancelQueries({ queryKey: workspaceMembersKey(workspaceId), exact: true })
   queryClient.setQueryData(workspaceMembersKey(workspaceId), data)
+}
+export function setAllWorkspaceMembers(value: WorkspaceMembersSnapshot[]): void {
+  if (!Array.isArray(value)) throw new Error('Invalid workspace members')
+  const snapshots = value.map(workspace => ({
+    id: validWorkspaceId(workspace.id),
+    data: parseWorkspaceMembers(workspace)
+  }))
+  const ids = new Set(snapshots.map(workspace => workspace.id))
+  if (ids.size !== snapshots.length) throw new Error('Duplicate workspace id')
+  const prefix = workspaceMembersKey('').slice(0, 2)
+  void queryClient.cancelQueries({ queryKey: prefix })
+  for (const query of queryClient.getQueryCache().findAll({ queryKey: prefix })) {
+    if (!ids.has(query.queryKey[2] as string))
+      queryClient.removeQueries({ queryKey: query.queryKey, exact: true })
+  }
+  for (const workspace of snapshots)
+    queryClient.setQueryData(workspaceMembersKey(workspace.id), workspace.data)
 }
 export function removeWorkspaceMembers(workspaceId: string) {
   validWorkspaceId(workspaceId)

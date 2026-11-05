@@ -10,6 +10,7 @@ export type WorkspaceInvitation = {
   pending?: boolean
 }
 export type WorkspaceMembers = { members: WorkspaceMember[]; invitations: WorkspaceInvitation[] }
+export type WorkspaceMembersSnapshot = WorkspaceMembers & { id: string }
 export function parseWorkspaceMembers(value: unknown): WorkspaceMembers {
   if (!isRecord(value) || !Array.isArray(value.members) || !Array.isArray(value.invitations))
     throw new Error('Invalid workspace members')
