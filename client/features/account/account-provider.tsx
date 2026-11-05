@@ -10,10 +10,17 @@ import {
   subscribeCurrentUserStore
 } from '@/client/features/collab/host-state'
 import { getIdentity, setIdentity, getIdentityGeneration } from '../identity/store'
-import { isAvatar, identityKey } from '../identity/types'
+import { identityKey } from '../identity/types'
+import type { Identity } from '../identity/types'
 import { workspaceMembersPrefix } from '../workspace-members/store'
-import { accountKeys, identityQuery, updateCloudProfile, signOutCloud } from './api'
-import type { ProfilePatch } from './api'
+import {
+  accountKeys,
+  identityQuery,
+  updateCloudProfile,
+  uploadCloudAvatar,
+  removeCloudAvatar,
+  signOutCloud
+} from './api'
 
 function useAccountState() {
   const { environment, demo } = useAppConfig()
@@ -37,12 +44,12 @@ function useAccountState() {
       window.location.assign('/cloud/login')
     }
   })
-  async function saveProfile(patch: ProfilePatch) {
+  async function saveProfile(field: 'name' | 'avatar', update: () => Promise<Identity>) {
     const before = getIdentity()
     const generation = getIdentityGeneration()
     if (!before || before.type !== 'user' || before.isAnonymous)
       throw new Error('Sign in to change your profile')
-    await updateCloudProfile(patch)
+    const saved = await update()
     const current = getIdentity()
     if (
       generation !== getIdentityGeneration() ||
@@ -54,10 +61,8 @@ function useAccountState() {
     // A newer server-pushed value wins. Apply only fields still equal to their original value.
     setIdentity({
       ...current,
-      ...(patch.name !== undefined && current.name === before.name ? { name: patch.name } : {}),
-      ...(patch.avatar !== undefined && current.avatar === before.avatar
-        ? { avatar: patch.avatar ?? undefined }
-        : {})
+      ...(field === 'name' && current.name === before.name ? { name: saved.name } : {}),
+      ...(field === 'avatar' && current.avatar === before.avatar ? { avatar: saved.avatar } : {})
     })
     // Our identity write can supersede the event bridge's in-flight snapshot.
     // Refresh active lists now and mark inactive lists stale for their next mount.
@@ -68,7 +73,7 @@ function useAccountState() {
     const name = value.trim()
     if (!name || name.length > 80) throw new Error('Enter a name of up to 80 characters')
     if (cloud) {
-      await saveProfile({ name })
+      await saveProfile('name', () => updateCloudProfile({ name }))
       return name
     }
     const local = getCurrentUser()
@@ -77,10 +82,8 @@ function useAccountState() {
     setLocalUser({ ...local, name })
     return name
   }
-  async function saveAvatar(value: string) {
-    const avatar = value.trim()
-    if (avatar && !isAvatar(avatar)) throw new Error('Enter an HTTP or HTTPS image URL')
-    await saveProfile({ avatar: avatar || null })
+  async function saveAvatar(file: File | null) {
+    await saveProfile('avatar', () => (file ? uploadCloudAvatar(file) : removeCloudAvatar()))
   }
   function getStatus() {
     if (demo) return 'signed-out'
