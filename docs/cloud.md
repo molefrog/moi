@@ -34,6 +34,8 @@ Cloud URLs use the same host as Moi. For example, on Moi Run they start with `ht
 | Read identity and all sharing records | `GET /cloud/api/bootstrap`                                            |
 | Read who I am                         | `GET /cloud/api/identity`                                             |
 | Update my name or avatar              | `POST /cloud/api/auth/profile`                                        |
+| Upload or replace my avatar           | `PUT /cloud/api/me/avatar`                                            |
+| Remove my avatar                      | `DELETE /cloud/api/me/avatar`                                         |
 | Read members and pending invitations  | `GET /cloud/api/workspaces/:workspaceId/members`                      |
 | Invite someone                        | `POST /cloud/api/workspaces/:workspaceId/invitations`                 |
 | Revoke an invitation                  | `DELETE /cloud/api/workspaces/:workspaceId/invitations/:invitationId` |
@@ -41,6 +43,8 @@ Cloud URLs use the same host as Moi. For example, on Moi Run they start with `ht
 | Receive live updates                  | `/cloud/api/events` — WebSocket                                       |
 
 An invitation link opens `/cloud/invite/:invitationId`. The cloud handles sign-in and acceptance from there.
+
+Both avatar endpoints return the full updated profile. Uploads use `multipart/form-data` with a `file` field. For now this is a test implementation: it discards the file and assigns one of five built-in avatar URLs. Add `preset` with `frog`, `robot`, `cat`, `sun`, or `ghost` to choose; omit it for a random choice. Any file type is accepted, up to a 5 MB total request. There is no R2 storage. Deleting clears the avatar field; the shared test images remain available. These endpoints currently require a signed-in human account.
 
 ## Frontend storage and API
 
