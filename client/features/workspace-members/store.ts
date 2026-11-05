@@ -1,5 +1,6 @@
 import { queryClient } from '@/client/api/query-client'
-import { getIdentity } from '../identity/store'
+import { getIdentity, getIdentityGeneration } from '../identity/store'
+import type { Identity } from '../identity/types'
 import { collabIdentityId, identityKey } from '../identity/types'
 import { normalizeUserProfile } from '../collab/host-state'
 import type { UserProfile } from '@/lib/collab/types'
@@ -15,6 +16,9 @@ export const workspaceMembersKey = (workspaceId: string) =>
   ] as const
 const revisions = new Map<string, number>()
 let revision = 0
+let loadedGeneration: number | undefined
+const collectionListeners = new Set<() => void>()
+const ownerSnapshots = new WeakMap<Identity, WorkspaceMembers>()
 queryClient.getQueryCache().subscribe(event => {
   if (event.query.queryKey[0] !== workspaceMembersPrefix[0]) return
   if (event.type === 'removed' || (event.type === 'updated' && event.action.type === 'success')) {
@@ -25,6 +29,19 @@ queryClient.getQueryCache().subscribe(event => {
 export const getWorkspaceMembersRevision = (workspaceId?: string) =>
   workspaceId === undefined ? revision : (revisions.get(workspaceId) ?? 0)
 const directoryCache = new WeakMap<WorkspaceMembers, readonly UserProfile[]>()
+// Cloud routing currently opens the owner's machine. No sharing record means
+// owner-only; Moi's own workspace registry decides whether that workspace exists.
+export function ownerOnlyWorkspaceMembers(): WorkspaceMembers | undefined {
+  const owner = getIdentity()
+  if (loadedGeneration !== getIdentityGeneration() || owner?.type !== 'user' || owner.isAnonymous)
+    return undefined
+  let snapshot = ownerSnapshots.get(owner)
+  if (!snapshot) {
+    snapshot = { members: [owner], invitations: [] }
+    ownerSnapshots.set(owner, snapshot)
+  }
+  return snapshot
+}
 export function setWorkspaceMembers(workspaceId: string, value: WorkspaceMembers): void {
   validWorkspaceId(workspaceId)
   const data = parseWorkspaceMembers(value)
@@ -40,6 +57,7 @@ export function setAllWorkspaceMembers(value: WorkspaceMembersSnapshot[]): void 
   }))
   const ids = new Set(snapshots.map(workspace => workspace.id))
   if (ids.size !== snapshots.length) throw new Error('Duplicate workspace id')
+  loadedGeneration = getIdentityGeneration()
   const prefix = workspaceMembersKey('').slice(0, 2)
   void queryClient.cancelQueries({ queryKey: prefix })
   for (const query of queryClient.getQueryCache().findAll({ queryKey: prefix })) {
@@ -48,6 +66,8 @@ export function setAllWorkspaceMembers(value: WorkspaceMembersSnapshot[]): void 
   }
   for (const workspace of snapshots)
     queryClient.setQueryData(workspaceMembersKey(workspace.id), workspace.data)
+  revision++
+  collectionListeners.forEach(listener => listener())
 }
 export function removeWorkspaceMembers(workspaceId: string) {
   validWorkspaceId(workspaceId)
@@ -59,7 +79,9 @@ export function clearWorkspaceMembers() {
   queryClient.removeQueries({ queryKey: workspaceMembersPrefix })
 }
 export function getWorkspaceDirectory(workspaceId: string): readonly UserProfile[] | undefined {
-  const data = queryClient.getQueryData<WorkspaceMembers>(workspaceMembersKey(workspaceId))
+  const data =
+    queryClient.getQueryData<WorkspaceMembers>(workspaceMembersKey(workspaceId)) ??
+    ownerOnlyWorkspaceMembers()
   if (!data) return undefined
   let profiles = directoryCache.get(data)
   if (!profiles) {
@@ -76,7 +98,12 @@ export function getWorkspaceDirectory(workspaceId: string): readonly UserProfile
   return profiles
 }
 export function subscribeWorkspaceDirectory(listener: () => void) {
-  return queryClient.getQueryCache().subscribe(event => {
+  collectionListeners.add(listener)
+  const unsubscribe = queryClient.getQueryCache().subscribe(event => {
     if (event.query.queryKey[0] === workspaceMembersPrefix[0]) listener()
   })
+  return () => {
+    collectionListeners.delete(listener)
+    unsubscribe()
+  }
 }
