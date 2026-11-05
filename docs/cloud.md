@@ -44,7 +44,7 @@ Cloud URLs use the same host as Moi. For example, on Moi Run they start with `ht
 
 An invitation link opens `/cloud/invite/:invitationId`. The cloud handles sign-in and acceptance from there.
 
-Both avatar endpoints return the full updated profile. Uploads use `multipart/form-data` with a `file` field. For now this is a test implementation: it discards the file and assigns one of five built-in avatar URLs. Add `preset` with `frog`, `robot`, `cat`, `sun`, or `ghost` to choose; omit it for a random choice. Any file type is accepted, up to a 5 MB total request. There is no R2 storage. Deleting clears the avatar field; the shared test images remain available. These endpoints currently require a signed-in human account.
+Both avatar endpoints return the full updated profile. Uploads use `multipart/form-data` with a `file` field. For now this is a test implementation: it discards the file and assigns an avatar URL from an existing hosted service. Add `provider` with `pravatar`, `dicebear`, `robohash`, `uiavatars`, or `gravatar` to choose; omit it for Pravatar. Random seeds contain no user information and uploaded bytes are never sent to the provider. Any file type is accepted, up to a 5 MB total request. There is no R2 storage. Deleting clears the avatar field; there is no stored image file to delete. These endpoints currently require a signed-in human account.
 
 ## Frontend storage and API
 
