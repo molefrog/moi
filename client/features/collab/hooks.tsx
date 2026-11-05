@@ -10,7 +10,7 @@ import type { JsonValue } from 'moi'
 import type { PresenceValue } from 'moi/collab'
 
 import { useAppletPresence, useCollabEngine } from './provider'
-import { resolvePeers, resolveUser, workspaceProfiles } from './users'
+import { resolvePeers, resolveUser, workspaceProfiles, userStatus } from './users'
 import type { WorkspaceUser, UsePeersOptions, UseWorkspaceUsersOptions } from './users'
 import { createPresencePublisher } from './presence-publisher'
 
@@ -58,10 +58,10 @@ export function useWorkspaceUsers({ status }: UseWorkspaceUsersOptions = {}): Wo
   )
 }
 export function useMe(): WorkspaceUser | undefined {
-  const { state, self, users } = useUsersSource()
+  const { state, self } = useUsersSource()
   return useMemo(
-    () => (self ? resolveUser({ ...state, users }, self.id) : undefined),
-    [state, self, users]
+    () => (self ? { ...self, status: userStatus(state.connections, self.id) } : undefined),
+    [state, self]
   )
 }
 export function usePeers(options: UsePeersOptions = {}): WorkspaceUser[] {

@@ -67,6 +67,7 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@tabler/icons-react": "^3.46.0",
     "@tailwindcss/typography": "^0.5.20",
+    "@tanstack/query-core": "5.102.8",
     "@tanstack/react-query": "^5.102.8",
     "@tldraw/store": "5.2.3",
     "@tldraw/tlschema": "5.2.3",

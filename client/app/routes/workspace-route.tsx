@@ -1,3 +1,4 @@
+import { useWorkspaceMembers } from '@/client/features/workspace-members/hooks'
 import { useWorkspaceHarnessChanges } from '@/client/features/workspace/harness-transition'
 import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
 import { CollabProvider, useCollabEnabled } from '@/client/features/collab'
@@ -26,6 +27,7 @@ type WorkspaceRouteProps = {
 // Navigation reads the raw browser address so encoded paths and query params
 // are decoded exactly once; the route only owns the workspace ID.
 export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
+  useWorkspaceMembers(id)
   const { collab } = useAppConfig()
 
   return (

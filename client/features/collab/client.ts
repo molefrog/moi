@@ -1,3 +1,4 @@
+import { getWorkspaceDirectory, subscribeWorkspaceDirectory } from '../workspace-members/store'
 import { wsUrl } from '@/client/lib/ws-url'
 import { COLLAB_PROTOCOL_VERSION } from '@/lib/collab/protocol'
 import type {
@@ -8,12 +9,7 @@ import type {
   PresenceRegistration
 } from '@/lib/collab/types'
 
-import {
-  getCurrentUser,
-  getDirectory,
-  subscribeCurrentUserStore,
-  subscribeDirectoryStore
-} from './host-state'
+import { getCurrentUser, subscribeCurrentUserStore, getCurrentUserSource } from './host-state'
 import { CollabStore, DISCONNECTED_STATE } from './store'
 import type { ClientState, PresenceEntry } from './store'
 
@@ -31,8 +27,7 @@ export type CollabEngineApi = {
   subscribe: (listener: () => void) => Unsubscribe
   getCurrentUser: () => UserProfile | undefined
   subscribeCurrentUser: (listener: () => void) => Unsubscribe
-  // Everyone an outer host published. Undefined without a host, in which
-  // case live users stand in.
+  // Authoritative members of this workspace; never an app-wide directory.
   getDirectory: () => readonly UserProfile[] | undefined
   subscribeDirectory: (listener: () => void) => Unsubscribe
   getLocation: () => ConnectionLocation | null
@@ -54,8 +49,8 @@ export const NO_ENGINE: CollabEngineApi = {
   subscribe: () => noop,
   getCurrentUser,
   subscribeCurrentUser: subscribeCurrentUserStore,
-  getDirectory,
-  subscribeDirectory: subscribeDirectoryStore,
+  getDirectory: () => undefined,
+  subscribeDirectory: () => noop,
   getLocation: () => null,
   setLocation: noop,
   setPresence: noop,
@@ -68,12 +63,14 @@ export class CollabClient implements CollabEngineApi {
   private socket: WebSocket | null = null
   private retry: ReturnType<typeof setTimeout> | undefined
   private heartbeat: ReturnType<typeof setInterval> | undefined
+  private unsubscribeMembers: (() => void) | undefined
   private unsubscribeCurrentUser: (() => void) | undefined
   private presenceTimer: ReturnType<typeof setTimeout> | undefined
   private queuedPresence = new Map<string, CollabClientMessage>()
   private stopped = true
   private attempts = 0
   private lastMessageAt = 0
+  private localDirectory: readonly UserProfile[] | undefined
   private userId = getCurrentUser()?.id
 
   constructor(
@@ -92,8 +89,23 @@ export class CollabClient implements CollabEngineApi {
     this.enabled ? this.store.subscribe(listener) : noop
   getCurrentUser = getCurrentUser
   subscribeCurrentUser = subscribeCurrentUserStore
-  getDirectory = getDirectory
-  subscribeDirectory = subscribeDirectoryStore
+  getDirectory = () => {
+    const members = getWorkspaceDirectory(this.workspaceId)
+    if (members !== undefined) return members
+    // Standalone Moi has one local viewer. Cloud membership never falls back.
+    const local = getCurrentUserSource() !== 'external' ? getCurrentUser() : undefined
+    if (!local) return undefined
+    if (this.localDirectory?.[0] !== local) this.localDirectory = [local]
+    return this.localDirectory
+  }
+  subscribeDirectory = (listener: () => void) => {
+    const members = subscribeWorkspaceDirectory(listener)
+    const identity = subscribeCurrentUserStore(listener)
+    return () => {
+      members()
+      identity()
+    }
+  }
   getLocation = (): ConnectionLocation | null => (this.enabled ? this.store.getLocation() : null)
   setLocation = (location: ConnectionLocation | null): void => {
     this.store.setLocation(location)
@@ -120,12 +132,24 @@ export class CollabClient implements CollabEngineApi {
         else this.connect()
       } else if (profile) this.send({ type: 'profile', profile })
     })
+    this.unsubscribeMembers = subscribeWorkspaceDirectory(() => {
+      if (!this.wantsConnection()) {
+        clearTimeout(this.retry)
+        this.socket?.close()
+        this.store.disconnect()
+      } else this.connect()
+    })
     this.connect()
     return () => this.stop()
   }
 
   private wantsConnection(): boolean {
-    return !this.stopped && getCurrentUser() !== undefined
+    const viewer = getCurrentUser()
+    return (
+      !this.stopped &&
+      viewer !== undefined &&
+      this.getDirectory()?.some(member => member.id === viewer.id) === true
+    )
   }
 
   private connect(): void {
@@ -226,6 +250,7 @@ export class CollabClient implements CollabEngineApi {
   private stop(): void {
     this.stopped = true
     this.unsubscribeCurrentUser?.()
+    this.unsubscribeMembers?.()
     clearTimeout(this.retry)
     clearTimeout(this.presenceTimer)
     this.presenceTimer = undefined

@@ -48,7 +48,7 @@ export type CloudflareAccessConfig = {
 
 const DEFAULTS: AppConfig = {
   environment: 'local',
-  // Temporarily disabled while collaboration is being reconsidered.
+  // Experimental; deployments opt in explicitly.
   collab: false,
   demo: false,
   demoInstallUrl: 'https://moi.computer',
@@ -198,6 +198,7 @@ function fileValues(raw: Record<string, unknown>): Partial<AppConfig> {
   const out: Partial<AppConfig> = {}
   const environment = parseEnvironment(raw.environment)
   if (environment !== undefined) out.environment = environment
+  if (typeof raw.collab === 'boolean') out.collab = raw.collab
   if (raw.demo !== undefined) {
     if (typeof raw.demo === 'boolean') out.demo = raw.demo
     else warn('ignoring "demo" — expected a boolean')
@@ -225,6 +226,7 @@ export function loadAppConfig(
   const fromEnv: Partial<AppConfig> = {
     environment: parseEnvironment(env.MOI_ENVIRONMENT),
     demo: parseBool(env.MOI_DEMO),
+    collab: parseBool(env.MOI_COLLAB),
     demoInstallUrl: parseString(env.MOI_DEMO_INSTALL_URL)
   }
   const merged = { ...DEFAULTS, ...fromFile }

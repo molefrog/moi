@@ -6,7 +6,9 @@ import type { CollabClientMessage } from '@/lib/collab/types'
 import { CollabService } from '@/server/collab/service'
 
 import { CollabClient, NO_ENGINE } from './client'
-import { getCurrentUser, publishUsers } from './host-state'
+import { getCurrentUser, setExternalUser } from './host-state'
+import { setIdentity } from '../identity/store'
+import { setWorkspaceMembers, clearWorkspaceMembers } from '../workspace-members/store'
 import type { UserProfileInput } from './host-state'
 
 const originalLocation = Object.getOwnPropertyDescriptor(globalThis, 'location')
@@ -17,10 +19,21 @@ let stop: (() => void) | undefined
 
 // Publish as an outer host would: one viewer, listed in the directory.
 function signIn(user: UserProfileInput, others: readonly UserProfileInput[] = []) {
-  publishUsers({ me: user.id, users: [user, ...others] })
+  setExternalUser(user)
+  setWorkspaceMembers('workspace', {
+    members: [user, ...others].map(u => ({
+      id: u.id,
+      type: 'user' as const,
+      name: u.name ?? '',
+      email: u.email ?? '',
+      isAnonymous: false
+    })),
+    invitations: []
+  })
 }
 function signOut() {
-  publishUsers({ users: [] })
+  setIdentity(null)
+  clearWorkspaceMembers()
 }
 
 class TestSocket {
@@ -280,12 +293,15 @@ test('a directory change that leaves the viewer alone sends nothing to the room'
   sockets[0]!.open()
   const sent = sockets[0]!.sent.length
   signIn(alice, [{ ...bob, name: 'Robert' }])
-  expect(engine.getDirectory()).toEqual([alice, { ...bob, name: 'Robert' }])
+  expect(engine.getDirectory()?.map(u => [u.id, u.name])).toEqual([
+    ['alice', 'Alice'],
+    ['bob', 'Robert']
+  ])
   expect(sockets[0]!.sent).toHaveLength(sent)
   expect(sockets).toHaveLength(1)
 })
 
-test('changing user reconnects and never sends the host directory over the socket', async () => {
+test('changing user reconnects and never sends workspace membership over the socket', async () => {
   signIn({ id: 'alice', name: 'Alice', color: 'emerald' })
   const engine = new CollabClient('workspace')
   stop = engine.start()
@@ -307,11 +323,11 @@ test('disabled engine exposes host profiles without starting a transport', () =>
   expect(engine.enabled).toBe(false)
   expect(engine.workspaceId).toBe('workspace')
   expect(engine.getCurrentUser()).toEqual(alice)
-  expect(engine.getDirectory()).toEqual([alice])
+  expect(engine.getDirectory()?.map(u => u.id)).toEqual(['alice'])
   let updates = 0
   const unsubscribe = engine.subscribeDirectory(() => updates++)
   signIn(alice, [bob])
-  expect(engine.getDirectory()).toEqual([alice, bob])
+  expect(engine.getDirectory()?.map(u => u.id)).toEqual(['alice', 'bob'])
   expect(updates).toBe(1)
   engine.setLocation({ page: 'overview', status: 'active' })
   engine.setPresence({
@@ -347,22 +363,46 @@ test('engine cleanup survives remounting and does not leave user listeners or re
   expect(engine.getSnapshot().status).toBe('connected')
 })
 
-test('the default engine keeps the viewer and directory readable while workspace operations stay inert', () => {
+test('the default engine exposes identity but no workspace directory or transport', () => {
   const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
   const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
   signIn(alice, [bob])
   expect(NO_ENGINE.getCurrentUser()).toEqual(alice)
-  // The directory belongs to the app, not to a workspace, so it needs no engine.
-  expect(NO_ENGINE.getDirectory()).toEqual([alice, bob])
+  // No workspace means no member directory.
+  expect(NO_ENGINE.getDirectory()).toBeUndefined()
   let updates = 0
   const unsubscribe = NO_ENGINE.subscribeDirectory(() => updates++)
   signIn(alice)
   unsubscribe()
-  expect([NO_ENGINE.getDirectory(), updates]).toEqual([[alice], 1])
+  expect([NO_ENGINE.getDirectory(), updates]).toEqual([undefined, 0])
   expect(NO_ENGINE.getPresenceSnapshot('one', 'field')).toBe(
     NO_ENGINE.getPresenceSnapshot('two', 'cursor')
   )
   NO_ENGINE.start()()
   NO_ENGINE.setLocation({ page: 'overview', status: 'active' })
   expect(sockets).toHaveLength(0)
+})
+
+test('cloud presence waits for this workspace membership and closes when access is removed', () => {
+  const viewer = { id: 'alice', name: 'Alice', color: 'emerald' } as const
+  signIn(viewer)
+  const engine = new CollabClient('other-workspace')
+  stop = engine.start()
+  expect(sockets).toHaveLength(0)
+  expect(engine.getDirectory()).toBeUndefined()
+  const member = {
+    id: 'alice',
+    type: 'user',
+    name: 'Alice',
+    email: 'alice@example.com',
+    isAnonymous: false
+  } as const
+  setWorkspaceMembers('other-workspace', { members: [member], invitations: [] })
+  expect(sockets).toHaveLength(1)
+  sockets[0]!.open()
+  expect(engine.getSnapshot().status).toBe('connected')
+  setWorkspaceMembers('other-workspace', { members: [], invitations: [] })
+  expect(sockets[0]!.readyState).toBe(3)
+  expect(engine.getSnapshot().connections).toEqual([])
+  expect(engine.getDirectory()).toEqual([])
 })

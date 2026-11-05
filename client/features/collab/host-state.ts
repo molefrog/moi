@@ -4,31 +4,13 @@ import type { AuthProvider, ProxyUserState, UserProfile } from '@/lib/collab/typ
 import { createLocalUser } from './local-user'
 
 export type UserProfileInput = Omit<UserProfile, 'color'> & { color?: UserProfile['color'] }
-// What an outer host publishes: the viewer's id and everyone moi may show.
-// `me` must be listed in `users`; leave it out when nobody is signed in.
-export type HostUsers = {
-  me?: string | null
-  users: readonly UserProfileInput[]
-}
-// `window.moi.collab`. An outer host calls it from a module script placed after
-// moi's bundle, once at startup and again whenever a user or the viewer changes.
-// A classic inline script runs before the bundle and finds nothing here.
-//
-//   window.moi.collab.publishUsers({ me: 'alex', users: [{ id: 'alex', name: 'Alex' }] })
-export type HostApi = { publishUsers: (next: HostUsers) => void }
 // Who supplies the current user: local setup, an outer host, or an auth proxy.
 export type CurrentUserSource = 'local' | 'external' | AuthProvider
 
 const PROFILE_KEY = 'moi:local-profile'
-const NO_USERS: readonly UserProfile[] = Object.freeze([])
 let currentUser: UserProfile | undefined
 let currentUserSource: CurrentUserSource | undefined
-// One list for the whole app. Undefined until a host publishes; from then on it
-// is authoritative, including when it is empty.
-let directory: readonly UserProfile[] | undefined
-let installed = false
 const listeners = new Set<() => void>()
-const directoryListeners = new Set<() => void>()
 
 // Normalized profiles list their fields in one order, so text equality is exact.
 function sameProfile(a: UserProfile | undefined, b: UserProfile | undefined): boolean {
@@ -67,40 +49,13 @@ export function normalizeUsers(users: readonly UserProfileInput[]): readonly Use
   return Object.freeze(snapshot)
 }
 
-// Replaces the viewer and the whole directory in one step. The host sends the
-// full list every time, so a removal is simply an id that is no longer there.
-// Invalid input throws and publishes nothing.
-export function publishUsers(next: HostUsers): void {
-  if (!next || typeof next !== 'object') throw new Error('Users must be published as an object.')
-  const users = normalizeUsers(next.users)
-  let user: UserProfile | undefined
-  if (next.me !== undefined && next.me !== null) {
-    if (typeof next.me !== 'string') throw new Error('The current user id must be a string.')
-    const id = next.me.trim()
-    user = users.find(candidate => candidate.id === id)
-    if (!user) throw new Error('The current user must be listed in users.')
-  }
-  // An unchanged viewer keeps its profile object and stays quiet: every notice
-  // makes each open workspace resend that profile to its room.
-  const changed = currentUserSource !== 'external' || !sameProfile(currentUser, user)
-  // Publish every field before notifying any observer, including transport listeners.
+// Cloud identity is independent of every workspace's member list.
+export function setExternalUser(profile: UserProfileInput | undefined): void {
+  const next = profile ? normalizeUserProfile(profile) : undefined
+  const changed = currentUserSource !== 'external' || !sameProfile(currentUser, next)
   currentUserSource = 'external'
-  if (changed) currentUser = user
-  // A signed-out viewer sees no one, whatever the host still lists.
-  directory = user ? users : NO_USERS
+  if (changed) currentUser = next
   if (changed) listeners.forEach(listener => listener())
-  directoryListeners.forEach(listener => listener())
-}
-
-export function getDirectory(): readonly UserProfile[] | undefined {
-  return directory
-}
-
-export function subscribeDirectoryStore(listener: () => void): () => void {
-  directoryListeners.add(listener)
-  return () => {
-    directoryListeners.delete(listener)
-  }
 }
 
 export function getCurrentUser(): UserProfile | undefined {
@@ -168,17 +123,6 @@ export function initializeLocalUser(local: boolean, proxyUser: ProxyUserState | 
     // Invalid or unavailable storage starts a fresh local profile.
   }
   setLocalUser(createLocalUser())
-}
-
-// Runs while moi's bundle evaluates, so a host script placed after the bundle
-// finds `publishUsers` at once and can publish before the app mounts.
-export function installHostApi(): void {
-  if (typeof window === 'undefined' || installed) return
-  installed = true
-  const host = window as Window & { moi?: { collab?: HostApi; [key: string]: unknown } }
-  host.moi ??= {}
-  const api: HostApi = { publishUsers }
-  host.moi.collab = api
 }
 
 // Storage events update this tab without writing back and triggering another event.

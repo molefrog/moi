@@ -61,7 +61,7 @@ test('boolean env accepts 1/true/0/false and ignores anything else', () => {
 })
 
 test.each([true, { enabled: true }])(
-  'collab config %j cannot enable collaboration',
+  'collaboration requires a boolean flag and honors its environment override: %j',
   async collab => {
     const file = await configFile(
       JSON.stringify({
@@ -72,12 +72,13 @@ test.each([true, { enabled: true }])(
     )
     const config = loadAppConfig(file, {
       MOI_EXPERIMENTS: 'collab',
-      MOI_COLLAB: '1',
       MOI_ENVIRONMENT: 'cloud',
       MOI_DEV: '1'
     })
     expect(config).not.toHaveProperty('experimental')
-    expect(config.collab).toBe(false)
+    expect(config.collab).toBe(collab === true)
+    expect(loadAppConfig(file, { MOI_COLLAB: '1' }).collab).toBe(true)
+    expect(loadAppConfig(file, { MOI_COLLAB: '0' }).collab).toBe(false)
   }
 )
 
