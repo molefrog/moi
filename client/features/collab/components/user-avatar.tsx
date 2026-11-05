@@ -40,12 +40,7 @@ export function UserAvatar({
   const name = user ? userDisplayName(user) : 'Unknown user'
 
   return (
-    <Avatar
-      size={size}
-      aria-label={name}
-      data-collab-color={user?.color ?? 'unknown'}
-      className={cn('after:border-0', className)}
-    >
+    <Avatar size={size} aria-label={name} className={cn('after:border-0', className)}>
       {user?.avatar && <AvatarImage src={user.avatar} alt="" />}
       <AvatarFallback>
         {user ? (
@@ -54,11 +49,10 @@ export function UserAvatar({
             name={user.id}
             animate="hover"
             background="circle"
-            traits={{ 'eye.rx': 1 }}
             palette={{
-              bg: 'var(--collab)',
-              head: 'var(--collab)',
-              eye: 'var(--collab-foreground)'
+              bg: 'color-mix(in srgb, var(--muted) 85%, var(--foreground))',
+              head: 'color-mix(in srgb, var(--muted) 85%, var(--foreground))',
+              eye: 'var(--foreground)'
             }}
           />
         ) : (

@@ -65,7 +65,7 @@ function LocalUserEditor({ profile }: LocalUserEditorProps) {
           Local user
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Change your avatar color here. Edit your name in Settings.
+          Change your collaboration color here. Edit your name in Settings.
         </p>
       </header>
       <div className="flex flex-col gap-5">
