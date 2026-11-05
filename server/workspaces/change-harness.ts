@@ -7,8 +7,7 @@ import { publishEvent } from '../events'
 import { updateWorkspaceState } from '../workspace-state'
 import { getWorkspace, updateWorkspaceHarness } from './registry'
 import { HarnessTransitionError, withHarnessTransition } from './harness-transition'
-import { skillsDirFor } from './init'
-import { installBundledSkills } from '../skills/template'
+import { installWorkspaceSkills } from '../skills/workspace'
 
 // Keep successful preparation for this server lifetime; failed attempts can retry.
 const preparation = new Map<string, Promise<void>>()
@@ -19,7 +18,7 @@ export function prepareWorkspaceHarness(ws: WorkspaceEntry): Promise<void> {
     pending = getWorkspaceSkillsStatus(ws.path, ws.type)
       .then(async status => {
         if (status.skills.some(skill => !skill.installed))
-          await installBundledSkills(skillsDirFor(ws.path, ws.type))
+          await installWorkspaceSkills(ws.path, ws.type)
       })
       .catch(error => {
         preparation.delete(key)

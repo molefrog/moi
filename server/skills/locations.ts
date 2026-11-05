@@ -5,6 +5,7 @@ import type { WorkspaceType } from '@/lib/types'
 
 import { skillsDirFor } from '../workspaces/init'
 import { bundledSkillNames } from './template'
+import { usesSharedWorkspaceSkill } from './workspace'
 
 type SkillDirectory = {
   targetPath: string
@@ -18,7 +19,8 @@ export type SkillLocation = SkillDirectory & {
 }
 
 // Resolve existing links, including links in parents of a missing installation.
-// A dangling link is distinct from an absent directory: updates must not replace it.
+// A dangling link is distinct from an absent directory. Claude/Codex can reset
+// their owned skill links; other harnesses keep reporting them as errors.
 async function inspectDirectory(path: string): Promise<SkillDirectory> {
   const entry = await lstat(path).catch((error: unknown) => {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
@@ -31,15 +33,18 @@ async function inspectDirectory(path: string): Promise<SkillDirectory> {
   try {
     return { exists: true, targetPath: await realpath(path) }
   } catch (error) {
-    if (entry.isSymbolicLink() && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+    if (
+      entry.isSymbolicLink() &&
+      ['ENOENT', 'ELOOP'].includes((error as NodeJS.ErrnoException).code ?? '')
+    ) {
       return { exists: true, targetPath: path, brokenLink: path }
     }
     throw error
   }
 }
 
-// The primary harness destination is required; other harnesses only participate
-// when this particular bundled skill is installed there (or its link is broken).
+// Claude/Codex require both paths to the shared skill. Other harnesses require
+// their primary destination and include existing Claude/Codex installations.
 export async function resolveSkillLocations(
   workspaceRoot: string,
   type?: WorkspaceType
@@ -55,7 +60,12 @@ export async function resolveSkillLocations(
       const path = join(directory, name)
       try {
         const inspected = await inspectDirectory(path)
-        if (directory === primary || inspected.exists || inspected.brokenLink) {
+        if (
+          usesSharedWorkspaceSkill(type) ||
+          directory === primary ||
+          inspected.exists ||
+          inspected.brokenLink
+        ) {
           locations.push({ name, path, ...inspected })
         }
       } catch (cause) {

@@ -1,6 +1,6 @@
 import '../api/index'
 import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readlink, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as executable from '../harness/executable'
@@ -142,13 +142,20 @@ test('restores session selections even when layout rollback also fails', async (
 test('prepares missing skills once, shares concurrent preparation, and retries failures', async () => {
   const { prepareWorkspaceHarness } = await import('./change-harness')
   const skills = await import('../skills/update')
-  const template = await import('../skills/template')
+  const template = await import('../skills/workspace')
   const ws = await registerWorkspace(root, { type: 'codex' })
   const status = spyOn(skills, 'getWorkspaceSkillsStatus').mockResolvedValue({
-    skills: [{ name: 'moi-workspace', installed: null, bundled: '1.0.0' }],
+    skills: [
+      {
+        name: 'moi-workspace',
+        path: join(root, '.agents', 'skills', 'moi-workspace'),
+        installed: null,
+        bundled: '1.0.0'
+      }
+    ],
     updateAvailable: true
   })
-  const install = spyOn(template, 'installBundledSkills')
+  const install = spyOn(template, 'installWorkspaceSkills')
     .mockRejectedValueOnce(new Error('Install failed'))
     .mockResolvedValue(['moi-workspace'])
   try {
@@ -157,9 +164,23 @@ test('prepares missing skills once, shares concurrent preparation, and retries f
     await prepareWorkspaceHarness(ws)
     expect(install).toHaveBeenCalledTimes(2)
     expect(status).toHaveBeenCalledTimes(2)
-    expect(install).toHaveBeenLastCalledWith(join(root, '.agents', 'skills'))
+    expect(install).toHaveBeenLastCalledWith(root, 'codex')
   } finally {
     status.mockRestore()
     install.mockRestore()
   }
 })
+
+for (const type of ['claude-code', 'codex'] as const) {
+  test(`preparing ${type} installs the shared skill and Claude link`, async () => {
+    const { prepareWorkspaceHarness } = await import('./change-harness')
+    const ws = await registerWorkspace(root, { type })
+    await prepareWorkspaceHarness(ws)
+    expect(
+      await Bun.file(join(root, '.agents', 'skills', 'moi-workspace', 'SKILL.md')).exists()
+    ).toBe(true)
+    expect(await readlink(join(root, '.claude', 'skills', 'moi-workspace'))).toBe(
+      '../../.agents/skills/moi-workspace'
+    )
+  })
+}

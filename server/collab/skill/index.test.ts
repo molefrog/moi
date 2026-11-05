@@ -78,7 +78,7 @@ test('optional guide uses each harness skill directory', async () => {
   }
 })
 
-test('ordinary workspace provisioning omits collab and preserves a manually installed guide', async () => {
+test('ordinary workspace provisioning resets the skill and omits collab', async () => {
   const workspace = await mkdtemp(join(tmpdir(), 'moi-collab-provision-'))
   directories.push(workspace)
   // An existing scaffold skips dependency installation; this exercises the
@@ -95,9 +95,8 @@ test('ordinary workspace provisioning omits collab and preserves a manually inst
   expect(await Bun.file(referencePath).exists()).toBe(false)
   expect(await Bun.file(typesPath).exists()).toBe(false)
   await installCollabSkill(workspace, 'codex')
-  const reference = await Bun.file(referencePath).text()
   const declarations = await Bun.file(typesPath).text()
   await provisionWorkspace(workspace, 'codex')
-  expect(await Bun.file(referencePath).text()).toBe(reference)
+  expect(await Bun.file(referencePath).exists()).toBe(false)
   expect(await Bun.file(typesPath).text()).toBe(declarations)
 })

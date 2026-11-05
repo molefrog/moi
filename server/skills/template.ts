@@ -31,7 +31,7 @@ function isDefaultSkillFile(source: string): boolean {
   return source !== COLLAB_REFERENCE_SOURCE_PATH
 }
 
-async function matchesBundledPath(source: string, target: string): Promise<boolean> {
+async function matchesBundledPath(source: string, target: string, exact = false): Promise<boolean> {
   const sourceStat = await lstat(source)
   const targetStat = await lstat(target).catch(() => null)
   if (!targetStat) return false
@@ -39,8 +39,9 @@ async function matchesBundledPath(source: string, target: string): Promise<boole
   if (sourceStat.isDirectory()) {
     if (!targetStat.isDirectory()) return false
     const entries = (await readdir(source)).filter(entry => isDefaultSkillFile(join(source, entry)))
+    if (exact && (await readdir(target)).length !== entries.length) return false
     const matches = await Promise.all(
-      entries.map(entry => matchesBundledPath(join(source, entry), join(target, entry)))
+      entries.map(entry => matchesBundledPath(join(source, entry), join(target, entry), exact))
     )
     return matches.every(Boolean)
   }
@@ -58,6 +59,10 @@ async function matchesBundledPath(source: string, target: string): Promise<boole
   }
 
   return false
+}
+
+export function matchesBundledSkill(name: string, target: string): Promise<boolean> {
+  return matchesBundledPath(join(BUNDLED_SKILLS_DIR, name), target, true)
 }
 
 // Copy changed shipped skill folders into `targetSkillsDir`. Leaves identical
