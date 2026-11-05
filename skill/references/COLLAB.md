@@ -124,7 +124,6 @@ distinct `id` values. A single area can omit `id`, which defaults to `"default"`
 
 ```tsx
 import { Cursors } from 'moi/collab'
-
 ;<Cursors id="board">{children}</Cursors>
 ```
 
@@ -164,7 +163,6 @@ owns focus when wrappers are nested.
 import { PresenceFrame, PresenceAvatars } from 'moi/collab'
 import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
-
 ;<>
   <PresenceFrame id="title" align="start">
     <label htmlFor="title">Title</label>
@@ -213,7 +211,6 @@ Wrap each record in a group so its fields belong to that record.
 ```tsx
 import { PresenceGroup, PresenceFrame } from 'moi/collab'
 import { Input } from '../ui/input'
-
 ;<PresenceGroup id={task.id}>
   <PresenceFrame id="title">
     <Input aria-label="Task title" defaultValue={task.title} />
@@ -237,7 +234,6 @@ its avatar glides from the previous target to the next.
 ```tsx
 import { PresenceGroup, PresenceAvatars } from 'moi/collab'
 import { Input } from '../ui/input'
-
 ;<PresenceGroup id="tasks">
   {tasks.map(task => (
     <PresenceAvatars key={task.id} id={task.id}>
