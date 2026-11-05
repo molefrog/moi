@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path'
 import { provisionWorkspace } from '../workspaces/init'
 import { getWorkspaceSkillsStatus, updateWorkspaceSkills } from './update'
 import { bundledSkillDirectory } from './template'
+import { installWorkspaceSkills } from './workspace'
 
 const roots: string[] = []
 
@@ -20,6 +21,48 @@ async function fixture() {
 
 afterEach(async () => {
   for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true })
+})
+
+test('concurrent provisioning and updates share one lock through workspace aliases', async () => {
+  const { root, workspace, canonical, claude } = await fixture()
+  await mkdir(workspace, { recursive: true })
+  const alias = join(root, 'alias')
+  await symlink(workspace, alias, 'dir')
+
+  const results = await Promise.all(
+    Array.from({ length: 12 }, (_, index) => {
+      const path = index % 2 === 0 ? workspace : alias
+      return index % 3 === 0
+        ? installWorkspaceSkills(path, 'claude-code')
+        : updateWorkspaceSkills(path, 'codex')
+    })
+  )
+
+  expect(results).toHaveLength(12)
+  expect(await realpath(claude)).toBe(await realpath(canonical))
+  expect(await Bun.file(join(canonical, 'SKILL.md')).text()).toBe(
+    await Bun.file(join(bundledSkillDirectory('moi-workspace'), 'SKILL.md')).text()
+  )
+  expect((await getWorkspaceSkillsStatus(workspace)).updateAvailable).toBe(false)
+  expect((await updateWorkspaceSkills(workspace)).changedSkills).toEqual([])
+})
+
+test('failed installations release the lock for queued calls and later retries', async () => {
+  const { workspace, canonical, claude } = await fixture()
+  const skills = join(workspace, '.claude', 'skills')
+  await mkdir(dirname(skills), { recursive: true })
+  await symlink('../.agents/skills', skills, 'dir')
+
+  const attempts = await Promise.allSettled([
+    installWorkspaceSkills(workspace),
+    updateWorkspaceSkills(workspace)
+  ])
+  expect(attempts.map(attempt => attempt.status)).toEqual(['rejected', 'rejected'])
+
+  await rm(skills)
+  await updateWorkspaceSkills(workspace)
+  expect(await realpath(claude)).toBe(await realpath(canonical))
+  expect((await getWorkspaceSkillsStatus(workspace)).updateAvailable).toBe(false)
 })
 
 for (const type of ['claude-code', 'codex'] as const) {

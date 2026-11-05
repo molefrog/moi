@@ -5,6 +5,7 @@ import type { WorkspaceType } from '@/lib/types'
 
 import { installBundledSkill, installBundledSkills, matchesBundledSkill } from './template'
 import { skillsDirFor } from '../workspaces/init'
+import { withSkillLock } from './lock'
 
 const SKILL_NAME = 'moi-workspace'
 
@@ -29,6 +30,20 @@ async function checkSkillsDirectory(path: string): Promise<void> {
 }
 
 export async function installWorkspaceSkills(
+  root: string,
+  type?: WorkspaceType
+): Promise<string[]> {
+  return withSkillLock(workspaceSkillLockPath(root, type), () =>
+    installWorkspaceSkillFiles(root, type)
+  )
+}
+
+export function workspaceSkillLockPath(root: string, type?: WorkspaceType): string {
+  return usesSharedWorkspaceSkill(type) ? join(root, '.agents', 'skills') : skillsDirFor(root, type)
+}
+
+// Callers must hold the workspace skill lock across any surrounding status reads.
+export async function installWorkspaceSkillFiles(
   root: string,
   type?: WorkspaceType
 ): Promise<string[]> {
