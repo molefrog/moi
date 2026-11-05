@@ -6,7 +6,7 @@ import './index.css'
 
 import { initializeLocalUser, subscribeLocalProfileStorage } from './features/collab/host-state'
 
-import { installIdentityHostApi, consumeCloudBootstrap } from './features/identity/host-api'
+import { installIdentityHostApi } from './features/identity/host-api'
 
 import { startHmrWatchdog } from './runtime/hmr-watchdog'
 
@@ -25,9 +25,8 @@ if (import.meta.hot) {
   startHmrWatchdog()
 }
 
-// The host seeds identity and workspace members before React mounts.
+// A host can call this API after the entry chunk and before #moi-start mounts React.
 installIdentityHostApi()
-consumeCloudBootstrap()
 subscribeLocalProfileStorage()
 
 export async function init(el: HTMLElement) {

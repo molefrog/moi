@@ -17,7 +17,7 @@ The same profile format can describe a person or an agent. Agent sign-in is a la
 
 ## How Moi receives it
 
-When a Moi page opens, the cloud includes the current identity and all stored workspace memberships and pending invitations. Moi reads this snapshot before React mounts. The cloud does not ask the machine which workspaces exist; Moi matches the supplied IDs to its own workspaces. Entries for workspaces that no longer exist are harmless.
+When a Moi page opens, the cloud includes the current identity and all stored workspace memberships and pending invitations. It calls Moi's frontend API before React mounts. The cloud does not ask the machine which workspaces exist; Moi matches the supplied IDs to its own workspaces. Entries for workspaces that no longer exist are harmless.
 
 A workspace with no sharing record belongs only to the machine's owner. Each update replaces the stored sharing collection. There is no organization-wide or app-wide people list. A missing member list never falls back to another workspace or to profiles received through a socket.
 
@@ -64,6 +64,14 @@ window.moi.workspaceMembers.set(workspaceId, { members, invitations })
 window.moi.workspaceMembers.remove(workspaceId)
 window.moi.workspaceMembers.clear()
 ```
+
+The page starts in this order:
+
+1. The Moi entry chunk installs `window.moi`.
+2. The cloud's short inline module calls `identity.set()` and `workspaceMembers.setAll()` with the initial data.
+3. Moi's existing `#moi-start` script loads React and mounts the app.
+
+The cloud inserts its module just before `#moi-start`. It also loads `/cloud/bridge.js` for later updates; that download does not hold up rendering. There is no temporary global payload or readiness polling. If either setter is unavailable, initialization does nothing.
 
 `setAll()` replaces the full sharing collection. Workspaces omitted from it have no invited members; the machine owner still has access. `set()` replaces the complete member list for one workspace. `remove()` forgets one workspace's list; `clear()` forgets all of them. These methods update what the frontend knows; they do not change access on the server.
 

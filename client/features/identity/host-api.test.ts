@@ -16,25 +16,17 @@ test('host bridge boots before React has been preloaded', async () => {
     expect(build.success).toBe(true)
     const source = `
       if (globalThis.__esm) throw new Error('Test requires React to be absent');
-      globalThis.window = { __MOI_CLOUD_BOOTSTRAP__: {
-        identity: { id: 'user', type: 'user', name: 'Name', email: 'name@example.com', isAnonymous: false },
-        workspaces: [
-          { id: 'workspace', members: [], invitations: [] },
-          { id: 'second', members: [], invitations: [] }
-        ]
-      } };
-      const { installIdentityHostApi, consumeCloudBootstrap } = await import(${JSON.stringify(build.outputs[0]!.path)});
+      globalThis.window = {};
+      const { installIdentityHostApi } = await import(${JSON.stringify(build.outputs[0]!.path)});
       installIdentityHostApi();
-      consumeCloudBootstrap();
       const api = window.moi;
-      if (window.__MOI_CLOUD_BOOTSTRAP__ || api.collab) throw new Error('Legacy API or bootstrap leaked');
-      if (!api.workspaceMembers.getRevision('workspace') || !api.workspaceMembers.getRevision('second')) throw new Error('All workspaces must be initialized before rendering');
-      const version = api.identity.getRevision();
-      consumeCloudBootstrap();
-      if (api.identity.getRevision() !== version) throw new Error('Bootstrap consumed twice');
+      if (api.collab) throw new Error('Legacy API leaked');
       api.identity.set({ id: 'user', type: 'user', name: 'Name', email: 'name@example.com', isAnonymous: false });
-      api.workspaceMembers.set('workspace', { members: [], invitations: [] });
-      if (api.identity.getRevision() < 1 || api.workspaceMembers.getRevision('workspace') < 1) throw new Error('Bridge did not initialize');
+      api.workspaceMembers.setAll([
+        { id: 'workspace', members: [], invitations: [] },
+        { id: 'second', members: [], invitations: [] }
+      ]);
+      if (api.identity.getRevision() < 1 || !api.workspaceMembers.getRevision('workspace') || !api.workspaceMembers.getRevision('second')) throw new Error('Direct host calls must initialize before React');
       process.exit(0);
     `
     const child = Bun.spawn([process.execPath, '--eval', source], {
