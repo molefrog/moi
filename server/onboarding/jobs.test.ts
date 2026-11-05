@@ -279,6 +279,7 @@ for (const type of ['claude-code', 'codex'] as const) {
         return {
           ...harnessFor(type),
           runAction: async request => {
+            expect(request.model).toBe('fast')
             input = request
             report = async value => {
               if (request.progressSchema && request.onProgress)

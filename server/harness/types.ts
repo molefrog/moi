@@ -83,8 +83,12 @@ export type DiscoveredWorkspaceCandidate = {
 
 export type HarnessWorkspace = Pick<WorkspaceEntry, 'id' | 'path' | 'type' | 'agentId'>
 
+export type ActionModel = 'fast' | 'normal' | 'smart'
+
 export type HarnessActionInput<TResult = unknown, TProgress = never> = {
   prompt: string
+  // Portable model and effort choice, resolved by each harness. Defaults to normal.
+  model?: ActionModel
   resultSchema: ZodType<TResult>
   signal: AbortSignal
 } & (

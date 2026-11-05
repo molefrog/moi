@@ -1,6 +1,27 @@
 import { expect, test } from 'bun:test'
 import { codexActionCommand } from './run-action'
 
+test.each([
+  ['fast', 'gpt-6.1-terra', 'medium'],
+  ['normal', 'gpt-6.1-sol', 'medium'],
+  ['smart', 'gpt-6.1-sol', 'xhigh'],
+  [undefined, 'gpt-6.1-sol', 'medium']
+] as const)('action model %s resolves to %s with %s effort', (model, expected, effort) => {
+  const command = codexActionCommand(
+    'codex',
+    '/tmp/action',
+    '/tmp/schema',
+    '/tmp/result',
+    undefined,
+    model
+  )
+  const index = command.indexOf('--model')
+  expect(index).toBeGreaterThan(-1)
+  expect(command[index + 1]).toBe(expected)
+  expect(command).toContain(`model_reasoning_effort="${effort}"`)
+  expect(command.some(arg => arg.includes('service_tier'))).toBe(false)
+})
+
 test('actions use an ephemeral read-only process', () => {
   const command = codexActionCommand('codex', '/tmp/action', '/tmp/schema', '/tmp/result')
   expect(command).toContain('--ephemeral')

@@ -1,6 +1,6 @@
-import { query, type Query } from '@anthropic-ai/claude-agent-sdk'
+import { query, type Options, type Query } from '@anthropic-ai/claude-agent-sdk'
 import { claudeCodeSpawn } from '../../agent-launcher'
-import type { HarnessActionInput } from '../types'
+import type { ActionModel, HarnessActionInput } from '../types'
 import { requireHarnessExecutable } from '../executable'
 import {
   type ActionExecution,
@@ -8,6 +8,13 @@ import {
   actionProgressToolName,
   executeHarnessAction
 } from '../run-action'
+
+const actionModels: Record<ActionModel, Required<Pick<Options, 'model' | 'effort'>>> = {
+  fast: { model: 'haiku', effort: 'high' },
+  normal: { model: 'sonnet', effort: 'medium' },
+  smart: { model: 'sonnet', effort: 'xhigh' }
+}
+
 const readTools = new Set([
   'Read',
   'Glob',
@@ -39,6 +46,7 @@ async function claudeAction(input: ActionExecution): Promise<unknown> {
     run = query({
       prompt: input.prompt,
       options: {
+        ...actionModels[input.model],
         cwd: input.cwd,
         abortController: controller,
         persistSession: false,

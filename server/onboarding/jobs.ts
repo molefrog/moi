@@ -118,6 +118,7 @@ export function createOnboardingJobs(overrides: Partial<typeof defaults> = {}) {
             new Date(now - days * 86_400_000).toISOString().slice(0, 10)
           const dates = `Research dates (UTC): today ${dateAgo(0)}; last 30 days start ${dateAgo(30)}; last 60 days start ${dateAgo(60)}.`
           return harness.runAction!({
+            model: 'fast',
             prompt: `${dates}\n\n${await Bun.file(new URL('./prompt.md', import.meta.url)).text()}`,
             resultSchema: ideasSchema,
             progressSchema: discoveryProgressSchema,

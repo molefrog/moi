@@ -131,3 +131,42 @@ for (const enabled of [false, true]) {
     }
   })
 }
+
+test.each([
+  ['fast', 'haiku', 'high'],
+  ['normal', 'sonnet', 'medium'],
+  ['smart', 'sonnet', 'xhigh'],
+  [undefined, 'sonnet', 'medium']
+] as const)('action model %s uses %s with %s effort', async (model, expectedModel, effort) => {
+  const executableSpy = spyOn(executable, 'requireHarnessExecutable').mockReturnValue(
+    '/fake/claude'
+  )
+  const querySpy = spyOn(sdk, 'query').mockImplementation(({ options }) => {
+    expect(options?.model).toBe(expectedModel)
+    expect(options?.effort).toBe(effort)
+    return {
+      close() {},
+      async *[Symbol.asyncIterator]() {
+        yield {
+          type: 'result',
+          subtype: 'success',
+          is_error: false,
+          structured_output: { done: true }
+        }
+      }
+    } as unknown as Query
+  })
+  try {
+    expect(
+      await runClaudeAction({
+        prompt: 'Work',
+        model,
+        resultSchema: z.object({ done: z.boolean() }),
+        signal: new AbortController().signal
+      })
+    ).toEqual({ done: true })
+  } finally {
+    querySpy.mockRestore()
+    executableSpy.mockRestore()
+  }
+})

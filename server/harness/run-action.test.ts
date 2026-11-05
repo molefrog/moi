@@ -25,6 +25,16 @@ const input = {
   signal: new AbortController().signal
 }
 
+test.each(['fast', 'normal', 'smart', undefined] as const)(
+  'forwards action model %s and defaults to normal',
+  async model => {
+    await executeHarnessAction({ ...input, model }, async action => {
+      expect(action.model).toBe(model ?? 'normal')
+      return { count: 3 }
+    })
+  }
+)
+
 test('actions infer and validate results without configuring progress', async () => {
   const result = await executeHarnessAction(input, async action => {
     expect(action.progressUrl).toBeUndefined()

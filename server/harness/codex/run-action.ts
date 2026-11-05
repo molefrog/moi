@@ -1,18 +1,30 @@
 import { join } from 'node:path'
 import { runHarnessCommand } from '../command'
-import type { HarnessActionInput } from '../types'
+import type { ActionModel, HarnessActionInput } from '../types'
 import { requireHarnessExecutable } from '../executable'
 import { actionProgressServerName, executeHarnessAction } from '../run-action'
+
+const actionModels: Record<ActionModel, { model: string; effort: 'medium' | 'xhigh' }> = {
+  fast: { model: 'gpt-6.1-terra', effort: 'medium' },
+  normal: { model: 'gpt-6.1-sol', effort: 'medium' },
+  smart: { model: 'gpt-6.1-sol', effort: 'xhigh' }
+}
+
 export function codexActionCommand(
   executable: string,
   cwd: string,
   schema: string,
   output: string,
-  progressUrl?: string
+  progressUrl?: string,
+  model: ActionModel = 'normal'
 ): string[] {
   return [
     executable,
     'exec',
+    '--model',
+    actionModels[model].model,
+    '-c',
+    `model_reasoning_effort=${JSON.stringify(actionModels[model].effort)}`,
     '--ephemeral',
     '--ignore-user-config',
     '--ignore-rules',
@@ -63,7 +75,8 @@ export async function runCodexAction<TResult, TProgress = never>(
         cwd,
         schema,
         output,
-        action.progressUrl
+        action.progressUrl,
+        action.model
       ),
       cwd,
       stdin: action.prompt,

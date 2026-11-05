@@ -363,6 +363,9 @@ or visible chat. Pass a prompt, Zod `resultSchema`, and cancellation signal to g
 validated, typed result. For progress updates, supply `progressSchema` and `onProgress`
 together. See [the action runner](run-action.ts) for implementation details.
 
+Optional `model: 'fast' | 'normal' | 'smart'` selects a harness-owned model and
+reasoning effort. Omission uses `normal`.
+
 ## Design lessons so far
 
 - Claude Code settings are either live-settable (`setModel`, effort/fast mode

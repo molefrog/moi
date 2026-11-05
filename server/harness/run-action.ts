@@ -2,13 +2,14 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import { z } from 'zod'
 import { createHarnessTempDir, removeHarnessTempDir } from './command'
-import type { HarnessActionInput } from './types'
+import type { ActionModel, HarnessActionInput } from './types'
 
 export const actionProgressServerName = 'moi_action'
 export const actionProgressToolName = 'report_progress'
 
 export type ActionExecution = {
   prompt: string
+  model: ActionModel
   resultSchema: Record<string, unknown>
   signal: AbortSignal
   cwd: string
@@ -63,6 +64,7 @@ export async function executeHarnessAction<TResult, TProgress>(
     if (input.progressSchema) progress = serveProgress(input.progressSchema, input.onProgress)
     input.signal.addEventListener('abort', stop, { once: true })
     const result = await execute({
+      model: input.model ?? 'normal',
       prompt:
         input.prompt +
         (progress
