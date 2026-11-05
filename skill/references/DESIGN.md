@@ -80,9 +80,17 @@ Use the shared radius scale and existing control shapes. Reserve `rounded-full` 
 
 ### Texture
 
-Texture is optional, limited to the root, and backed by an opaque semantic color: `texture-checker`, `texture-grid`, `texture-noise`, `texture-gradient-linear`, or `texture-inset-shadow`.
+Texture gives an open surface depth and character without adding containers or decoration. It helps most where content is sparse and the background shows. A view filled with content is fine without one. Apply it to the root next to an opaque semantic color, such as `bg-background texture-noise`.
 
-Behind dense content, use plain `bg-background`, `texture-gradient-linear`, or `texture-inset-shadow`; checker, grid, and noise may only surround an opaque work area. Never stack or tune textures, or put them behind full-bleed media. Coordinate related widgets and views.
+| Texture                   | Look                                     | Use for                                        |
+| ------------------------- | ---------------------------------------- | ---------------------------------------------- |
+| `texture-gradient-linear` | Soft tint that deepens toward the bottom | The default; safe behind any content           |
+| `texture-inset-shadow`    | Soft glow around the edges               | A focal value or a centered composition        |
+| `texture-noise`           | Fine grain                               | A tactile surface behind sparse, large content |
+| `texture-grid`            | Thin 24 px line grid                     | Plans, schedules, drawing, and measurement     |
+| `texture-checker`         | 32 px checker, the strongest pattern     | Playful content, games, and placeholder areas  |
+
+Pick the texture that suits the content, and keep related widgets and views on the same one. Behind dense content such as tables or long text, use only the gradient or inset shadow. Use one texture per applet.
 
 ### Interaction and states
 
@@ -103,9 +111,20 @@ Use brief, interruptible motion to explain changes or acknowledge input. Respect
 
 ## Widgets
 
-**Widgets support a quick glance or immediate action.** Choose the smallest footprint that presents the content clearly. Keep the main information prominent and supporting controls limited to the immediate task. Put tabs, deeper navigation, and multi-step work in a view. Keep hover feedback on controls; leave the widget surface unchanged.
+Each widget does one of two jobs:
+
+- **Glance:** summarizes current information and emphasizes the key value.
+- **Action:** completes one small task in place. Prefer an action widget when the task fits the footprint.
+
+A widget must add value beyond navigation. The Overview already lists every view, so a widget that only opens a view is redundant. Show real content or let people act in place; a link to a view is secondary.
+
+Never show content that invites an interaction the widget cannot complete.
+
+Choose the smallest footprint the content fills. If a large part of the widget is empty, reduce its span. Keep supporting controls limited to the immediate task. Don't put tabs, deeper navigation, or multi-step work in a widget. Keep hover feedback on controls, but leave the widget surface unchanged.
 
 The host owns the widget’s outer shape, clipping, and elevation. Do not add another outer card.
+
+Give every widget root a [texture](#texture) so it does not look flat, unless media or a visualization fills it edge to edge.
 
 The grid has four columns, 160 px rows, 8 px gaps, and a maximum width of 640 px. Widgets span one to four rows and columns. Width is flexible; height is fixed:
 
