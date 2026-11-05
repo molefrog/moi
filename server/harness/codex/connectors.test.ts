@@ -109,7 +109,7 @@ test('publishes app notifications before the final response and removes the list
     if (method === 'config/read') return { layers: [] } as T
     if (method === 'app/installed')
       return { apps: [{ id: 'drive', enabled: true, callable: true }] } as T
-    expect(options?.timeoutMs).toBe(90_000)
+    expect(options?.timeoutMs).toBe(60_000)
     started.resolve()
     return (await pending.promise) as T
   }

@@ -216,7 +216,7 @@ Before restoring support:
   not forwarded to display rows.
   Settings request `/mcp?stream=true` for incremental NDJSON snapshots. Codex
   `app/list/updated` notifications and paginated results feed partial rows; only
-  the final snapshot marks discovery complete. `app/list` has a 90-second RPC
+  the final snapshot marks discovery complete. `app/list` has a 60-second RPC
   deadline while other methods retain the default 30 seconds.
 
 ## Diagnostics and maintenance

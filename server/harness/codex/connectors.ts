@@ -83,7 +83,7 @@ export async function expandCodexApps(
       client,
       'app/list',
       { ...context, limit: 100 },
-      { timeoutMs: 90_000, onPage: publish }
+      { timeoutMs: 60_000, onPage: publish }
     )
     return toConnectors(apps.filter(app => app.isAccessible))
   } finally {
