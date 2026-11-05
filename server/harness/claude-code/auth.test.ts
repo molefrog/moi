@@ -44,22 +44,25 @@ test('reads the manual URL from CLI output, including terminal hyperlinks', () =
   expect(claudeLoginUrl('Visit: https://claude.com/oauth')).toBeUndefined()
 })
 
-test('Claude login captures the local callback URL and preserves the cloud code flow', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'moi-auth-cli-'))
-  const path = join(dir, 'fake claude.ts')
-  const helperPath = join(dir, 'helper-path')
-  const find = spyOn(executable, 'findHarnessExecutable').mockReturnValue(process.execPath)
-  const command = spyOn(launcher, 'agentCommand').mockReturnValue([process.execPath, path])
-  const appConfig = config.getAppConfig()
-  const cfg = spyOn(config, 'getAppConfig')
-  const open = spyOn(browser, 'openBrowser').mockResolvedValue()
-  const manualUrl = 'https://claude.com/oauth/authorize?response_type=code&state=test-state'
-  // Preserve encoded characters, ampersands, and exclamation marks through the helper.
-  const callbackUrl = `${manualUrl}&redirect_uri=http%3A%2F%2Flocalhost%3A1234%2Fcallback&test=a!b%20c`
-  try {
-    await Bun.write(
-      path,
-      `
+// Each flow launches a CLI subprocess; local flows also launch PowerShell on Windows.
+test.each(['local', 'cloud', 'automatic', 'cancelled'] as const)(
+  'Claude login handles the %s flow',
+  async flow => {
+    const dir = await mkdtemp(join(tmpdir(), 'moi-auth-cli-'))
+    const path = join(dir, 'fake claude.ts')
+    const helperPath = join(dir, 'helper-path')
+    const find = spyOn(executable, 'findHarnessExecutable').mockReturnValue(process.execPath)
+    const command = spyOn(launcher, 'agentCommand').mockReturnValue([process.execPath, path])
+    const appConfig = config.getAppConfig()
+    const cfg = spyOn(config, 'getAppConfig')
+    const open = spyOn(browser, 'openBrowser').mockResolvedValue()
+    const manualUrl = 'https://claude.com/oauth/authorize?response_type=code&state=test-state'
+    // Preserve encoded characters, ampersands, and exclamation marks through the helper.
+    const callbackUrl = `${manualUrl}&redirect_uri=http%3A%2F%2Flocalhost%3A1234%2Fcallback&test=a!b%20c`
+    try {
+      await Bun.write(
+        path,
+        `
 console.log(${JSON.stringify(manualUrl)})
 if (process.env.BROWSER !== 'true') {
   await Bun.sleep(200)
@@ -90,8 +93,7 @@ for await (const chunk of Bun.stdin.stream()) {
 }
 process.exit(code.trim() === 'test-code#test-state' ? 0 : 1)
 `
-    )
-    for (const flow of ['local', 'cloud', 'automatic', 'cancelled'] as const) {
+      )
       const environment = flow === 'cloud' ? 'cloud' : 'local'
       command.mockReturnValue([process.execPath, path, flow])
       cfg.mockReturnValue({ ...appConfig, environment })
@@ -121,13 +123,15 @@ process.exit(code.trim() === 'test-code#test-state' ? 0 : 1)
         }
       } finally {
         await login.cancel?.()
+        await login.completed?.catch(() => {})
       }
+    } finally {
+      find.mockRestore()
+      command.mockRestore()
+      cfg.mockRestore()
+      open.mockRestore()
+      await rm(dir, { recursive: true, force: true })
     }
-  } finally {
-    find.mockRestore()
-    command.mockRestore()
-    cfg.mockRestore()
-    open.mockRestore()
-    await rm(dir, { recursive: true, force: true })
-  }
-})
+  },
+  process.platform === 'win32' ? 15_000 : 5_000
+)
