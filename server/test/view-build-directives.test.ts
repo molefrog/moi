@@ -18,7 +18,7 @@ describe('view build directives', () => {
     expect(context).toContain('moi views set garden --title "<title>" --icon <icon-id>')
     expect(context).toContain('moi views create --requirements "<complete requirements>"')
     expect(context).not.toContain('--from-session')
-    expect(context).toContain('[Open the view](moi:/views/garden)')
+    expect(context).not.toContain('[Open the view](moi:/views/garden)')
     expect(context).not.toContain('moi check')
     expect(context).not.toContain('moi bundle')
   })

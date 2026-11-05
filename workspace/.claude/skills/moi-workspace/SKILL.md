@@ -343,8 +343,7 @@ moi views set <view-id> --title "<title>" --icon <icon-id>
 Choose from the available view icons in the hidden context when that list is present. Then write
 `.moi/views/<view-id>.tsx` and use the same title and icon in its config. Run
 `moi check --only views/<view-id>` before `moi bundle --only views/<view-id>`. A successful bundle
-replaces the pending screen in the same tab. Keep the user's current tab open and finish with a
-`moi:/views/<view-id>` link.
+replaces the pending screen in the same tab.
 
 ### Styling and UI components
 
@@ -453,8 +452,11 @@ After the final successful checks, hand off the result according to the task:
 
 - After building or editing a widget, run `moi navigate 'moi:/overview'`.
 - After editing an existing view, run `moi navigate 'moi:/views/<view-id>'`.
-- After a pending view build, keep the current tab open and link to `moi:/views/<view-id>` in the
-  final reply.
+- After a pending view build, keep the current tab open.
+
+Use the chat's owning tab from the hidden context to decide whether a view link is useful.
+In a view's own chat, summarize the result without linking back to that same view. Include
+`moi:/views/<view-id>` links when replying from Overview or pointing to another view.
 
 Keep the final reply brief and user-facing. Do not include file or storage links, file paths, or
 bundle, test, and runtime-log summaries.
@@ -520,4 +522,4 @@ This skill is installed with Moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.20.0" />
+<moi-skill version="0.20.1" />
