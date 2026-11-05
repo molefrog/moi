@@ -125,7 +125,7 @@ distinct `id` values. A single area can omit `id`, which defaults to `"default"`
 ```tsx
 import { Cursors } from 'moi/collab'
 
-<Cursors id="board">{children}</Cursors>
+;<Cursors id="board">{children}</Cursors>
 ```
 
 #### `PresenceFrame` and `PresenceAvatars`
@@ -165,7 +165,7 @@ import { PresenceFrame, PresenceAvatars } from 'moi/collab'
 import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
 
-<>
+;<>
   <PresenceFrame id="title" align="start">
     <label htmlFor="title">Title</label>
     <Input id="title" />
@@ -214,7 +214,7 @@ Wrap each record in a group so its fields belong to that record.
 import { PresenceGroup, PresenceFrame } from 'moi/collab'
 import { Input } from '../ui/input'
 
-<PresenceGroup id={task.id}>
+;<PresenceGroup id={task.id}>
   <PresenceFrame id="title">
     <Input aria-label="Task title" defaultValue={task.title} />
   </PresenceFrame>
@@ -238,7 +238,7 @@ its avatar glides from the previous target to the next.
 import { PresenceGroup, PresenceAvatars } from 'moi/collab'
 import { Input } from '../ui/input'
 
-<PresenceGroup id="tasks">
+;<PresenceGroup id="tasks">
   {tasks.map(task => (
     <PresenceAvatars key={task.id} id={task.id}>
       <Input aria-label={task.title} defaultValue={task.title} />

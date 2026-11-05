@@ -26,7 +26,7 @@ import {
   summarizeSkillStatuses,
   updateWorkspaceSkills
 } from '../skills/update'
-import { BUNDLED_SKILLS_DIR, installBundledSkills } from '../skills/template'
+import { bundledSkillDirectory, installBundledSkills } from '../skills/template'
 import { skillsDirFor } from '../workspaces/init'
 
 let tempRoot = ''
@@ -73,7 +73,7 @@ describe('workspace skill update service', () => {
         name: 'moi-workspace',
         path: join(skillsDirFor(tempRoot, type), 'moi-workspace'),
         installed: '0.7.1',
-        bundled: await readSkillVersion(join(BUNDLED_SKILLS_DIR, 'moi-workspace', 'SKILL.md'))
+        bundled: await readSkillVersion(join(bundledSkillDirectory('moi-workspace'), 'SKILL.md'))
       })
     })
   }
@@ -105,7 +105,7 @@ describe('workspace skill update service', () => {
         for (const reference of ['INTENTS.md', 'UI-COMPONENTS.md']) {
           expect(await Bun.file(join(stalePath, 'references', reference)).text()).toBe(
             await Bun.file(
-              join(BUNDLED_SKILLS_DIR, 'moi-workspace', 'references', reference)
+              join(bundledSkillDirectory('moi-workspace'), 'references', reference)
             ).text()
           )
         }

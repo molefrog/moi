@@ -58,19 +58,19 @@ Use semantic tokens and their matching foregrounds. The default root is `h-full 
 
 For widgets, the host sets the `background` token to the workspace’s `primary`, supplies a readable `foreground`, and derives a light local `primary` action surface. The host wrapper is transparent: each widget must paint its own opaque root, normally with `bg-background`, or provide an opaque fallback behind full-bleed media. Views inherit the page theme.
 
-| Intent | Classes |
-| --- | --- |
-| Main content | `text-foreground` |
-| Supporting content | `text-muted-foreground` |
-| Inset surface | `bg-card text-card-foreground` |
-| Quiet fill | `bg-muted` for inset regions, skeletons, and disabled structure |
-| Control state | `bg-accent text-accent-foreground` for hover, active, and selected controls |
-| Main action | `bg-primary text-primary-foreground hover:bg-primary/90` |
-| State | `text-success`, `bg-success/10`, `text-destructive`, or `bg-destructive/10` in views; `text-foreground` in widgets |
-| Object edge | `ring-1 ring-border` for complete container and control outlines |
-| Separator | A one-sided border such as `border-b border-border`, never doubled with a ring |
-| Focus | `focus-visible:ring-2 focus-visible:ring-ring` |
-| Floating content | `bg-popover text-popover-foreground` for menus, tooltips, and popovers inside the applet scope |
+| Intent             | Classes                                                                                                            |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| Main content       | `text-foreground`                                                                                                  |
+| Supporting content | `text-muted-foreground`                                                                                            |
+| Inset surface      | `bg-card text-card-foreground`                                                                                     |
+| Quiet fill         | `bg-muted` for inset regions, skeletons, and disabled structure                                                    |
+| Control state      | `bg-accent text-accent-foreground` for hover, active, and selected controls                                        |
+| Main action        | `bg-primary text-primary-foreground hover:bg-primary/90`                                                           |
+| State              | `text-success`, `bg-success/10`, `text-destructive`, or `bg-destructive/10` in views; `text-foreground` in widgets |
+| Object edge        | `ring-1 ring-border` for complete container and control outlines                                                   |
+| Separator          | A one-sided border such as `border-b border-border`, never doubled with a ring                                     |
+| Focus              | `focus-visible:ring-2 focus-visible:ring-ring`                                                                     |
+| Floating content   | `bg-popover text-popover-foreground` for menus, tooltips, and popovers inside the applet scope                     |
 
 Keep every text level comfortably readable and don't let muted text dominate the screen. Communicate meaning through wording, symbols, or shapes as well as color.
 

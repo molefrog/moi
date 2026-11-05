@@ -137,7 +137,7 @@ describe('collab deployment environment', () => {
 })
 
 describe('collab init CLI flag', () => {
-  test('plain init omits the guide; flagged init adds it and plain refresh preserves it', async () => {
+  test('plain init omits the guide; flagged init adds it and plain refresh removes it', async () => {
     const args = ['init', '--harness=codex']
     const guide = join(workspace, '.agents', 'skills', 'moi-workspace', 'references', 'COLLAB.md')
     const types = join(workspace, '.moi', 'collab.d.ts')
@@ -151,7 +151,7 @@ describe('collab init CLI flag', () => {
     expect(await Bun.file(types).exists()).toBe(true)
     expect(await Bun.file(capturePath).exists()).toBe(false)
     expect((await runCli(args)).code).toBe(0)
-    expect(await Bun.file(guide).exists()).toBe(true)
+    expect(await Bun.file(guide).exists()).toBe(false)
     expect(await Bun.file(types).exists()).toBe(true)
   }, 30_000)
 
