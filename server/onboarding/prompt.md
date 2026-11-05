@@ -35,12 +35,12 @@ Use sentence case for workspace, view, and widget names, preserving proper nouns
 
 ### Views and widgets
 
-Include exactly three full-page views, each with its own tab and build chat, and optionally up to four focused Overview widgets. For each, provide:
+Include exactly three full-page views, each with its own tab and build chat, and two to four focused Overview widgets. For each, provide:
 
 - A sentence-case name.
 - For views, a relevant built-in Moi icon ID. The workspace and view icons within each option must all be different.
 - A short description of its purpose and content.
-- Only the features needed for one small, complete workflow. Aim for two or three focused features per view, covering its main action, needed data, and saved state. For widgets, include the main action or link to a view where useful.
+- Only the features needed for one small, complete workflow. Aim for two or three focused features per view, covering its main action, needed data, and saved state. Each widget must show live information or let people act in place; never plan one that only links to a view.
 
 Keep each plan small and ready to build. Include useful source references and access limitations in the features, without private transcripts or secrets. Do not promise integrations you haven't verified.
 

@@ -116,7 +116,7 @@ Each widget does one of two jobs:
 - **Glance:** summarizes current information and emphasizes the key value.
 - **Action:** completes one small task in place. Prefer an action widget when the task fits the footprint.
 
-Any widget may link to a related view when that helps.
+A widget must add value beyond navigation. The Overview already lists every view, so a widget that only opens a view is redundant. Show real content or let people act in place; a link to a view is secondary.
 
 Never show content that invites an interaction the widget cannot complete.
 
