@@ -4,13 +4,11 @@ import { runClaudeAction } from './run-action'
 import { join } from 'node:path'
 import { forkSession } from '@anthropic-ai/claude-agent-sdk'
 
-import type { McpServer } from '@/lib/types'
-
 import type { DiscoveredWorkspaceCandidate, Harness } from '../types'
 import { findHarnessExecutable, pathHarnessAvailability } from '../executable'
 import { getClaudeAuthReadiness, startClaudeLogin } from './auth'
 import { isLinkedGitWorktree } from './git-worktree'
-import { getMcpStatus } from './mcp'
+import { claudeConnectors, getMcpStatus } from './mcp'
 import { getClaudeModels, lastProbedClaudeCli, onClaudeCliChanged } from './models'
 import {
   SESSION_LIMITS,
@@ -106,9 +104,8 @@ export const claudeCodeHarness: Harness = {
     getSessionWorkspacePreview(ws.path, includeFirstUserMessage),
   sessionEvents: (ws, sessionId) => getSessionEvents(sessionId, ws.path),
   listModels: ws => getClaudeModels(ws.path),
-  // The SDK's McpServerStatus is a superset of the UI's McpServer (extra
-  // fields are ignored by the client) — pass it through unchanged.
-  mcpStatus: async ws => (await getMcpStatus(ws.path)) as unknown as McpServer[],
+  // Expose only provider apps and explicitly configured MCP servers.
+  mcpStatus: async ws => claudeConnectors(await getMcpStatus(ws.path)),
   discoverWorkspaces,
   availability: async ws => {
     const runtime = await pathHarnessAvailability('claude-code')

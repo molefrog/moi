@@ -60,3 +60,23 @@ test('settled MCP status survives an SDK cleanup error', async () => {
 
   expect(await getMcpStatus('/test/workspace/close-error')).toEqual([])
 })
+
+test('classifies provider and custom connections by source, excluding injected tools', async () => {
+  const { claudeConnectors } = await import('./mcp')
+  expect(
+    claudeConnectors([
+      { name: 'Gmail', status: 'connected', source: 'claudeai' },
+      { name: 'custom', status: 'disabled', source: 'user' },
+      { name: 'legacy', status: 'connected', scope: 'project' },
+      { name: 'plugin-server', status: 'connected', source: 'plugin' },
+      { name: 'injected', status: 'connected', source: 'sdk', scope: 'user' },
+      { name: 'runtime', status: 'connected', source: 'dynamic' },
+      { name: 'unknown', status: 'connected' }
+    ])
+  ).toEqual([
+    { name: 'Gmail', status: 'connected' },
+    { name: 'custom', status: 'disabled' },
+    { name: 'legacy', status: 'connected' },
+    { name: 'plugin-server', status: 'connected' }
+  ])
+})

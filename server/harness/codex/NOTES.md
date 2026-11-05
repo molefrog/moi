@@ -209,8 +209,15 @@ Before restoring support:
   is required. The status request omits resource catalogs with `toolsAndAuthOnly`.
   It targets the workspace's most recently observed loaded chat, since an
   app-scoped request can return null runtime states.
-  Full tool definitions are not carried into connector display rows. `codex_apps` branding
-  uses the dotted tool-name prefix; connector `_meta` is not forwarded.
+  Settings list accessible apps from `app/list`, joined with `app/installed` for
+  runtime state. Custom MCP servers must have an explicit user, project, or admin
+  configuration layer; injected and packaged servers are omitted. Discovery failures
+  reach the Settings retry state. Full tool definitions and connector `_meta` are
+  not forwarded to display rows.
+  Settings request `/mcp?stream=true` for incremental NDJSON snapshots. Codex
+  `app/list/updated` notifications and paginated results feed partial rows; only
+  the final snapshot marks discovery complete. `app/list` has a 60-second RPC
+  deadline while other methods retain the default 30 seconds.
 
 ## Diagnostics and maintenance
 

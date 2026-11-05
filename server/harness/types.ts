@@ -136,7 +136,10 @@ export type Harness = {
   sessionEvents(ws: WorkspaceEntry, sessionId: string): Promise<StreamEvent[]>
   listModels(ws: WorkspaceEntry): Promise<Model[]>
   // MCP server status for the connectors UI; absent = backend has no MCP story.
-  mcpStatus?(ws: WorkspaceEntry): Promise<McpServer[]>
+  mcpStatus?(
+    ws: WorkspaceEntry,
+    onProgress?: (connectors: McpServer[]) => void
+  ): Promise<McpServer[]>
   // Workspaces this backend knows about that aren't registered yet.
   discoverWorkspaces?(registeredPaths: Set<string>): Promise<DiscoveredWorkspaceCandidate[]>
   // Without a workspace, only check whether the runtime is installed. With a

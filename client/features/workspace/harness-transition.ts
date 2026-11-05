@@ -39,6 +39,7 @@ export async function receiveWorkspaceHarness(
   await queryClient.cancelQueries(affected)
   // Discard the old provider snapshot before rendering the new harness status.
   void queryClient.resetQueries({ queryKey: workspaceKeys.harness(id), exact: true })
+  void queryClient.resetQueries({ queryKey: workspaceKeys.mcp(id), exact: true })
   queryClient.setQueryData<WorkspaceLayoutResponse>(workspaceKeys.layout(id), previous =>
     previous
       ? {

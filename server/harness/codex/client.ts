@@ -2,6 +2,7 @@
 // threads share the connection. Framing lives in transport.ts; see NOTES.md
 // for lifecycle, configuration, and wire-type maintenance.
 import { homedir } from 'node:os'
+import { expandCodexApps } from './connectors'
 
 import type { McpServer, Model, SessionSummary, StreamEvent } from '@/lib/types'
 
@@ -50,7 +51,7 @@ export function getCodexProcessInfo(workspacePath: string): Promise<CodexProcess
 }
 
 export type CodexClient = {
-  rpc: <T>(method: string, params?: Json) => Promise<T>
+  rpc: <T>(method: string, params?: Json, options?: { timeoutMs?: number }) => Promise<T>
   onNotification: (l: NotificationListener) => () => void
   isAlive: () => boolean
   workspacePath: string
@@ -359,7 +360,8 @@ export async function getCodexModels(workspacePath: string): Promise<Model[]> {
 // Runtime status distinguishes failed/disabled servers from authenticated ones.
 export async function getCodexMcpStatus(
   workspacePath: string,
-  sessionId?: string
+  sessionId?: string,
+  onProgress?: (connectors: McpServer[]) => void
 ): Promise<McpServer[]> {
   try {
     const client = await getCodexClient(workspacePath)
@@ -371,12 +373,13 @@ export async function getCodexMcpStatus(
       detail: 'toolsAndAuthOnly',
       ...(sessionId ? { threadId: sessionId } : {})
     })
-    return servers
+    const mapped = servers
       .filter((s): s is { name: string; authStatus?: string } => typeof s.name === 'string')
       .map(codexMcpServerToServer)
+    return await expandCodexApps(client, mapped, sessionId, workspacePath, onProgress)
   } catch (err) {
-    console.error('[codex] mcpServerStatus/list failed', err)
-    return []
+    console.error('[codex] connector discovery failed', err)
+    throw err
   }
 }
 
