@@ -44,7 +44,9 @@ Cloud URLs use the same host as Moi. For example, on Moi Run they start with `ht
 
 An invitation link opens `/cloud/invite/:invitationId`. The cloud handles sign-in and acceptance from there.
 
-Both avatar endpoints return the full updated profile. Uploads use `multipart/form-data` with a `file` field. For now this is a test implementation: it discards the file and assigns an avatar URL from an existing hosted service. Add `provider` with `pravatar`, `dicebear`, `robohash`, `uiavatars`, or `gravatar` to choose; omit it for Pravatar. Random seeds contain no user information and uploaded bytes are never sent to the provider. Any file type is accepted, up to a 5 MB total request. There is no R2 storage. Deleting clears the avatar field; there is no stored image file to delete. These endpoints currently require a signed-in human account.
+Both avatar endpoints return the full updated profile. Uploads use `multipart/form-data` with a `file` field. For now this is a test implementation: it discards the file and assigns a DiceBear 9.x Croodles PNG URL, with a fresh random face and one of ten rich background colors at 256 × 256. No provider or color field is needed. Random seeds contain no user information and uploaded bytes are never sent to DiceBear. Any file type is accepted, up to a 5 MB total request. There is no R2 storage. Deleting clears the avatar field; there is no stored image file to delete. These endpoints currently require a signed-in human account.
+
+Test artwork: [Croodles](https://www.dicebear.com/styles/croodles/) by [Vijay Verma](https://vjy.me/), served by DiceBear, under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 ## Frontend storage and API
 
