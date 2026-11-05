@@ -32,7 +32,7 @@ import { useChangeWorkspaceHarness } from '@/client/features/workspace/api'
 import { SettingsPage, SettingsRow, SettingsSection } from './settings-layout'
 
 export function GeneralSettings() {
-  const { demo } = useAppConfig()
+  const { demo, environment } = useAppConfig()
   const { name, cwd, workspaceId } = useWorkspaceLayoutCtx()
   const [, navigate] = useLocation()
   const removeWorkspace = useRemoveWorkspace()
@@ -45,18 +45,20 @@ export function GeneralSettings() {
   return (
     <SettingsPage title="General" description="Basic details for this space">
       <SettingsSection>
-        <SettingsRow
-          title="Path"
-          control={
-            <Input
-              value={cwd ?? ''}
-              aria-label="Workspace path"
-              title={cwd ?? undefined}
-              className="w-56"
-              readOnly
-            />
-          }
-        />
+        {environment === 'local' && (
+          <SettingsRow
+            title="Path"
+            control={
+              <Input
+                value={cwd ?? ''}
+                aria-label="Workspace path"
+                title={cwd ?? undefined}
+                className="w-56"
+                readOnly
+              />
+            }
+          />
+        )}
         <WorkspaceHarnessSetting />
       </SettingsSection>
 
