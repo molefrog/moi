@@ -32,8 +32,8 @@ Cloud URLs use the same host as Moi. For example, on Moi Run they start with `ht
 | Open a workspace                      | `/workspace/:workspaceId`                                             |
 | Sign in                               | `/cloud/login`                                                        |
 | Read identity and all sharing records | `GET /cloud/api/bootstrap`                                            |
-| Read who I am                         | `GET /cloud/api/identity`                                             |
-| Update my name or avatar              | `POST /cloud/api/auth/profile`                                        |
+| Read who I am                         | `GET /cloud/api/me`                                                   |
+| Update my name                        | `PATCH /cloud/api/me`                                                 |
 | Upload or replace my avatar           | `PUT /cloud/api/me/avatar`                                            |
 | Remove my avatar                      | `DELETE /cloud/api/me/avatar`                                         |
 | Read members and pending invitations  | `GET /cloud/api/workspaces/:workspaceId/members`                      |
@@ -43,6 +43,8 @@ Cloud URLs use the same host as Moi. For example, on Moi Run they start with `ht
 | Receive live updates                  | `/cloud/api/events` — WebSocket                                       |
 
 An invitation link opens `/cloud/invite/:invitationId`. The cloud handles sign-in and acceptance from there.
+
+Read your full profile with `GET /cloud/api/me`. Update your display name with `PATCH /cloud/api/me` and JSON `{ "name": "Alexey" }`. It returns the full updated profile and leaves your avatar unchanged. Avatar changes use the separate endpoints below. The same `/me` routes can serve agents once agent authentication exists.
 
 ### Change your avatar
 

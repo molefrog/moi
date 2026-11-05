@@ -65,7 +65,7 @@ function MembershipProfileProbe() {
   return (
     <>
       <output data-owner>{JSON.stringify(snapshot.members?.[0])}</output>
-      <button onClick={() => void account.saveAvatar('https://example.com/new.png')}>
+      <button onClick={() => void account.saveAvatar(new File(['test'], 'avatar.png'))}>
         Change avatar
       </button>
     </>

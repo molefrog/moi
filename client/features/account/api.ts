@@ -36,7 +36,7 @@ export const identityQuery = queryOptions({
     const version = getIdentityVersion()
     let identity: Identity | null
     try {
-      identity = parseIdentity(await (await cloudRequest('identity', { signal })).json())
+      identity = parseIdentity(await (await cloudRequest('me', { signal })).json())
     } catch (error) {
       if (!(error instanceof CloudApiError) || error.status !== 401) throw error
       identity = null
@@ -48,7 +48,14 @@ export const identityQuery = queryOptions({
   retry: false,
   staleTime: 30_000
 })
-export type ProfilePatch = { name?: string; avatar?: string | null }
-export const updateCloudProfile = (patch: ProfilePatch) =>
-  cloudRequest('auth/profile', jsonRequest('POST', patch))
+export type ProfilePatch = { name: string }
+export const updateCloudProfile = async (patch: ProfilePatch) =>
+  parseIdentity(await (await cloudRequest('me', jsonRequest('PATCH', patch))).json())
+export async function uploadCloudAvatar(file: File) {
+  const body = new FormData()
+  body.set('file', file)
+  return parseIdentity(await (await cloudRequest('me/avatar', { method: 'PUT', body })).json())
+}
+export const removeCloudAvatar = async () =>
+  parseIdentity(await (await cloudRequest('me/avatar', { method: 'DELETE' })).json())
 export const signOutCloud = () => cloudRequest('auth/sign-out', jsonRequest('POST'))

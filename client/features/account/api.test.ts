@@ -1,6 +1,6 @@
 import { afterEach, expect, spyOn, test } from 'bun:test'
 import { QueryClient } from '@tanstack/react-query'
-import { identityQuery, updateCloudProfile } from './api'
+import { identityQuery, updateCloudProfile, uploadCloudAvatar, removeCloudAvatar } from './api'
 import { getIdentity, setIdentity } from '../identity/store'
 import { parseIdentity } from '../identity/types'
 let cleanup = () => {}
@@ -50,12 +50,32 @@ test('an old identity response cannot overwrite a newer host announcement', asyn
   expect(getIdentity()?.id).toBe('new')
   client.clear()
 })
-test('profile uses same-origin cloud route and can clear avatar', async () => {
-  const mock = fetchResponse(Response.json({ success: true }))
-  await updateCloudProfile({ name: 'New name', avatar: null })
-  expect(mock.mock.calls[0]?.[0]).toBe('/cloud/api/auth/profile')
+test('profile updates use PATCH me and return the full profile', async () => {
+  const saved = { ...human, name: 'New name', avatar: 'https://example.com/avatar.png' }
+  const mock = fetchResponse(Response.json(saved))
+  expect(await updateCloudProfile({ name: 'New name' })).toEqual(saved)
+  expect(mock.mock.calls[0]?.[0]).toBe('/cloud/api/me')
   expect(mock.mock.calls[0]?.[1]).toMatchObject({
     credentials: 'same-origin',
-    body: JSON.stringify({ name: 'New name', avatar: null })
+    method: 'PATCH',
+    body: JSON.stringify({ name: 'New name' })
   })
+})
+
+test('avatar upload sends a file to the dedicated route and returns the full profile', async () => {
+  const saved = { ...human, avatar: 'https://example.com/avatar.png' }
+  const mock = fetchResponse(Response.json(saved))
+  const file = new File(['test'], 'test.png', { type: 'image/png' })
+  expect(await uploadCloudAvatar(file)).toEqual(saved)
+  expect(mock.mock.calls[0]?.[0]).toBe('/cloud/api/me/avatar')
+  const init = mock.mock.calls[0]?.[1]
+  expect(init).toMatchObject({ method: 'PUT', credentials: 'same-origin' })
+  expect((init!.body as FormData).get('file')).toBeInstanceOf(File)
+})
+
+test('avatar removal uses DELETE and returns the profile without an avatar', async () => {
+  const mock = fetchResponse(Response.json(human))
+  expect(await removeCloudAvatar()).toEqual(human)
+  expect(mock.mock.calls[0]?.[0]).toBe('/cloud/api/me/avatar')
+  expect(mock.mock.calls[0]?.[1]).toMatchObject({ method: 'DELETE', credentials: 'same-origin' })
 })

@@ -109,7 +109,9 @@ export async function mountAccount({
       async (input: RequestInfo | URL, init?: RequestInit) => {
         const path = String(input)
         const body = init?.body
-          ? (JSON.parse(String(init.body)) as Record<string, string>)
+          ? init.body instanceof FormData
+            ? {}
+            : (JSON.parse(String(init.body)) as Record<string, string>)
           : undefined
         calls.push({ path, body })
         if (path === '/api/workspaces')
@@ -117,7 +119,7 @@ export async function mountAccount({
             { id: 'one', name: 'First workspace' },
             { id: 'two', name: 'Second workspace' }
           ])
-        if (path.endsWith('/identity')) {
+        if (path.endsWith('/me') && (!init?.method || init.method === 'GET')) {
           if (loadingSession) return new Promise<Response>(() => {})
           return failures.session
             ? Response.json({ error: 'Session unavailable' }, { status: 503 })
@@ -170,11 +172,13 @@ export async function mountAccount({
           return Response.json({ invitation: membership.invitations.at(-1) }, { status: 201 })
         }
         if (path === '/api/settings') return Response.json({ autoUpdateSkills: false, ...body })
-        if (path.endsWith('/profile') && cloudSession) {
+        if ((path.endsWith('/me') || path.endsWith('/me/avatar')) && cloudSession) {
           cloudSession = {
             ...cloudSession,
             ...(body?.name ? { name: body.name } : {}),
-            ...(body?.avatar !== undefined ? { avatar: body.avatar || undefined } : {})
+            ...(path.endsWith('/avatar')
+              ? { avatar: init?.method === 'DELETE' ? undefined : 'https://example.com/new.png' }
+              : {})
           }
           membership = {
             ...membership,
@@ -182,7 +186,7 @@ export async function mountAccount({
               member.id === cloudSession!.id ? { ...member, ...cloudSession! } : member
             )
           }
-          return Response.json({ success: true })
+          return Response.json(cloudSession)
         }
         return Response.json({ success: true })
       },
