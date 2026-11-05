@@ -8,6 +8,12 @@ type DevRouteEntry = {
 
 const DEV_ROUTES: DevRouteEntry[] = [
   {
+    path: '/dev/cloud',
+    title: 'Workspace sharing',
+    description:
+      'Inspect identity and workspace members, update your profile, and test invitations.'
+  },
+  {
     path: '/dev/onboarding',
     title: 'Onboarding ideas',
     description: 'Polish the real idea cards with fixed mock data and inactive build actions.'

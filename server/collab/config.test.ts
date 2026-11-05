@@ -29,7 +29,7 @@ afterEach(async () => {
 describe('collab startup configuration', () => {
   test('dev mode, old environment settings and legacy workspace flags do not enable runtime', async () => {
     process.env.MOI_DEV = '1'
-    process.env.MOI_COLLAB = '1'
+
     await Bun.write(
       join(workspacePath, '.moi', '.workspace.json'),
       JSON.stringify({ version: 1, experimental: { collab: true } })
@@ -37,6 +37,13 @@ describe('collab startup configuration', () => {
     expect(isCollabEnabled()).toBe(false)
     expect(clientAppConfig().environment === 'cloud').toBe(false)
     expect(await getCollabReferencePath(workspacePath)).toBeUndefined()
+  })
+
+  test('explicit environment opt-in enables experimental collaboration', () => {
+    process.env.MOI_COLLAB = '1'
+    initializeAppConfig()
+    expect(isCollabEnabled()).toBe(true)
+    expect(clientAppConfig().collab).toBe(true)
   })
 
   test('cloud collaboration stays disabled without changing workspace files', async () => {

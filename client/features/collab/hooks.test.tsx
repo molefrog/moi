@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { CollabEngineApi } from './client'
 import { createFakeEngine } from './testing/fake-engine'
-import { publishUsers } from './host-state'
+import { setExternalUser } from './host-state'
 import {
   useMe,
   usePeers,
@@ -94,30 +94,26 @@ function Disabled() {
   return <Observer />
 }
 test('hooks are safe without a backend or applet and resolve missing users to undefined', () => {
-  publishUsers({ users: [] })
+  setExternalUser(undefined)
   const html = renderToStaticMarkup(<Disabled />)
   expect(html).toContain('[]')
 })
 
-test('a published directory resolves users without a workspace engine', () => {
-  publishUsers({ me: 'alice', users: [alice, bob] })
+test('identity does not provide a global member directory', () => {
+  setExternalUser(alice)
   try {
     function Global() {
       return encodeURIComponent(
         JSON.stringify({ me: useMe(), user: useUser('bob'), users: useWorkspaceUsers() })
       )
     }
-    // No room is joined here, so everyone resolves and reads as offline.
+    // No workspace means no directory; the current identity is still available.
     expect(JSON.parse(decodeURIComponent(renderToStaticMarkup(<Global />)))).toEqual({
       me: { ...alice, status: 'offline' },
-      user: { ...bob, status: 'offline' },
-      users: [
-        { ...alice, status: 'offline' },
-        { ...bob, status: 'offline' }
-      ]
+      users: []
     })
   } finally {
-    publishUsers({ users: [] })
+    setExternalUser(undefined)
   }
 })
 
@@ -268,14 +264,14 @@ test('absent and empty directories preserve distinct user resolution', () => {
     hasMe: true
   }
   // Without a host directory, the viewer and live users stand in.
-  expect(render()).toEqual(fallback)
+  expect(render()).toEqual({ users: [], me: { ...alice, status: 'active' }, hasMe: true })
   // An empty host directory is authoritative, even over the viewer.
   engine.setUsers([])
-  expect(render()).toEqual({ users: [], hasMe: false })
+  expect(render()).toEqual({ users: [], me: { ...alice, status: 'active' }, hasMe: true })
   engine.setUsers([alice, bob])
   expect(render()).toEqual(fallback)
   engine.setUsers(undefined)
-  expect(render()).toEqual(fallback)
+  expect(render()).toEqual({ users: [], me: { ...alice, status: 'active' }, hasMe: true })
 })
 
 test('away peers remain on the page while their focus presence is hidden', () => {

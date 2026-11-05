@@ -1,0 +1,64 @@
+import { queryClient } from '@/client/api/query-client'
+import { getIdentity } from '../identity/store'
+import { collabIdentityId, identityKey } from '../identity/types'
+import { normalizeUserProfile } from '../collab/host-state'
+import type { UserProfile } from '@/lib/collab/types'
+import { parseWorkspaceMembers, validWorkspaceId } from './types'
+import type { WorkspaceMembers } from './types'
+
+export const workspaceMembersPrefix = ['workspace-members'] as const
+export const workspaceMembersKey = (workspaceId: string) =>
+  [
+    ...workspaceMembersPrefix,
+    getIdentity() ? identityKey(getIdentity()!) : 'unknown',
+    workspaceId
+  ] as const
+const revisions = new Map<string, number>()
+let revision = 0
+queryClient.getQueryCache().subscribe(event => {
+  if (event.query.queryKey[0] !== workspaceMembersPrefix[0]) return
+  if (event.type === 'removed' || (event.type === 'updated' && event.action.type === 'success')) {
+    const workspaceId = event.query.queryKey[2]
+    if (typeof workspaceId === 'string') revisions.set(workspaceId, ++revision)
+  }
+})
+export const getWorkspaceMembersRevision = (workspaceId: string) => revisions.get(workspaceId) ?? 0
+const directoryCache = new WeakMap<WorkspaceMembers, readonly UserProfile[]>()
+export function setWorkspaceMembers(workspaceId: string, value: WorkspaceMembers): void {
+  validWorkspaceId(workspaceId)
+  const data = parseWorkspaceMembers(value)
+  // A push supersedes any older in-flight GET for this snapshot.
+  void queryClient.cancelQueries({ queryKey: workspaceMembersKey(workspaceId), exact: true })
+  queryClient.setQueryData(workspaceMembersKey(workspaceId), data)
+}
+export function removeWorkspaceMembers(workspaceId: string) {
+  validWorkspaceId(workspaceId)
+  void queryClient.cancelQueries({ queryKey: workspaceMembersKey(workspaceId), exact: true })
+  queryClient.removeQueries({ queryKey: workspaceMembersKey(workspaceId), exact: true })
+}
+export function clearWorkspaceMembers() {
+  void queryClient.cancelQueries({ queryKey: workspaceMembersPrefix })
+  queryClient.removeQueries({ queryKey: workspaceMembersPrefix })
+}
+export function getWorkspaceDirectory(workspaceId: string): readonly UserProfile[] | undefined {
+  const data = queryClient.getQueryData<WorkspaceMembers>(workspaceMembersKey(workspaceId))
+  if (!data) return undefined
+  let profiles = directoryCache.get(data)
+  if (!profiles) {
+    profiles = data.members.map(member =>
+      normalizeUserProfile({
+        id: collabIdentityId(member),
+        name: member.name || undefined,
+        avatar: member.avatar,
+        email: member.type === 'user' ? member.email || undefined : undefined
+      })
+    )
+    directoryCache.set(data, profiles)
+  }
+  return profiles
+}
+export function subscribeWorkspaceDirectory(listener: () => void) {
+  return queryClient.getQueryCache().subscribe(event => {
+    if (event.query.queryKey[0] === workspaceMembersPrefix[0]) listener()
+  })
+}

@@ -1,3 +1,5 @@
+import { colorForId } from '@/lib/collab/colors'
+import { verifyCloudActor } from './collab/cloud-actor'
 import { isSpeedMode } from '@/lib/speed-mode'
 import type { UserProfile } from '@/lib/collab/types'
 import { isMessageAttachments } from '@/lib/message-attachments'
@@ -182,16 +184,23 @@ export const app = Bun.serve<WsData>({
       if (!isCollabEnabled()) {
         return new Response('Collab is not enabled for this workspace', { status: 403 })
       }
-      // Behind Cloudflare Access, presence is joined only as the verified viewer.
-      const { provider, profile } = await proxyUserState(req)
-      if (provider && !profile) {
-        return new Response('Sign in through Cloudflare Access to join', { status: 401 })
+      let verifiedProfile: UserProfile | undefined
+      if (getAppConfig().environment === 'cloud') {
+        const actor = await verifyCloudActor(req, workspaceId)
+        if (!actor) return new Response('Sign in to join this workspace', { status: 401 })
+        const id = actor.type === 'agent' ? `agent:${actor.id}` : actor.id
+        verifiedProfile = { id, color: colorForId(id) }
+      } else {
+        const { provider, profile } = await proxyUserState(req)
+        if (provider && !profile)
+          return new Response('Sign in through Cloudflare Access to join', { status: 401 })
+        verifiedProfile = profile
       }
       return upgrade(server, req, {
         channel: 'collab',
         workspaceId,
         workspacePath: workspace.path,
-        ...(profile ? { verifiedProfile: profile } : {})
+        ...(verifiedProfile ? { verifiedProfile } : {})
       })
     }
   },
