@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { useMutation, useMutationState, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getIdentityGeneration } from '../identity/store'
 import { useIdentity } from '../identity/use-identity'
@@ -53,12 +52,6 @@ export function useWorkspaceMembers(workspaceId: string | undefined) {
     retry: false,
     staleTime: 30_000
   })
-  useEffect(() => {
-    if (!enabled || !workspaceId) return
-    window.dispatchEvent(
-      new CustomEvent('moi:workspace-members:watch', { detail: { workspaceId } })
-    )
-  }, [workspaceId, enabled, generation])
   const pending = useMutationState({
     filters: { mutationKey, status: 'pending', exact: true },
     select: mutation => ({
