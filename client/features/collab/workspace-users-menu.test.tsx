@@ -1,3 +1,5 @@
+import { QueryClientProvider } from '@tanstack/react-query'
+import { queryClient } from '@/client/api/query-client'
 import { expect, test } from 'bun:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { IconLayoutDashboard, IconScribble } from '@tabler/icons-react'
@@ -45,31 +47,33 @@ function renderUsers(options: FakeEngineOptions, list = false) {
     users: engine.getDirectory() ?? []
   })
   return renderToStaticMarkup(
-    <Router ssrPath="/workspace/test/overview">
-      <CollabContext value={engine}>
-        {list ? (
-          <WorkspaceUsersList
-            users={users}
-            page="overview"
-            describeTab={describeTab}
-            onOpenTab={() => {}}
-          />
-        ) : (
-          <WorkspaceUsersMenu workspaceId="test" describeTab={describeTab} onOpenTab={() => {}} />
-        )}
-      </CollabContext>
-    </Router>
+    <QueryClientProvider client={queryClient}>
+      <Router ssrPath="/workspace/test/overview">
+        <CollabContext value={engine}>
+          {list ? (
+            <WorkspaceUsersList
+              users={users}
+              page="overview"
+              describeTab={describeTab}
+              onOpenTab={() => {}}
+            />
+          ) : (
+            <WorkspaceUsersMenu workspaceId="test" describeTab={describeTab} onOpenTab={() => {}} />
+          )}
+        </CollabContext>
+      </Router>
+    </QueryClientProvider>
   )
 }
 
-test('menu is hidden for a single member even with multiple open tabs', () => {
+test('menu stays visible for a single member even with multiple open tabs', () => {
   expect(
     renderUsers({
       self,
       users: [self],
       otherConnections: [connection(self, 'scratchpad')]
     })
-  ).toBe('')
+  ).toContain('aria-label="Users in this workspace"')
 })
 
 test('menu remains visible when other members are offline', () => {
@@ -194,12 +198,12 @@ test('an authoritative empty directory does not leak live users into avatars', (
   expect(html).not.toContain('Active colleague')
 })
 
-test('menu is hidden without a current user', () => {
+test('menu stays visible without a current user', () => {
   expect(
     renderUsers({
       self: undefined,
       users: [active],
       otherConnections: [connection(active, 'overview')]
     })
-  ).toBe('')
+  ).toContain('aria-label="Users in this workspace"')
 })

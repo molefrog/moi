@@ -1,6 +1,10 @@
+import { WorkspaceAgentInvite } from './workspace-agent-invite'
+import type { ReactNode } from 'react'
+import { WorkspaceRemoveButton } from './workspace-remove-button'
+import { userDisplayName } from '@/client/lib/user-display-name'
 import { useState, useSyncExternalStore } from 'react'
 
-import { IconChevronDown } from '@tabler/icons-react'
+import { IconChevronDown, IconUsers } from '@tabler/icons-react'
 import type { Icon as TabIcon } from '@tabler/icons-react'
 import { useRouter } from 'wouter'
 import { usePathname } from 'wouter/use-browser-location'
@@ -14,11 +18,16 @@ import {
 } from '@/client/components/ui/popover'
 import { cn } from '@/client/lib/cn'
 import type { WorkspaceTabId } from '@/lib/types'
+import { colorForId } from '@/lib/collab/colors'
 import { tabFromPath } from '@/lib/workspace-tabs'
 
-import { UserContainer } from './components/user'
+import { WorkspaceInviteForm } from './workspace-invite-form'
+import { useIdentity } from '../identity/use-identity'
+import { collabIdentityId, identityKey } from '../identity/types'
+import { User, UserContainer } from './components/user'
 import { UserAvatarGroupContainer as UserAvatarGroup } from './components/user-avatar-group'
-import { pageFromPath, useCollabEnabled, useCollabEngine } from './provider'
+import { useWorkspaceMembers } from '../workspace-members/hooks'
+import { pageFromPath, useCollabEngine } from './provider'
 import { useConnectionState, useWorkspaceUsers } from './hooks'
 import { summarizeWorkspaceUsers } from './users'
 import type { WorkspaceUserInfo } from './users'
@@ -38,7 +47,8 @@ export function WorkspaceUsersMenu({
   describeTab,
   onOpenTab
 }: WorkspaceUsersMenuProps) {
-  const enabled = useCollabEnabled()
+  const identity = useIdentity()
+  const membership = useWorkspaceMembers(workspaceId)
   const engine = useCollabEngine()
   const state = useConnectionState()
   const workspaceUsers = useWorkspaceUsers()
@@ -60,8 +70,6 @@ export function WorkspaceUsersMenu({
     .map(user => user.profile.id)
   const [open, setOpen] = useState(false)
 
-  if (!enabled || workspaceUsers.length <= 1) return null
-
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
@@ -74,29 +82,98 @@ export function WorkspaceUsersMenu({
           />
         }
       >
-        <UserAvatarGroup ids={avatarIds} size="xs" max={4} />
+        {avatarIds.length > 0 ? (
+          <UserAvatarGroup ids={avatarIds} size="xs" max={4} />
+        ) : (
+          <IconUsers stroke={1.75} />
+        )}
         <IconChevronDown stroke={2.5} className="size-3! text-muted-foreground" />
       </PopoverTrigger>
-      <PopoverContent align="end" className="max-w-64 p-1">
-        <PopoverTitle className="sr-only">Users in this workspace</PopoverTitle>
+      <PopoverContent align="end" className="w-96 max-w-[calc(100vw-2rem)] gap-3 p-3">
+        <PopoverTitle>Share</PopoverTitle>
+        {identity?.type === 'user' && !identity.isAnonymous && (
+          <WorkspaceInviteForm
+            key={`${workspaceId}:${identityKey(identity)}`}
+            workspaceId={workspaceId}
+            disabled={!membership.data}
+          />
+        )}
+        <p className="text-xs text-muted-foreground">Participants</p>
         <WorkspaceUsersList
-          users={users}
+          users={
+            membership.members
+              ? users.filter(user =>
+                  membership.members!.some(member => collabIdentityId(member) === user.profile.id)
+                )
+              : users
+          }
+          renderAction={user => {
+            const member = membership.members?.find(
+              member => collabIdentityId(member) === user.profile.id
+            )
+            return member?.membershipId ? (
+              <WorkspaceRemoveButton
+                workspaceId={workspaceId}
+                target={{
+                  type: 'member',
+                  id: member.membershipId,
+                  name: userDisplayName(user.profile)
+                }}
+              />
+            ) : undefined
+          }}
           page={page}
           describeTab={describeTab}
           onOpenTab={tab => {
             setOpen(false)
             onOpenTab(tab)
           }}
-        />
-        {users.length === 0 && (
-          <p className="px-2 py-1 text-xs text-muted-foreground">No workspace users to show.</p>
+        >
+          {membership.invitations?.map(invitation => (
+            <li
+              key={`invitation:${invitation.id}`}
+              className="flex min-w-0 items-center gap-2 px-2 py-1"
+            >
+              <User
+                className="flex-1"
+                size="sm"
+                profile={{
+                  id: invitation.id,
+                  email: invitation.email,
+                  color: colorForId(invitation.email)
+                }}
+                description={invitation.pending ? 'Sending…' : 'Invited'}
+              />
+              <WorkspaceRemoveButton
+                workspaceId={workspaceId}
+                disabled={invitation.pending}
+                target={{ type: 'invitation', id: invitation.id, name: invitation.email }}
+              />
+            </li>
+          ))}
+        </WorkspaceUsersList>
+        {membership.isError && (
+          <div className="px-2 py-1 text-xs text-muted-foreground">
+            <p>Couldn’t refresh workspace members</p>
+            <Button variant="ghost" size="sm" onClick={() => void membership.refetch()}>
+              Retry
+            </Button>
+          </div>
         )}
+        {users.length === 0 && !membership.invitations?.length && !membership.isError && (
+          <p className="px-2 py-1 text-xs text-muted-foreground">
+            {membership.isFetching ? 'Loading workspace members…' : 'No workspace users to show'}
+          </p>
+        )}
+        <WorkspaceAgentInvite />
       </PopoverContent>
     </Popover>
   )
 }
 
 type WorkspaceUsersListProps = {
+  children?: ReactNode
+  renderAction?: (user: WorkspaceUserInfo) => ReactNode
   users: WorkspaceUserInfo[]
   page: string
   describeTab: DescribeTab
@@ -104,6 +181,8 @@ type WorkspaceUsersListProps = {
 }
 
 export function WorkspaceUsersList({
+  children,
+  renderAction,
   users,
   page,
   describeTab,
@@ -114,23 +193,28 @@ export function WorkspaceUsersList({
       USER_STATUS_ORDER[a.status] - USER_STATUS_ORDER[b.status] || Number(b.self) - Number(a.self)
   )
   return (
-    <ul className="flex max-h-80 scroll-fade flex-col overflow-y-auto">
+    <ul aria-label="Participants" className="flex max-h-80 scroll-fade flex-col overflow-y-auto">
       {sorted.map(user => (
         <UserRow
           key={user.profile.id}
           user={user}
+          action={renderAction?.(user)}
           page={page}
           describeTab={describeTab}
           onOpenTab={onOpenTab}
         />
       ))}
+      {children}
     </ul>
   )
 }
 
-type UserRowProps = Omit<WorkspaceUsersListProps, 'users'> & { user: WorkspaceUserInfo }
+type UserRowProps = Omit<WorkspaceUsersListProps, 'users'> & {
+  user: WorkspaceUserInfo
+  action?: ReactNode
+}
 
-function UserRow({ user, page, describeTab, onOpenTab }: UserRowProps) {
+function UserRow({ user, page, describeTab, onOpenTab, action }: UserRowProps) {
   const tabs = user.pages.map(candidate => {
     const tab = tabFromPath(candidate)
     return { tab, info: tab ? describeTab(tab) : null }
@@ -166,10 +250,10 @@ function UserRow({ user, page, describeTab, onOpenTab }: UserRowProps) {
       }
     />
   )
-  const row = 'flex w-full items-center gap-2.5 rounded-md px-2 py-1 text-left'
+  const row = 'flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 py-1 text-left'
 
   return (
-    <li>
+    <li className="flex min-w-0 items-center gap-2 pr-2">
       {target ? (
         <button
           type="button"
@@ -185,6 +269,7 @@ function UserRow({ user, page, describeTab, onOpenTab }: UserRowProps) {
       ) : (
         <div className={row}>{content}</div>
       )}
+      {action}
     </li>
   )
 }

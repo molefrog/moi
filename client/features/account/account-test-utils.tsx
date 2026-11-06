@@ -58,6 +58,7 @@ export async function mountAccount({
   Object.defineProperty(window, 'location', {
     configurable: true,
     value: {
+      pathname: '/settings',
       assign: (href: string) => navigations.push(href),
       replace: (href: string) => navigations.push(href)
     }
