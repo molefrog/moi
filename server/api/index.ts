@@ -613,7 +613,32 @@ one.get('/sessions/:sessionId/events', async c => {
 
 one.get('/mcp', async c => {
   const ws = c.get('ws')
-  return c.json((await harnessFor(ws).mcpStatus?.(ws)) ?? [])
+  const harness = harnessFor(ws)
+  if (c.req.query('stream') !== 'true') return c.json((await harness.mcpStatus?.(ws)) ?? [])
+  let cancelled = false
+  const encoder = new TextEncoder()
+  return new Response(
+    new ReadableStream({
+      async start(controller) {
+        const emit = (frame: unknown) => {
+          if (!cancelled) controller.enqueue(encoder.encode(JSON.stringify(frame) + '\n'))
+        }
+        try {
+          const connectors =
+            (await harness.mcpStatus?.(ws, connectors => emit({ connectors }))) ?? []
+          emit({ connectors, done: true })
+        } catch {
+          emit({ error: 'Could not load connectors' })
+        } finally {
+          if (!cancelled) controller.close()
+        }
+      },
+      cancel() {
+        cancelled = true
+      }
+    }),
+    { headers: { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-store' } }
+  )
 })
 
 // Harness debug tap for /dev/harness: the backend's native wire frames

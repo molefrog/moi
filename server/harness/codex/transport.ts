@@ -17,7 +17,7 @@ export class CodexRpcError extends Error {
 }
 
 export type CodexTransport = {
-  rpc: <T>(method: string, params?: Json) => Promise<T>
+  rpc: <T>(method: string, params?: Json, options?: { timeoutMs?: number }) => Promise<T>
   notify: (method: string, params?: Json) => void
   onNotification: (listener: NotificationListener) => () => void
   isAlive: () => boolean
@@ -92,14 +92,21 @@ export function createCodexTransport(options: TransportOptions): CodexTransport 
     }
   }
 
-  function rpc<T>(method: string, params: Json = {}): Promise<T> {
+  function rpc<T>(
+    method: string,
+    params: Json = {},
+    requestOptions?: { timeoutMs?: number }
+  ): Promise<T> {
     if (!alive) return Promise.reject(new Error('ChatGPT app-server is not running'))
     const id = nextId++
     return new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        pending.delete(id)
-        reject(new Error(`ChatGPT request timed out: ${method}`))
-      }, options.timeoutMs ?? 30_000)
+      const timer = setTimeout(
+        () => {
+          pending.delete(id)
+          reject(new Error(`ChatGPT request timed out: ${method}`))
+        },
+        requestOptions?.timeoutMs ?? options.timeoutMs ?? 30_000
+      )
       // Register before writing: a synchronous response must find its waiter.
       pending.set(id, { resolve: resolve as (value: unknown) => void, reject, timer })
       send({ jsonrpc: '2.0', id, method, params })

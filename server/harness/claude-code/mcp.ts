@@ -1,5 +1,22 @@
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import type { McpServerStatus, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
+import type { McpServer } from '@/lib/types'
+
+export function claudeConnectors(servers: McpServerStatus[]): McpServer[] {
+  const customSources = new Set(['user', 'project', 'local', 'managed', 'enterprise', 'plugin'])
+  return servers.flatMap(server => {
+    const source = server.source ?? server.scope
+    if (source === 'sdk' || source === 'agent' || source === 'dynamic') return []
+    const app = source === 'claudeai' || server.config?.type === 'claudeai-proxy'
+    if (!app && (!source || !customSources.has(source))) return []
+    return [
+      {
+        name: server.name,
+        status: server.status
+      }
+    ]
+  })
+}
 
 import { claudeCodeSpawn } from '../../agent-launcher'
 import { debugEnabled } from '../../debug'

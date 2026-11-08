@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { QueryClient } from '@tanstack/react-query'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
-import type { WorkspaceState } from '@/lib/types'
+import type { McpServer, WorkspaceState } from '@/lib/types'
 import { receiveWorkspaceHarness } from './harness-transition'
 
 const storageDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage')
@@ -86,4 +86,18 @@ test('an absent layout is not treated as an implicit Claude workspace', async ()
   expect(client.getQueryData<WorkspaceState>(workspaceKeys.state('one'))?.selected).toEqual({
     overview: 'old'
   })
+})
+
+test('discards the previous agent connector list even while its settings tab is closed', async () => {
+  client.setQueryData(workspaceKeys.layout('one'), {
+    ...createDefaultWorkspaceLayout(),
+    provider: 'codex'
+  })
+  client.setQueryData(workspaceKeys.mcp('one'), [{ name: 'codex_apps', status: 'connected' }])
+  client.setQueryData(workspaceKeys.mcp('two'), [{ name: 'other', status: 'connected' }])
+  await receiveWorkspaceHarness(client, 'one', 'claude-code')
+  expect(client.getQueryData(workspaceKeys.mcp('one'))).toBeUndefined()
+  expect(client.getQueryData<McpServer[]>(workspaceKeys.mcp('two'))).toEqual([
+    { name: 'other', status: 'connected' }
+  ])
 })

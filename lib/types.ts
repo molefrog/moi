@@ -512,13 +512,15 @@ export type WorkspaceIcon =
   | { type: 'glyph'; value: IdentityIconId; background?: 'theme' }
   | { type: 'upload'; value: string }
 
-// One MCP server's connection status, as surfaced by GET /api/workspaces/:id/mcp
-// (a subset of the agent SDK's McpServerStatus — only what the UI renders).
+// One connector's status, as surfaced by GET /api/workspaces/:id/mcp.
+// Includes standalone MCP servers and individual hosted apps.
 export type McpServerState = 'connected' | 'failed' | 'needs-auth' | 'pending' | 'disabled'
 
 export type McpServer = {
   name: string
   status: McpServerState
+  displayName?: string
+  iconUrl?: string
 }
 
 export type WorkspaceEntry = {
