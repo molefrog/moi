@@ -7,14 +7,17 @@ import {
   useSyncExternalStore
 } from 'react'
 import type { JsonValue } from 'moi'
+import type { UserProfile } from '@/lib/collab/types'
 import type { PresenceValue } from 'moi/collab'
 
 import { useAppletPresence, useCollabEngine } from './provider'
-import { resolvePeers, resolveUser, workspaceProfiles, userStatus } from './users'
+import { resolvePeers, resolveUser, userStatus } from './users'
 import type { WorkspaceUser, UsePeersOptions, UseWorkspaceUsersOptions } from './users'
 import { createPresencePublisher } from './presence-publisher'
 
 export type { WorkspaceUser, UsePeersOptions, UseWorkspaceUsersOptions } from './users'
+
+const EMPTY_USERS: readonly UserProfile[] = []
 
 export function useConnectionState() {
   const engine = useCollabEngine()
@@ -33,10 +36,8 @@ function useUsersSource() {
     engine.getDirectory,
     engine.getDirectory
   )
-  const users = useMemo(
-    () => workspaceProfiles(state.users, self, directory),
-    [state.users, self, directory]
-  )
+  // Live connections describe activity; only the directory establishes membership.
+  const users = directory ?? EMPTY_USERS
   return { state, self, users, engine }
 }
 export function useUser(id: string): WorkspaceUser | undefined {

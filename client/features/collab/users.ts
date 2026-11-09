@@ -22,16 +22,6 @@ export function userStatus(connections: readonly Connection[], id: string): User
       : 'offline'
 }
 
-// A supplied host directory is authoritative, including an empty list/removals.
-export function workspaceProfiles(
-  _liveUsers: readonly UserProfile[],
-  _self: UserProfile | undefined,
-  directory: readonly UserProfile[] | undefined
-): readonly UserProfile[] {
-  // A connected socket is activity, never evidence of workspace membership.
-  return directory ?? []
-}
-
 export function resolveUser(source: UsersSource, id: string): WorkspaceUser | undefined {
   const profile = source.users.find(user => user.id === id)
   return profile ? { ...profile, status: userStatus(source.connections, id) } : undefined
