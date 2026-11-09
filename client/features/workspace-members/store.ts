@@ -13,7 +13,6 @@ import type { WorkspaceMembers, WorkspaceMembersSnapshot } from './types'
 queryClient.setQueryDefaults(memberKeys.all, { gcTime: Infinity })
 
 // Revisions track membership writes so older cloud snapshots cannot replace them.
-const workspaceRevisions = new Map<string, number>()
 let membersRevision = 0
 let membersLoadedForAccountGeneration: number | undefined
 const collectionListeners = new Set<() => void>()
@@ -21,12 +20,10 @@ const ownerSnapshots = new WeakMap<Identity, WorkspaceMembers>()
 queryClient.getQueryCache().subscribe(event => {
   if (event.query.queryKey[0] !== memberKeys.all[0]) return
   if (event.type === 'removed' || (event.type === 'updated' && event.action.type === 'success')) {
-    const workspaceId = event.query.queryKey[2]
-    if (typeof workspaceId === 'string') workspaceRevisions.set(workspaceId, ++membersRevision)
+    membersRevision++
   }
 })
-export const getWorkspaceMembersRevision = (workspaceId?: string) =>
-  workspaceId === undefined ? membersRevision : (workspaceRevisions.get(workspaceId) ?? 0)
+export const getWorkspaceMembersRevision = () => membersRevision
 const directoryCache = new WeakMap<WorkspaceMembers, readonly UserProfile[]>()
 // Cloud routing currently opens the owner's machine. No sharing record means
 // owner-only; Moi's own workspace registry decides whether that workspace exists.

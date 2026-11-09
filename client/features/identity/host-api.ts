@@ -16,7 +16,7 @@ export type IdentityHostApi = {
     setAll: (workspaces: WorkspaceMembersSnapshot[]) => void
     remove: (workspaceId: string) => void
     clear: () => void
-    getRevision: (workspaceId?: string) => number
+    getRevision: () => number
   }
 }
 export function installIdentityHostApi() {

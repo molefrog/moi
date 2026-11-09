@@ -26,18 +26,15 @@ export const cleanupAccount = () => cleanup()
 
 export type AccountFixtureOptions = {
   children?: ReactNode
-  role?: string
   anonymous?: boolean
   signedOut?: boolean
   demo?: boolean
-  failTeam?: boolean
   environment?: 'local' | 'cloud'
   failSession?: boolean
   loadingSession?: boolean
   pendingMutation?: boolean
   pendingMutationPaths?: string[]
   injected?: boolean
-  loadingTeam?: boolean
 }
 export async function mountAccount({
   children = <AccountProbe />,

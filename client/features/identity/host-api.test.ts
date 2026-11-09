@@ -26,7 +26,16 @@ test('host bridge boots before React has been preloaded', async () => {
         { id: 'workspace', members: [], invitations: [] },
         { id: 'second', members: [], invitations: [] }
       ]);
-      if (api.identity.getRevision() < 1 || !api.workspaceMembers.getRevision('workspace') || !api.workspaceMembers.getRevision('second')) throw new Error('Direct host calls must initialize before React');
+      if (api.identity.getRevision() < 1 || !api.workspaceMembers.getRevision()) throw new Error('Direct host calls must initialize before React');
+      let revision = api.workspaceMembers.getRevision();
+      for (const workspaceId of ['workspace', 'second']) {
+        api.workspaceMembers.set(workspaceId, { members: [], invitations: [] });
+        const next = api.workspaceMembers.getRevision();
+        if (next <= revision) throw new Error('Changes to any workspace must advance the shared revision');
+        revision = next;
+      }
+      api.workspaceMembers.setAll([]);
+      if (api.workspaceMembers.getRevision() <= revision) throw new Error('An empty sharing collection must advance the revision');
       process.exit(0);
     `
     const child = Bun.spawn([process.execPath, '--eval', source], {

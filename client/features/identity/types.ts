@@ -7,7 +7,7 @@ export type Identity =
 function text(value: unknown, max: number): value is string {
   return typeof value === 'string' && value.length <= max && !value.includes('\0')
 }
-export function isAvatar(value: unknown): value is string {
+function isAvatar(value: unknown): value is string {
   if (!text(value, 2048)) return false
   try {
     return ['http:', 'https:'].includes(new URL(value).protocol)
