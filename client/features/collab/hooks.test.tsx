@@ -19,6 +19,53 @@ import type { WorkspaceUser } from './hooks'
 const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
 const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
 
+test.each(['offline member', 'empty', 'missing'] as const)(
+  '%s directory stays authoritative over connected users and self',
+  kind => {
+    const offline = { id: 'offline', name: 'Offline user', color: 'blue' } as const
+    const room = createFakeEngine({
+      self: alice,
+      users: [alice, bob],
+      otherConnections: [
+        {
+          connectionId: 'b',
+          userId: 'bob',
+          location: { page: 'preview', status: 'active' },
+          presence: []
+        }
+      ]
+    })
+    // Keep the socket snapshot populated even when membership is absent or changes.
+    const directory = kind === 'missing' ? undefined : kind === 'empty' ? [] : [offline]
+    const engine: CollabEngineApi = {
+      ...room,
+      getDirectory: () => directory
+    }
+    function Members() {
+      return encodeURIComponent(
+        JSON.stringify({
+          users: useWorkspaceUsers(),
+          connectedUser: useUser('bob'),
+          peers: usePeers()
+        })
+      )
+    }
+    const snapshot = JSON.parse(
+      decodeURIComponent(
+        renderToStaticMarkup(
+          <CollabContext value={engine}>
+            <Members />
+          </CollabContext>
+        )
+      )
+    )
+    expect(snapshot).toEqual({
+      users: kind === 'offline member' ? [{ ...offline, status: 'offline' }] : [],
+      peers: []
+    })
+  }
+)
+
 test('presence pages follow nested navigation paths and deployment bases, decoding once', () => {
   expect(pageFromPath('/workspace/test/views/board', 'test')).toBe('views/board')
   expect(pageFromPath('/prefix/workspace/test/views/draft', 'test', '/prefix')).toBe('views/draft')
@@ -233,7 +280,7 @@ test('workspace users include self and offline members with workspace-wide statu
   expect(render().all).toEqual([])
 })
 
-test('absent and empty directories preserve distinct user resolution', () => {
+test('missing and empty directories hide members while preserving self', () => {
   const engine = createFakeEngine({
     self: alice,
     users: [alice, bob],
@@ -256,7 +303,7 @@ test('absent and empty directories preserve distinct user resolution', () => {
         )
       )
     )
-  const fallback = {
+  const populated = {
     users: [
       { ...alice, status: 'active' },
       { ...bob, status: 'away' }
@@ -264,13 +311,13 @@ test('absent and empty directories preserve distinct user resolution', () => {
     me: { ...alice, status: 'active' },
     hasMe: true
   }
-  // Without a host directory, the viewer and live users stand in.
+  // Identity remains available even when workspace membership is unknown.
   expect(render()).toEqual({ users: [], me: { ...alice, status: 'active' }, hasMe: true })
   // An empty host directory is authoritative, even over the viewer.
   engine.setUsers([])
   expect(render()).toEqual({ users: [], me: { ...alice, status: 'active' }, hasMe: true })
   engine.setUsers([alice, bob])
-  expect(render()).toEqual(fallback)
+  expect(render()).toEqual(populated)
   engine.setUsers(undefined)
   expect(render()).toEqual({ users: [], me: { ...alice, status: 'active' }, hasMe: true })
 })

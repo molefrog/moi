@@ -2,7 +2,7 @@ import { userDisplayName } from '@/client/lib/user-display-name'
 import { expect, test } from 'bun:test'
 import type { ConnectionStatus } from 'moi/collab'
 import type { Connection } from '@/lib/collab/types'
-import { summarizeWorkspaceUsers, resolvePeers, resolveUser, workspaceProfiles } from './users'
+import { summarizeWorkspaceUsers, resolvePeers, resolveUser } from './users'
 
 const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
 const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
@@ -55,23 +55,6 @@ test('peers are other users, deduplicated across tabs, with page/workspace and s
   ])
 })
 
-test('host directory resolves offline users and removals remain authoritative over live profiles', () => {
-  const offline = {
-    id: 'offline',
-    name: 'Offline user',
-    color: 'emerald',
-    email: 'user@example.test'
-  } as const
-  const profiles = workspaceProfiles([alice, bob], alice, [offline])
-  expect(resolveUser({ connections, users: profiles }, offline.id)).toEqual({
-    ...offline,
-    status: 'offline'
-  })
-  expect(resolveUser({ connections, users: profiles }, bob.id)).toBeUndefined()
-  expect(workspaceProfiles([bob], alice, [])).toEqual([])
-  expect(workspaceProfiles([bob], alice, undefined)).toEqual([])
-})
-
 test('hidden tabs stay in their page peers and support the away filter', () => {
   const connections = [
     connection('self', 'alice', 'board'),
@@ -118,7 +101,6 @@ test.each(['__proto__', 'constructor', 'toString'])('%s resolves as an ordinary 
     status: 'offline'
   })
   expect(resolveUser({ connections: [], users: [] }, id)).toBeUndefined()
-  expect(workspaceProfiles([{ ...user, name: 'Stale name' }, bob], user, undefined)).toEqual([])
 })
 
 test('header groups users, includes offline users, and merges visible browser tabs', () => {
