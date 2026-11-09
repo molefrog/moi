@@ -1,4 +1,5 @@
 import { useMutation, useMutationState, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useWorkspaces } from '../home/api'
 import { getAccountGeneration } from '../identity/store'
 import { useIdentity } from '../identity/use-identity'
 import { ownerOnlyWorkspaceMembers } from './store'
@@ -67,6 +68,8 @@ export function useWorkspaceMembers(workspaceId: string | undefined) {
   return { ...query, data, members: data?.members, invitations: data?.invitations }
 }
 function useMembershipAction(workspaceId: string) {
+  const workspaces = useWorkspaces()
+
   const identity = useIdentity()
   const accountId = identity ? identityKey(identity) : undefined
   const accountGeneration = getAccountGeneration()
@@ -81,7 +84,10 @@ function useMembershipAction(workspaceId: string) {
         accountGeneration !== getAccountGeneration()
       )
         throw new Error('Sign in to manage workspace members')
-      if (action.type === 'invite') return inviteWorkspaceMember(workspaceId, action.email)
+      if (action.type === 'invite') {
+        const name = workspaces.data?.find(workspace => workspace.id === workspaceId)?.name
+        return inviteWorkspaceMember(workspaceId, action.email, name?.trim() || undefined)
+      }
       if (action.type === 'remove') return removeWorkspaceMember(workspaceId, action.membershipId)
       return revokeWorkspaceInvitation(workspaceId, action.invitationId)
     },
