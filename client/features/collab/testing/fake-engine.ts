@@ -1,8 +1,20 @@
 import type { UserProfile, Connection, PresenceRegistration } from '@/lib/collab/types'
 import { COLLAB_PROTOCOL_VERSION } from '@/lib/collab/protocol'
 import type { CollabEngineApi } from '../client'
-import { normalizeUsers } from '../host-state'
+import { normalizeUserProfile } from '../host-state'
 import { CollabStore } from '../store'
+
+function normalizeUsers(users: readonly UserProfile[]): readonly UserProfile[] {
+  if (!Array.isArray(users)) throw new Error('Users must be an array.')
+  const ids = new Set<string>()
+  const snapshot = users.map(user => {
+    const normalized = normalizeUserProfile(user)
+    if (ids.has(normalized.id)) throw new Error('Users must have unique ids.')
+    ids.add(normalized.id)
+    return normalized
+  })
+  return Object.freeze(snapshot)
+}
 
 export type FakeEngineOptions = {
   self: UserProfile | undefined

@@ -2,7 +2,7 @@ import { cloudRequest } from '../account/api'
 import { jsonRequest } from '@/client/api/http'
 import { parseWorkspaceMembers, validWorkspaceId } from './types'
 
-export const workspaceMembersPath = (id: string) =>
+const workspaceMembersPath = (id: string) =>
   `workspaces/${encodeURIComponent(validWorkspaceId(id))}`
 export async function fetchWorkspaceMembers(id: string, signal?: AbortSignal) {
   const response = await cloudRequest(`${workspaceMembersPath(id)}/members`, { signal })

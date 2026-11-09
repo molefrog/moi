@@ -39,18 +39,6 @@ export function normalizeUserProfile(value: UserProfileInput): UserProfile {
   return Object.freeze(normalized)
 }
 
-export function normalizeUsers(users: readonly UserProfileInput[]): readonly UserProfile[] {
-  if (!Array.isArray(users)) throw new Error('Users must be an array.')
-  const ids = new Set<string>()
-  const snapshot = users.map(user => {
-    const normalized = normalizeUserProfile(user)
-    if (ids.has(normalized.id)) throw new Error('Users must have unique ids.')
-    ids.add(normalized.id)
-    return normalized
-  })
-  return Object.freeze(snapshot)
-}
-
 // This is a memoized projection of cloud identity, never a separately writable profile.
 let cloudProfile: UserProfile | undefined
 let cloudIdentity: ReturnType<typeof getIdentity>

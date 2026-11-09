@@ -52,7 +52,7 @@ export const identityRefreshQuery = queryOptions({
   retry: false,
   staleTime: 30_000
 })
-export type ProfilePatch = { name: string }
+type ProfilePatch = { name: string }
 export const updateCloudProfile = async (patch: ProfilePatch) =>
   parseIdentity(await (await cloudRequest('me', jsonRequest('PATCH', patch))).json())
 export async function uploadCloudAvatar(file: File) {

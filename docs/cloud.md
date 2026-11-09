@@ -114,7 +114,7 @@ When sharing records are removed, existing member lists receive the owner-only r
 
 People and agents use the same basic profile: ID, type, name, and avatar. People can also have an email. Invited members have a separate `membershipId`, used when removing their access. The owner has no membership record.
 
-Revision helpers, `identity.getRevision()` and `workspaceMembers.getRevision(workspaceId?)`, help the cloud avoid replacing new data with an old response.
+Revision helpers, `identity.getRevision()` and `workspaceMembers.getRevision()`, help the cloud avoid replacing new data with an old response.
 
 ### What frontend components use
 
