@@ -6,7 +6,7 @@ import type { CollabClientMessage } from '@/lib/collab/types'
 import { CollabService } from '@/server/collab/service'
 
 import { CollabClient, NO_ENGINE } from './client'
-import { getCurrentUser, setExternalUser } from './host-state'
+import { getCurrentUser } from './host-state'
 import { setIdentity } from '../identity/store'
 import { setWorkspaceMembers, clearWorkspaceMembers } from '../workspace-members/store'
 import type { UserProfileInput } from './host-state'
@@ -19,7 +19,14 @@ let stop: (() => void) | undefined
 
 // Publish as an outer host would: one viewer, listed in the directory.
 function signIn(user: UserProfileInput, others: readonly UserProfileInput[] = []) {
-  setExternalUser(user)
+  setIdentity({
+    id: user.id,
+    type: 'user',
+    name: user.name ?? '',
+    email: user.email ?? '',
+    avatar: user.avatar,
+    isAnonymous: false
+  })
   setWorkspaceMembers('workspace', {
     members: [user, ...others].map(u => ({
       id: u.id,
@@ -121,7 +128,7 @@ test('runtime without a current user stays idle and never joins anonymously', ()
 test('an explicit user enables workspace presence without an applet and clearing it disconnects', () => {
   const engine = new CollabClient('workspace')
   stop = engine.start()
-  const profile = { id: 'alice', name: 'Alice', color: 'emerald' } as const
+  const profile = { id: 'alice', name: 'Alice', color: colorForId('alice') } as const
   signIn(profile)
   expect(sockets).toHaveLength(1)
   const socket = sockets[0]!
@@ -157,7 +164,7 @@ test('two tabs send the same resolved color for a host user without one', () => 
 })
 
 test('reconnecting restores current presence and removed registrations stay gone', async () => {
-  signIn({ id: 'alice', name: 'Alice', color: 'emerald' })
+  signIn({ id: 'alice', name: 'Alice', color: colorForId('alice') })
   const engine = new CollabClient('workspace')
   stop = engine.start()
   sockets[0]!.open()
@@ -271,12 +278,12 @@ test('errors after joining keep the connection available for further presence', 
 })
 
 test('profile edits publish immediately without changing the user id or reconnecting', () => {
-  const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
+  const alice = { id: 'alice', name: 'Alice', color: colorForId('alice') } as const
   signIn(alice)
   const engine = new CollabClient('workspace')
   stop = engine.start()
   sockets[0]!.open()
-  const edited = { ...alice, name: 'Ada Lovelace', color: 'cyan' } as const
+  const edited = { ...alice, name: 'Ada Lovelace' } as const
   signIn(edited)
   expect(sockets).toHaveLength(1)
   expect(sockets[0]!.readyState).toBe(TestSocket.OPEN)
@@ -285,7 +292,7 @@ test('profile edits publish immediately without changing the user id or reconnec
 })
 
 test('a directory change that leaves the viewer alone sends nothing to the room', () => {
-  const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
+  const alice = { id: 'alice', name: 'Alice', color: colorForId('alice') } as const
   const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
   signIn(alice, [bob])
   const engine = new CollabClient('workspace')
@@ -302,7 +309,7 @@ test('a directory change that leaves the viewer alone sends nothing to the room'
 })
 
 test('changing user reconnects and never sends workspace membership over the socket', async () => {
-  signIn({ id: 'alice', name: 'Alice', color: 'emerald' })
+  signIn({ id: 'alice', name: 'Alice', color: colorForId('alice') })
   const engine = new CollabClient('workspace')
   stop = engine.start()
   sockets[0]!.open()
@@ -315,7 +322,7 @@ test('changing user reconnects and never sends workspace membership over the soc
 })
 
 test('disabled engine exposes host profiles without starting a transport', () => {
-  const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
+  const alice = { id: 'alice', name: 'Alice', color: colorForId('alice') } as const
   const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
   signIn(alice)
   const engine = new CollabClient('workspace', false)
@@ -345,7 +352,7 @@ test('disabled engine exposes host profiles without starting a transport', () =>
 })
 
 test('engine cleanup survives remounting and does not leave user listeners or retry sockets', async () => {
-  const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
+  const alice = { id: 'alice', name: 'Alice', color: colorForId('alice') } as const
   signIn(alice)
   const engine = new CollabClient('workspace')
   stop = engine.start()
@@ -364,7 +371,7 @@ test('engine cleanup survives remounting and does not leave user listeners or re
 })
 
 test('the default engine exposes identity but no workspace directory or transport', () => {
-  const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
+  const alice = { id: 'alice', name: 'Alice', color: colorForId('alice') } as const
   const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
   signIn(alice, [bob])
   expect(NO_ENGINE.getCurrentUser()).toEqual(alice)
@@ -384,7 +391,7 @@ test('the default engine exposes identity but no workspace directory or transpor
 })
 
 test('cloud presence waits for this workspace membership and closes when access is removed', () => {
-  const viewer = { id: 'alice', name: 'Alice', color: 'emerald' } as const
+  const viewer = { id: 'alice', name: 'Alice', color: colorForId('alice') } as const
   signIn(viewer)
   const engine = new CollabClient('other-workspace')
   stop = engine.start()

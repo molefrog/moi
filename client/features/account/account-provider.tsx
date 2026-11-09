@@ -9,13 +9,11 @@ import {
   setLocalUser,
   subscribeCurrentUserStore
 } from '@/client/features/collab/host-state'
-import { getIdentity, setIdentity, getIdentityGeneration } from '../identity/store'
-import { identityKey } from '../identity/types'
-import type { Identity } from '../identity/types'
-import { workspaceMembersPrefix } from '../workspace-members/store'
+import { setIdentity } from '../identity/store'
+import { saveCloudProfile } from './profile-actions'
 import {
   accountKeys,
-  identityQuery,
+  identityRefreshQuery,
   updateCloudProfile,
   uploadCloudAvatar,
   removeCloudAvatar,
@@ -33,47 +31,21 @@ function useAccountState() {
   )
   const identity = useIdentity()
   const qc = useQueryClient()
-  const query = useQuery({ ...identityQuery, enabled: cloud && !demo })
+  const query = useQuery({ ...identityRefreshQuery, enabled: cloud && !demo })
   const registered = cloud && !demo && identity?.type === 'user' && !identity.isAnonymous
   const signOut = useMutation({
     mutationFn: signOutCloud,
     onSuccess: async () => {
       await qc.cancelQueries({ queryKey: accountKeys.all })
       setIdentity(null)
-      qc.setQueryData(accountKeys.identity, null)
       window.location.assign('/cloud/login')
     }
   })
-  async function saveProfile(field: 'name' | 'avatar', update: () => Promise<Identity>) {
-    const before = getIdentity()
-    const generation = getIdentityGeneration()
-    if (!before || before.type !== 'user' || before.isAnonymous)
-      throw new Error('Sign in to change your profile')
-    const saved = await update()
-    const current = getIdentity()
-    if (
-      generation !== getIdentityGeneration() ||
-      !current ||
-      current.type !== 'user' ||
-      current.id !== before.id
-    )
-      throw new Error('Your account changed. Reload Moi to try again.')
-    // A newer server-pushed value wins. Apply only fields still equal to their original value.
-    setIdentity({
-      ...current,
-      ...(field === 'name' && current.name === before.name ? { name: saved.name } : {}),
-      ...(field === 'avatar' && current.avatar === before.avatar ? { avatar: saved.avatar } : {})
-    })
-    // Our identity write can supersede the event bridge's in-flight snapshot.
-    // Refresh active lists now and mark inactive lists stale for their next mount.
-    if (generation === getIdentityGeneration())
-      await qc.invalidateQueries({ queryKey: [...workspaceMembersPrefix, identityKey(current)] })
-  }
   async function saveName(value: string) {
     const name = value.trim()
     if (!name || name.length > 80) throw new Error('Enter a name of up to 80 characters')
     if (cloud) {
-      await saveProfile('name', () => updateCloudProfile({ name }))
+      await saveCloudProfile('name', () => updateCloudProfile({ name }))
       return name
     }
     const local = getCurrentUser()
@@ -83,7 +55,7 @@ function useAccountState() {
     return name
   }
   async function saveAvatar(file: File | null) {
-    await saveProfile('avatar', () => (file ? uploadCloudAvatar(file) : removeCloudAvatar()))
+    await saveCloudProfile('avatar', () => (file ? uploadCloudAvatar(file) : removeCloudAvatar()))
   }
   function getStatus() {
     if (demo) return 'signed-out'

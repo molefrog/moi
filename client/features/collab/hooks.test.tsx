@@ -2,7 +2,8 @@ import { expect, test } from 'bun:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { CollabEngineApi } from './client'
 import { createFakeEngine } from './testing/fake-engine'
-import { setExternalUser } from './host-state'
+import { setIdentity } from '../identity/store'
+import { colorForId } from '@/lib/collab/colors'
 import {
   useMe,
   usePeers,
@@ -94,13 +95,13 @@ function Disabled() {
   return <Observer />
 }
 test('hooks are safe without a backend or applet and resolve missing users to undefined', () => {
-  setExternalUser(undefined)
+  setIdentity(null)
   const html = renderToStaticMarkup(<Disabled />)
   expect(html).toContain('[]')
 })
 
 test('identity does not provide a global member directory', () => {
-  setExternalUser(alice)
+  setIdentity({ ...alice, type: 'user', email: '', isAnonymous: false })
   try {
     function Global() {
       return encodeURIComponent(
@@ -109,11 +110,11 @@ test('identity does not provide a global member directory', () => {
     }
     // No workspace means no directory; the current identity is still available.
     expect(JSON.parse(decodeURIComponent(renderToStaticMarkup(<Global />)))).toEqual({
-      me: { ...alice, status: 'offline' },
+      me: { ...alice, color: colorForId(alice.id), status: 'offline' },
       users: []
     })
   } finally {
-    setExternalUser(undefined)
+    setIdentity(null)
   }
 })
 

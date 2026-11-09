@@ -1,4 +1,6 @@
-import { afterEach, expect, test } from 'bun:test'
+import * as identityStore from '../identity/store'
+import { colorForId } from '@/lib/collab/colors'
+import { afterEach, expect, spyOn, test } from 'bun:test'
 
 import type { UserProfile } from '@/lib/collab/types'
 
@@ -13,8 +15,11 @@ const descriptors = new Map(
   ['window', 'localStorage'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)])
 )
 let instance = 0
+let restoreIdentity = () => {}
 
 afterEach(() => {
+  restoreIdentity()
+  identityStore.setIdentity(null)
   for (const [key, descriptor] of descriptors) {
     if (descriptor) Object.defineProperty(globalThis, key, descriptor)
     else Reflect.deleteProperty(globalThis, key)
@@ -36,6 +41,9 @@ async function setup({
   initializeSaved = true,
   host = {}
 }: SetupOptions = {}) {
+  restoreIdentity()
+  const identitySpy = spyOn(identityStore, 'getIdentity').mockReturnValue(undefined)
+  restoreIdentity = () => identitySpy.mockRestore()
   const saved = new Map<string, string>(profile ? [[PROFILE_KEY, JSON.stringify(profile)]] : [])
   Object.defineProperty(globalThis, 'localStorage', {
     configurable: true,
@@ -50,7 +58,25 @@ async function setup({
   const collab: typeof HostStateModule = await import(path)
   beforeInstall?.(collab)
   if (profile && initializeSaved) collab.initializeLocalUser(true, {})
-  return { ...collab, saved }
+  return {
+    ...collab,
+    saved,
+    publishIdentity: (profile: UserProfile | undefined) => {
+      restoreIdentity()
+      identityStore.setIdentity(
+        profile
+          ? {
+              id: profile.id,
+              type: 'user',
+              name: profile.name ?? '',
+              email: profile.email ?? '',
+              avatar: profile.avatar,
+              isAnonymous: false
+            }
+          : null
+      )
+    }
+  }
 }
 
 test('a saved local profile restores after confirmed local initialization', async () => {
@@ -121,9 +147,9 @@ test('storage changes synchronize local profiles without writing back or replaci
   collab.receiveLocalProfile({ key: PROFILE_KEY, newValue: 'bad' })
   collab.receiveLocalProfile({ key: PROFILE_KEY, newValue: JSON.stringify(bob) })
   expect(notices).toBe(1)
-  collab.setExternalUser(alice)
+  collab.publishIdentity(alice)
   collab.receiveLocalProfile({ key: PROFILE_KEY, newValue: JSON.stringify(bob) })
-  expect(collab.getCurrentUser()).toEqual(alice)
+  expect(collab.getCurrentUser()).toEqual({ ...alice, color: colorForId(alice.id) })
 })
 
 test('storage subscription updates the profile and stops after cleanup', async () => {
@@ -151,14 +177,29 @@ test('cloud identity publishes without a global member list or callback', async 
   const collab = await setup({ profile: alice })
   let notices = 0
   collab.subscribeCurrentUserStore(() => notices++)
-  collab.setExternalUser(bob)
-  expect(collab.getCurrentUser()).toEqual(bob)
+  collab.publishIdentity(bob)
+  expect(collab.getCurrentUser()).toEqual({ ...bob, color: colorForId(bob.id) })
   expect(collab.getCurrentUserSource()).toBe('external')
-  collab.setExternalUser({ ...bob })
+  const profile = collab.getCurrentUser()
+  expect(collab.getCurrentUser()).toBe(profile)
+  collab.publishIdentity({ ...bob })
+  expect(collab.getCurrentUser()).toBe(profile)
   expect(notices).toBe(1)
   collab.setProxyUserState(accessed)
-  expect(collab.getCurrentUser()).toEqual(bob)
-  collab.setExternalUser(undefined)
+  expect(collab.getCurrentUser()).toEqual({ ...bob, color: colorForId(bob.id) })
+  collab.publishIdentity(undefined)
   collab.setLocalUser(alice)
+  expect(collab.getCurrentUser()).toBeUndefined()
+})
+
+test('agent identity and anonymous sign-in derive presence without restoring a local profile', async () => {
+  const collab = await setup({ profile: alice })
+  restoreIdentity()
+  identityStore.setIdentity({ id: 'helper', type: 'agent', name: 'Helper' })
+  expect(collab.getCurrentUser()).toMatchObject({ id: 'agent:helper', name: 'Helper' })
+  identityStore.setIdentity({ id: 'guest', type: 'user', name: '', email: '', isAnonymous: true })
+  expect(collab.getCurrentUser()).toBeUndefined()
+  expect(collab.getCurrentUserSource()).toBe('external')
+  collab.initializeLocalUser(true, {})
   expect(collab.getCurrentUser()).toBeUndefined()
 })

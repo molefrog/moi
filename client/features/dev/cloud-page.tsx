@@ -127,12 +127,11 @@ function SharingMembers({ workspaceId, workspaceName }: SharingMembersProps) {
   const removing = remove.isPending || revoke.isPending
   const removalError = remove.error ?? revoke.error
   async function sendInvitation() {
-    const address = email.trim().toLowerCase()
     setNotice(undefined)
     try {
-      await invite.mutateAsync({ type: 'invite', email: address })
+      await invite.mutateAsync({ email })
       setEmail('')
-      setNotice(`Invitation sent to ${address}`)
+      setNotice(`Invitation sent to ${email.trim().toLowerCase()}`)
     } catch {
       /* Keep the address so the invitation can be retried. */
     }
@@ -145,9 +144,8 @@ function SharingMembers({ workspaceId, workspaceName }: SharingMembersProps) {
   async function confirmRemoval() {
     if (!removal) return
     try {
-      if (removal.type === 'member')
-        await remove.mutateAsync({ type: 'remove', membershipId: removal.id })
-      else await revoke.mutateAsync({ type: 'revoke', invitationId: removal.id })
+      if (removal.type === 'member') await remove.mutateAsync({ membershipId: removal.id })
+      else await revoke.mutateAsync({ invitationId: removal.id })
       setNotice(removal.type === 'member' ? 'Member removed' : 'Invitation revoked')
       setRemoval(undefined)
     } catch {

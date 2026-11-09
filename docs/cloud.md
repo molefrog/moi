@@ -84,6 +84,8 @@ Moi keeps two separate things in the browser:
 
 Both live in memory. They are not saved to localStorage, SQLite, or workspace files. The cloud supplies fresh data after a reload.
 
+The identity store is the single source for cloud identity. Collaboration derives its current profile from it; the account query tracks refresh status without storing another identity. Membership snapshots stay in memory until explicitly replaced or cleared, even when their workspace is not open.
+
 ### Methods the cloud calls
 
 Moi makes these methods available before the app appears:
@@ -107,6 +109,8 @@ The page starts in this order:
 The cloud inserts its module just before `#moi-start`. It also loads `/cloud/bridge.js` for later updates; that download does not hold up rendering. There is no temporary global payload or readiness polling. If either setter is unavailable, initialization does nothing.
 
 `setAll()` replaces the full sharing collection. Workspaces omitted from it have no invited members; the machine owner still has access. `set()` replaces the complete member list for one workspace. `remove()` forgets one workspace's list; `clear()` forgets all of them. These methods update what the frontend knows; they do not change access on the server.
+
+When sharing records are removed, existing member lists receive the owner-only replacement immediately. If ownership has not been established, the replacement is empty. This keeps mounted views and live presence in sync.
 
 People and agents use the same basic profile: ID, type, name, and avatar. People can also have an email. Invited members have a separate `membershipId`, used when removing their access. The owner has no membership record.
 

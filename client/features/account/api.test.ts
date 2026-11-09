@@ -1,6 +1,11 @@
 import { afterEach, expect, spyOn, test } from 'bun:test'
 import { QueryClient } from '@tanstack/react-query'
-import { identityQuery, updateCloudProfile, uploadCloudAvatar, removeCloudAvatar } from './api'
+import {
+  identityRefreshQuery,
+  updateCloudProfile,
+  uploadCloudAvatar,
+  removeCloudAvatar
+} from './api'
 import { getIdentity, setIdentity } from '../identity/store'
 import { parseIdentity } from '../identity/types'
 let cleanup = () => {}
@@ -35,7 +40,7 @@ test('401 clears identity while a temporary API failure does not sign out', asyn
   setIdentity(human)
   fetchResponse(Response.json({ error: 'No session' }, { status: 401 }))
   const client = new QueryClient()
-  expect(await client.fetchQuery(identityQuery)).toBeNull()
+  expect(await client.fetchQuery(identityRefreshQuery)).toBe(true)
   expect(getIdentity()).toBeNull()
   client.clear()
 })
@@ -43,11 +48,13 @@ test('an old identity response cannot overwrite a newer host announcement', asyn
   const pending = Promise.withResolvers<Response>()
   fetchResponse(pending.promise)
   const client = new QueryClient()
-  const request = client.fetchQuery(identityQuery)
+  const request = client.fetchQuery(identityRefreshQuery)
   setIdentity({ ...human, id: 'new', name: 'New account' })
   pending.resolve(Response.json(human))
   await request
   expect(getIdentity()?.id).toBe('new')
+  expect(client.getQueryData<boolean>(['account', 'identity-refresh'])).toBe(true)
+  expect(client.getQueryData(['account', 'identity'])).toBeUndefined()
   client.clear()
 })
 test('profile updates use PATCH me and return the full profile', async () => {

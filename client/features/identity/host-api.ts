@@ -1,4 +1,4 @@
-import { setIdentity, getIdentityVersion } from './store'
+import { setIdentity, getIdentityRevision } from './store'
 import {
   setWorkspaceMembers,
   setAllWorkspaceMembers,
@@ -23,7 +23,7 @@ export function installIdentityHostApi() {
   if (typeof window === 'undefined') return
   const host = window as Window & { moi?: Partial<IdentityHostApi> & Record<string, unknown> }
   host.moi ??= {}
-  host.moi.identity = { set: setIdentity, getRevision: getIdentityVersion }
+  host.moi.identity = { set: setIdentity, getRevision: getIdentityRevision }
   host.moi.workspaceMembers = {
     set: setWorkspaceMembers,
     setAll: setAllWorkspaceMembers,
