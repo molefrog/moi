@@ -4,13 +4,13 @@
   "description": "Local AI workspace powered by the Claude Agent SDK, Bun, React, and Tailwind. Requires Bun.",
   "license": "Elastic-2.0",
   "type": "module",
-  "homepage": "https://github.com/molefrog/moi#readme",
+  "homepage": "https://github.com/moi-computer/moi#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/molefrog/moi.git"
+    "url": "git+https://github.com/moi-computer/moi.git"
   },
   "bugs": {
-    "url": "https://github.com/molefrog/moi/issues"
+    "url": "https://github.com/moi-computer/moi/issues"
   },
   "keywords": [
     "ai",
