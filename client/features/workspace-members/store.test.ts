@@ -1,3 +1,4 @@
+import { memberKeys } from './keys'
 import { afterEach, expect, test } from 'bun:test'
 import { queryClient } from '@/client/api/query-client'
 import { setIdentity, getIdentity } from '../identity/store'
@@ -6,8 +7,7 @@ import {
   setWorkspaceMembers,
   setAllWorkspaceMembers,
   getWorkspaceMembersRevision,
-  getWorkspaceDirectory,
-  workspaceMembersKey
+  getWorkspaceDirectory
 } from './store'
 import type { WorkspaceMembers } from './types'
 import { parseWorkspaceMembers } from './types'
@@ -24,10 +24,24 @@ afterEach(() => {
   setIdentity(null)
   queryClient.clear()
 })
+test('host-published members survive ordinary query garbage collection without mounted observers', async () => {
+  const defaults = queryClient.getDefaultOptions()
+  queryClient.setDefaultOptions({ queries: { gcTime: 5 } })
+  try {
+    setIdentity(alex)
+    setAllWorkspaceMembers([{ id: 'one', members: [alex, bot], invitations: [] }])
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(getWorkspaceDirectory('one')?.map(user => user.id)).toEqual(['alex', 'agent:alex'])
+  } finally {
+    queryClient.setDefaultOptions(defaults)
+  }
+})
 test('pre-mount snapshots populate the actual query cache and separate user and agent ids', () => {
   setIdentity(alex)
   setWorkspaceMembers('one', { members: [alex, bot], invitations: [] })
-  expect(queryClient.getQueryData<WorkspaceMembers>(workspaceMembersKey('one'))).toEqual({
+  expect(
+    queryClient.getQueryData<WorkspaceMembers>(memberKeys.workspace('user:alex', 'one'))
+  ).toEqual({
     members: [alex, bot],
     invitations: []
   })
@@ -65,7 +79,12 @@ test('sharing snapshots replace members and omitted workspaces become owner-only
   const before = getWorkspaceMembersRevision()
   setAllWorkspaceMembers([{ id: 'two', members: [alex, bot], invitations: [] }])
   expect(getWorkspaceDirectory('one')?.map(user => user.id)).toEqual(['alex'])
-  expect(queryClient.getQueryData(workspaceMembersKey('one'))).toBeUndefined()
+  expect(
+    queryClient.getQueryData<WorkspaceMembers>(memberKeys.workspace('user:alex', 'one'))
+  ).toEqual({
+    members: [alex],
+    invitations: []
+  })
   expect(getWorkspaceDirectory('two')).toHaveLength(2)
   expect(getWorkspaceMembersRevision()).toBeGreaterThan(before)
   expect(() =>

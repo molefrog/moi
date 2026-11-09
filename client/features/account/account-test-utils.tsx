@@ -7,7 +7,6 @@ import { memoryLocation } from 'wouter/memory-location'
 import { parseHTML } from 'linkedom'
 import { QueryClientProvider, notifyManager } from '@tanstack/react-query'
 import * as config from '@/client/api/app-config'
-import { setExternalUser } from '@/client/features/collab/host-state'
 import { AccountProvider, useAccount } from './account-provider'
 import { queryClient } from '@/client/api/query-client'
 import type { WorkspaceMembers } from '../workspace-members/types'
@@ -197,16 +196,8 @@ export async function mountAccount({
   qc.clear()
   qc.setDefaultOptions({ queries: { retry: false }, mutations: { retry: false } })
   setIdentity(null)
-  setExternalUser(undefined)
   if (!loadingSession && !failSession && environment === 'cloud') setIdentity(cloudSession)
-  if (injected)
-    setExternalUser({
-      id: 'me',
-      name: 'Alex',
-      email: 'alex@example.com',
-      color: 'blue',
-      avatar: 'https://example.com/avatar.png'
-    })
+  if (injected && environment === 'local') setIdentity(session)
   const { createRoot } = await import('react-dom/client')
   const root = createRoot(document.getElementById('root')!)
   notifyManager.setNotifyFunction(callback => {
@@ -235,7 +226,6 @@ export async function mountAccount({
     })
     qc.clear()
     setIdentity(null)
-    setExternalUser(undefined)
     layoutEffectSpy.mockRestore()
     configSpy.mockRestore()
     fetchSpy.mockRestore()

@@ -1,3 +1,5 @@
+import { getIdentity, subscribeIdentity } from '../identity/store'
+import { collabIdentityId } from '../identity/types'
 import { isUserProfile } from '@/lib/collab/protocol'
 import { colorForId, isUserColor } from '@/lib/collab/colors'
 import type { AuthProvider, ProxyUserState, UserProfile } from '@/lib/collab/types'
@@ -49,34 +51,55 @@ export function normalizeUsers(users: readonly UserProfileInput[]): readonly Use
   return Object.freeze(snapshot)
 }
 
-// Cloud identity is independent of every workspace's member list.
-export function setExternalUser(profile: UserProfileInput | undefined): void {
-  const next = profile ? normalizeUserProfile(profile) : undefined
-  const changed = currentUserSource !== 'external' || !sameProfile(currentUser, next)
-  currentUserSource = 'external'
-  if (changed) currentUser = next
-  if (changed) listeners.forEach(listener => listener())
-}
-
+// This is a memoized projection of cloud identity, never a separately writable profile.
+let cloudProfile: UserProfile | undefined
+let cloudIdentity: ReturnType<typeof getIdentity>
 export function getCurrentUser(): UserProfile | undefined {
-  return currentUser
+  const identity = getIdentity()
+  if (identity === undefined) return currentUser
+  if (identity !== cloudIdentity) {
+    cloudIdentity = identity
+    const next =
+      !identity || (identity.type === 'user' && identity.isAnonymous)
+        ? undefined
+        : normalizeUserProfile({
+            id: collabIdentityId(identity),
+            name: identity.name || undefined,
+            avatar: identity.avatar,
+            email: identity.type === 'user' ? identity.email || undefined : undefined
+          })
+    if (!sameProfile(cloudProfile, next)) cloudProfile = next
+  }
+  return cloudProfile
 }
 
 export function subscribeCurrentUserStore(listener: () => void): () => void {
-  listeners.add(listener)
+  let profile = getCurrentUser()
+  let source = getCurrentUserSource()
+  const notify = () => {
+    const nextProfile = getCurrentUser()
+    const nextSource = getCurrentUserSource()
+    if (profile === nextProfile && source === nextSource) return
+    profile = nextProfile
+    source = nextSource
+    listener()
+  }
+  listeners.add(notify)
+  const unsubscribeIdentity = subscribeIdentity(notify)
   return () => {
-    listeners.delete(listener)
+    listeners.delete(notify)
+    unsubscribeIdentity()
   }
 }
 
 export function getCurrentUserSource(): CurrentUserSource | undefined {
-  return currentUserSource
+  return getIdentity() !== undefined ? 'external' : currentUserSource
 }
 
 // An auth proxy takes precedence over local users; an outer host takes
 // precedence over the proxy. A configured proxy with no user signs this tab out.
 export function setProxyUserState({ provider, profile }: ProxyUserState): void {
-  if (currentUserSource === 'external') return
+  if (getCurrentUserSource() === 'external') return
   if (provider === undefined) {
     if (currentUserSource === undefined || currentUserSource === 'local') return
     currentUserSource = undefined
@@ -100,7 +123,7 @@ function persistLocalUser(): void {
 
 export function setLocalUser(next: UserProfile): void {
   // A provider may take over between rendering the local user form and handling input.
-  if (currentUserSource !== undefined && currentUserSource !== 'local') return
+  if (getCurrentUserSource() !== undefined && getCurrentUserSource() !== 'local') return
   const normalized = normalizeUserProfile(next)
   currentUserSource = 'local'
   currentUser = normalized
@@ -111,7 +134,12 @@ export function setLocalUser(next: UserProfile): void {
 // Called after startup config and proxy identity settle, before React mounts.
 // A host that has already published keeps the viewer it chose, signed in or not.
 export function initializeLocalUser(local: boolean, proxyUser: ProxyUserState | undefined): void {
-  if (!local || !proxyUser || proxyUser.provider !== undefined || currentUserSource !== undefined)
+  if (
+    !local ||
+    !proxyUser ||
+    proxyUser.provider !== undefined ||
+    getCurrentUserSource() !== undefined
+  )
     return
   try {
     const saved = localStorage.getItem(PROFILE_KEY)
@@ -127,7 +155,7 @@ export function initializeLocalUser(local: boolean, proxyUser: ProxyUserState | 
 
 // Storage events update this tab without writing back and triggering another event.
 export function receiveLocalProfile(event: Pick<StorageEvent, 'key' | 'newValue'>): void {
-  if (event.key !== PROFILE_KEY || !event.newValue || currentUserSource !== 'local') return
+  if (event.key !== PROFILE_KEY || !event.newValue || getCurrentUserSource() !== 'local') return
   try {
     const profile = normalizeUserProfile(JSON.parse(event.newValue) as UserProfile)
     if (sameProfile(profile, currentUser)) return

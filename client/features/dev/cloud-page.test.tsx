@@ -24,6 +24,18 @@ const tony = {
   membershipId: 'member-tony'
 } as const
 
+async function waitForAvatarInput(ui: Awaited<ReturnType<typeof mountAccount>>) {
+  // The picker appears after both the workspace list and membership query finish.
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const input = ui.document.querySelector<HTMLInputElement>(
+      '[aria-label="Choose an avatar file"]'
+    )
+    if (input) return input
+    await ui.settle()
+  }
+  throw new Error('Avatar picker did not appear')
+}
+
 test('sharing shows workspace names, member profiles and owner without developer data', async () => {
   const ui = await mountAccount({ children: <CloudPage /> })
   await ui.settle()
@@ -44,8 +56,7 @@ test('sharing shows workspace names, member profiles and owner without developer
 
 test('my avatar opens a file picker and uploads through the cloud profile API', async () => {
   const ui = await mountAccount({ children: <CloudPage /> })
-  await ui.settle()
-  const input = ui.document.querySelector<HTMLInputElement>('[aria-label="Choose an avatar file"]')!
+  const input = await waitForAvatarInput(ui)
   const picker = spyOn(input, 'click')
   const notification = spyOn(toast, 'add')
   try {
@@ -74,9 +85,7 @@ test('a failed avatar upload preserves the current avatar and allows retry', asy
   const original = getIdentity()?.avatar
   const notification = spyOn(toast, 'add')
   try {
-    const input = ui.document.querySelector<HTMLInputElement>(
-      '[aria-label="Choose an avatar file"]'
-    )!
+    const input = await waitForAvatarInput(ui)
     Object.defineProperty(input, 'files', {
       configurable: true,
       value: [new File(['avatar'], 'avatar.png', { type: 'image/png' })]

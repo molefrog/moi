@@ -2,10 +2,13 @@ import { queryOptions } from '@tanstack/react-query'
 import { jsonRequest } from '@/client/api/http'
 import { isRecord } from '@/lib/collab/protocol'
 import { parseIdentity } from '../identity/types'
-import { getIdentityVersion, setIdentity } from '../identity/store'
+import { getIdentityRevision, setIdentity } from '../identity/store'
 import type { Identity } from '../identity/types'
 
-export const accountKeys = { all: ['account'] as const, identity: ['account', 'identity'] as const }
+export const accountKeys = {
+  all: ['account'] as const,
+  identityRefresh: ['account', 'identity-refresh'] as const
+}
 export class CloudApiError extends Error {
   constructor(
     message: string,
@@ -30,10 +33,11 @@ export async function cloudRequest(path: string, init?: RequestInit): Promise<Re
   }
   return response
 }
-export const identityQuery = queryOptions({
-  queryKey: accountKeys.identity,
-  queryFn: async ({ signal }): Promise<Identity | null> => {
-    const version = getIdentityVersion()
+// React Query tracks refresh status only. Identity itself lives in the identity store.
+export const identityRefreshQuery = queryOptions({
+  queryKey: accountKeys.identityRefresh,
+  queryFn: async ({ signal }): Promise<true> => {
+    const identityRevision = getIdentityRevision()
     let identity: Identity | null
     try {
       identity = parseIdentity(await (await cloudRequest('me', { signal })).json())
@@ -42,8 +46,8 @@ export const identityQuery = queryOptions({
       identity = null
     }
     // A pushed identity or account switch wins over an older request.
-    if (!signal.aborted && getIdentityVersion() === version) setIdentity(identity)
-    return identity
+    if (!signal.aborted && getIdentityRevision() === identityRevision) setIdentity(identity)
+    return true
   },
   retry: false,
   staleTime: 30_000

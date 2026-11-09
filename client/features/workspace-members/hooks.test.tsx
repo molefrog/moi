@@ -2,7 +2,12 @@ import { afterEach, expect, test } from 'bun:test'
 import { act } from 'react'
 import { cleanupAccount, mountAccount } from '../account/account-test-utils'
 import { useInviteMember, useWorkspaceMembers } from './hooks'
-import { setWorkspaceMembers } from './store'
+import {
+  clearWorkspaceMembers,
+  removeWorkspaceMembers,
+  setAllWorkspaceMembers,
+  setWorkspaceMembers
+} from './store'
 import { setIdentity } from '../identity/store'
 const me = {
   id: 'me',
@@ -24,11 +29,25 @@ function Probe() {
   const invite = useInviteMember('one')
   return (
     <>
-      <button onClick={() => invite.mutate({ email: 'tony@example.com' })}>Invite Tony</button>
+      <button onClick={() => invite.mutate({ email: ' Tony@Example.COM ' })}>Invite Tony</button>
+      <button onClick={() => void invite.mutateAsync({ email: ' Tony@Example.COM ' })}>
+        Invite Tony asynchronously
+      </button>
       <pre data-members>{JSON.stringify(snapshot.data)}</pre>
       <p data-error>{invite.error?.message}</p>
     </>
   )
+}
+for (const button of ['Invite Tony', 'Invite Tony asynchronously']) {
+  test(`${button} normalizes the email before sending`, async () => {
+    const ui = await mountAccount({ children: <Probe /> })
+    await ui.settle()
+    await ui.click(button)
+    expect(ui.calls.filter(call => call.path.endsWith('/invitations'))).toEqual([
+      { path: '/cloud/api/workspaces/one/invitations', body: { email: 'tony@example.com' } }
+    ])
+    expect(ui.document.querySelector('[data-members]')?.textContent).toContain('tony@example.com')
+  })
 }
 test('failed optimistic invite disappears without losing a concurrent membership push', async () => {
   const ui = await mountAccount({
@@ -61,4 +80,22 @@ test('an old account invite completion cannot publish membership into the new ac
   await act(async () => ui.mutationRequest.resolve())
   await ui.settle()
   expect(ui.document.querySelector('[data-members]')?.textContent).not.toContain('pending:')
+})
+
+test.each([
+  ['full snapshot', () => setAllWorkspaceMembers([])],
+  ['single removal', () => removeWorkspaceMembers('one')],
+  ['clear', clearWorkspaceMembers]
+] as const)('%s removes old members from an already mounted view', async (_label, remove) => {
+  const ui = await mountAccount({ children: <Probe /> })
+  await ui.settle()
+  await act(async () =>
+    setAllWorkspaceMembers([{ id: 'one', members: [me, tony], invitations: [] }])
+  )
+  await ui.settle()
+  expect(ui.document.querySelector('[data-members]')?.textContent).toContain('Tony')
+  await act(async () => remove())
+  await ui.settle()
+  expect(ui.document.querySelector('[data-members]')?.textContent).not.toContain('Tony')
+  expect(ui.document.querySelector('[data-members]')?.textContent).toContain('Alex')
 })

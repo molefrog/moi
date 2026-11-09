@@ -1,7 +1,9 @@
 import { useMutation, useMutationState, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getIdentityGeneration } from '../identity/store'
+import { getAccountGeneration } from '../identity/store'
 import { useIdentity } from '../identity/use-identity'
-import { workspaceMembersKey, ownerOnlyWorkspaceMembers } from './store'
+import { ownerOnlyWorkspaceMembers } from './store'
+import { memberKeys } from './keys'
+import { identityKey } from '../identity/types'
 import {
   fetchWorkspaceMembers,
   inviteWorkspaceMember,
@@ -37,15 +39,16 @@ export function applyPendingMembership(
 }
 export function useWorkspaceMembers(workspaceId: string | undefined) {
   const identity = useIdentity()
+  const accountId = identity ? identityKey(identity) : undefined
   const enabled = !!workspaceId && identity?.type === 'user' && !identity.isAnonymous
-  const generation = getIdentityGeneration()
-  const mutationKey = ['workspace-members-action', generation, workspaceId]
+  const accountGeneration = getAccountGeneration()
+  const mutationKey = ['workspace-members-action', accountGeneration, workspaceId]
   const query = useQuery({
-    queryKey: workspaceMembersKey(workspaceId ?? ''),
+    queryKey: memberKeys.workspace(accountId, workspaceId ?? ''),
     initialData: ownerOnlyWorkspaceMembers,
     queryFn: async ({ signal }) => {
       const snapshot = await fetchWorkspaceMembers(workspaceId!, signal)
-      if (signal.aborted || generation !== getIdentityGeneration())
+      if (signal.aborted || accountGeneration !== getAccountGeneration())
         throw new Error('Identity changed')
       return snapshot
     },
@@ -65,16 +68,17 @@ export function useWorkspaceMembers(workspaceId: string | undefined) {
 }
 function useMembershipAction(workspaceId: string) {
   const identity = useIdentity()
-  const generation = getIdentityGeneration()
+  const accountId = identity ? identityKey(identity) : undefined
+  const accountGeneration = getAccountGeneration()
   const client = useQueryClient()
   return useMutation({
-    mutationKey: ['workspace-members-action', generation, workspaceId],
+    mutationKey: ['workspace-members-action', accountGeneration, workspaceId],
     mutationFn: async (action: MembershipAction) => {
       if (
         !identity ||
         identity.type !== 'user' ||
         identity.isAnonymous ||
-        generation !== getIdentityGeneration()
+        accountGeneration !== getAccountGeneration()
       )
         throw new Error('Sign in to manage workspace members')
       if (action.type === 'invite') return inviteWorkspaceMember(workspaceId, action.email)
@@ -82,9 +86,12 @@ function useMembershipAction(workspaceId: string) {
       return revokeWorkspaceInvitation(workspaceId, action.invitationId)
     },
     onSuccess: async () => {
-      if (generation !== getIdentityGeneration()) return
+      if (accountGeneration !== getAccountGeneration()) return
       // Keep the optimistic overlay until the canonical snapshot has caught up.
-      await client.invalidateQueries({ queryKey: workspaceMembersKey(workspaceId), exact: true })
+      await client.invalidateQueries({
+        queryKey: memberKeys.workspace(accountId, workspaceId),
+        exact: true
+      })
     }
   })
 }
@@ -93,7 +100,9 @@ export function useInviteMember(workspaceId: string) {
   return {
     ...mutation,
     mutate: ({ email }: { email: string }) =>
-      mutation.mutate({ type: 'invite', email: email.trim().toLowerCase() })
+      mutation.mutate({ type: 'invite', email: email.trim().toLowerCase() }),
+    mutateAsync: ({ email }: { email: string }) =>
+      mutation.mutateAsync({ type: 'invite', email: email.trim().toLowerCase() })
   }
 }
 export function useRemoveMember(workspaceId: string) {
@@ -101,7 +110,9 @@ export function useRemoveMember(workspaceId: string) {
   return {
     ...mutation,
     mutate: ({ membershipId }: { membershipId: string }) =>
-      mutation.mutate({ type: 'remove', membershipId })
+      mutation.mutate({ type: 'remove', membershipId }),
+    mutateAsync: ({ membershipId }: { membershipId: string }) =>
+      mutation.mutateAsync({ type: 'remove', membershipId })
   }
 }
 export function useRevokeInvitation(workspaceId: string) {
@@ -109,6 +120,8 @@ export function useRevokeInvitation(workspaceId: string) {
   return {
     ...mutation,
     mutate: ({ invitationId }: { invitationId: string }) =>
-      mutation.mutate({ type: 'revoke', invitationId })
+      mutation.mutate({ type: 'revoke', invitationId }),
+    mutateAsync: ({ invitationId }: { invitationId: string }) =>
+      mutation.mutateAsync({ type: 'revoke', invitationId })
   }
 }
