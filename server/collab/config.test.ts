@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { clientAppConfig, initializeAppConfig, resetAppConfig } from '../app-config'
-import { getCollabReferencePath, isCollabEnabled } from './config'
+import { getCollabReferencePath } from './config'
 import { collabSkillReferencePath } from './skill'
 
 let workspacePath: string
@@ -34,7 +34,6 @@ describe('collab startup configuration', () => {
       join(workspacePath, '.moi', '.workspace.json'),
       JSON.stringify({ version: 1, experimental: { collab: true } })
     )
-    expect(isCollabEnabled()).toBe(false)
     expect(clientAppConfig().environment === 'cloud').toBe(false)
     expect(await getCollabReferencePath(workspacePath)).toBeUndefined()
   })
@@ -45,7 +44,6 @@ describe('collab startup configuration', () => {
     expect(await getCollabReferencePath(workspacePath)).toBeUndefined()
     process.env.MOI_ENVIRONMENT = 'cloud'
     initializeAppConfig()
-    expect(isCollabEnabled()).toBe(true)
     expect(await getCollabReferencePath(workspacePath)).toBe(referencePath)
   })
 })

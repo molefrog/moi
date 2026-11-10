@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 
 import type { WorkspaceTabsState } from '@/lib/types'
 import { normalizeWorkspaceTabs } from '@/lib/workspace-layout'
-import { useCollabEnabled } from '@/client/features/collab'
+import { useAppConfig } from '@/client/api/app-config'
 import { useWorkspaceLayoutCtx } from './workspace-layout-context'
 
 const keyFor = (workspaceId: string) => `moi:collab:${workspaceId}:tabs`
@@ -29,15 +29,15 @@ export function writeWorkspaceTabs(workspaceId: string, tabs: WorkspaceTabsState
 
 export function useWorkspaceTabs() {
   const { workspaceId, layout, setLayout } = useWorkspaceLayoutCtx()
-  const enabled = useCollabEnabled()
+  const cloud = useAppConfig().environment === 'cloud'
   const defaults = useMemo(() => normalizeWorkspaceTabs(layout.tabs), [layout.tabs])
   const [local, setLocal] = useState<WorkspaceTabsState>(() =>
-    enabled ? readWorkspaceTabs(workspaceId, defaults) : defaults
+    cloud ? readWorkspaceTabs(workspaceId, defaults) : defaults
   )
   const setTabs = useCallback(
     (tabs: WorkspaceTabsState) => {
       const next = normalizeWorkspaceTabs(tabs)
-      if (enabled) {
+      if (cloud) {
         setLocal(next)
         writeWorkspaceTabs(workspaceId, next)
       } else {
@@ -45,7 +45,7 @@ export function useWorkspaceTabs() {
       }
       return next
     },
-    [enabled, setLayout, workspaceId]
+    [cloud, setLayout, workspaceId]
   )
-  return [enabled ? local : defaults, setTabs] as const
+  return [cloud ? local : defaults, setTabs] as const
 }

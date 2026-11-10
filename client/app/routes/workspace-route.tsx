@@ -1,7 +1,7 @@
 import { useWorkspaceMembers } from '@/client/features/collab/members/hooks'
 import { useWorkspaceHarnessChanges } from '@/client/features/workspace/harness-transition'
 import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
-import { CollabProvider, useCollabEnabled } from '@/client/features/collab'
+import { CollabProvider } from '@/client/features/collab'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
@@ -44,7 +44,6 @@ export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
 }
 
 function WorkspaceContent({ id }: WorkspaceRouteProps) {
-  const collabEnabled = useCollabEnabled()
   const queryClient = useQueryClient()
   const [selectedSessionId] = useSelectedSession()
   const { isLoading: layoutLoading, layout, provider } = useWorkspaceLayoutCtx()
@@ -75,9 +74,7 @@ function WorkspaceContent({ id }: WorkspaceRouteProps) {
     layoutLoading || selectedSessionId === undefined || widgets.isLoading || views.isLoading
 
   return (
-    // Reset the screen when switching between shared and browser tab state.
     <WorkspaceScreen
-      key={collabEnabled ? 'browser-tab' : 'shared'}
       contentPending={contentPending}
       widgets={widgets.data}
       views={views.data ?? []}

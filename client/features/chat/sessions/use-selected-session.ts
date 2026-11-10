@@ -9,7 +9,7 @@ import {
   writeSelectedSession,
   type BrowserTabSelection
 } from '@/client/features/chat/sessions/browser-tab-state'
-import { useCollabEnabled } from '@/client/features/collab'
+import { useAppConfig } from '@/client/api/app-config'
 import { useWorkspaceId } from '@/client/features/workspace/workspace-context'
 import {
   changeWorkspaceStateCache,
@@ -193,8 +193,8 @@ export function useSelectedSession(explicitTabId?: WorkspaceTabId): SelectedSess
   const routeTabId = useCurrentTabId()
   const tabId = explicitTabId ?? routeTabId
   const workspaceId = useWorkspaceId()
-  const collabEnabled = useCollabEnabled()
-  const scope: SelectedSessionScope = collabEnabled ? 'browser-tab' : 'shared'
+  const cloud = useAppConfig().environment === 'cloud'
+  const scope: SelectedSessionScope = cloud ? 'browser-tab' : 'shared'
   const queryClient = useQueryClient()
   const state = useWorkspaceState(workspaceId).data
   const local = useQuery({

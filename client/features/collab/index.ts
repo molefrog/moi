@@ -1,4 +1,4 @@
-export { CollabProvider, AppletPresenceProvider, useCollabEnabled } from './presence/provider'
+export { CollabProvider, AppletPresenceProvider } from './presence/provider'
 export { WorkspaceSharingMenu } from './sharing/workspace-sharing-menu'
 export type { TabInfo } from './sharing/workspace-sharing-menu'
 export { appletCollabApi } from './applet-api'

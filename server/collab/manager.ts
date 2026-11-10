@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path'
 import { COLLAB_MAX_MESSAGE_BYTES, isCollabClientMessage } from '@/lib/collab/protocol'
 import type { CollabClientMessage, CollabServerMessage, UserProfile } from '@/lib/collab/types'
 
-import { isCollabEnabled } from './config'
+import { getAppConfig } from '../app-config'
 import type { ParentMessage, WorkerMessage } from './worker-messages'
 
 export type ClientSocket = {
@@ -107,7 +107,10 @@ export class CollabManager {
     const canonicalPath = await realpath(workspacePath)
     binding.workspacePaths.add(canonicalPath)
     if (binding.closed) throw new CollabRuntimeError('unavailable', 'Collab connection closed')
-    if (!(await (this.options.enabled ?? isCollabEnabled)(canonicalPath))) {
+    const enabled = this.options.enabled
+      ? await this.options.enabled(canonicalPath)
+      : getAppConfig().environment === 'cloud'
+    if (!enabled) {
       throw new CollabRuntimeError(
         'unavailable',
         'Collaboration is only available in the cloud environment'
