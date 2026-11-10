@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -78,9 +78,9 @@ export function ReorderableList<T>({
   )
   const listRef = useRef<HTMLDivElement>(null)
   const [draggingId, setDraggingId] = useState<ReorderableId>()
-  // Set after mount: the server renderer used by tests cannot render portals.
-  const [overlayRoot, setOverlayRoot] = useState<HTMLElement>()
-  useEffect(() => setOverlayRoot(document.body), [])
+  // Mounted on the first drag and kept, so the drop animation can finish. The
+  // server renderer used by tests cannot render portals.
+  const [overlayMounted, setOverlayMounted] = useState(false)
 
   // The dropped order is shown right away and held until the owner's `items`
   // change, so a drop never flashes the old order while the owner saves it.
@@ -106,6 +106,7 @@ export function ReorderableList<T>({
 
   const handleDragStart = ({ active, activatorEvent }: DragStartEvent) => {
     setDraggingId(String(active.id))
+    setOverlayMounted(true)
     // Keep receiving the pointer while it is over an iframe (a view can embed
     // one), which otherwise swallows the release and leaves the drag stuck.
     // Captured on the list, not the item: a captured link would get a native
@@ -152,12 +153,12 @@ export function ReorderableList<T>({
         </div>
       </SortableContext>
       {/* Portaled so the dragged copy is not clipped by the panels next to the list. */}
-      {overlayRoot &&
+      {overlayMounted &&
         createPortal(
           <DragOverlay>
             {draggingItem && renderOverlay ? renderOverlay(draggingItem) : null}
           </DragOverlay>,
-          overlayRoot
+          document.body
         )}
     </DndContext>
   )
