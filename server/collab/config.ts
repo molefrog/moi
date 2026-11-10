@@ -4,7 +4,7 @@ import { getAppConfig } from '../app-config'
 import { collabSkillReferencePath } from './skill'
 
 export function isCollabEnabled(): boolean {
-  return getAppConfig().collab
+  return getAppConfig().environment === 'cloud'
 }
 
 export async function getCollabReferencePath(

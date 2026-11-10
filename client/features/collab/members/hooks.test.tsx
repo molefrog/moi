@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from 'bun:test'
 import { act } from 'react'
-import { cleanupAccount, mountAccount } from '../account/account-test-utils'
+import { cleanupAccount, mountAccount } from '../../account/account-test-utils'
 import { useInviteMember, useWorkspaceMembers } from './hooks'
 import {
   clearWorkspaceMembers,
@@ -8,9 +8,8 @@ import {
   setAllWorkspaceMembers,
   setWorkspaceMembers
 } from './store'
-
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { setIdentity } from '../identity/store'
+import { setIdentity } from '../../identity/store'
 const me = {
   id: 'me',
   type: 'user',

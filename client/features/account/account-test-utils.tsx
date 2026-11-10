@@ -9,7 +9,7 @@ import { QueryClientProvider, notifyManager } from '@tanstack/react-query'
 import * as config from '@/client/api/app-config'
 import { AccountProvider, useAccount } from './account-provider'
 import { queryClient } from '@/client/api/query-client'
-import type { WorkspaceMembers } from '../workspace-members/types'
+import type { WorkspaceMembers } from '../collab/members/types'
 import { setIdentity } from '../identity/store'
 import type { Identity } from '../identity/types'
 
@@ -87,7 +87,6 @@ export async function mountAccount({
   const configSpy = spyOn(config, 'useAppConfig').mockReturnValue({
     environment,
     demo,
-    collab: false,
     demoInstallUrl: '/'
   })
   let cloudSession: Identity | null = signedOut

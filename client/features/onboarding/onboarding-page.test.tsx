@@ -41,7 +41,7 @@ async function mount(
   const configSpy = spyOn(config, 'useAppConfig').mockReturnValue({
     environment: local ? 'local' : 'cloud',
     demo,
-    collab: false,
+
     demoInstallUrl: '/'
   })
   const client = new QueryClient({

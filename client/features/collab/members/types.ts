@@ -1,6 +1,6 @@
 import { isRecord } from '@/lib/collab/protocol'
-import { identityKey, parseIdentity } from '../identity/types'
-import type { Identity } from '../identity/types'
+import { identityKey, parseIdentity } from '../../identity/types'
+import type { Identity } from '../../identity/types'
 
 export type WorkspaceMember = Identity & { membershipId?: string }
 export type WorkspaceInvitation = {

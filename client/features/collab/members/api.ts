@@ -1,4 +1,4 @@
-import { cloudRequest } from '../account/api'
+import { cloudRequest } from '../../account/api'
 import { jsonRequest } from '@/client/api/http'
 import { parseWorkspaceMembers, validWorkspaceId } from './types'
 

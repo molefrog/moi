@@ -3,6 +3,7 @@
 // workspace). Both commands take a fresh or existing directory and lay
 // down the same set of skill folders.
 import { cp, lstat, mkdir, readFile, readdir, readlink } from 'node:fs/promises'
+import { getAppConfig } from '../app-config'
 import { join } from 'node:path'
 
 // Resolve relative to this file so source checkouts and published installs agree.
@@ -19,9 +20,9 @@ export async function bundledSkillNames(): Promise<string[]> {
 
 export const COLLAB_REFERENCE_SOURCE_PATH = join(BUNDLED_SKILL_DIR, 'references', 'COLLAB.md')
 
-// The guide lives beside the other references, but only explicit collab init installs it.
+// Only cloud workspaces expose live presence to applets.
 function isDefaultSkillFile(source: string): boolean {
-  return source !== COLLAB_REFERENCE_SOURCE_PATH
+  return source !== COLLAB_REFERENCE_SOURCE_PATH || getAppConfig().environment === 'cloud'
 }
 
 async function matchesBundledPath(source: string, target: string, exact = false): Promise<boolean> {

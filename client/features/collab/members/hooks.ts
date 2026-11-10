@@ -1,10 +1,10 @@
 import { useMutation, useMutationState, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useWorkspaces } from '../home/api'
-import { getAccountGeneration } from '../identity/store'
-import { useIdentity } from '../identity/use-identity'
+import { useWorkspaces } from '../../home/api'
+import { getAccountGeneration } from '../../identity/store'
+import { useIdentity } from '../../identity/use-identity'
 import { ownerOnlyWorkspaceMembers } from './store'
 import { memberKeys } from './keys'
-import { identityKey } from '../identity/types'
+import { identityKey } from '../../identity/types'
 import {
   fetchWorkspaceMembers,
   inviteWorkspaceMember,

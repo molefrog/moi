@@ -1,5 +1,5 @@
 import { queryClient } from '@/client/api/query-client'
-import { memberKeys } from '../workspace-members/keys'
+import { memberKeys } from '../collab/members/keys'
 import { identityKey, parseIdentity } from './types'
 import type { Identity } from './types'
 

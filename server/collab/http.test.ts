@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, realpath, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -11,7 +11,6 @@ import { clientAppConfig, initializeAppConfig, resetAppConfig } from '../app-con
 import { DEFAULT_REGISTRY_PATH, setRegistryPath } from '../workspaces/registry'
 import { collabManager, type ClientSocket } from './manager'
 import { collabSkillReferencePath } from './skill'
-import * as collabConfig from './config'
 
 let fixtureRoot: string
 let directory: string
@@ -19,7 +18,6 @@ let canonicalPath: string
 let registryPath: string
 let workspace: WorkspaceEntry
 let savedEnv: Record<string, string | undefined>
-let restorePresence = () => {}
 const envKeys = ['MOI_COLLAB', 'MOI_DEV', 'MOI_ENVIRONMENT']
 
 async function until(predicate: () => boolean) {
@@ -59,7 +57,6 @@ afterEach(async () => {
     if (savedEnv[key] === undefined) delete process.env[key]
     else process.env[key] = savedEnv[key]
   }
-  restorePresence()
   resetAppConfig()
   setRegistryPath(DEFAULT_REGISTRY_PATH)
   await rm(fixtureRoot, { recursive: true, force: true })
@@ -83,47 +80,38 @@ function useCloudConfig() {
   expect(clientAppConfig().environment === 'cloud').toBe(true)
 }
 
-function enablePresenceForTest() {
-  useCloudConfig()
-  const enabled = spyOn(collabConfig, 'isCollabEnabled').mockReturnValue(true)
-  restorePresence = () => enabled.mockRestore()
-}
-
 describe('collab HTTP integration', () => {
-  test.each(['local', 'cloud'])(
-    '%s deployments reject presence joins without starting a worker',
-    async environment => {
-      process.env.MOI_ENVIRONMENT = environment
-      initializeAppConfig()
-      const messages: CollabServerMessage[] = []
-      const socket: ClientSocket = {
-        send(data) {
-          messages.push(JSON.parse(data) as CollabServerMessage)
-          return data.length
-        },
-        close() {}
-      }
-      collabManager.open(socket, directory)
-      collabManager.message(
-        socket,
-        JSON.stringify({
-          type: 'join',
-          version: 1,
-          profile: { id: 'anna', name: 'Anna', color: 'blue' }
-        })
-      )
-      try {
-        await until(() => messages.some(message => message.type === 'error'))
-        expect(messages).toContainEqual(
-          expect.objectContaining({ type: 'error', code: 'unavailable' })
-        )
-        expect(messages.some(message => message.type === 'welcome')).toBe(false)
-        expect(collabManager.debugSnapshot()).toEqual([])
-      } finally {
-        collabManager.close(socket)
-      }
+  test('local deployments reject presence joins without starting a worker', async () => {
+    process.env.MOI_ENVIRONMENT = 'local'
+    initializeAppConfig()
+    const messages: CollabServerMessage[] = []
+    const socket: ClientSocket = {
+      send(data) {
+        messages.push(JSON.parse(data) as CollabServerMessage)
+        return data.length
+      },
+      close() {}
     }
-  )
+    collabManager.open(socket, directory)
+    collabManager.message(
+      socket,
+      JSON.stringify({
+        type: 'join',
+        version: 1,
+        profile: { id: 'anna', name: 'Anna', color: 'blue' }
+      })
+    )
+    try {
+      await until(() => messages.some(message => message.type === 'error'))
+      expect(messages).toContainEqual(
+        expect.objectContaining({ type: 'error', code: 'unavailable' })
+      )
+      expect(messages.some(message => message.type === 'welcome')).toBe(false)
+      expect(collabManager.debugSnapshot()).toEqual([])
+    } finally {
+      collabManager.close(socket)
+    }
+  })
 
   test('ordinary and dev starts remain disabled without creating data', async () => {
     expect(clientAppConfig().environment === 'cloud').toBe(false)
@@ -187,7 +175,7 @@ describe('collab HTTP integration', () => {
   test.each(['existing', 'missing-directory', 'missing-symlink'])(
     'removing a workspace closes joined sockets and stops its worker (%s)',
     async state => {
-      enablePresenceForTest()
+      useCloudConfig()
       if (state === 'missing-symlink') {
         workspace.path = join(fixtureRoot, 'workspace-link')
         await symlink(directory, workspace.path, 'dir')
@@ -252,7 +240,7 @@ describe('collab HTTP integration', () => {
   })
 
   test('stopping presence preserves installed guides and any existing database file', async () => {
-    enablePresenceForTest()
+    useCloudConfig()
     const referencePath = collabSkillReferencePath(directory, workspace.type)
     const databasePath = join(directory, '.moi', 'data', 'collab.sqlite')
     const previousDatabase = new Uint8Array([83, 81, 76, 105, 116, 101, 0, 1, 2, 3])

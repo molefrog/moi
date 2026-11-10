@@ -1,8 +1,8 @@
 import { memberKeys } from './keys'
 import { afterEach, expect, test } from 'bun:test'
 import { queryClient } from '@/client/api/query-client'
-import { setIdentity, getIdentity } from '../identity/store'
-import { getCurrentUser } from '../collab/host-state'
+import { setIdentity, getIdentity } from '../../identity/store'
+import { getCurrentUser } from '../host-state'
 import {
   setWorkspaceMembers,
   setAllWorkspaceMembers,

@@ -12,7 +12,6 @@ import { requestJson } from './http'
 
 const DEFAULTS: ClientAppConfig = {
   environment: 'local',
-  collab: false,
   demo: false,
   demoInstallUrl: 'https://moi.computer'
 }

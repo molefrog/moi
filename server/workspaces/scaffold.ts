@@ -154,6 +154,7 @@ export async function scaffoldMoiDir(
     // Repair path: workspaces scaffolded before `.moi/.gitignore` existed pick
     // it up on the next `moi init` instead of leaking cache files into git.
     await ensureMoiGitignore(workspacePath)
+    await syncAppletDeclarations(workspacePath)
     return 'exists'
   }
   // A bare `.moi/` dir without package.json counts as not-bootstrapped —

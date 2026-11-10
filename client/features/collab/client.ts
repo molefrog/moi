@@ -1,4 +1,4 @@
-import { getWorkspaceDirectory, subscribeWorkspaceDirectory } from '../workspace-members/store'
+import { getWorkspaceDirectory, subscribeWorkspaceDirectory } from './members/store'
 import { wsUrl } from '@/client/lib/ws-url'
 import { COLLAB_PROTOCOL_VERSION } from '@/lib/collab/protocol'
 import type {

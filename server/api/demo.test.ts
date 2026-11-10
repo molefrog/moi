@@ -64,7 +64,6 @@ test('GET /api/config reports the demo flag and install url', async () => {
   expect(body).toEqual({
     environment: 'cloud',
     demo: true,
-    collab: false,
     demoInstallUrl: 'https://moi.computer'
   })
 })

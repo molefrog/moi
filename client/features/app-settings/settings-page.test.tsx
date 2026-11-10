@@ -3,7 +3,7 @@ import { act } from 'react'
 import { getCurrentUser } from '../collab/host-state'
 import { setIdentity } from '../identity/store'
 import { cleanupAccount, mountAccount } from '../account/account-test-utils'
-import { useWorkspaceMembers } from '../workspace-members/hooks'
+import { useWorkspaceMembers } from '../collab/members/hooks'
 import { useAccount } from '../account/account-provider'
 import { SettingsPage } from './settings-page'
 afterEach(cleanupAccount)

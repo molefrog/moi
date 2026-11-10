@@ -1,4 +1,4 @@
-import { useWorkspaceMembers } from '@/client/features/workspace-members/hooks'
+import { useWorkspaceMembers } from '@/client/features/collab/members/hooks'
 import { useWorkspaceHarnessChanges } from '@/client/features/workspace/harness-transition'
 import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
 import { CollabProvider, useCollabEnabled } from '@/client/features/collab'
@@ -28,13 +28,13 @@ type WorkspaceRouteProps = {
 // are decoded exactly once; the route only owns the workspace ID.
 export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
   useWorkspaceMembers(id)
-  const { collab } = useAppConfig()
+  const { environment } = useAppConfig()
 
   return (
     <SidebarLayout>
       <Workspace id={id}>
         <WorkspaceLayoutProvider id={id}>
-          <CollabProvider workspaceId={id} enabled={collab}>
+          <CollabProvider workspaceId={id} enabled={environment === 'cloud'}>
             <WorkspaceContent id={id} />
           </CollabProvider>
         </WorkspaceLayoutProvider>

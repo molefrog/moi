@@ -34,8 +34,8 @@ import {
   useInviteMember,
   useRemoveMember,
   useRevokeInvitation
-} from '../workspace-members/hooks'
-import type { WorkspaceMember } from '../workspace-members/types'
+} from '../collab/members/hooks'
+import type { WorkspaceMember } from '../collab/members/types'
 import { CloudAvatarUpload } from './cloud-avatar-upload'
 
 export function CloudPage() {

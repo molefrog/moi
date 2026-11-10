@@ -19,7 +19,6 @@ test('defaults apply when no config file exists', () => {
   expect(config).toEqual({
     environment: 'local',
     demo: false,
-    collab: false,
     demoInstallUrl: 'https://moi.computer',
     cloudflareAccess: null,
     workspacesDir: null,
@@ -33,7 +32,6 @@ test('config file values override defaults', async () => {
     JSON.stringify({
       demo: true,
       experimental: { collab: true },
-      collab: false,
       demoInstallUrl: 'https://moi.computer/download'
     })
   )
@@ -60,27 +58,12 @@ test('boolean env accepts 1/true/0/false and ignores anything else', () => {
   expect(on('maybe')).toBe(false) // unparseable → default
 })
 
-test.each([true, { enabled: true }])(
-  'collaboration requires a boolean flag and honors its environment override: %j',
-  async collab => {
-    const file = await configFile(
-      JSON.stringify({
-        collab,
-        experimentalCollab: true,
-        experiments: ['collab']
-      })
-    )
-    const config = loadAppConfig(file, {
-      MOI_EXPERIMENTS: 'collab',
-      MOI_ENVIRONMENT: 'cloud',
-      MOI_DEV: '1'
-    })
-    expect(config).not.toHaveProperty('experimental')
-    expect(config.collab).toBe(collab === true)
-    expect(loadAppConfig(file, { MOI_COLLAB: '1' }).collab).toBe(true)
-    expect(loadAppConfig(file, { MOI_COLLAB: '0' }).collab).toBe(false)
-  }
-)
+test('legacy collaboration overrides do not change cloud mode', async () => {
+  const file = await configFile(JSON.stringify({ environment: 'cloud', collab: false }))
+  const config = loadAppConfig(file, { MOI_COLLAB: '0' })
+  expect(config.environment).toBe('cloud')
+  expect(config).not.toHaveProperty('collab')
+})
 
 test('invalid JSON falls back to defaults without throwing', async () => {
   const file = await configFile('{ not json')

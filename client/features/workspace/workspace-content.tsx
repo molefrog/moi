@@ -17,6 +17,7 @@ import type { WelcomeDestination } from '@/client/features/chat/messages/chat-em
 import { ChatPopup } from '@/client/features/chat/chat-popup'
 import { ThemePanel } from '@/client/features/workspace/theme-panel'
 import { Overview } from '@/client/features/overview/overview'
+import { useAppConfig } from '@/client/api/app-config'
 import { WorkspaceUsersMenu } from '@/client/features/collab'
 import { PanelHeader } from '@/client/components/shared/panel-header'
 import { Button } from '@/client/components/ui/button'
@@ -117,6 +118,7 @@ function tabItemFor(
 }
 
 export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentProps) {
+  const { environment } = useAppConfig()
   const { layout, workspaceId } = useWorkspaceLayoutCtx()
   const theme = resolveWorkspaceTheme(layout.theme)
   const viewActions = useViewActions()
@@ -543,11 +545,13 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
             onReorder={reorderTabs}
           />
         </div>
-        <WorkspaceUsersMenu
-          workspaceId={workspaceId}
-          describeTab={tab => tabItemFor(tab, allViews, false, () => false)}
-          onOpenTab={openTab}
-        />
+        {environment === 'cloud' && (
+          <WorkspaceUsersMenu
+            workspaceId={workspaceId}
+            describeTab={tab => tabItemFor(tab, allViews, false, () => false)}
+            onOpenTab={openTab}
+          />
+        )}
         {canUseSplit && mode === 'fullscreen' && (
           <Tooltip>
             <TooltipTrigger

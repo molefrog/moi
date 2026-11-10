@@ -2,7 +2,6 @@ import type { WorkspaceType } from '@/lib/types'
 import { defineCommand } from 'citty'
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'path'
-import { installCollabSkill } from '../../collab/skill'
 import { PORT } from '../../constants'
 import type { DetectedAgent } from '../../harness/detect'
 import {
@@ -137,11 +136,6 @@ export const init = defineCommand({
       default: false,
       description: 'Start the web server if not already running'
     },
-    collab: {
-      type: 'boolean',
-      default: false,
-      description: 'Include the optional collaboration guide and applet types'
-    },
     id: {
       type: 'string',
       description:
@@ -204,11 +198,6 @@ export const init = defineCommand({
     // package.json + bun install). An existing `.moi/` is left untouched.
     console.log()
     const { scaffold, skillsDir, installLogPath } = await provisionWorkspace(target, type)
-    if (args['collab']) {
-      const { referencePath } = await installCollabSkill(target, type)
-      console.log(pc.dim('  Collaboration guide installed to ' + referencePath))
-      console.log(pc.dim('  Live presence is available in the cloud environment'))
-    }
     if (scaffold !== 'exists') {
       if (scaffold === 'installing') {
         console.log(pc.dim('  Widget dependencies still installing in .moi/ (background)'))

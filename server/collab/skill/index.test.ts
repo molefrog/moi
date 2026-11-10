@@ -1,20 +1,15 @@
-import { afterEach, expect, test } from 'bun:test'
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { expect, test } from 'bun:test'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import type * as CollabApi from 'moi/collab'
-
 import type { AppletCollabApi } from '@/client/features/collab/applet-api'
 import type { USER_COLORS } from '@/lib/collab/colors'
 import type { WorkspaceType } from '@/lib/types'
-
-import {
-  BASE_DECLARATION_SOURCE_PATH,
-  COLLAB_DECLARATION_SOURCE_PATH
-} from '../../applets/declarations'
-import { COLLAB_REFERENCE_SOURCE_PATH } from '../../skills/template'
-import { provisionWorkspace, skillsDirFor } from '../../workspaces/init'
-import { installCollabSkill, removeCollabSkill } from './index'
+import { resetAppConfig } from '../../app-config'
+import { updateWorkspaceSkills } from '../../skills/update'
+import { provisionWorkspace } from '../../workspaces/init'
+import { collabSkillReferencePath } from './index'
 
 // This assignment is checked by tsc without importing React into the server.
 const declarationsMatch: AppletCollabApi extends typeof CollabApi ? true : false = true
@@ -23,80 +18,38 @@ const paletteDeclarationsMatch: CollabApi.UserColor extends (typeof USER_COLORS)
   ? true
   : false = true
 
-const directories: string[] = []
-
-afterEach(async () => {
-  for (const directory of directories.splice(0))
-    await rm(directory, { recursive: true, force: true })
-})
-
-test('optional collab reference installs beside the default skill without changing it', async () => {
-  const workspace = await mkdtemp(join(tmpdir(), 'moi-collab-skill-'))
-  directories.push(workspace)
-  const installed = await installCollabSkill(workspace, 'codex')
-  expect(installed.referencePath).toBe(
-    join(workspace, '.agents', 'skills', 'moi-workspace', 'references', 'COLLAB.md')
-  )
-  expect(installed.typesPath).toBe(join(workspace, '.moi', 'collab.d.ts'))
-  expect(await readFile(join(workspace, '.moi', 'base.d.ts'), 'utf8')).toBe(
-    await readFile(BASE_DECLARATION_SOURCE_PATH, 'utf8')
-  )
-  expect(await readFile(installed.referencePath, 'utf8')).toBe(
-    await readFile(COLLAB_REFERENCE_SOURCE_PATH, 'utf8')
-  )
-  expect(await readFile(installed.typesPath, 'utf8')).toBe(
-    await readFile(COLLAB_DECLARATION_SOURCE_PATH, 'utf8')
-  )
-  const defaultSkill = join(dirname(dirname(installed.referencePath)), 'SKILL.md')
-  const marker = '# Existing workspace skill\nLeave its authored instructions alone.\n'
-  await writeFile(defaultSkill, marker)
-  const before = await stat(installed.referencePath)
-  await installCollabSkill(workspace, 'codex')
-  expect((await stat(installed.referencePath)).mtimeMs).toBe(before.mtimeMs)
-  expect(await readFile(defaultSkill, 'utf8')).toBe(marker)
-  await removeCollabSkill(workspace, 'codex')
-  expect(await Bun.file(installed.referencePath).exists()).toBe(false)
-  expect(await Bun.file(installed.typesPath).exists()).toBe(false)
-  expect(await readFile(defaultSkill, 'utf8')).toBe(marker)
-})
-
 test('workspace declarations match the public hooks and components', () => {
   expect(declarationsMatch).toBe(true)
   expect(paletteDeclarationsMatch).toBe(true)
 })
 
-test('optional guide uses each harness skill directory', async () => {
-  const types: WorkspaceType[] = ['claude-code', 'codex', 'openclaw', 'hermes']
-  for (const type of types) {
-    const workspace = await mkdtemp(join(tmpdir(), 'moi-collab-harness-'))
-    directories.push(workspace)
-    const { referencePath } = await installCollabSkill(workspace, type)
-    expect(referencePath).toBe(
-      join(skillsDirFor(workspace, type), 'moi-workspace', 'references', 'COLLAB.md')
-    )
-    expect(await Bun.file(referencePath).exists()).toBe(true)
+test('cloud setup and skill updates install presence resources for each harness', async () => {
+  const original = process.env.MOI_ENVIRONMENT
+  const root = await mkdtemp(join(tmpdir(), 'moi-cloud-skills-'))
+  try {
+    const types: WorkspaceType[] = ['claude-code', 'codex', 'openclaw', 'hermes']
+    for (const type of types) {
+      const path = join(root, type)
+      await Bun.write(join(path, '.moi', 'package.json'), '{}')
+      process.env.MOI_ENVIRONMENT = 'local'
+      resetAppConfig()
+      await provisionWorkspace(path, type)
+      const guide = collabSkillReferencePath(path, type)
+      const declaration = join(path, '.moi', 'collab.d.ts')
+      expect(await Bun.file(guide).exists()).toBe(false)
+      expect(await Bun.file(declaration).exists()).toBe(false)
+      process.env.MOI_ENVIRONMENT = 'cloud'
+      resetAppConfig()
+      await updateWorkspaceSkills(path, type)
+      expect(await Bun.file(guide).exists()).toBe(true)
+      expect(await Bun.file(declaration).exists()).toBe(true)
+      await provisionWorkspace(path, type)
+      expect(await Bun.file(guide).exists()).toBe(true)
+    }
+  } finally {
+    if (original === undefined) delete process.env.MOI_ENVIRONMENT
+    else process.env.MOI_ENVIRONMENT = original
+    resetAppConfig()
+    await rm(root, { recursive: true, force: true })
   }
-})
-
-test('ordinary workspace provisioning resets the skill and omits collab', async () => {
-  const workspace = await mkdtemp(join(tmpdir(), 'moi-collab-provision-'))
-  directories.push(workspace)
-  // An existing scaffold skips dependency installation; this exercises the
-  // same provisioning path used by ordinary init and the UI.
-  await Bun.write(join(workspace, '.moi', 'package.json'), '{}\n')
-  await provisionWorkspace(workspace, 'codex')
-  const referencePath = join(
-    skillsDirFor(workspace, 'codex'),
-    'moi-workspace',
-    'references',
-    'COLLAB.md'
-  )
-  const typesPath = join(workspace, '.moi', 'collab.d.ts')
-  expect(await Bun.file(referencePath).exists()).toBe(false)
-  expect(await Bun.file(typesPath).exists()).toBe(false)
-  await installCollabSkill(workspace, 'codex')
-  const declarations = await Bun.file(typesPath).text()
-  await provisionWorkspace(workspace, 'codex')
-  expect(await Bun.file(referencePath).exists()).toBe(false)
-  expect(await Bun.file(typesPath).text()).toBe(declarations)
 })

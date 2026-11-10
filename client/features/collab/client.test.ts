@@ -8,7 +8,7 @@ import { CollabService } from '@/server/collab/service'
 import { CollabClient, NO_ENGINE } from './client'
 import { getCurrentUser } from './host-state'
 import { setIdentity } from '../identity/store'
-import { setWorkspaceMembers, clearWorkspaceMembers } from '../workspace-members/store'
+import { setWorkspaceMembers, clearWorkspaceMembers } from './members/store'
 import type { UserProfileInput } from './host-state'
 
 const originalLocation = Object.getOwnPropertyDescriptor(globalThis, 'location')

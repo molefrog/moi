@@ -52,8 +52,6 @@ export async function installWorkspaceSkillFiles(
   return (await installBundledSkills(directory)).map(name => join(directory, name))
 }
 
-// Both init and updates reset the owned skill. Local additions (including the
-// experimental collab guide) are intentionally discarded; sibling skills stay.
 async function resetWorkspaceSkill(workspaceRoot: string): Promise<string[]> {
   const root = resolve(workspaceRoot)
   const canonical = join(root, '.agents', 'skills', SKILL_NAME)

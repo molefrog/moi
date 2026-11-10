@@ -1,7 +1,7 @@
 import { afterEach, expect, spyOn, test } from 'bun:test'
 import { act } from 'react'
 import { cleanupAccount, mountAccount } from '../account/account-test-utils'
-import { setWorkspaceMembers } from '../workspace-members/store'
+import { setWorkspaceMembers } from '../collab/members/store'
 import { CloudPage } from './cloud-page'
 import { getIdentity } from '../identity/store'
 import { toast } from '@/client/components/ui/toast'
