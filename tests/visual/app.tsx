@@ -6,11 +6,12 @@ import '@/client/structured-clone-shim'
 import 'blobatar/motion.css'
 import '@/client/index.css'
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { createRoot } from 'react-dom/client'
 import { Router } from 'wouter'
 import { memoryLocation } from 'wouter/memory-location'
 
+import { queryClient } from '@/client/api/query-client'
 import { loadAppConfig } from '@/client/api/app-config'
 import { AppProvider } from '@/client/app/app-provider'
 import { AppRouter } from '@/client/app/app-router'
@@ -38,7 +39,6 @@ if (target.startsWith('ui/')) {
     </main>
   )
 } else {
-  const queryClient = new QueryClient()
   initConnection(queryClient)
   await loadAppConfig()
   // client/index.tsx makes a random local user on first run; a fixed one keeps

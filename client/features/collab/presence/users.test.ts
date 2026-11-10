@@ -75,11 +75,10 @@ test('hidden tabs stay in their page peers and support the away filter', () => {
   expect(
     summarizeWorkspaceUsers(connections, {
       currentUser: alice,
-      connectionId: 'self',
       page: 'board',
       users: source.users
     }).find(user => user.profile.id === 'bob')
-  ).toMatchObject({ pages: ['board', 'notes'], status: 'away' })
+  ).toMatchObject({ page: undefined, status: 'away' })
 })
 
 test('a visible connection makes the user active across their away page connections', () => {
@@ -103,15 +102,30 @@ test.each(['__proto__', 'constructor', 'toString'])('%s resolves as an ordinary 
   expect(resolveUser({ connections: [], users: [] }, id)).toBeUndefined()
 })
 
-test('header groups users, includes offline users, and merges visible browser tabs', () => {
+test('member summary includes offline users and puts self first', () => {
   const users = [...source.users, { ...eve, id: 'offline' }]
   const result = summarizeWorkspaceUsers(connections, {
     currentUser: alice,
-    connectionId: 'self',
     page: 'board',
     users
   })
-  expect(result[0]).toMatchObject({ profile: alice, self: true, pages: ['board'] })
-  expect(result[1]).toMatchObject({ profile: bob, pages: ['board'], status: 'active' })
-  expect(result.at(-1)).toMatchObject({ pages: [], status: 'offline' })
+  expect(result[0]).toMatchObject({ profile: alice, self: true, page: 'board' })
+  expect(result[1]).toMatchObject({ profile: bob, page: 'board', status: 'active' })
+  expect(result.at(-1)).toMatchObject({ page: undefined, status: 'offline' })
+})
+
+test('summary prefers an active page, keeps the first active connection, and uses my current page', () => {
+  const result = summarizeWorkspaceUsers(
+    [
+      connection('self-other', 'alice', 'notes'),
+      connection('b-away', 'bob', 'old-page', 'away'),
+      connection('b-active', 'bob', 'board'),
+      connection('b-other', 'bob', 'notes'),
+      connection('e-away', 'eve', 'notes', 'away')
+    ],
+    { currentUser: alice, page: 'current-page', users: [alice, bob, eve] }
+  )
+  expect(result[0]).toMatchObject({ self: true, page: 'current-page' })
+  expect(result[1]).toMatchObject({ page: 'board', status: 'active' })
+  expect(result[2]).toMatchObject({ page: undefined, status: 'away' })
 })

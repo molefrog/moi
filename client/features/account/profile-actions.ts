@@ -2,7 +2,7 @@ import { queryClient } from '@/client/api/query-client'
 import { getIdentity, setIdentity, getAccountGeneration } from '../identity/store'
 import { identityKey } from '../identity/types'
 import type { Identity } from '../identity/types'
-import { memberKeys } from '../workspace-members/keys'
+import { memberKeys } from '../collab/members/keys'
 
 export async function saveCloudProfile(field: 'name' | 'avatar', update: () => Promise<Identity>) {
   const before = getIdentity()

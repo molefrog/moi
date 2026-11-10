@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { clientAppConfig, initializeAppConfig, resetAppConfig } from '../app-config'
-import { getCollabReferencePath, isCollabEnabled } from './config'
+import { getCollabReferencePath } from './config'
 import { collabSkillReferencePath } from './skill'
 
 let workspacePath: string
@@ -34,47 +34,8 @@ describe('collab startup configuration', () => {
       join(workspacePath, '.moi', '.workspace.json'),
       JSON.stringify({ version: 1, experimental: { collab: true } })
     )
-    expect(isCollabEnabled()).toBe(false)
     expect(clientAppConfig().environment === 'cloud').toBe(false)
     expect(await getCollabReferencePath(workspacePath)).toBeUndefined()
-  })
-
-  test('explicit environment opt-in enables experimental collaboration', () => {
-    process.env.MOI_COLLAB = '1'
-    initializeAppConfig()
-    expect(isCollabEnabled()).toBe(true)
-    expect(clientAppConfig().collab).toBe(true)
-  })
-
-  test('cloud collaboration stays disabled without changing workspace files', async () => {
-    process.env.MOI_ENVIRONMENT = 'cloud'
-    initializeAppConfig()
-    expect(isCollabEnabled()).toBe(false)
-    expect(clientAppConfig().environment === 'cloud').toBe(true)
-    expect(clientAppConfig().collab).toBe(false)
-    expect(await getCollabReferencePath(workspacePath)).toBeUndefined()
-    expect(await getCollabReferencePath(join(workspacePath, 'another'))).toBeUndefined()
-    expect(await Bun.file(join(workspacePath, '.moi', '.workspace.json')).exists()).toBe(false)
-    expect(await Bun.file(collabSkillReferencePath(workspacePath)).exists()).toBe(false)
-  })
-
-  test('runtime stays disabled across cloud and local initialization and reset', () => {
-    process.env.MOI_ENVIRONMENT = 'cloud'
-    initializeAppConfig()
-    expect(isCollabEnabled()).toBe(false)
-    expect(clientAppConfig().environment === 'cloud').toBe(true)
-    process.env.MOI_ENVIRONMENT = 'local'
-    initializeAppConfig()
-    expect(isCollabEnabled()).toBe(false)
-    expect(clientAppConfig().environment === 'cloud').toBe(false)
-    process.env.MOI_ENVIRONMENT = 'cloud'
-    initializeAppConfig()
-    expect(isCollabEnabled()).toBe(false)
-    expect(clientAppConfig().environment === 'cloud').toBe(true)
-    process.env.MOI_ENVIRONMENT = 'local'
-    resetAppConfig()
-    expect(isCollabEnabled()).toBe(false)
-    expect(clientAppConfig().environment === 'cloud').toBe(false)
   })
 
   test('hides installed collaboration instructions while runtime is disabled', async () => {
@@ -83,6 +44,6 @@ describe('collab startup configuration', () => {
     expect(await getCollabReferencePath(workspacePath)).toBeUndefined()
     process.env.MOI_ENVIRONMENT = 'cloud'
     initializeAppConfig()
-    expect(await getCollabReferencePath(workspacePath)).toBeUndefined()
+    expect(await getCollabReferencePath(workspacePath)).toBe(referencePath)
   })
 })

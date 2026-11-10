@@ -3,9 +3,9 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import type { PresenceRegistration, UserProfile } from '@/lib/collab/types'
 
-import { AppletPresenceProvider, CollabContext } from '../provider'
-import { presenceChannels } from '../hooks'
-import { presenceTarget } from '../presence-target'
+import { AppletPresenceProvider, CollabContext } from '../presence/provider'
+import { presenceChannels } from '../presence/hooks'
+import { presenceTarget } from '../presence/presence-target'
 import { createFakeEngine } from './fake-engine'
 import type { FakeEngine } from './fake-engine'
 

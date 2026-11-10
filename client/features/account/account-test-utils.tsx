@@ -9,7 +9,7 @@ import { QueryClientProvider, notifyManager } from '@tanstack/react-query'
 import * as config from '@/client/api/app-config'
 import { AccountProvider, useAccount } from './account-provider'
 import { queryClient } from '@/client/api/query-client'
-import type { WorkspaceMembers } from '../workspace-members/types'
+import type { WorkspaceMembers } from '../collab/members/types'
 import { setIdentity } from '../identity/store'
 import type { Identity } from '../identity/types'
 
@@ -32,6 +32,7 @@ export type AccountFixtureOptions = {
   environment?: 'local' | 'cloud'
   failSession?: boolean
   loadingSession?: boolean
+  pendingMembership?: boolean
   pendingMutation?: boolean
   pendingMutationPaths?: string[]
   injected?: boolean
@@ -44,6 +45,7 @@ export async function mountAccount({
   environment = 'cloud',
   failSession = false,
   loadingSession = false,
+  pendingMembership = false,
   pendingMutation = false,
   pendingMutationPaths = [],
   injected = true
@@ -54,6 +56,7 @@ export async function mountAccount({
   Object.defineProperty(window, 'location', {
     configurable: true,
     value: {
+      pathname: '/settings',
       assign: (href: string) => navigations.push(href),
       replace: (href: string) => navigations.push(href)
     }
@@ -87,14 +90,14 @@ export async function mountAccount({
   const configSpy = spyOn(config, 'useAppConfig').mockReturnValue({
     environment,
     demo,
-    collab: false,
     demoInstallUrl: '/'
   })
   let cloudSession: Identity | null = signedOut
     ? null
     : { ...session, type: 'user', email: 'alex@example.com', isAnonymous: anonymous }
-  const failures = { signOut: false, mutation: false, session: failSession }
+  const failures = { signOut: false, mutation: false, session: failSession, membership: false }
   const mutationRequest = Promise.withResolvers<void>()
+  const membershipRequest = Promise.withResolvers<void>()
   let membership: WorkspaceMembers = {
     members: [{ ...session, membershipId: 'member-me' }],
     invitations: []
@@ -123,8 +126,12 @@ export async function mountAccount({
               ? Response.json(cloudSession)
               : Response.json({ error: 'No session' }, { status: 401 })
         }
-        if (path.endsWith('/members') && (!init?.method || init.method === 'GET'))
-          return Response.json(membership)
+        if (path.endsWith('/members') && (!init?.method || init.method === 'GET')) {
+          if (pendingMembership) await membershipRequest.promise
+          return failures.membership
+            ? Response.json({ error: 'Members unavailable' }, { status: 503 })
+            : Response.json(membership)
+        }
         if (path.endsWith('/sign-out')) {
           if (failures.signOut)
             return Response.json({ error: 'Try signing out again.' }, { status: 503 })
@@ -238,6 +245,7 @@ export async function mountAccount({
     calls,
     failures,
     mutationRequest,
+    membershipRequest,
     qc,
     setMembership: (next: WorkspaceMembers) => {
       membership = next

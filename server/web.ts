@@ -14,7 +14,6 @@ import { harnessStore } from './harness/auth'
 import { PORT } from './constants'
 import { control } from './control'
 import { proxyUserState } from './collab/cloudflare-access'
-import { isCollabEnabled } from './collab/config'
 import { collabManager } from './collab/manager'
 import { EVENTS_TOPIC, setEventServer } from './events'
 import { killBuildWorkers } from './applets/build-worker'
@@ -179,7 +178,7 @@ export const app = Bun.serve<WsData>({
       const workspaceId = decodeURIComponent(new URL(req.url).pathname.split('/')[3] ?? '')
       const workspace = await getWorkspace(workspaceId)
       if (!workspace) return new Response('Workspace not found', { status: 404 })
-      if (!isCollabEnabled()) {
+      if (getAppConfig().environment !== 'cloud') {
         return new Response('Collab is not enabled for this workspace', { status: 403 })
       }
       // Behind Cloudflare Access, presence is joined only as the verified viewer.

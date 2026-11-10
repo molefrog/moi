@@ -80,7 +80,7 @@ async function updateWorkspaceSkillFiles(
   }
   const changedSkills = [...new Set(changedSkillPaths.map(path => basename(path)))]
   // Applet declarations ship with the CLI, so refresh installed copies along
-  // with skills. The optional collab declaration is only updated if present.
+  // with skills.
   const updatedAppletTypes = await syncAppletDeclarations(workspaceRoot)
   const skills = await skillStatuses(workspaceRoot, type)
 

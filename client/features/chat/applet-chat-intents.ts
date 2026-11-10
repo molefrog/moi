@@ -14,7 +14,7 @@ import { useLayoutEffect } from 'react'
 import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { toast } from '@/client/components/ui/toast'
 import { cachedSelectedSession } from '@/client/features/chat/sessions/use-selected-session'
-import { useCollabEnabled } from '@/client/features/collab'
+import { useAppConfig } from '@/client/api/app-config'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import type { SelectedSessionScope, WorkspaceTabId } from '@/lib/types'
 import { useCurrentTabId } from './sessions/use-selected-session'
@@ -153,14 +153,14 @@ export function useAppletChatMessage(options: Omit<UseAppletChatMessageOptions, 
   const workspaceId = useWorkspaceId()
   const queryClient = useQueryClient()
   const tabId = useCurrentTabId()
-  const collabEnabled = useCollabEnabled()
+  const cloud = useAppConfig().environment === 'cloud'
   const latest = useLatestRef({ ...options, tabId })
   useLayoutEffect(() => {
     const handler = createAppletMessageHandler(
       workspaceId,
       queryClient,
       () => latest.current,
-      collabEnabled ? 'browser-tab' : 'shared'
+      cloud ? 'browser-tab' : 'shared'
     )
     const unsubscribe = appletRuntime(workspaceId).on('sendChatMessage', event => {
       void handler.handle(event)
@@ -169,7 +169,7 @@ export function useAppletChatMessage(options: Omit<UseAppletChatMessageOptions, 
       unsubscribe()
       handler.dispose()
     }
-  }, [workspaceId, queryClient, latest, tabId, collabEnabled])
+  }, [workspaceId, queryClient, latest, tabId, cloud])
 }
 
 export function useAppletChatAttachment(sessionId: string | null, revealChat: () => void): void {

@@ -4,6 +4,7 @@ import { Field, FieldGroup, FieldLabel } from '@/ui-components/field'
 import { Input } from '@/client/components/ui/input'
 import { toast } from '@/client/components/ui/toast'
 import { useAccount } from '../account/account-provider'
+import { UserAvatar } from '../collab/components/user-avatar'
 import { SettingsSection } from './settings-section'
 
 export function ProfileSettings() {
@@ -12,6 +13,15 @@ export function ProfileSettings() {
   return (
     <SettingsSection title="Profile">
       <FieldGroup>
+        {account.registered && (
+          <Field>
+            <FieldLabel>Avatar</FieldLabel>
+            {/* Restore AvatarUpload once the cloud API stores uploaded images. */}
+            <div>
+              <UserAvatar profile={account.profile} className="size-16!" />
+            </div>
+          </Field>
+        )}
         <NameField
           key={account.profile.id}
           name={account.profile.name ?? ''}

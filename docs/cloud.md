@@ -125,17 +125,13 @@ const me = useIdentity()
 const { members, invitations, isPending } = useWorkspaceMembers(workspaceId)
 ```
 
-They use mutation hooks for actions:
+They use the shared mutation hook for actions:
 
 ```tsx
-const invite = useInviteMember(workspaceId)
-invite.mutate({ email: 'tony@example.com' })
-
-const remove = useRemoveMember(workspaceId)
-remove.mutate({ membershipId })
-
-const revoke = useRevokeInvitation(workspaceId)
-revoke.mutate({ invitationId })
+const action = useMembershipAction(workspaceId)
+action.mutate({ type: 'invite', email: 'tony@example.com' })
+action.mutate({ type: 'remove', membershipId })
+action.mutate({ type: 'revoke', invitationId })
 ```
 
 These hooks call the cloud URLs above. Moi shows pending changes immediately and undoes them if the request fails. Confirmed cloud updates go into the same cache. Switching accounts clears the previous account's data. The cloud checks permission for every action.
@@ -146,6 +142,6 @@ The collaboration engine combines this workspace's members with live connections
 
 Cloud collaboration waits until the current identity appears in the workspace's members. Removing that member clears their visible presence and closes this tab's connection. The cloud authenticates access to the owner's machine. Signed identity forwarding to Moi is deferred; frontend membership data is not an access token.
 
-Collaboration is off by default. An experimental image can enable it with `collab: true` in the machine configuration or `MOI_COLLAB=1`. Local Moi keeps its local profile; it does not invent a cloud member list. Being a member and being online remain different things.
+Cloud deployments enable presence and sharing automatically. Cloud workspace setup and skill updates install the collaboration guide and applet types. Local deployments keep a local profile and leave presence disconnected.
 
-The code lives in [identity](../client/features/identity/store.ts), [the frontend API](../client/features/identity/host-api.ts), and [workspace member hooks](../client/features/workspace-members/hooks.ts). The sharing page at `/dev/cloud` is a small working example available in development builds, alongside the other dev routes. Production builds exclude it.
+The code lives in [identity](../client/features/identity/store.ts), [the frontend API](../client/features/identity/host-api.ts), and [workspace member hooks](../client/features/collab/members/hooks.ts). The [workspace sharing menu](../client/features/collab/sharing/workspace-sharing-menu.tsx) manages invitations and members. [Profile settings](../client/features/app-settings/profile-settings.tsx) manages the user's name and avatar.

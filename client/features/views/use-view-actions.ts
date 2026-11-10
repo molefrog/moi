@@ -19,7 +19,7 @@ import {
   changeWorkspaceStateCache,
   getCachedWorkspaceState
 } from '@/client/features/workspace/workspace-state'
-import { useCollabEnabled } from '@/client/features/collab'
+import { useAppConfig } from '@/client/api/app-config'
 import { useWorkspaceHarness } from '@/client/features/workspace/api'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-layout-context'
 import {
@@ -34,8 +34,8 @@ import { viewTabId } from '@/lib/workspace-tabs'
 
 export function useViewActions() {
   const queryClient = useQueryClient()
-  const collabEnabled = useCollabEnabled()
-  const selectionScope = collabEnabled ? 'browser-tab' : 'shared'
+  const cloud = useAppConfig().environment === 'cloud'
+  const selectionScope = cloud ? 'browser-tab' : 'shared'
   const { workspaceId, layout } = useWorkspaceLayoutCtx()
   const { pinnedSessionId } = usePinnedSession()
   const modelData = useWorkspaceHarness(workspaceId).data

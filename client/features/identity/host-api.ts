@@ -5,9 +5,9 @@ import {
   removeWorkspaceMembers,
   clearWorkspaceMembers,
   getWorkspaceMembersRevision
-} from '../workspace-members/store'
+} from '../collab/members/store'
 import type { Identity } from './types'
-import type { WorkspaceMembers, WorkspaceMembersSnapshot } from '../workspace-members/types'
+import type { WorkspaceMembers, WorkspaceMembersSnapshot } from '../collab/members/types'
 
 export type IdentityHostApi = {
   identity: { set: (identity: Identity | null) => void; getRevision: () => number }

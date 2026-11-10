@@ -12,7 +12,7 @@ import {
   usePinnedSession,
   useSelectedSession
 } from './use-selected-session'
-import { useCollabEnabled } from '@/client/features/collab'
+import { useAppConfig } from '@/client/api/app-config'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import { useWorkspaceId } from '@/client/features/workspace/workspace-context'
 import {
@@ -70,10 +70,10 @@ export function useWorkspaceSessions(workspaceId: string): { data: SessionInfo[]
 export function useSelectLinkedChat() {
   const workspaceId = useWorkspaceId()
   const queryClient = useQueryClient()
-  const collabEnabled = useCollabEnabled()
+  const cloud = useAppConfig().environment === 'cloud'
   const [, , selectSessionForTab] = useSelectedSession()
   const { unpinAsync } = usePinnedSession()
-  const stateRef = useLatestRef({ collabEnabled, selectSessionForTab, unpinAsync })
+  const stateRef = useLatestRef({ cloud, selectSessionForTab, unpinAsync })
   // Stable so selection updates do not restart a pending chat link.
   return useCallback(
     async (
@@ -81,7 +81,7 @@ export function useSelectLinkedChat() {
       tab: WorkspaceTabId,
       signal: AbortSignal
     ): Promise<WorkspaceTabId | undefined> => {
-      const { collabEnabled, selectSessionForTab, unpinAsync } = stateRef.current
+      const { cloud, selectSessionForTab, unpinAsync } = stateRef.current
       signal.throwIfAborted()
       let sessions =
         queryClient.getQueryData<SessionSummary[]>(workspaceKeys.sessions(workspaceId)) ?? []
@@ -96,7 +96,7 @@ export function useSelectLinkedChat() {
       const state = await queryClient.ensureQueryData(
         workspaceStateOptions(queryClient, workspaceId)
       )
-      if (collabEnabled) await queryClient.ensureQueryData(browserTabSelectionOptions(workspaceId))
+      if (cloud) await queryClient.ensureQueryData(browserTabSelectionOptions(workspaceId))
       signal.throwIfAborted()
       const pinned = state.pinnedSessionId
       const destination =

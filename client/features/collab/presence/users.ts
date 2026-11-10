@@ -54,12 +54,11 @@ export function resolvePeers(
 export type WorkspaceUserInfo = {
   profile: UserProfile
   self: boolean
-  pages: string[]
+  page: string | undefined
   status: UserStatus
 }
 export type CurrentUserContext = {
   currentUser: UserProfile | undefined
-  connectionId: string | null
   page: string | null
   users: readonly UserProfile[]
 }
@@ -67,23 +66,22 @@ export function summarizeWorkspaceUsers(
   connections: Connection[],
   context: CurrentUserContext
 ): WorkspaceUserInfo[] {
-  const users = [...context.users].sort(
-    (a, b) => Number(b.id === context.currentUser?.id) - Number(a.id === context.currentUser?.id)
-  )
-  return users.map(profile => {
-    const pages = new Set<string>()
-    for (const connection of connections) {
-      if (connection.userId !== profile.id || connection.connectionId === context.connectionId)
-        continue
-      if (connection.location) pages.add(connection.location.page)
-    }
-    const isSelf = profile.id === context.currentUser?.id
-    if (isSelf && context.page) pages.add(context.page)
-    return {
-      profile,
-      self: isSelf,
-      pages: [...pages],
-      status: userStatus(connections, profile.id)
-    }
-  })
+  return context.users
+    .map(profile => {
+      const isSelf = profile.id === context.currentUser?.id
+      const activeConnection = connections.find(
+        connection => connection.userId === profile.id && connection.location?.status === 'active'
+      )
+      return {
+        profile,
+        self: isSelf,
+        page: isSelf ? (context.page ?? undefined) : activeConnection?.location?.page,
+        status: userStatus(connections, profile.id)
+      }
+    })
+    .toSorted(
+      (a, b) =>
+        Number(b.self) - Number(a.self) ||
+        Number(b.status === 'active') - Number(a.status === 'active')
+    )
 }

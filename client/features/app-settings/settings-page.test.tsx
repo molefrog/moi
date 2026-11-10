@@ -3,7 +3,7 @@ import { act } from 'react'
 import { getCurrentUser } from '../collab/host-state'
 import { setIdentity } from '../identity/store'
 import { cleanupAccount, mountAccount } from '../account/account-test-utils'
-import { useWorkspaceMembers } from '../workspace-members/hooks'
+import { useWorkspaceMembers } from '../collab/members/hooks'
 import { useAccount } from '../account/account-provider'
 import { SettingsPage } from './settings-page'
 afterEach(cleanupAccount)
@@ -21,7 +21,7 @@ test('settings retain profile and general settings without organization user con
 })
 test('name saves preserve avatar and update the visible identity', async () => {
   const ui = await mountAccount({ children: <SettingsPage /> })
-  const input = ui.document.querySelector('input')!
+  const input = ui.document.querySelector<HTMLInputElement>('input:not([type="file"])')!
   await ui.type(input, 'New name')
   await act(async () => input.dispatchEvent(new ui.window.Event('focusout', { bubbles: true })))
   await ui.settle()
@@ -32,7 +32,7 @@ test('name saves preserve avatar and update the visible identity', async () => {
 })
 test('a delayed name save cannot restore a previous account', async () => {
   const ui = await mountAccount({ pendingMutation: true, children: <SettingsPage /> })
-  const input = ui.document.querySelector('input')!
+  const input = ui.document.querySelector<HTMLInputElement>('input:not([type="file"])')!
   await ui.type(input, 'Old response')
   await act(async () => input.dispatchEvent(new ui.window.Event('focusout', { bubbles: true })))
   await act(async () =>
@@ -51,7 +51,12 @@ test('a delayed name save cannot restore a previous account', async () => {
 test('local settings keep profile readonly and cloud email hidden', async () => {
   const ui = await mountAccount({ environment: 'local', children: <SettingsPage /> })
   expect(ui.document.querySelector('#profile-email')).toBeNull()
-  expect(ui.document.querySelector('input')?.hasAttribute('readOnly')).toBe(true)
+  expect(
+    ui.document
+      .querySelector<HTMLInputElement>('input:not([type="file"])')
+      ?.hasAttribute('readOnly')
+  ).toBe(true)
+  expect(ui.document.querySelector('[aria-label="Change your avatar"]')).toBeNull()
   expect(ui.calls).toEqual([])
 })
 test('signed-out settings navigate to cloud login', async () => {
@@ -81,7 +86,7 @@ test('profile saves refresh the active workspace owner row without waiting for a
     )
   })
   await ui.settle()
-  const input = ui.document.querySelector('input')!
+  const input = ui.document.querySelector<HTMLInputElement>('input:not([type="file"])')!
   await ui.type(input, 'Renamed owner')
   await act(async () => input.dispatchEvent(new ui.window.Event('focusout', { bubbles: true })))
   await ui.settle()
@@ -90,4 +95,11 @@ test('profile saves refresh the active workspace owner row without waiting for a
   expect(ui.document.querySelector('[data-owner]')?.textContent).toContain(
     'https://example.com/new.png'
   )
+})
+
+test('settings show the avatar without an upload control', async () => {
+  const ui = await mountAccount({ children: <SettingsPage /> })
+  expect(ui.document.querySelector('[data-slot="avatar"]')).not.toBeNull()
+  expect(ui.document.querySelector('[aria-label="Change your avatar"]')).toBeNull()
+  expect(ui.document.querySelector('input[type="file"]')).toBeNull()
 })

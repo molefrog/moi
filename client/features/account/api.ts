@@ -12,7 +12,8 @@ export const accountKeys = {
 export class CloudApiError extends Error {
   constructor(
     message: string,
-    readonly status: number
+    readonly status: number,
+    readonly code?: string
   ) {
     super(message)
   }
@@ -28,7 +29,8 @@ export async function cloudRequest(path: string, init?: RequestInit): Promise<Re
       : undefined
     throw new CloudApiError(
       message ?? 'Couldn’t complete this request. Try again.',
-      response.status
+      response.status,
+      isRecord(body) && typeof body.code === 'string' ? body.code : undefined
     )
   }
   return response

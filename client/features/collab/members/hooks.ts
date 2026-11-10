@@ -1,10 +1,10 @@
 import { useMutation, useMutationState, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useWorkspaces } from '../home/api'
-import { getAccountGeneration } from '../identity/store'
-import { useIdentity } from '../identity/use-identity'
+import { useWorkspaces } from '../../home/api'
+import { getAccountGeneration } from '../../identity/store'
+import { useIdentity } from '../../identity/use-identity'
 import { ownerOnlyWorkspaceMembers } from './store'
 import { memberKeys } from './keys'
-import { identityKey } from '../identity/types'
+import { identityKey } from '../../identity/types'
 import {
   fetchWorkspaceMembers,
   inviteWorkspaceMember,
@@ -67,7 +67,7 @@ export function useWorkspaceMembers(workspaceId: string | undefined) {
   const data = applyPendingMembership(query.data, pending)
   return { ...query, data, members: data?.members, invitations: data?.invitations }
 }
-function useMembershipAction(workspaceId: string) {
+export function useMembershipAction(workspaceId: string) {
   const workspaces = useWorkspaces()
 
   const identity = useIdentity()
@@ -100,34 +100,4 @@ function useMembershipAction(workspaceId: string) {
       })
     }
   })
-}
-export function useInviteMember(workspaceId: string) {
-  const mutation = useMembershipAction(workspaceId)
-  return {
-    ...mutation,
-    mutate: ({ email }: { email: string }) =>
-      mutation.mutate({ type: 'invite', email: email.trim().toLowerCase() }),
-    mutateAsync: ({ email }: { email: string }) =>
-      mutation.mutateAsync({ type: 'invite', email: email.trim().toLowerCase() })
-  }
-}
-export function useRemoveMember(workspaceId: string) {
-  const mutation = useMembershipAction(workspaceId)
-  return {
-    ...mutation,
-    mutate: ({ membershipId }: { membershipId: string }) =>
-      mutation.mutate({ type: 'remove', membershipId }),
-    mutateAsync: ({ membershipId }: { membershipId: string }) =>
-      mutation.mutateAsync({ type: 'remove', membershipId })
-  }
-}
-export function useRevokeInvitation(workspaceId: string) {
-  const mutation = useMembershipAction(workspaceId)
-  return {
-    ...mutation,
-    mutate: ({ invitationId }: { invitationId: string }) =>
-      mutation.mutate({ type: 'revoke', invitationId }),
-    mutateAsync: ({ invitationId }: { invitationId: string }) =>
-      mutation.mutateAsync({ type: 'revoke', invitationId })
-  }
 }

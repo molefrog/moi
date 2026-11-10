@@ -1,4 +1,5 @@
 import { mkdir, stat } from 'node:fs/promises'
+import { getAppConfig } from '../app-config'
 import { dirname, join } from 'node:path'
 
 export const BASE_DECLARATION_SOURCE_PATH = join(import.meta.dir, 'declarations', 'base.d.ts')
@@ -33,14 +34,12 @@ export async function syncAppletDeclarations(
   const updated: AppletDeclarationFile[] = []
   if (await writeDeclaration(workspacePath, 'base.d.ts')) updated.push('base.d.ts')
 
-  // Only an explicit collab install creates this optional declaration.
-  if (await Bun.file(appletDeclarationPath(workspacePath, 'collab.d.ts')).exists()) {
+  // Keep existing applets typecheckable when a cloud workspace is opened locally.
+  if (
+    getAppConfig().environment === 'cloud' ||
+    (await Bun.file(appletDeclarationPath(workspacePath, 'collab.d.ts')).exists())
+  ) {
     if (await writeDeclaration(workspacePath, 'collab.d.ts')) updated.push('collab.d.ts')
   }
   return updated
-}
-
-export async function installCollabDeclaration(workspacePath: string): Promise<void> {
-  await writeDeclaration(workspacePath, 'base.d.ts')
-  await writeDeclaration(workspacePath, 'collab.d.ts')
 }

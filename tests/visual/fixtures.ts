@@ -164,7 +164,6 @@ const events: StreamEvent[] = [
 export const API: Record<string, unknown> = {
   '/api/config': {
     environment: 'local',
-    collab: false,
     demo: false,
     demoInstallUrl: 'https://moi.computer'
   } satisfies ClientAppConfig,

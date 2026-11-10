@@ -8,9 +8,9 @@ import {
   PresenceAvatarsContainer as PresenceAvatars,
   PresenceAvatars as PlainPresenceAvatars
 } from './presence-avatars'
-import { presenceTarget } from '../presence-target'
+import { presenceTarget } from '../presence/presence-target'
 import { PresenceGroupContainer as PresenceGroup } from './presence-group'
-import { presenceChannels } from '../hooks'
+import { presenceChannels } from '../presence/hooks'
 import {
   createFocusRoom,
   me,

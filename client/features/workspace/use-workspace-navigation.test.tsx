@@ -1,3 +1,4 @@
+import * as appConfig from '@/client/api/app-config'
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -5,9 +6,6 @@ import { Route, Router } from 'wouter'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { Workspace } from './workspace-context'
-import { CollabContext } from '@/client/features/collab/provider'
-import { NO_ENGINE } from '@/client/features/collab/client'
-import { createFakeEngine } from '@/client/features/collab/testing/fake-engine'
 import {
   browserTabSelectionKey,
   useCurrentTabId
@@ -30,7 +28,7 @@ type ReadNavigationOptions = {
   navigate?: (path: string, options?: { replace?: boolean }) => void
   queryClient?: QueryClient
   onOpenChat?: () => void
-  collab?: boolean
+  cloud?: boolean
   tabs?: WorkspaceTabsState
 }
 
@@ -43,7 +41,7 @@ function readNavigation(
     navigate,
     queryClient = new QueryClient(),
     onOpenChat = () => {},
-    collab = false,
+    cloud = false,
     tabs = createDefaultWorkspaceLayout().tabs
   }: ReadNavigationOptions = {}
 ) {
@@ -63,45 +61,40 @@ function readNavigation(
       </script>
     )
   }
+  const configSpy = spyOn(appConfig, 'useAppConfig').mockReturnValue({
+    environment: cloud ? 'cloud' : 'local',
+    demo: false,
+    demoInstallUrl: '/'
+  })
   const html = renderToStaticMarkup(
     <Workspace id="abc">
-      <CollabContext
-        value={
-          collab
-            ? createFakeEngine({
-                self: { id: 'self', name: 'Self', color: 'blue' },
-                page: 'overview'
-              })
-            : NO_ENGINE
-        }
-      >
-        <QueryClientProvider client={queryClient}>
-          <Router
-            base={base}
-            ssrPath={`${prefix}/workspace/abc/${path}`}
-            ssrSearch={search}
-            hook={navigate ? () => [`${prefix}/workspace/abc/${path}`, navigate] : undefined}
-          >
-            <Route path="/workspace/:id/*?">
-              <WorkspaceLayoutContext
-                value={{
-                  layout: { ...createDefaultWorkspaceLayout(), tabs },
-                  setLayout: () => {},
-                  name: null,
-                  cwd: null,
-                  provider: null,
-                  workspaceId: 'abc',
-                  isLoading: false
-                }}
-              >
-                <Probe />
-              </WorkspaceLayoutContext>
-            </Route>
-          </Router>
-        </QueryClientProvider>
-      </CollabContext>
+      <QueryClientProvider client={queryClient}>
+        <Router
+          base={base}
+          ssrPath={`${prefix}/workspace/abc/${path}`}
+          ssrSearch={search}
+          hook={navigate ? () => [`${prefix}/workspace/abc/${path}`, navigate] : undefined}
+        >
+          <Route path="/workspace/:id/*?">
+            <WorkspaceLayoutContext
+              value={{
+                layout: { ...createDefaultWorkspaceLayout(), tabs },
+                setLayout: () => {},
+                name: null,
+                cwd: null,
+                provider: null,
+                workspaceId: 'abc',
+                isLoading: false
+              }}
+            >
+              <Probe />
+            </WorkspaceLayoutContext>
+          </Route>
+        </Router>
+      </QueryClientProvider>
     </Workspace>
   )
+  configSpy.mockRestore()
   if (!html) throw new Error('The workspace route did not match')
   return JSON.parse(html.slice(html.indexOf('>') + 1, html.lastIndexOf('<'))) as Pick<
     ReturnType<typeof useWorkspaceNavigation>,
@@ -287,7 +280,7 @@ test.each(['', '/', '/prefix'])(
 
 type Write = { method: string; url: string; body: unknown }
 
-function createChatNavigationFixture(collab: boolean) {
+function createChatNavigationFixture(cloud: boolean) {
   const views: ViewInfo[] = [
     { id: 'orders', status: 'compiled', title: 'Orders' },
     { id: 'draft', status: 'draft', requirements: '' }
@@ -400,7 +393,7 @@ function createChatNavigationFixture(collab: boolean) {
     navigate: (path, options) => routed.push({ path, ...options }),
     queryClient,
     onOpenChat: () => revealed.push(true),
-    collab,
+    cloud,
     tabs: { open: ['overview', 'scratchpad'], active: 'scratchpad' }
   })
   return {
@@ -416,7 +409,7 @@ function createChatNavigationFixture(collab: boolean) {
     cachedState: () => queryClient.getQueryData<WorkspaceState>(workspaceKeys.state('abc')),
     // The chat this browser tab's selection shows on a workspace tab.
     selectedIn: (tab: WorkspaceTabId) =>
-      collab
+      cloud
         ? queryClient.getQueryData<BrowserTabSelection>(browserTabSelectionKey('abc'))?.selected[
             tab
           ]
@@ -437,11 +430,11 @@ function createChatNavigationFixture(collab: boolean) {
 const selectionUrl = (id: string) => `/api/workspaces/abc/sessions/${id}/selection`
 const pinUrl = (id: string) => `/api/workspaces/abc/sessions/${id}/pin`
 
-for (const collab of [false, true]) {
-  describe(`chat links with Collab ${collab ? 'enabled' : 'disabled'}`, () => {
+for (const cloud of [false, true]) {
+  describe(`chat links with ${cloud ? 'cloud' : 'local'} environment`, () => {
     let fixture: ReturnType<typeof createChatNavigationFixture>
     beforeEach(() => {
-      fixture = createChatNavigationFixture(collab)
+      fixture = createChatNavigationFixture(cloud)
     })
     afterEach(() => fixture.cleanup())
 
@@ -457,12 +450,12 @@ for (const collab of [false, true]) {
         setState(patch)
         const before = cachedState()
         const local: BrowserTabSelection = { selected: { overview: 'local' } }
-        if (collab) queryClient.setQueryData(browserTabSelectionKey('abc'), local)
+        if (cloud) queryClient.setQueryData(browserTabSelectionKey('abc'), local)
         await navigate('moi:/chat')
         expect(routed).toEqual([])
         expect(revealed).toEqual([true])
         expect(cachedState()).toEqual(before)
-        if (collab)
+        if (cloud)
           expect(
             queryClient.getQueryData<BrowserTabSelection>(browserTabSelectionKey('abc'))
           ).toEqual(local)
@@ -498,7 +491,7 @@ for (const collab of [false, true]) {
         expect(selectedIn(destination)).toBe(id)
         expect(writes).toEqual([
           ...(pinned ? [{ method: 'DELETE', url: pinUrl(pinned), body: undefined }] : []),
-          ...(collab
+          ...(cloud
             ? []
             : [
                 {
@@ -511,7 +504,7 @@ for (const collab of [false, true]) {
                 }
               ])
         ])
-        if (collab)
+        if (cloud)
           expect(JSON.parse(storage.get('moi:collab:abc:session')!).selected[destination]).toBe(id)
       }
     )
@@ -528,7 +521,7 @@ for (const collab of [false, true]) {
       await opening
       expect(writes.map(write => write.url)).toEqual([
         pinUrl('other'),
-        ...(collab ? [] : [selectionUrl('general')])
+        ...(cloud ? [] : [selectionUrl('general')])
       ])
       expect(revealed).toEqual([true])
     })
@@ -559,7 +552,7 @@ for (const collab of [false, true]) {
       expect(cachedState()?.pinnedSessionId).toBe('other')
     })
 
-    if (!collab) {
+    if (!cloud) {
       test('waits for selection persistence before redirecting or acknowledging', async () => {
         const { initial, responses, navigate, routed, revealed } = fixture
         const saving = Promise.withResolvers<Response>()

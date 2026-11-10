@@ -136,39 +136,33 @@ describe('collab deployment environment', () => {
   }
 })
 
-describe('collab init CLI flag', () => {
-  test('plain init omits the guide; flagged init adds it and plain refresh removes it', async () => {
+describe('workspace environment during init', () => {
+  test('cloud init adds the guide and types to an existing local workspace', async () => {
     const args = ['init', '--harness=codex']
     const guide = join(workspace, '.agents', 'skills', 'moi-workspace', 'references', 'COLLAB.md')
     const types = join(workspace, '.moi', 'collab.d.ts')
     expect((await runCli(args)).code).toBe(0)
     expect(await Bun.file(guide).exists()).toBe(false)
     expect(await Bun.file(types).exists()).toBe(false)
-    const initialized = await runCli([...args, '--collab'])
+    env.MOI_ENVIRONMENT = 'cloud'
+    const initialized = await runCli(args)
     expect(initialized.code).toBe(0)
-    expect(initialized.stdout).toContain('Collaboration guide installed')
     expect(await Bun.file(guide).exists()).toBe(true)
     expect(await Bun.file(types).exists()).toBe(true)
+    env.MOI_ENVIRONMENT = 'local'
     expect(await Bun.file(capturePath).exists()).toBe(false)
     expect((await runCli(args)).code).toBe(0)
     expect(await Bun.file(guide).exists()).toBe(false)
     expect(await Bun.file(types).exists()).toBe(true)
   }, 30_000)
 
-  test('init --web --collab installs docs without enabling the runtime', async () => {
-    spawnCli(['init', '--harness=codex', '--web', '--collab'])
-    expect((await capturedServerLaunch()).flag).toBe('')
-    expect(await Bun.file(join(workspace, '.moi', 'collab.d.ts')).exists()).toBe(true)
-  }, 15_000)
-
-  test('only init offers the optional collaboration guide in help', async () => {
+  test('start and init omit the retired flag', async () => {
     const start = await runCli(['start', '--help'])
     expect(start.code).toBe(0)
     expect(start.stdout).not.toContain('--collab')
     expect(start.stdout).not.toContain('--experimental-collab')
     const init = await runCli(['init', '--help'])
     expect(init.code).toBe(0)
-    expect(init.stdout).toContain('--collab')
-    expect(init.stdout).toContain('guide and applet types')
+    expect(init.stdout).not.toContain('--collab')
   }, 15_000)
 })

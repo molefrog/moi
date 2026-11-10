@@ -1,3 +1,4 @@
+import * as appConfig from '@/client/api/app-config'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { act, useState } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -8,9 +9,6 @@ import { Link, Route, Router } from 'wouter'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { browserTabSelectionKey } from '@/client/features/chat/sessions/use-selected-session'
 import type { BrowserTabSelection } from '@/client/features/chat/sessions/browser-tab-state'
-import { CollabContext } from '@/client/features/collab/provider'
-import { NO_ENGINE } from '@/client/features/collab/client'
-import { createFakeEngine } from '@/client/features/collab/testing/fake-engine'
 import * as workspaceEvents from '@/client/runtime/use-workspace-events'
 import { resolveUrl } from '@/lib/navigation'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
@@ -29,7 +27,7 @@ afterEach(() => cleanup())
 
 function mountNavigation(
   path: string,
-  collab: boolean,
+  cloud: boolean,
   tabs: WorkspaceTabsState = { open: ['overview', 'scratchpad'], active: 'scratchpad' }
 ) {
   const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>')
@@ -101,7 +99,7 @@ function mountNavigation(
   }
   queryClient.setQueryData(workspaceKeys.sessions('abc'), responses.sessions)
   queryClient.setQueryData(workspaceKeys.state('abc'), server)
-  if (collab) queryClient.setQueryData(browserTabSelectionKey('abc'), { selected: {} })
+  if (cloud) queryClient.setQueryData(browserTabSelectionKey('abc'), { selected: {} })
   const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
     Object.assign(
       async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -200,6 +198,11 @@ function mountNavigation(
       </WorkspaceLayoutContext>
     )
   }
+  const configSpy = spyOn(appConfig, 'useAppConfig').mockReturnValue({
+    environment: cloud ? 'cloud' : 'local',
+    demo: false,
+    demoInstallUrl: '/'
+  })
   const root = createRoot(document.getElementById('root')!)
   cleanup = async () => {
     await act(async () => {
@@ -208,6 +211,7 @@ function mountNavigation(
       await Bun.sleep(0)
     })
     notifyManager.setNotifyFunction(callback => callback())
+    configSpy.mockRestore()
     fetchSpy.mockRestore()
     navigationSpy.mockRestore()
     eventsSpy.mockRestore()
@@ -220,24 +224,13 @@ function mountNavigation(
     act(async () => {
       root.render(
         <Workspace id="abc">
-          <CollabContext
-            value={
-              collab
-                ? createFakeEngine({
-                    self: { id: 'self', name: 'Self', color: 'blue' },
-                    page: 'overview'
-                  })
-                : NO_ENGINE
-            }
-          >
-            <QueryClientProvider client={queryClient}>
-              <Router base="/prefix">
-                <Route path="/workspace/:id/*?">
-                  <Layout />
-                </Route>
-              </Router>
-            </QueryClientProvider>
-          </CollabContext>
+          <QueryClientProvider client={queryClient}>
+            <Router base="/prefix">
+              <Route path="/workspace/:id/*?">
+                <Layout />
+              </Route>
+            </Router>
+          </QueryClientProvider>
         </Workspace>
       )
     })
@@ -255,7 +248,7 @@ function mountNavigation(
     expect(document.getElementById('revealed')?.textContent).toBe('yes')
     expect(cachedState()?.pinnedSessionId).toBeUndefined()
     expect(
-      collab
+      cloud
         ? queryClient.getQueryData<BrowserTabSelection>(browserTabSelectionKey('abc'))?.selected[
             tab
           ]
@@ -280,12 +273,12 @@ function mountNavigation(
   }
 }
 
-for (const collab of [false, true]) {
-  describe(`mounted chat links with Collab ${collab ? 'enabled' : 'disabled'}`, () => {
+for (const cloud of [false, true]) {
+  describe(`mounted chat links with ${cloud ? 'cloud' : 'local'} environment`, () => {
     test.each(['overview', 'scratchpad?after=1'])(
       'a route change to %s cancels a pending chat lookup',
       async path => {
-        const fixture = mountNavigation('scratchpad?before=1', collab)
+        const fixture = mountNavigation('scratchpad?before=1', cloud)
         await fixture.render()
         const lookup = Promise.withResolvers<SessionSummary[]>()
         fixture.responses.sessions = lookup.promise
@@ -307,7 +300,7 @@ for (const collab of [false, true]) {
     test.each(['chat', 'chats/source'])(
       'navigation immediately followed by %s resolves the chat destination',
       async path => {
-        const fixture = mountNavigation('scratchpad', collab)
+        const fixture = mountNavigation('scratchpad', cloud)
         await fixture.render()
         await act(async () => {
           const switching = fixture.navigate('moi:/views/orders?order=o-3')
@@ -327,7 +320,7 @@ for (const collab of [false, true]) {
     test.each(['chats', 'chats/%', 'chats/a/b'])(
       'invalid chat route %s restores the saved tab without changing selection or pin',
       async path => {
-        const fixture = mountNavigation(path, collab)
+        const fixture = mountNavigation(path, cloud)
         const before = fixture.cachedState()
         await fixture.render()
         expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/scratchpad')
@@ -337,7 +330,7 @@ for (const collab of [false, true]) {
       }
     )
     test('tab navigation restores params and avoids a duplicate history entry', async () => {
-      const fixture = mountNavigation('views/orders?order=o-1&literal=%252F', collab)
+      const fixture = mountNavigation('views/orders?order=o-1&literal=%252F', cloud)
       await fixture.render()
       const clickTab = (tab: string) =>
         act(async () => {
@@ -355,18 +348,18 @@ for (const collab of [false, true]) {
       await clickTab('orders')
       expect(fixture.history.filter(entry => entry.kind === 'push')).toHaveLength(2)
       const savedTabs = fixture.storage.get('moi:collab:abc:tabs')
-      if (collab) expect(JSON.parse(savedTabs!).active).toBe('views/orders')
+      if (cloud) expect(JSON.parse(savedTabs!).active).toBe('views/orders')
       else expect(savedTabs).toBeUndefined()
     })
 
     test.each([undefined, 'other'])(
       'a direct current-chat URL restores the saved tab and preserves pin %s and selection',
       async pinned => {
-        const fixture = mountNavigation('chat', collab)
+        const fixture = mountNavigation('chat', cloud)
         const local: BrowserTabSelection = { selected: { overview: 'local' } }
         fixture.setState({ selected: { overview: 'previous' }, pinnedSessionId: pinned })
         const before = fixture.cachedState()
-        if (collab) fixture.queryClient.setQueryData(browserTabSelectionKey('abc'), local)
+        if (cloud) fixture.queryClient.setQueryData(browserTabSelectionKey('abc'), local)
         await fixture.render()
         await fixture.waitForReveal()
         expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/scratchpad')
@@ -375,7 +368,7 @@ for (const collab of [false, true]) {
           { kind: 'replace', href: '/prefix/workspace/abc/scratchpad' }
         ])
         expect(fixture.cachedState()).toEqual(before)
-        if (collab)
+        if (cloud)
           expect(
             fixture.queryClient.getQueryData<BrowserTabSelection>(browserTabSelectionKey('abc'))
           ).toEqual(local)
@@ -386,7 +379,7 @@ for (const collab of [false, true]) {
     test.each(['chat', 'native-chat'])(
       'clicking a %s link stays on the current tab and reveals the current chat',
       async kind => {
-        const fixture = mountNavigation('scratchpad', collab)
+        const fixture = mountNavigation('scratchpad', cloud)
         const before = fixture.cachedState()
         await fixture.render()
         const click = new fixture.window.Event('click', { bubbles: true, cancelable: true })
@@ -409,7 +402,7 @@ for (const collab of [false, true]) {
     test.each(['chats/source', 'chats/%73ource'])(
       'a direct chat URL %s selects and reveals its chat through the route effect',
       async path => {
-        const fixture = mountNavigation(path, collab)
+        const fixture = mountNavigation(path, cloud)
         await fixture.render()
         await fixture.waitForNavigation()
         // A direct load has no origin page, so the entry route is replaced in place.
@@ -422,7 +415,7 @@ for (const collab of [false, true]) {
     test.each(['chat', 'chats/source'])(
       'a direct %s URL resolves the current chat or the linked chat owning tab',
       async path => {
-        const fixture = mountNavigation(path, collab, {
+        const fixture = mountNavigation(path, cloud, {
           open: ['overview', 'scratchpad', 'views/orders'],
           active: 'views/orders'
         })
@@ -440,7 +433,7 @@ for (const collab of [false, true]) {
     test.each(['chat', 'native-chat'])(
       'clicking a %s link preserves the current view and its parameters',
       async kind => {
-        const fixture = mountNavigation('views/orders?order=o-2&literal=%252F', collab)
+        const fixture = mountNavigation('views/orders?order=o-2&literal=%252F', cloud)
         await fixture.render()
         await act(async () => {
           const click = new fixture.window.Event('click', { bubbles: true, cancelable: true })
@@ -458,7 +451,7 @@ for (const collab of [false, true]) {
     test.each(['source', 'native'])(
       'opening a generic parent through %s switches from the child view to Overview',
       async kind => {
-        const fixture = mountNavigation('views/orders?order=o-2', collab)
+        const fixture = mountNavigation('views/orders?order=o-2', cloud)
         fixture.setState({
           pinnedSessionId: undefined,
           sessions: { child: { tabId: 'views/orders' } },
@@ -482,7 +475,7 @@ for (const collab of [false, true]) {
     test.each(['source', 'native'])(
       'clicking a %s chat link selects and reveals its chat',
       async kind => {
-        const fixture = mountNavigation('overview', collab)
+        const fixture = mountNavigation('overview', cloud)
         await fixture.render()
         const click = new fixture.window.Event('click', { bubbles: true, cancelable: true })
         Object.assign(click, { button: 0 })

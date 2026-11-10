@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useSyncExternalStore } from 'react'
+import { createContext, useContext, useEffect, useMemo } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'wouter'
 import { usePathname } from 'wouter/use-browser-location'
@@ -65,15 +65,4 @@ export function useCollabEngine(): CollabEngineApi {
 }
 export function useAppletPresence(): AppletPresence | null {
   return useContext(AppletPresenceContext)
-}
-
-// Collab controls and browser-tab selection require both runtime support and a current user.
-export function useCollabEnabled(): boolean {
-  const engine = useCollabEngine()
-  const currentUser = useSyncExternalStore(
-    engine.subscribeCurrentUser,
-    engine.getCurrentUser,
-    engine.getCurrentUser
-  )
-  return engine.enabled && currentUser !== undefined
 }

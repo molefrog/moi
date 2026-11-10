@@ -5,7 +5,7 @@ import type { HTMLAttributes, ReactNode, Ref } from 'react'
 import { motion } from 'motion/react'
 import { cn } from '@/client/lib/cn'
 import { PresenceGroupContext, usePresenceTarget, useTargetPresence } from './presence-helpers'
-import { useUsers } from '../hooks'
+import { useUsers } from '../presence/hooks'
 import { UserAvatar } from './user-avatar'
 
 export function PresenceAvatarsContainer({

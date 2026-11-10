@@ -18,7 +18,6 @@ import { DATA_DIR } from './data-dir'
 // CLI or server down with it.
 export type AppConfig = {
   environment: AppEnvironment
-  collab: boolean
   // Demo mode: workspace creation is blocked (UI shows the
   // cloud-demo promo dialog instead) and `moi` system commands are disabled.
   demo: boolean
@@ -48,8 +47,6 @@ export type CloudflareAccessConfig = {
 
 const DEFAULTS: AppConfig = {
   environment: 'local',
-  // Experimental; deployments opt in explicitly.
-  collab: false,
   demo: false,
   demoInstallUrl: 'https://moi.computer',
   cloudflareAccess: null,
@@ -198,7 +195,6 @@ function fileValues(raw: Record<string, unknown>): Partial<AppConfig> {
   const out: Partial<AppConfig> = {}
   const environment = parseEnvironment(raw.environment)
   if (environment !== undefined) out.environment = environment
-  if (typeof raw.collab === 'boolean') out.collab = raw.collab
   if (raw.demo !== undefined) {
     if (typeof raw.demo === 'boolean') out.demo = raw.demo
     else warn('ignoring "demo" — expected a boolean')
@@ -226,7 +222,6 @@ export function loadAppConfig(
   const fromEnv: Partial<AppConfig> = {
     environment: parseEnvironment(env.MOI_ENVIRONMENT),
     demo: parseBool(env.MOI_DEMO),
-    collab: parseBool(env.MOI_COLLAB),
     demoInstallUrl: parseString(env.MOI_DEMO_INSTALL_URL)
   }
   const merged = { ...DEFAULTS, ...fromFile }
@@ -264,6 +259,6 @@ export function resetAppConfig(): void {
 // The only shape that reaches the browser (GET /api/config). Server-only keys
 // added to AppConfig later stay out unless explicitly forwarded here.
 export function clientAppConfig(): ClientAppConfig {
-  const { environment, collab, demo, demoInstallUrl } = getAppConfig()
-  return { environment, collab, demo, demoInstallUrl }
+  const { environment, demo, demoInstallUrl } = getAppConfig()
+  return { environment, demo, demoInstallUrl }
 }
