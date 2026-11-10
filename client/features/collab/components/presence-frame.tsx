@@ -5,7 +5,7 @@ import type { HTMLAttributes, ReactNode, Ref } from 'react'
 import { cn } from '@/client/lib/cn'
 import type { UserColor } from '@/lib/collab/colors'
 import { Badge } from '@/ui-components/badge'
-import { useUsers } from '../hooks'
+import { useUsers } from '../presence/hooks'
 import { userDisplayName } from '@/client/lib/user-display-name'
 import { usePresenceTarget, useTargetPresence } from './presence-helpers'
 

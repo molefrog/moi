@@ -5,8 +5,8 @@ import { Route, Router } from 'wouter'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { Workspace } from './workspace-context'
-import { CollabContext } from '@/client/features/collab/provider'
-import { NO_ENGINE } from '@/client/features/collab/client'
+import { CollabContext } from '@/client/features/collab/presence/provider'
+import { NO_ENGINE } from '@/client/features/collab/presence/client'
 import { createFakeEngine } from '@/client/features/collab/testing/fake-engine'
 import {
   browserTabSelectionKey,

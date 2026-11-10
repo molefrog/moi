@@ -1,8 +1,8 @@
 import { expect, test } from 'bun:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { CollabEngineApi } from './client'
-import { createFakeEngine } from './testing/fake-engine'
-import { setIdentity } from '../identity/store'
+import { createFakeEngine } from '../testing/fake-engine'
+import { setIdentity } from '../../identity/store'
 import { colorForId } from '@/lib/collab/colors'
 import {
   useMe,

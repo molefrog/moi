@@ -44,8 +44,8 @@ import {
   usePublishPresence,
   useUser,
   useWorkspaceUsers
-} from '@/client/features/collab/hooks'
-import { AppletPresenceProvider, CollabContext } from '@/client/features/collab/provider'
+} from '@/client/features/collab/presence/hooks'
+import { AppletPresenceProvider, CollabContext } from '@/client/features/collab/presence/provider'
 import { connectPlaygroundParticipants } from './playground-room'
 
 const YOU: UserProfile = {

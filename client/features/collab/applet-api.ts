@@ -13,7 +13,7 @@ import {
   usePublishPresence,
   useUser,
   useWorkspaceUsers
-} from './hooks'
+} from './presence/hooks'
 
 export type AppletCollabApi = typeof CollabApi
 

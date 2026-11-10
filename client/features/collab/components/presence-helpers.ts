@@ -1,8 +1,8 @@
 import type { JsonValue } from 'moi'
 import { createContext, useContext, useLayoutEffect, useRef } from 'react'
 import type { FocusEvent } from 'react'
-import { presenceChannels, usePresenceChannel, usePresencePublisher } from '../hooks'
-import { presenceTarget } from '../presence-target'
+import { presenceChannels, usePresenceChannel, usePresencePublisher } from '../presence/hooks'
+import { presenceTarget } from '../presence/presence-target'
 
 export const hasPresence = (value: JsonValue) => value !== false && value !== null
 

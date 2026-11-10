@@ -4,7 +4,7 @@ import type { UserProfile } from '@/lib/collab/types'
 import { cn } from '@/client/lib/cn'
 import { UserAvatar } from './user-avatar'
 import { userDisplayName } from '@/client/lib/user-display-name'
-import { useMe, useUser } from '../hooks'
+import { useMe, useUser } from '../presence/hooks'
 
 export function UserContainer({ id, showStatusBadge, showYouLabel, ...props }: UserContainerProps) {
   const user = useUser(id)

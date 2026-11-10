@@ -3,7 +3,7 @@ import type { JsonValue } from 'moi'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import { CursorsContainer as Cursors, Cursors as PlainCursors } from './cursors'
-import { presenceChannels } from '../hooks'
+import { presenceChannels } from '../presence/hooks'
 import { createRoom, namelessUsers, renderCollab } from '../testing/component-fixtures'
 
 test('remote cursors resolve a usable label for nameless user', () => {

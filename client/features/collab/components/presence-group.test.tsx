@@ -6,7 +6,7 @@ import {
 } from './presence-group'
 import { PresenceFrameContainer as PresenceFrame } from './presence-frame'
 import { PresenceAvatarsContainer as PresenceAvatars } from './presence-avatars'
-import { presenceTarget } from '../presence-target'
+import { presenceTarget } from '../presence/presence-target'
 import { createFocusRoom, renderCollab } from '../testing/component-fixtures'
 
 test('grouped wrappers resolve remote focus by semantic ID regardless of child order', () => {

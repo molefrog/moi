@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { CollabContext, useCollabEnabled } from './provider'
-import { createFakeEngine } from './testing/fake-engine'
+import { createFakeEngine } from '../testing/fake-engine'
 
 const self = { id: 'self', name: 'Self', color: 'emerald' } as const
 

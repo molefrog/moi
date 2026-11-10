@@ -5,7 +5,7 @@ import { Blobatar } from '@blobatar/react'
 import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from '@/ui-components/avatar'
 import { cn } from '@/client/lib/cn'
 import { userDisplayName } from '@/client/lib/user-display-name'
-import { useUser } from '../hooks'
+import { useUser } from '../presence/hooks'
 
 export function UserAvatarContainer({
   id,

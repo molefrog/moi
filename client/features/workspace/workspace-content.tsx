@@ -18,7 +18,7 @@ import { ChatPopup } from '@/client/features/chat/chat-popup'
 import { ThemePanel } from '@/client/features/workspace/theme-panel'
 import { Overview } from '@/client/features/overview/overview'
 import { useAppConfig } from '@/client/api/app-config'
-import { WorkspaceUsersMenu } from '@/client/features/collab'
+import { WorkspaceSharingMenu } from '@/client/features/collab'
 import { PanelHeader } from '@/client/components/shared/panel-header'
 import { Button } from '@/client/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
@@ -546,7 +546,7 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
           />
         </div>
         {environment === 'cloud' && (
-          <WorkspaceUsersMenu
+          <WorkspaceSharingMenu
             workspaceId={workspaceId}
             describeTab={tab => tabItemFor(tab, allViews, false, () => false)}
             onOpenTab={openTab}

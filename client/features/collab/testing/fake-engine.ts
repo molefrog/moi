@@ -1,8 +1,8 @@
 import type { UserProfile, Connection, PresenceRegistration } from '@/lib/collab/types'
 import { COLLAB_PROTOCOL_VERSION } from '@/lib/collab/protocol'
-import type { CollabEngineApi } from '../client'
+import type { CollabEngineApi } from '../presence/client'
 import { normalizeUserProfile } from '../host-state'
-import { CollabStore } from '../store'
+import { CollabStore } from '../presence/store'
 
 function normalizeUsers(users: readonly UserProfile[]): readonly UserProfile[] {
   if (!Array.isArray(users)) throw new Error('Users must be an array.')

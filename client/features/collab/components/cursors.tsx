@@ -8,7 +8,12 @@ import { IconPointer2 } from '@tabler/icons-react'
 import { cn } from '@/client/lib/cn'
 import { Badge } from '@/ui-components/badge'
 
-import { presenceChannels, usePresenceChannel, usePresencePublisher, useUsers } from '../hooks'
+import {
+  presenceChannels,
+  usePresenceChannel,
+  usePresencePublisher,
+  useUsers
+} from '../presence/hooks'
 import { userDisplayName } from '@/client/lib/user-display-name'
 import { hasPresence } from './presence-helpers'
 

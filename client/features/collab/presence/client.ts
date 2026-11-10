@@ -1,4 +1,4 @@
-import { getWorkspaceDirectory, subscribeWorkspaceDirectory } from './members/store'
+import { getWorkspaceDirectory, subscribeWorkspaceDirectory } from '../members/store'
 import { wsUrl } from '@/client/lib/ws-url'
 import { COLLAB_PROTOCOL_VERSION } from '@/lib/collab/protocol'
 import type {
@@ -9,7 +9,7 @@ import type {
   PresenceRegistration
 } from '@/lib/collab/types'
 
-import { getCurrentUser, subscribeCurrentUserStore, getCurrentUserSource } from './host-state'
+import { getCurrentUser, subscribeCurrentUserStore, getCurrentUserSource } from '../host-state'
 import { CollabStore, DISCONNECTED_STATE } from './store'
 import type { ClientState, PresenceEntry } from './store'
 

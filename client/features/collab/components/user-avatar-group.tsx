@@ -3,7 +3,7 @@ import type { UserProfile } from '@/lib/collab/types'
 import { AvatarGroup as AvatarGroupPrimitive, AvatarGroupCount } from '@/ui-components/avatar'
 import { UserAvatar } from './user-avatar'
 import type { UserAvatarProps } from './user-avatar'
-import { useUsers } from '../hooks'
+import { useUsers } from '../presence/hooks'
 
 export function UserAvatarGroupContainer({ ids, ...props }: UserAvatarGroupContainerProps) {
   const users = useUsers([...new Set(ids)])

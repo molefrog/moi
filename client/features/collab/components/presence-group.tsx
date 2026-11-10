@@ -2,7 +2,7 @@ import type { PresenceGroupProps as PresenceGroupContainerProps } from 'moi/coll
 import type { ReactNode } from 'react'
 import { useContext, useId, useMemo } from 'react'
 import { LayoutGroup, MotionConfig } from 'motion/react'
-import { presenceTarget } from '../presence-target'
+import { presenceTarget } from '../presence/presence-target'
 import { PresenceGroupContext } from './presence-helpers'
 
 export function PresenceGroupContainer({ id, children }: PresenceGroupContainerProps) {

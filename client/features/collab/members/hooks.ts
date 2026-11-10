@@ -67,7 +67,7 @@ export function useWorkspaceMembers(workspaceId: string | undefined) {
   const data = applyPendingMembership(query.data, pending)
   return { ...query, data, members: data?.members, invitations: data?.invitations }
 }
-function useMembershipAction(workspaceId: string) {
+export function useMembershipAction(workspaceId: string) {
   const workspaces = useWorkspaces()
 
   const identity = useIdentity()
