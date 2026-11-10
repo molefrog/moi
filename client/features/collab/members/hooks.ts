@@ -101,33 +101,3 @@ export function useMembershipAction(workspaceId: string) {
     }
   })
 }
-export function useInviteMember(workspaceId: string) {
-  const mutation = useMembershipAction(workspaceId)
-  return {
-    ...mutation,
-    mutate: ({ email }: { email: string }) =>
-      mutation.mutate({ type: 'invite', email: email.trim().toLowerCase() }),
-    mutateAsync: ({ email }: { email: string }) =>
-      mutation.mutateAsync({ type: 'invite', email: email.trim().toLowerCase() })
-  }
-}
-export function useRemoveMember(workspaceId: string) {
-  const mutation = useMembershipAction(workspaceId)
-  return {
-    ...mutation,
-    mutate: ({ membershipId }: { membershipId: string }) =>
-      mutation.mutate({ type: 'remove', membershipId }),
-    mutateAsync: ({ membershipId }: { membershipId: string }) =>
-      mutation.mutateAsync({ type: 'remove', membershipId })
-  }
-}
-export function useRevokeInvitation(workspaceId: string) {
-  const mutation = useMembershipAction(workspaceId)
-  return {
-    ...mutation,
-    mutate: ({ invitationId }: { invitationId: string }) =>
-      mutation.mutate({ type: 'revoke', invitationId }),
-    mutateAsync: ({ invitationId }: { invitationId: string }) =>
-      mutation.mutateAsync({ type: 'revoke', invitationId })
-  }
-}
