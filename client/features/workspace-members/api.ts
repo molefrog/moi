@@ -8,8 +8,11 @@ export async function fetchWorkspaceMembers(id: string, signal?: AbortSignal) {
   const response = await cloudRequest(`${workspaceMembersPath(id)}/members`, { signal })
   return parseWorkspaceMembers(await response.json())
 }
-export const inviteWorkspaceMember = (id: string, email: string) =>
-  cloudRequest(`${workspaceMembersPath(id)}/invitations`, jsonRequest('POST', { email }))
+export const inviteWorkspaceMember = (id: string, email: string, workspaceName?: string) =>
+  cloudRequest(
+    `${workspaceMembersPath(id)}/invitations`,
+    jsonRequest('POST', { email, workspaceName })
+  )
 export const removeWorkspaceMember = (id: string, membershipId: string) =>
   cloudRequest(`${workspaceMembersPath(id)}/members/${encodeURIComponent(membershipId)}`, {
     method: 'DELETE'

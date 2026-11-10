@@ -8,6 +8,8 @@ import {
   setAllWorkspaceMembers,
   setWorkspaceMembers
 } from './store'
+
+import { workspaceKeys } from '@/client/api/workspace-keys'
 import { setIdentity } from '../identity/store'
 const me = {
   id: 'me',
@@ -44,7 +46,10 @@ for (const button of ['Invite Tony', 'Invite Tony asynchronously']) {
     await ui.settle()
     await ui.click(button)
     expect(ui.calls.filter(call => call.path.endsWith('/invitations'))).toEqual([
-      { path: '/cloud/api/workspaces/one/invitations', body: { email: 'tony@example.com' } }
+      {
+        path: '/cloud/api/workspaces/one/invitations',
+        body: { email: 'tony@example.com', workspaceName: 'First workspace' }
+      }
     ])
     expect(ui.document.querySelector('[data-members]')?.textContent).toContain('tony@example.com')
   })
@@ -99,3 +104,21 @@ test.each([
   expect(ui.document.querySelector('[data-members]')?.textContent).not.toContain('Tony')
   expect(ui.document.querySelector('[data-members]')?.textContent).toContain('Alex')
 })
+
+for (const name of ['Weekly Review', '', '   ']) {
+  test(`invitations send the workspace display name with an ID fallback for ${JSON.stringify(name)}`, async () => {
+    const ui = await mountAccount({ children: <Probe /> })
+    await ui.settle()
+    await act(async () => {
+      ui.qc.setQueryData(workspaceKeys.all, [{ id: 'one', name }])
+    })
+    await ui.settle()
+    await ui.click('Invite Tony')
+    expect(ui.calls.find(call => call.path.endsWith('/invitations'))).toEqual({
+      path: '/cloud/api/workspaces/one/invitations',
+      body: name.trim()
+        ? { email: 'tony@example.com', workspaceName: 'Weekly Review' }
+        : { email: 'tony@example.com' }
+    })
+  })
+}
