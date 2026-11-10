@@ -73,7 +73,6 @@ async function mount(
   const configSpy = spyOn(config, 'useAppConfig').mockReturnValue({
     environment,
     demo,
-
     demoInstallUrl: ''
   })
   const destinations: string[] = []
