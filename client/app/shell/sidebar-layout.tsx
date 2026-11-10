@@ -107,6 +107,7 @@ function Sidebar({ workspaces }: SidebarProps) {
                 <ReorderableList
                   items={workspaces}
                   getId={ws => ws.id}
+                  axis="y"
                   className="flex flex-col gap-4"
                   onReorder={ids => reorder.mutate(ids)}
                   renderPlaceholder={() => (

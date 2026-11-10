@@ -207,6 +207,7 @@ export function WorkspaceTabs({
         <ReorderableList
           items={tabs}
           getId={tab => tab.key}
+          axis="x"
           isItemDragDisabled={tab => tab.reorderable === false}
           className="flex w-max items-center gap-1"
           onReorder={ordered => onReorder(ordered as WorkspaceTabId[])}
