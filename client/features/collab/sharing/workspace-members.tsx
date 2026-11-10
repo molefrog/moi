@@ -127,7 +127,7 @@ function InviteForm({ className, workspaceId, members, invitations }: InviteForm
   }
   return (
     <form
-      className={cn('flex gap-2', className)}
+      className={cn('flex', className)}
       onSubmit={event => {
         event.preventDefault()
         void submit()
@@ -136,7 +136,6 @@ function InviteForm({ className, workspaceId, members, invitations }: InviteForm
       <Input
         id="invite-email"
         type="email"
-        required
         aria-label="Email"
         placeholder="Email"
         autoComplete="off"
@@ -145,7 +144,7 @@ function InviteForm({ className, workspaceId, members, invitations }: InviteForm
         onChange={event => setEmail(event.target.value)}
         disabled={invite.isPending}
       />
-      <Button type="submit" disabled={invite.isPending || !email.trim()}>
+      <Button className="ms-2" type="submit" disabled={invite.isPending || !email.trim()}>
         Invite
       </Button>
     </form>
