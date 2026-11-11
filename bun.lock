@@ -43,6 +43,7 @@
         "pathe": "^2.0.3",
         "picocolors": "^1.1.1",
         "postcss": "^8.5.28",
+        "proper-lockfile": "4.1.2",
         "react": "19.2.4",
         "react-dom": "19.2.4",
         "react-grid-layout": "^2.2.4",
@@ -68,6 +69,7 @@
         "@agentclientprotocol/sdk": "^1.4.0",
         "@babel/types": "^7.29.8",
         "@types/culori": "^4.0.1",
+        "@types/proper-lockfile": "^4.1.4",
         "@types/react": "^19.2.18",
         "@types/react-dom": "^19.2.7",
         "@types/react-grid-layout": "^2.1.0",
@@ -701,6 +703,8 @@
     "@types/ms": ["@types/ms@2.1.0", "", {}, "sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA=="],
 
     "@types/node": ["@types/node@25.3.5", "", { "dependencies": { "undici-types": "~7.18.0" } }, "sha512-oX8xrhvpiyRCQkG1MFchB09f+cXftgIXb3a7UUa4Y3wpmZPw5tyZGTLWhlESOLq1Rq6oDlc8npVU2/9xiCuXMA=="],
+
+    "@types/proper-lockfile": ["@types/proper-lockfile@4.1.4", "", { "dependencies": { "@types/retry": "*" } }, "sha512-uo2ABllncSqg9F1D4nugVl9v93RmjxF6LJzQLMLDdPaXCUIDPeOJ21Gbqi43xNKzBi/WQ0Q0dICqufzQbMjipQ=="],
 
     "@types/react": ["@types/react@19.2.18", "", { "dependencies": { "csstype": "^3.2.2" } }, "sha512-AnzbBERsrLKtk2XSfTbYRLjQPdy116Sty4q+T+Bp3IC4l6jNBvreVPAHmpq9qhXQM7CXZPjLVmGMw9sy+hxQ3w=="],
 
