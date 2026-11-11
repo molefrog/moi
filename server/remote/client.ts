@@ -32,6 +32,19 @@ const profileSchema = z
 const workspacesSchema = z.object({
   workspaces: z.array(z.object({ id: z.string(), owner: profileSchema }))
 })
+const invitationSchema = z.object({
+  id: z.string(),
+  workspaceId: z.string(),
+  workspaceName: z.string(),
+  inviter: profileSchema,
+  expiresAt: z.iso.datetime()
+})
+const invitationsSchema = z.object({ invitations: z.array(invitationSchema) })
+const acceptanceSchema = z.object({
+  success: z.literal(true),
+  workspaceId: z.string(),
+  membershipId: z.string()
+})
 const remoteSchema = z.object({
   url: z.string().min(1).optional(),
   clientId: z.string().min(1).optional(),
@@ -41,6 +54,8 @@ const configSchema = z.object({ remote: remoteSchema.optional() })
 type RemoteConfig = { url: string; clientId: string; managed: boolean }
 export type Profile = { id: string; name: string; email: string }
 export type SharedWorkspace = { id: string; owner: Profile }
+export type RemoteInvitation = z.infer<typeof invitationSchema>
+export type AcceptedInvitation = z.infer<typeof acceptanceSchema>
 export type RemoteStatus = { me: Profile; workspaces: SharedWorkspace[] }
 export function resolveRemoteConfig(
   remote: { url?: string; clientId?: string; managed?: boolean },
@@ -183,7 +198,7 @@ export function createRemoteClient(directory: string) {
     const config = await remoteConfig()
     if (config.managed) throw new Error('Cloud manages sign-in on this machine')
     const response = await post(config, '/device/code', {
-      scope: 'profile:read workspaces:read offline_access',
+      scope: 'profile:read workspaces:read workspaces:access offline_access',
       resource: 'urn:moi:cloud'
     })
     if (!response.ok) throw new Error(`Could not start login (${response.status})`)
@@ -266,14 +281,20 @@ export function createRemoteClient(directory: string) {
     })
   }
 
-  async function authenticatedGet<T>(
+  async function authenticatedRequest<T>(
     config: RemoteConfig,
     pair: Credentials,
     path: string,
-    schema: z.ZodType<T>
+    schema: z.ZodType<T>,
+    method: 'GET' | 'POST' = 'GET'
   ): Promise<T> {
     const response = await fetch(`${config.url}/api${path}`, {
-      headers: { authorization: `Bearer ${pair.accessToken}` },
+      method,
+      headers: {
+        authorization: `Bearer ${pair.accessToken}`,
+        ...(method === 'POST' ? { 'content-type': 'application/json' } : {})
+      },
+      body: method === 'POST' ? '{}' : undefined,
       redirect: 'error',
       signal: AbortSignal.timeout(30_000)
     })
@@ -288,22 +309,52 @@ export function createRemoteClient(directory: string) {
   async function fetchSharedWorkspaces(): Promise<SharedWorkspace[]> {
     const config = await remoteConfig()
     const pair = await access(config)
-    const result = await authenticatedGet(config, pair, '/workspaces/shared', workspacesSchema)
+    const result = await authenticatedRequest(config, pair, '/workspaces/shared', workspacesSchema)
     return result.workspaces
+  }
+
+  /** Pending invitations addressed to the signed-in user's verified email. */
+  async function fetchInvitations(): Promise<RemoteInvitation[]> {
+    const config = await remoteConfig()
+    const pair = await access(config)
+    return (await authenticatedRequest(config, pair, '/invitations', invitationsSchema)).invitations
+  }
+
+  /** Accept an invitation returned by fetchInvitations; no email-link token needed. */
+  async function acceptInvitation(id: string): Promise<AcceptedInvitation> {
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) throw new Error('Invalid invitation ID')
+    const config = await remoteConfig()
+    const pair = await access(config)
+    return authenticatedRequest(config, pair, `/invitations/${id}/accept`, acceptanceSchema, 'POST')
   }
 
   async function remoteStatus(): Promise<RemoteStatus> {
     const config = await remoteConfig()
     const pair = await access(config)
     const [me, shared] = await Promise.all([
-      authenticatedGet(config, pair, '/me', profileSchema),
-      authenticatedGet(config, pair, '/workspaces/shared', workspacesSchema)
+      authenticatedRequest(config, pair, '/me', profileSchema),
+      authenticatedRequest(config, pair, '/workspaces/shared', workspacesSchema)
     ])
     return { me, workspaces: shared.workspaces }
   }
 
-  return { remoteConfig, login, logout, fetchSharedWorkspaces, remoteStatus }
+  return {
+    remoteConfig,
+    login,
+    logout,
+    fetchSharedWorkspaces,
+    fetchInvitations,
+    acceptInvitation,
+    remoteStatus
+  }
 }
 
-export const { remoteConfig, login, logout, fetchSharedWorkspaces, remoteStatus } =
-  createRemoteClient(DATA_DIR)
+export const {
+  remoteConfig,
+  login,
+  logout,
+  fetchSharedWorkspaces,
+  fetchInvitations,
+  acceptInvitation,
+  remoteStatus
+} = createRemoteClient(DATA_DIR)

@@ -38,3 +38,21 @@ The function uses the configured Cloud URL and saved credentials, refreshing the
 Credentials use the same data-directory layout in every environment. Set `MOI_DATA_DIR` to a different directory to keep local testing and production logins separate. Saved credentials are bound to their Cloud URL (including its mount path) and client ID: changing either requires a new login, and never sends the previous login's tokens to the new target.
 
 Normal reads do not take a file lock. Refresh, login, and logout coordinate across processes, and credential replacements are atomic. An abandoned lock is recoverable after one minute.
+
+## Pending invitations
+
+Server code can list invitations addressed to the signed-in user's verified email and accept them by ID:
+
+```ts
+import { fetchInvitations, acceptInvitation, fetchSharedWorkspaces } from './remote/client'
+
+const invitations = await fetchInvitations()
+// [{ id, workspaceId, workspaceName, inviter: { id, name, email, avatar? }, expiresAt }]
+
+await acceptInvitation(invitations[0]!.id)
+const workspaces = await fetchSharedWorkspaces()
+```
+
+These helpers use the same saved credentials and automatic refresh as shared-workspace listing, including cloud-managed installations. They call `GET /cloud/api/invitations` and `POST /cloud/api/invitations/:id/accept` (JSON body `{}`). The list excludes accepted, expired, and revoked invitations. Acceptance checks the authenticated user's verified email; the email-link token is not required. After acceptance, refresh both lists in the UI. No UI is included in these helpers.
+
+Listing requires `workspaces:read`; acceptance requires `workspaces:access`. Older CLI logins without the access scope need a new `moi remote login`; refreshing cannot add a scope. Managed credentials receive these scopes at machine startup.
