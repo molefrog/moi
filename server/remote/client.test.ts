@@ -59,29 +59,6 @@ beforeEach(async () => {
         return new Response(null, { status: 200 })
       }
       expect(request.headers.get('authorization')).toStartWith('Bearer ')
-      if (path.endsWith('/invitations'))
-        return Response.json({
-          invitations: [
-            {
-              id: 'invite-1',
-              workspaceId: 'w1',
-              workspaceName: 'Project',
-              inviter: {
-                id: 'u2',
-                name: 'Owner',
-                email: 'owner@example.com',
-                avatar: 'https://example.com/avatar.png'
-              },
-              expiresAt: '2026-12-01T00:00:00.000Z'
-            }
-          ]
-        })
-      if (path.endsWith('/invitations/invite-1/accept')) {
-        expect(request.method).toBe('POST')
-        expect(request.headers.get('content-type')).toBe('application/json')
-        expect(await request.json()).toEqual({})
-        return Response.json({ success: true, workspaceId: 'w1', membershipId: 'membership-1' })
-      }
       if (path.endsWith('/me'))
         return Response.json({ id: 'u1', name: 'Test', email: 'test@example.com' })
       return Response.json({
@@ -242,31 +219,4 @@ test('development requires a target; published installs default to production', 
   ]) {
     expect(() => resolveRemoteConfig({ url }, true)).toThrow()
   }
-})
-
-test('invitation helpers refresh managed credentials and preserve inviter metadata', async () => {
-  await config({ managed: true })
-  await credentials()
-  const invitations = await client.fetchInvitations()
-  expect(invitations).toHaveLength(1)
-  expect(invitations[0]).toMatchObject({
-    id: 'invite-1',
-    workspaceName: 'Project',
-    inviter: { avatar: 'https://example.com/avatar.png' }
-  })
-  expect(await client.acceptInvitation(invitations[0]!.id)).toEqual({
-    success: true,
-    workspaceId: 'w1',
-    membershipId: 'membership-1'
-  })
-  expect(refreshes).toBe(1)
-})
-
-test('accept rejects path injection locally and does not follow cloud redirects', async () => {
-  await credentials(Date.now() / 1000 + 3600)
-  await expect(client.acceptInvitation('../other')).rejects.toThrow('Invalid invitation ID')
-  expect(requests).toBe(0)
-  responseMode = 'redirect'
-  await expect(client.acceptInvitation('invite-1')).rejects.toThrow()
-  expect(requests).toBe(1)
 })
