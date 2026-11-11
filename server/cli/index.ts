@@ -14,6 +14,7 @@ import { init } from './commands/init'
 import { navigate } from './commands/navigate'
 import { openclaw } from './commands/openclaw'
 import { refresh } from './commands/refresh'
+import { remote } from './commands/remote'
 import { scratch } from './commands/scratch'
 import { service } from './commands/service'
 import { skill } from './commands/skill'
@@ -44,6 +45,7 @@ const workspaceCommands = {
   skill,
   tabs,
   navigate,
+  remote,
   'ui-components': uiComponents
 }
 
