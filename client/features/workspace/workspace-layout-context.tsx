@@ -1,4 +1,3 @@
-import { chatAvailable } from '@/client/features/workspace/chat-availability'
 import { Button } from '@/client/components/ui/button'
 import { Spinner } from '@/client/components/ui/spinner'
 import type { RemoteWorkspaceTarget } from '@/lib/workspace-config'
@@ -135,7 +134,8 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
       provider: query.data ? (query.data.provider ?? 'claude-code') : null,
       workspaceId: id,
       remote: query.data?.remote,
-      chatAvailable: chatAvailable(id),
+      // Remote chat support is deferred.
+      chatAvailable: !query.data?.remote,
       isLoading: query.isLoading
     }),
     [query.data, query.isLoading, setLayout, id]

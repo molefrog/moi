@@ -1,5 +1,4 @@
 import { requestJson } from '@/client/api/http'
-import { workspaceBase } from '@/lib/workspace-identity'
 import { useCallback, useEffect, useState } from 'react'
 
 import { IconVersions } from '@tabler/icons-react'
@@ -65,7 +64,7 @@ export function useScratchpadSnapshot(workspaceId: string): {
 
   useEffect(() => {
     let cancelled = false
-    requestJson<ScratchpadFetch>(`${workspaceBase(workspaceId)}/scratchpad`)
+    requestJson<ScratchpadFetch>(`/api/workspaces/${workspaceId}/scratchpad`)
       .then((data: ScratchpadFetch) => {
         if (cancelled) return
         let snapshot: TLEditorSnapshot['document'] | undefined

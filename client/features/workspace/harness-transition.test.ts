@@ -1,4 +1,3 @@
-import { workspaceIdentity } from '@/lib/workspace-identity'
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { QueryClient } from '@tanstack/react-query'
 import { workspaceKeys } from '@/client/api/workspace-keys'
@@ -101,35 +100,4 @@ test('discards the previous agent connector list even while its settings tab is 
   expect(client.getQueryData<McpServer[]>(workspaceKeys.mcp('two'))).toEqual([
     { name: 'other', status: 'connected' }
   ])
-})
-
-test("owner harness changes preserve the visitor's preferences and state", async () => {
-  const id = workspaceIdentity({ id: 'board', remote: { user_id: 'alice', workspace_id: 'board' } })
-  const layout = {
-    ...createDefaultWorkspaceLayout(),
-    provider: 'claude-code',
-    selectedModel: 'visitor-model',
-    selectedEffort: 'high',
-    selectedSpeedMode: 'fast'
-  }
-  const state = {
-    revision: 1,
-    selected: { overview: 'visitor-chat' },
-    pinnedSessionId: 'visitor-chat',
-    sessions: {},
-    pendingViews: {}
-  }
-  client.setQueryData(workspaceKeys.layout(id), layout)
-  client.setQueryData(workspaceKeys.state(id), state)
-  client.setQueryData(workspaceKeys.skills(id), { updateAvailable: true })
-  await receiveWorkspaceHarness(client, id, 'claude-code')
-  // Simulate refreshed owner metadata before the effect runs.
-  client.setQueryData(workspaceKeys.layout(id), { ...layout, provider: 'codex' })
-  await receiveWorkspaceHarness(client, id, 'codex')
-  expect(client.getQueryData<typeof layout>(workspaceKeys.layout(id))).toEqual({
-    ...layout,
-    provider: 'codex'
-  })
-  expect(client.getQueryData<typeof state>(workspaceKeys.state(id))).toEqual(state)
-  expect(client.getQueryState(workspaceKeys.skills(id))?.isInvalidated).toBe(false)
 })

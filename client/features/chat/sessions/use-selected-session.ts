@@ -1,4 +1,3 @@
-import { chatAvailable } from '@/client/features/workspace/chat-availability'
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { useParams } from 'wouter'
@@ -228,11 +227,7 @@ export function useSelectedSession(explicitTabId?: WorkspaceTabId): SelectedSess
     scope === 'browser-tab' && local === undefined
       ? undefined
       : selectedSessionForTab(state, tabId, scope === 'browser-tab' ? local : undefined)
-  return [
-    chatAvailable(workspaceId) ? selectedSessionId : null,
-    setSelectedSessionId,
-    selectSessionForTab
-  ]
+  return [selectedSessionId, setSelectedSessionId, selectSessionForTab]
 }
 
 export function usePinnedSession() {

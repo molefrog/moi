@@ -3,8 +3,6 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { workspaceIdentity } from '@/lib/workspace-identity'
-
 import type { WorkspaceSkillsStatus } from '@/lib/types'
 
 import { api } from './index'
@@ -111,7 +109,7 @@ test('remote references update only the visitor skill copy', async () => {
   })
   await Bun.write(join(visitorRoot, '.moi', '.workspace.json'), config)
   const visitor = await registerWorkspace(visitorRoot, { type: 'codex' })
-  const base = `/api/workspaces/${workspaceIdentity(visitor)}`
+  const base = `/api/workspaces/${visitor.id}`
   const before = await api.request(`${base}/skills`)
   expect(before.status).toBe(200)
   expect((await before.json()).updateAvailable).toBe(true)

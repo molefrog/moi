@@ -1,10 +1,10 @@
-import { remoteFromIdentity } from '@/lib/workspace-identity'
+import { remoteTarget } from '@/client/features/workspace/remote'
 import { cloudRequest } from '../../account/api'
 import { jsonRequest } from '@/client/api/http'
 import { parseWorkspaceMembers, validWorkspaceId } from './types'
 
 function workspaceMembersPath(id: string, suffix: string) {
-  const remote = remoteFromIdentity(id)
+  const remote = remoteTarget(id)
   const workspaceId = validWorkspaceId(remote?.workspace_id ?? id)
   return `workspaces/${encodeURIComponent(workspaceId)}/${suffix}${remote ? `?owner_id=${encodeURIComponent(remote.user_id)}` : ''}`
 }

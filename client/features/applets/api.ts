@@ -1,4 +1,3 @@
-import { workspaceBase } from '@/lib/workspace-identity'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
@@ -14,7 +13,7 @@ export function useAppletThumbnailRecords(workspaceId: string) {
     queryFn: async () =>
       (
         await requestJson<{ thumbnails: AppletThumbnail[] }>(
-          `${workspaceBase(workspaceId)}/applet-thumbnails`
+          `/api/workspaces/${workspaceId}/applet-thumbnails`
         )
       ).thumbnails,
     ...WORKSPACE_RESOURCE_OPTIONS
@@ -27,7 +26,7 @@ export function useSaveAppletThumbnails(workspaceId: string) {
   return useMutation<void, Error, AppletThumbnailBatch>({
     mutationFn: input =>
       requestVoid(
-        `${workspaceBase(workspaceId)}/applet-thumbnails`,
+        `/api/workspaces/${workspaceId}/applet-thumbnails`,
         jsonRequest('PUT', input),
         'Failed to save applet thumbnails'
       ),

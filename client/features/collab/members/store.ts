@@ -1,4 +1,4 @@
-import { remoteFromIdentity } from '@/lib/workspace-identity'
+import { remoteTarget } from '@/client/features/workspace/remote'
 import { memberKeys } from './keys'
 import { queryClient } from '@/client/api/query-client'
 import { getIdentity, getAccountGeneration } from '../../identity/store'
@@ -46,7 +46,7 @@ export function ownerOnlyWorkspaceMembers(): WorkspaceMembers | undefined {
 export function setWorkspaceMembers(workspaceId: string, value: WorkspaceMembers): void {
   const identity = getIdentity()
   const queryKey = memberKeys.workspace(identity ? identityKey(identity) : undefined, workspaceId)
-  validWorkspaceId(remoteFromIdentity(workspaceId)?.workspace_id ?? workspaceId)
+  validWorkspaceId(workspaceId)
   const data = parseWorkspaceMembers(value)
   // A push supersedes any older in-flight GET for this snapshot.
   void queryClient.cancelQueries({ queryKey, exact: true })
@@ -66,7 +66,7 @@ export function setAllWorkspaceMembers(value: WorkspaceMembersSnapshot[]): void 
   const prefix = memberKeys.account(accountId)
   void queryClient.cancelQueries({ queryKey: prefix })
   for (const query of queryClient.getQueryCache().findAll({ queryKey: prefix })) {
-    if (!remoteFromIdentity(query.queryKey[2] as string) && !ids.has(query.queryKey[2] as string))
+    if (!remoteTarget(query.queryKey[2] as string) && !ids.has(query.queryKey[2] as string))
       forgetWorkspaceMembers(query.queryKey)
   }
   for (const workspace of snapshots)
@@ -77,7 +77,7 @@ export function setAllWorkspaceMembers(value: WorkspaceMembersSnapshot[]): void 
 export function removeWorkspaceMembers(workspaceId: string) {
   const identity = getIdentity()
   const queryKey = memberKeys.workspace(identity ? identityKey(identity) : undefined, workspaceId)
-  validWorkspaceId(remoteFromIdentity(workspaceId)?.workspace_id ?? workspaceId)
+  validWorkspaceId(workspaceId)
   void queryClient.cancelQueries({ queryKey, exact: true })
   forgetWorkspaceMembers(queryKey)
 }
@@ -91,7 +91,7 @@ function forgetWorkspaceMembers(queryKey: readonly unknown[]) {
   // the replacement so mounted views and the presence engine update together.
   queryClient.setQueryData<WorkspaceMembers>(
     queryKey,
-    (!remoteFromIdentity(queryKey[2] as string) ? ownerOnlyWorkspaceMembers() : undefined) ?? {
+    (!remoteTarget(queryKey[2] as string) ? ownerOnlyWorkspaceMembers() : undefined) ?? {
       members: [],
       invitations: []
     }
@@ -102,7 +102,7 @@ export function getWorkspaceDirectory(workspaceId: string): readonly UserProfile
   const queryKey = memberKeys.workspace(identity ? identityKey(identity) : undefined, workspaceId)
   const data =
     queryClient.getQueryData<WorkspaceMembers>(queryKey) ??
-    (!remoteFromIdentity(workspaceId) ? ownerOnlyWorkspaceMembers() : undefined)
+    (!remoteTarget(workspaceId) ? ownerOnlyWorkspaceMembers() : undefined)
   if (!data) return undefined
   let profiles = directoryCache.get(data)
   if (!profiles) {

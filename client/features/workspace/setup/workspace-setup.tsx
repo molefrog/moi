@@ -1,4 +1,4 @@
-import { chatAvailable } from '../chat-availability'
+import { remoteTarget } from '../remote'
 import { useHarnessStatus, useRetryHarnessStatus } from '@/client/features/harness/api'
 import { useCallback } from 'react'
 import { useAppConfig } from '@/client/api/app-config'
@@ -22,7 +22,8 @@ export function useWorkspaceSetup(
   contentPending = false,
   welcome: WorkspaceWelcomeStateProps = {}
 ) {
-  const canChat = chatAvailable(workspaceId)
+  // Remote chat support is deferred, so the visitor's agent needs no setup.
+  const canChat = !remoteTarget(workspaceId)
   const { environment, demo } = useAppConfig()
   const workspace = useWorkspaceHarness(workspaceId)
   const { data } = workspace

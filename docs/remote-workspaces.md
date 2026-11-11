@@ -38,11 +38,19 @@ Shared layout, name, icon, harness, theme, and content come from the owner. Icon
 
 ## Routing and CLI
 
-A remote workspace is identified by `(user_id, workspace_id)`. Browser routes and caches encode the pair as `remote~` plus base64url JSON `[user_id, workspace_id]`. The browser reads the visitor config at `/api/workspaces/{pair_key}` and owner content at `/api/remote/{user_id}/workspaces/{workspace_id}`. Local workspaces use `/api/workspaces/{workspace_id}`.
+A remote workspace is registered like any other folder and gets an ordinary local ID. The browser and CLI use `/api/workspaces/{workspace_id}` for local and remote workspaces alike; only the visitor’s server knows the difference.
 
-The gateway routes the remote prefix to the owner and preserves it. Applet RPC and file URLs retain that prefix; the host frontend comes from the visitor’s Moi. Production gateway routing and access checks remain deferred.
+For a folder whose config has `remote`, the visitor’s server:
 
-Local and remote CLI commands share the workspace API; the folder config selects the destination:
+- answers the registration itself (`GET` merges the owner’s layout with the visitor’s tabs and chat options; `PUT` saves the visitor’s part and sends shared edits to the owner);
+- answers the personal routes (`/skills`, `/state`, `/sessions`, `/harness`) from the visitor’s folder;
+- forwards every other request to `/api/remote/{user_id}/workspaces/{workspace_id}` at the configured Cloud URL and relays the answer.
+
+Owner-served applet code carries the owner’s API prefix; the visitor’s server rewrites it to the local prefix, so applet RPC and file URLs come back through the same API. The owner refuses personal routes, view creation, and removal on the remote prefix. Presence is the one connection a visitor’s browser opens to the owner directly.
+
+The gateway routes the remote prefix to the owner and preserves it. In cloud mode the visitor’s server passes the browser’s cookies along; elsewhere it sends none. Production gateway routing and access checks remain deferred.
+
+CLI commands call the same workspace API as the browser, so they need no remote handling of their own:
 
 - `tabs` lists owner views and marks the visitor’s saved active tab. `navigate` validates against those views and moves the visitor’s browser.
 - `theme`, `config`, `call-server-fn`, `debug logs`, and scratchpad reads/edits use owner data. Function calls share the normal RPC worker pool; image edits upload visitor file bytes.
@@ -58,9 +66,9 @@ Scratchpad documents and assets stay on the owner. Reopen the canvas for edits m
 ## Mock owner for localhost:8787
 
 1. Start Moi and Batiok normally. Set `MOCK_REMOTE_ORIGIN=http://127.0.0.1:13340` in Batiok’s `.dev.vars` and restart Wrangler.
-2. For CLI commands, set `remote.url` to `http://localhost:8787/cloud` in Moi’s data-directory `config.json` (see [Cloud CLI setup](remote-cli.md)). The mock needs no login.
+2. Set `remote.url` to `http://localhost:8787/cloud` in Moi’s data-directory `config.json` (see [Cloud CLI setup](remote-cli.md)); the visitor’s server reaches the owner through it. The mock needs no login.
 3. Run `bun scripts/mock-owner.ts` from the Moi repository.
-4. Open `http://localhost:8787` and add the printed folder, normally `~/moi/shared-counter`. Existing references to `alice/owner-board` also work.
+4. Open Moi (`http://localhost:8787`, or `http://localhost:13337` directly) and add the printed folder, normally `~/moi/shared-counter`. Existing references to `alice/owner-board` also work.
 
 The script creates the visitor config only if missing and installs `moi-workspace` without scaffolding applets. Existing configs are preserved. Owner data and an isolated registry live in `moi-mock-owner` under the OS temporary directory; restarts preserve the counter and sources. The normal registry is untouched.
 
@@ -68,4 +76,4 @@ The script creates the visitor config only if missing and installs `moi-workspac
 
 To test, increment **Shared counter** in Overview and the **Counter** view. Check the script’s `OWNER` logs and printed counter file, then refresh or restart to verify persistence. The mock supports presence WebSockets, but does not simulate Cloud membership or invitations. Owner files remain after Ctrl+C until removed or cleaned up by the OS.
 
-Coverage: [owner API](../server/api/remote-workspace.test.ts), [client routing](../client/features/workspace/remote-routing.test.ts), [CLI routing](../server/workspaces/api.test.ts), and [visual states](../tests/visual/workspace.visual.ts).
+Coverage: [forwarding and owner API](../server/api/remote-workspace.test.ts), [CLI requests](../server/workspaces/api.test.ts), and [visual states](../tests/visual/workspace.visual.ts).

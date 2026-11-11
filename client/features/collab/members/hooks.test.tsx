@@ -1,4 +1,4 @@
-import { workspaceIdentity } from '@/lib/workspace-identity'
+import { queryClient } from '@/client/api/query-client'
 import { afterEach, expect, test } from 'bun:test'
 import { act } from 'react'
 import { cleanupAccount, mountAccount } from '../../account/account-test-utils'
@@ -109,7 +109,10 @@ for (const name of ['Weekly Review', '', '   ']) {
 }
 
 function RemoteMembersProbe() {
-  const id = workspaceIdentity({ id: 'board', remote: { user_id: 'alice', workspace_id: 'board' } })
+  const id = 'visitor-board'
+  queryClient.setQueryData(workspaceKeys.all, [
+    { id, path: '/visitor-board', addedAt: '', remote: { user_id: 'alice', workspace_id: 'board' } }
+  ])
   const members = useWorkspaceMembers(id)
   return <span data-enabled>{String(members.isEnabled)}</span>
 }

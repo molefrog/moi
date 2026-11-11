@@ -1,7 +1,8 @@
 import { executeScratchOp } from '../scratchpad/executor'
-import type { ScratchOp } from '@/lib/types'
-import { workspaceApiBase } from '@/lib/workspace-config'
-import { workspaceIdentity } from '@/lib/workspace-identity'
+import type { ScratchOp, WorkspaceLayoutResponse, WorkspacePreview } from '@/lib/types'
+import { workspaceApiBase, type RemoteWorkspaceTarget } from '@/lib/workspace-config'
+import { requestOwner } from '../workspaces/api'
+import { normalizeWorkspaceTabs } from '@/lib/workspace-layout'
 import { loadWorkspaceFileConfig, saveWorkspacePersonalConfig } from '../workspaces/layout'
 import { personalWorkspaceConfig } from '@/lib/workspace-config'
 import { resolveWorkspaceEnv } from '../workspaces/env'
@@ -167,6 +168,58 @@ async function handleFunctionCall(
   }
 }
 
+// Routes that describe the person using a workspace, not the workspace itself.
+// A visitor's Moi answers them from its own folder; an owner never serves them
+// to visitors.
+const PERSONAL_ROUTE_RE = /^\/(?:sessions|state|harness|skills)(?:\/|$)/
+
+async function ownerLayout(remote: RemoteWorkspaceTarget): Promise<WorkspaceLayoutResponse> {
+  const response = await requestOwner(remote, '')
+  if (!response.ok) throw new Error(`Owner request failed (${response.status})`)
+  return response.json()
+}
+
+// Relay one request to the owner and hand back its answer. Owner-served code
+// carries the owner's API prefix; swap in this workspace's so applet RPC and
+// file URLs come back through here too.
+async function forwardToOwner(
+  request: Request,
+  id: string,
+  remote: RemoteWorkspaceTarget,
+  suffix: string
+): Promise<Response> {
+  const headers = new Headers(request.headers)
+  for (const name of ['host', 'connection', 'content-length', 'accept-encoding'])
+    headers.delete(name)
+  // Only the cloud gateway shares this origin's session with the owner route.
+  if (getAppConfig().environment !== 'cloud') {
+    headers.delete('cookie')
+    headers.delete('authorization')
+  }
+  const hasBody = request.method !== 'GET' && request.method !== 'HEAD'
+  let response: Response
+  try {
+    response = await requestOwner(remote, suffix + new URL(request.url).search, {
+      method: request.method,
+      headers,
+      body: hasBody ? await request.arrayBuffer() : undefined,
+      signal: request.signal
+    })
+  } catch {
+    return new Response('Couldn’t reach the workspace owner', { status: 502 })
+  }
+  const answer = new Headers(response.headers)
+  answer.delete('content-encoding')
+  answer.delete('content-length')
+  const init = { status: response.status, headers: answer }
+  if (!answer.get('content-type')?.includes('javascript')) return new Response(response.body, init)
+  const code = await response.text()
+  return new Response(
+    code.replaceAll(workspaceApiBase(remote.workspace_id, remote.user_id), workspaceApiBase(id)),
+    init
+  )
+}
+
 // Resolve `:id` to a registered workspace once, 404 if unknown, and stash it on
 // the context. Mounted on the single-workspace sub-app so every nested route
 // shares the lookup instead of repeating `getWorkspace(...) ?? 404`.
@@ -180,23 +233,26 @@ const withWorkspace = createMiddleware<ApiEnv>(async (c, next) => {
     const ws = await getWorkspace(id)
     if (!ws) return c.text('Workspace not found', 404)
     const config = await loadWorkspaceFileConfig(ws.path)
-    const remoteRequest = Boolean(c.req.param('userId'))
+    const ownerRoute = Boolean(c.req.param('userId'))
     const suffix = (c.req.path.split(`/workspaces/${encodeURIComponent(id)}`)[1] ?? '').replace(
       /\/$/,
       ''
     )
+    const personal = PERSONAL_ROUTE_RE.test(suffix)
     if (
-      remoteRequest &&
-      (/^(?:\/sessions|\/state|\/harness|\/skills)(?:\/|$)/.test(suffix) ||
+      ownerRoute &&
+      (personal ||
         (suffix === '' && c.req.method === 'DELETE') ||
         (suffix === '/views' && c.req.method === 'POST') ||
         suffix.endsWith('/submit'))
     )
       return c.text('This operation is unavailable for remote workspaces', 403)
-    if (!remoteRequest && config.remote && !['', '/', '/skills', '/skills/update'].includes(suffix))
-      return c.text('Use the owner API for this remote workspace', 409)
-    if (config.remote && c.req.method === 'DELETE')
+    if (config.remote && suffix === '' && c.req.method === 'DELETE')
       return c.text('Leaving remote workspaces is not available yet', 403)
+    // A remote workspace keeps only its registration and personal routes here;
+    // everything else is the owner's, so the client speaks one API for both.
+    if (config.remote && !ownerRoute && suffix !== '' && !personal)
+      return await forwardToOwner(c.req.raw, ws.id, config.remote, suffix)
     c.set('ws', ws)
     await next()
   } catch (error) {
@@ -947,7 +1003,24 @@ one.delete('/icon', async c => {
 one.get('/', async c => {
   const ws = c.get('ws')
   const config = await loadWorkspaceFileConfig(ws.path)
-  if (config.remote) return c.json({ ...config, name: ws.name || basename(ws.path), cwd: ws.path })
+  if (config.remote) {
+    // Shared layout comes from the owner; tabs and chat options stay the visitor's.
+    const owner = await ownerLayout(config.remote).catch(() => null)
+    if (!owner) return c.text('Couldn’t reach the workspace owner', 502)
+    const {
+      selectedModel: _model,
+      selectedEffort: _effort,
+      selectedSpeedMode: _speed,
+      ...shared
+    } = owner
+    return c.json({
+      ...shared,
+      ...personalWorkspaceConfig(config),
+      tabs: normalizeWorkspaceTabs(config.tabs),
+      remote: config.remote,
+      cwd: ws.path
+    })
+  }
   const layout = config
   return c.json({
     ...layout,
@@ -1030,7 +1103,19 @@ one.put('/', async c => {
   const config = await loadWorkspaceFileConfig(ws.path)
   if (config.remote) {
     await saveWorkspacePersonalConfig(personalWorkspaceConfig({ ...config, ...body }), ws.path)
-    return c.body(null, 204)
+    // A full layout also carries shared edits (grid, theme) for the owner.
+    if (!('widgetGrid' in body)) return c.body(null, 204)
+    const { tabs: _tabs, ...shared } = body
+    return forwardToOwner(
+      new Request(c.req.url, {
+        method: 'PUT',
+        headers: c.req.raw.headers,
+        body: JSON.stringify(shared)
+      }),
+      ws.id,
+      config.remote,
+      ''
+    )
   }
   const existing = await loadLayout(ws.path)
   const next = mergeLayoutForSave(existing, layout)
@@ -1072,7 +1157,19 @@ async function mergeWorkspaceList(entries: WorkspaceEntry[]) {
     entries.map(async e => {
       const layout = await loadWorkspaceFileConfig(e.path).catch(() => null)
       if (!layout) return e
-      if (layout.remote) return { ...e, remote: layout.remote }
+      if (layout.remote) {
+        // Display metadata belongs to the owner; the registration stays the visitor's.
+        const owner = await ownerLayout(layout.remote).catch(() => null)
+        return {
+          ...e,
+          remote: layout.remote,
+          name: owner?.name ?? e.name ?? layout.remote.workspace_id,
+          icon: owner?.icon,
+          theme: owner?.theme,
+          type: owner ? (owner.provider ?? 'claude-code') : e.type,
+          agentId: owner?.agentId
+        }
+      }
       return {
         ...e,
         name: layout.name ?? e.name,
@@ -1156,7 +1253,23 @@ workspaces.get('/previews', async c => {
   const previews = await Promise.all(
     entries.map(async ws => {
       const config = await loadWorkspaceFileConfig(ws.path).catch(() => null)
-      if (!config || config.remote) return [workspaceIdentity(ws), { thumbnails: [] }] as const
+      if (!config) return [ws.id, { thumbnails: [] }] as const
+      if (config.remote) {
+        const { remote } = config
+        const preview = await requestOwner(remote, '/home-preview')
+          .then(async response =>
+            response.ok
+              ? (JSON.parse(
+                  (await response.text()).replaceAll(
+                    workspaceApiBase(remote.workspace_id, remote.user_id),
+                    workspaceApiBase(ws.id)
+                  )
+                ) as WorkspacePreview)
+              : null
+          )
+          .catch(() => null)
+        return [ws.id, preview ?? { thumbnails: [] }] as const
+      }
       const views = await listCompiledViews(ws.path).catch(() => [])
       const preview = await getWorkspacePreview(ws.path, {
         getProviderPreview: includeFirstUserMessage =>

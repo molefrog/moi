@@ -1,4 +1,5 @@
-import { workspaceIdentity } from '@/lib/workspace-identity'
+import { workspaceKeys } from '@/client/api/workspace-keys'
+import { queryClient } from '@/client/api/query-client'
 import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test'
 
 import { colorForId } from '@/lib/collab/colors'
@@ -419,7 +420,10 @@ test('cloud presence waits for this workspace membership and closes when access 
 test('remote presence connects to the owner with the same membership rules', () => {
   signIn({ id: 'visitor', name: 'Visitor' })
   clearWorkspaceMembers()
-  const id = workspaceIdentity({ id: 'board', remote: { user_id: 'alice', workspace_id: 'board' } })
+  const id = 'visitor-board'
+  queryClient.setQueryData(workspaceKeys.all, [
+    { id, path: '/visitor-board', addedAt: '', remote: { user_id: 'alice', workspace_id: 'board' } }
+  ])
   setWorkspaceMembers(id, {
     members: [{ id: 'visitor', type: 'user', name: 'Visitor', email: '', isAnonymous: false }],
     invitations: []

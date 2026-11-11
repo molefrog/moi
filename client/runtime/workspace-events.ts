@@ -17,12 +17,12 @@ export type WorkspaceEvent =
       status: HarnessStatus
     }
   | { type: 'workspace-harness:switched'; workspaceId: string; harness: WorkspaceType }
-  | { type: 'widget:updated'; workspaceId: string; name: string }
+  | { type: 'widget:updated'; workspaceId?: string; name: string }
   | { type: 'widget-layout:updated'; workspaceId: string; widgets: WidgetInfo[] }
   // `moi refresh` — cache-bust and re-fetch applets without a rebuild. `only`
   // narrows to one kind; absent means both widgets and views.
-  | { type: 'applets:refresh'; workspaceId: string; only?: 'widgets' | 'views' }
-  | { type: 'view:updated'; workspaceId: string; name: string }
+  | { type: 'applets:refresh'; only?: 'widgets' | 'views' }
+  | { type: 'view:updated'; workspaceId?: string; name: string }
   | { type: 'view-layout:updated'; workspaceId: string; views: CompiledView[] }
   | { type: 'view:deleted'; workspaceId: string; name: string }
   // A workspace's chat state changed (pin, selection, chat settings, views

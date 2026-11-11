@@ -1,4 +1,4 @@
-import { workspaceIdentity } from '@/lib/workspace-identity'
+import { workspaceKeys } from '@/client/api/workspace-keys'
 import { memberKeys } from './keys'
 import { afterEach, expect, test } from 'bun:test'
 import { queryClient } from '@/client/api/query-client'
@@ -122,7 +122,10 @@ test('optimistic pending actions are derived over the newest snapshot without mu
 
 test('local membership bootstrap preserves separately fetched remote members', () => {
   setIdentity(alex)
-  const id = workspaceIdentity({ id: 'board', remote: { user_id: 'host', workspace_id: 'board' } })
+  const id = 'visitor-board'
+  queryClient.setQueryData(workspaceKeys.all, [
+    { id, path: '/visitor-board', addedAt: '', remote: { user_id: 'host', workspace_id: 'board' } }
+  ])
   expect(getWorkspaceDirectory(id)).toBeUndefined()
   setWorkspaceMembers(id, { members: [alex, bot], invitations: [] })
   setAllWorkspaceMembers([])

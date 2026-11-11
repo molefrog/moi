@@ -1,5 +1,6 @@
 import { afterEach, expect, spyOn, test } from 'bun:test'
-import { workspaceIdentity } from '@/lib/workspace-identity'
+import { queryClient } from '@/client/api/query-client'
+import { workspaceKeys } from '@/client/api/workspace-keys'
 import {
   fetchWorkspaceMembers,
   inviteWorkspaceMember,
@@ -8,7 +9,10 @@ import {
 } from './api'
 
 let fetchSpy: ReturnType<typeof spyOn> | undefined
-afterEach(() => fetchSpy?.mockRestore())
+afterEach(() => {
+  fetchSpy?.mockRestore()
+  queryClient.removeQueries({ queryKey: workspaceKeys.all, exact: true })
+})
 
 test('remote membership actions use the same host workspace', async () => {
   const calls: { url: string; method: string }[] = []
@@ -21,7 +25,10 @@ test('remote membership actions use the same host workspace', async () => {
       { preconnect: fetch.preconnect }
     )
   )
-  const id = workspaceIdentity({ id: 'board', remote: { user_id: 'alice', workspace_id: 'board' } })
+  const id = 'visitor-board'
+  queryClient.setQueryData(workspaceKeys.all, [
+    { id, path: '/visitor-board', addedAt: '', remote: { user_id: 'alice', workspace_id: 'board' } }
+  ])
   await fetchWorkspaceMembers(id)
   await inviteWorkspaceMember(id, 'new@example.com')
   await removeWorkspaceMember(id, 'member-1')

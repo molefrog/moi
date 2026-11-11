@@ -10,6 +10,7 @@ import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import type { ViewInfo } from '@/lib/types'
 
 import { assembleTabRows, assertNavigableTab, getWorkspaceTabs } from './tabs'
+import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from './registry'
 
 const views: ViewInfo[] = [
   { id: 'roadmap', status: 'compiled', title: 'Roadmap' },
@@ -76,6 +77,7 @@ const directories: string[] = []
 const spies: { mockRestore(): void }[] = []
 afterEach(async () => {
   for (const spy of spies.splice(0)) spy.mockRestore()
+  setRegistryPath(DEFAULT_REGISTRY_PATH)
   await Promise.all(directories.splice(0).map(path => rm(path, { recursive: true, force: true })))
 })
 
@@ -84,7 +86,8 @@ async function workspaceFixture(config: unknown) {
   directories.push(path)
   await mkdir(join(path, '.moi'))
   await Bun.write(join(path, '.moi/.workspace.json'), JSON.stringify(config))
-  return { id: 'board', path }
+  setRegistryPath(join(path, 'registry.json'))
+  return registerWorkspace(path, { id: 'board' })
 }
 
 function mockOwner(status = 200) {

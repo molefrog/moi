@@ -1,5 +1,4 @@
 import { requestWorkspace } from './workspaces/api'
-import { workspaceIdentity } from '@/lib/workspace-identity'
 import { stringify as devalueStringify } from 'devalue'
 import { resolve } from 'path'
 
@@ -334,7 +333,7 @@ export const control = Bun.serve({
               throw new Error('Navigation needs a workspace page address')
             const tab = href.slice(5).split('?', 1)[0]
             if (isWorkspaceTabId(tab)) assertNavigableTab(tab, await getWorkspaceTabs(match))
-            await navigationRelay.navigate(workspaceIdentity(match), href)
+            await navigationRelay.navigate(match.id, href)
             ws.send(JSON.stringify({ ok: true, href }))
           } catch (error) {
             ws.send(
@@ -357,20 +356,14 @@ export const control = Bun.serve({
             ws.send(JSON.stringify({ error: `Invalid applet selector "${data.only}"` }))
             return
           }
-          for (const workspace of await listWorkspaces()) {
-            if (only?.id) {
-              publishEvent({
-                type: only.segment === 'widgets' ? 'widget:updated' : 'view:updated',
-                workspaceId: workspaceIdentity(workspace),
-                name: only.id
-              })
-            } else {
-              publishEvent({
-                type: 'applets:refresh',
-                workspaceId: workspaceIdentity(workspace),
-                ...(data.only ? { only: data.only } : {})
-              })
-            }
+          // No `workspaceId`: `moi refresh` names no workspace, so every open one reloads.
+          if (only?.id) {
+            publishEvent({
+              type: only.segment === 'widgets' ? 'widget:updated' : 'view:updated',
+              name: only.id
+            })
+          } else {
+            publishEvent({ type: 'applets:refresh', ...(data.only ? { only: data.only } : {}) })
           }
           ws.send(JSON.stringify({ ok: true }))
           return
@@ -452,7 +445,7 @@ export const control = Bun.serve({
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ ...shared, theme: result.theme })
           })
-          publishEvent({ type: 'theme:updated', workspaceId: workspaceIdentity(match) })
+          publishEvent({ type: 'theme:updated', workspaceId: match.id })
           ws.send(JSON.stringify({ ok: true, ...result.applied }))
           return
         }
@@ -492,7 +485,7 @@ export const control = Bun.serve({
               method: 'PUT',
               body: Bun.file(String(data.iconPath))
             })
-          publishEvent({ type: 'workspace:updated', workspaceId: workspaceIdentity(match) })
+          publishEvent({ type: 'workspace:updated', workspaceId: match.id })
           ws.send(
             JSON.stringify({
               ok: true,
@@ -540,7 +533,7 @@ export const control = Bun.serve({
             // a live tab (and fails if none is open). Every mutation runs headlessly
             // against the disk snapshot, so drawing never needs an open canvas.
             let result
-            if (op.kind === 'view') result = await relayScratchOp(workspaceIdentity(match), op)
+            if (op.kind === 'view') result = await relayScratchOp(match.id, op)
             else {
               const body = new FormData()
               body.set('op', JSON.stringify(op))

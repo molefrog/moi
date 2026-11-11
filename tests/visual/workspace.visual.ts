@@ -165,26 +165,23 @@ test(
   }
 )
 
-const remoteBase = '/api/remote/alice/workspaces/owner-board'
-const remoteKey = 'remote~WyJhbGljZSIsIm93bmVyLWJvYXJkIl0'
-const remotePage = `/#/workspace/${remoteKey}`
+// A remote workspace is served through the same API as a local one; the
+// visitor's Moi merges the owner's layout with the visitor's preferences.
+const REMOTE = 'shared-board'
+const remoteBase = `/api/workspaces/${REMOTE}`
+const remotePage = `/#/workspace/${REMOTE}`
 const remoteAnswers = {
-  [`/api/workspaces/${remoteKey}/skills`]: { skills: [], updateAvailable: false },
-  [`/api/workspaces/${remoteKey}`]: {
-    version: 2,
-    remote: { user_id: 'alice', workspace_id: 'owner-board' },
-    layoutMode: 'split',
-    cwd: '/visitor',
-    name: 'Shared board'
-  },
+  [`${remoteBase}/skills`]: { skills: [], updateAvailable: false },
   [remoteBase]: {
     version: 2,
+    remote: { user_id: 'alice', workspace_id: 'owner-board' },
     name: 'Shared board',
-    cwd: '/owner',
+    cwd: '/visitor',
     widgetGrid: [],
-    layoutMode: 'fullscreen',
+    layoutMode: 'split',
     tabs: { open: ['overview'], active: 'overview' }
   },
+  [`${remoteBase}/state`]: { revision: 1, selected: {}, sessions: {}, pendingViews: {} },
   [`${remoteBase}/widgets`]: { widgets: [] },
   [`${remoteBase}/views`]: { views: [] },
   [`${remoteBase}/applet-thumbnails`]: { thumbnails: [] }
@@ -221,7 +218,7 @@ test(
   'remote workspace owner unavailable',
   async page => {
     await page.route(`**${remoteBase}`, route =>
-      route.fulfill({ status: 503, body: 'Owner unavailable' })
+      route.fulfill({ status: 502, body: 'Couldn’t reach the workspace owner' })
     )
     await page.goto(remotePage)
     await expect(page.getByRole('alert')).toBeVisible()
@@ -251,8 +248,8 @@ test(
   {
     api: {
       ...remoteAnswers,
-      [`/api/workspaces/${remoteKey}`]: {
-        ...remoteAnswers[`/api/workspaces/${remoteKey}`],
+      [remoteBase]: {
+        ...remoteAnswers[remoteBase],
         tabs: { open: ['overview', 'views/counter'], active: 'views/counter' }
       },
       [`${remoteBase}/views`]: { views: [{ id: 'counter', status: 'compiled', title: 'Counter' }] }
@@ -274,13 +271,14 @@ test(
       ...remoteAnswers,
       '/api/workspaces': [
         {
-          id: 'owner-board',
+          id: REMOTE,
           path: '/visitor-alias',
           addedAt: '2026-01-01T00:00:00Z',
+          name: 'Shared board',
           remote: { user_id: 'alice', workspace_id: 'owner-board' }
         }
       ],
-      [`${remoteBase}/home-preview`]: { thumbnails: [], theme: { color: 'mint' } }
+      '/api/workspaces/previews': { [REMOTE]: { thumbnails: [], theme: { color: 'mint' } } }
     }
   }
 )
@@ -295,8 +293,8 @@ test(
   {
     api: {
       ...remoteAnswers,
-      [`/api/workspaces/${remoteKey}`]: {
-        ...remoteAnswers[`/api/workspaces/${remoteKey}`],
+      [remoteBase]: {
+        ...remoteAnswers[remoteBase],
         tabs: { open: ['overview', 'scratchpad'], active: 'scratchpad' }
       },
       [`${remoteBase}/scratchpad`]: { document: null }

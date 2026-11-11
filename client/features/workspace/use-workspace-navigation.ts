@@ -1,4 +1,3 @@
-import { workspaceBase } from '@/lib/workspace-identity'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import type { MouseEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -100,7 +99,7 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
       { replace = false }: NavigationOptions = {},
       controller = new AbortController()
     ) => {
-      const target = resolveUrl(href, { workspaceId, base, apiBase: workspaceBase(workspaceId) })
+      const target = resolveUrl(href, { workspaceId, base })
       navigationRequest.current?.controller.abort()
       if (!target.startsWith(prefix)) {
         navigationRequest.current = null

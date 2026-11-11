@@ -1,4 +1,3 @@
-import { workspaceBase } from '@/lib/workspace-identity'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { readConnectors } from './read-connectors'
@@ -11,7 +10,7 @@ export function useWorkspaceMcp(workspaceId: string, enabled: boolean) {
     queryKey: workspaceKeys.mcp(workspaceId),
     queryFn: async ({ signal }) =>
       readConnectors(
-        await fetch(`${workspaceBase(workspaceId)}/mcp?stream=true`, { signal }),
+        await fetch(`/api/workspaces/${workspaceId}/mcp?stream=true`, { signal }),
         connectors => {
           if (!signal.aborted) queryClient.setQueryData(workspaceKeys.mcp(workspaceId), connectors)
         }

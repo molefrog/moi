@@ -1,4 +1,3 @@
-import { remoteFromIdentity } from '@/lib/workspace-identity'
 import { useEffect } from 'react'
 import { matchQuery, useQueryClient, type QueryClient, type Query } from '@tanstack/react-query'
 import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
@@ -14,8 +13,6 @@ export async function receiveWorkspaceHarness(
   id: string,
   harness: WorkspaceType
 ) {
-  // A remote workspace displays the owner's harness; it does not change the visitor's agent.
-  if (remoteFromIdentity(id)) return
   const cached = queryClient.getQueryData<WorkspaceLayoutResponse>(workspaceKeys.layout(id))
   let previous = cached ? (cached.provider ?? 'claude-code') : undefined
   try {

@@ -499,44 +499,31 @@ describe('getWorkspace', () => {
   })
 })
 
-test('local and two remote owners can share a workspace id without sharing registration', async () => {
-  const { workspaceIdentity } = await import('../../lib/workspace-identity')
+test('remote references get their own ids, one registration per owner workspace', async () => {
   const local = await registerWorkspace(join(tmpDir, 'local'), { id: 'board' })
-  const references = []
-  for (const user_id of ['alice', 'bob']) {
-    const path = join(tmpDir, user_id)
+  const reference = async (folder: string, user_id: string) => {
+    const path = join(tmpDir, folder)
     await mkdir(join(path, '.moi'), { recursive: true })
     await Bun.write(
       join(path, '.moi/.workspace.json'),
       JSON.stringify({ version: 2, remote: { user_id, workspace_id: 'board' } })
     )
-    const entry = await registerWorkspace(path)
-    expect(entry.id).toBe('board')
-    expect((await getWorkspace(workspaceIdentity(entry)))?.path).toBe(path)
-    references.push(entry)
+    return registerWorkspace(path)
   }
+  const alice = await reference('alice', 'alice')
+  const bob = await reference('bob', 'bob')
+  expect(new Set([local.id, alice.id, bob.id]).size).toBe(3)
+  expect((await getWorkspace(alice.id))?.remote).toEqual({
+    user_id: 'alice',
+    workspace_id: 'board'
+  })
   expect((await getWorkspace('board'))?.path).toBe(local.path)
-  const order = [local, ...references].map(workspaceIdentity)
-  expect((await reorderWorkspaces(order)).map(workspaceIdentity)).toEqual(order)
-  await removeWorkspace(workspaceIdentity(references[0]!))
-  expect(await getWorkspace(workspaceIdentity(references[0]!))).toBeNull()
-  expect(await getWorkspace(workspaceIdentity(references[1]!))).not.toBeNull()
-  expect(await getWorkspace('board')).not.toBeNull()
-})
-
-test('legacy remote references normalize to the owner identity', async () => {
-  const path = join(tmpDir, 'legacy')
-  const previous = await registerWorkspace(path)
-  await mkdir(join(path, '.moi'), { recursive: true })
-  await Bun.write(
-    join(path, '.moi/.workspace.json'),
-    JSON.stringify({ version: 2, remote: { user_id: 'alice', workspace_id: 'board' } })
-  )
-  const { workspaceIdentity } = await import('../../lib/workspace-identity')
-  const [entry] = await listWorkspaces()
-  expect(entry?.id).toBe('board')
-  expect(await getWorkspace(previous.id)).toBeNull()
-  expect((await getWorkspace(workspaceIdentity(entry!)))?.path).toBe(path)
+  // A second folder pointing at the same owner workspace reuses the registration.
+  expect((await reference('alice-again', 'alice')).id).toBe(alice.id)
+  expect(await listWorkspaces()).toHaveLength(3)
+  await removeWorkspace(alice.id)
+  expect(await getWorkspace(alice.id)).toBeNull()
+  expect(await getWorkspace(bob.id)).not.toBeNull()
 })
 
 test('remote routing comes only from config and is omitted from registry writes', async () => {
@@ -554,8 +541,7 @@ test('remote routing comes only from config and is omitted from registry writes'
   stored[0].remote = { user_id: 'wrong-owner', workspace_id: 'wrong-board' }
   await Bun.write(registryFile, JSON.stringify(stored))
   expect((await listWorkspaces())[0]?.remote).toEqual(remote)
-  const { workspaceIdentity } = await import('../../lib/workspace-identity')
-  await reorderWorkspaces([workspaceIdentity(entry)])
+  await reorderWorkspaces([entry.id])
   expect((await registryFile.json())[0]).not.toHaveProperty('remote')
   // Removing the reference in config must not resurrect a stored remote value.
   await Bun.write(registryFile, JSON.stringify(stored))

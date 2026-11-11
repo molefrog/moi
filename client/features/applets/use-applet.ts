@@ -1,4 +1,4 @@
-import { remoteFromIdentity } from '@/lib/workspace-identity'
+import { remoteTarget } from '@/client/features/workspace/remote'
 import type { ComponentType } from 'react'
 import { useRouter } from 'wouter'
 import { useCallback, useEffect, useState } from 'react'
@@ -15,7 +15,7 @@ import {
 import { attachAppletBridge } from '@/client/features/applets/applet-runtime'
 import { reportAppletError } from '@/client/features/applets/applet-log'
 import { useWorkspaceId } from '@/client/features/workspace/workspace-context'
-import { type WorkspaceEvent, useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
+import { type WorkspaceEvent, useWorkspaceScopedEvent } from '@/client/runtime/use-workspace-events'
 import type { AppletKind } from '@/lib/types'
 
 // Views receive URL query params. Widgets mount without params; applets must
@@ -119,23 +119,24 @@ function useApplet(kind: AppletKindSpec, name: string): AppletState {
   // unmounted case, but doing it here keeps this self-sufficient and
   // order-independent. The bumped version remounts the component and re-runs its
   // `rpc()` calls.
-  useWorkspaceEvent(event => {
-    if (!('workspaceId' in event) || event.workspaceId !== workspaceId) return
+  useWorkspaceScopedEvent(workspaceId, event => {
     if (kind.shouldReload(event, name)) {
       invalidateApplet(kind.segment, workspaceId, name)
       load()
     }
   })
 
+  // Owner events don't reach visitors yet, so a remote applet reloads on focus.
+  const remote = !!remoteTarget(workspaceId)
   useEffect(() => {
-    if (!remoteFromIdentity(workspaceId)) return
+    if (!remote) return
     const refresh = () => {
       invalidateApplet(kind.segment, workspaceId, name)
       load()
     }
     window.addEventListener('focus', refresh)
     return () => window.removeEventListener('focus', refresh)
-  }, [kind.segment, workspaceId, name, load])
+  }, [remote, kind.segment, workspaceId, name, load])
   return state
 }
 
@@ -154,8 +155,7 @@ export function useView(name: string): AppletState {
 // fires while that applet is on screen; this covers the (common) rest.
 export function useAppletCacheInvalidation(): void {
   const workspaceId = useWorkspaceId()
-  useWorkspaceEvent(event => {
-    if (!('workspaceId' in event) || event.workspaceId !== workspaceId) return
+  useWorkspaceScopedEvent(workspaceId, event => {
     if (event.type === 'view:updated') invalidateApplet('views', workspaceId, event.name)
     else if (event.type === 'widget:updated') invalidateApplet('widgets', workspaceId, event.name)
     else if (event.type === 'applets:refresh') {

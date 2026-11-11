@@ -1,5 +1,3 @@
-import { chatAvailable } from '@/client/features/workspace/chat-availability'
-import { workspaceBase } from '@/lib/workspace-identity'
 // The workspace applet runtime — the host side of the applet `moi` module.
 //
 // Every applet bundle inlines its own copy of the `moi` runtime module (see
@@ -135,10 +133,6 @@ function createRuntime(workspaceId: string) {
         },
         addChatAttachment(input) {
           if (!alive) return
-          if (!chatAvailable(workspaceId)) {
-            drop(identity, 'Chats are unavailable in this workspace')
-            return
-          }
           try {
             const attachment = snapshotAttachmentInput(input, source)
             emitter.emit('addChatAttachment', attachment)
@@ -158,14 +152,10 @@ function createRuntime(workspaceId: string) {
         },
         resolveUrl(url) {
           if (!alive) return ''
-          return resolveUrl(url, { workspaceId, base, apiBase: workspaceBase(workspaceId) })
+          return resolveUrl(url, { workspaceId, base })
         },
         sendChatMessage(input, legacyContext) {
           if (!alive) return
-          if (!chatAvailable(workspaceId)) {
-            drop(identity, 'Chats are unavailable in this workspace')
-            return
-          }
           try {
             // Runtime compatibility for older bundles. Both forms use the same
             // attachment validation and send path; only the object API is public.

@@ -1,5 +1,5 @@
 import { CloudApiError } from '../../account/api'
-import { remoteFromIdentity } from '@/lib/workspace-identity'
+import { remoteTarget } from '@/client/features/workspace/remote'
 import { useMutation, useMutationState, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useWorkspaces } from '../../home/api'
 import { getAccountGeneration } from '../../identity/store'
@@ -43,7 +43,7 @@ export function applyPendingMembership(
 export function useWorkspaceMembers(workspaceId: string | undefined) {
   const identity = useIdentity()
   const accountId = identity ? identityKey(identity) : undefined
-  const remote = workspaceId ? remoteFromIdentity(workspaceId) : undefined
+  const remote = workspaceId ? remoteTarget(workspaceId) : undefined
   const enabled = !!workspaceId && identity?.type === 'user' && !identity.isAnonymous
   const accountGeneration = getAccountGeneration()
   const mutationKey = ['workspace-members-action', accountGeneration, workspaceId]

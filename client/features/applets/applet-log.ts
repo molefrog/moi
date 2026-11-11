@@ -1,4 +1,3 @@
-import { workspaceBase, workspaceIdentity } from '@/lib/workspace-identity'
 import { createRateLimiter } from '@/client/lib/rate-limit'
 import type { AppletClientError, AppletKind } from '@/lib/types'
 
@@ -22,7 +21,7 @@ export function reportAppletError(workspaceId: string, event: AppletClientError)
   const key = [workspaceId, event.source, event.kind, event.name, event.message].join('\0')
   if (limiter.admit(key) !== 'ok') return
 
-  void fetch(`${workspaceBase(workspaceId)}/applet-log`, {
+  void fetch(`/api/workspaces/${workspaceId}/applet-log`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ events: [event] })
@@ -36,8 +35,7 @@ export function reportAppletError(workspaceId: string, event: AppletClientError)
 // Matched against ErrorEvent.filename (a bare URL) and stack-trace text, where
 // segments stop at `/`, whitespace, or `)` because stack frame formats differ
 // per browser (Chrome parenthesizes URLs, Firefox uses `fn@url`).
-const BUNDLE_URL_RE =
-  /\/api\/(?:remote\/([^/\s)]+)\/)?workspaces\/([^/\s)]+)\/(widgets|views)\/([^/\s)]+)\//
+const BUNDLE_URL_RE = /\/api\/workspaces\/([^/\s)]+)\/(widgets|views)\/([^/\s)]+)\//
 
 type BundleRef = { workspaceId: string; kind: AppletKind; name: string }
 
@@ -46,19 +44,7 @@ export function matchBundleUrl(text: string | undefined): BundleRef | null {
   if (!text) return null
   const m = BUNDLE_URL_RE.exec(text)
   if (!m) return null
-  try {
-    const id = decodeURIComponent(m[2])
-    return {
-      workspaceId: workspaceIdentity({
-        id,
-        remote: m[1] ? { user_id: decodeURIComponent(m[1]), workspace_id: id } : undefined
-      }),
-      kind: m[3] === 'widgets' ? 'widget' : 'view',
-      name: m[4]
-    }
-  } catch {
-    return null
-  }
+  return { workspaceId: m[1], kind: m[2] === 'widgets' ? 'widget' : 'view', name: m[3] }
 }
 
 let installed = false

@@ -1,9 +1,6 @@
-import { workspaceIdentity } from '@/lib/workspace-identity'
-import { chatAvailable } from '@/client/features/workspace/chat-availability'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { jsonRequest, requestJson } from '@/client/api/http'
-import { resolveWorkspaceNames } from '@/client/features/home/api'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useUiStore } from '@/client/store/ui'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
@@ -21,17 +18,11 @@ export function upsertWorkspaceEntry(
 export function useImportWorkspace() {
   const queryClient = useQueryClient()
   return useMutation<WorkspaceEntry, Error, ImportWorkspaceInput>({
-    mutationFn: async input => {
-      const entry = await requestJson<WorkspaceEntry>(
-        '/api/workspaces',
-        jsonRequest('POST', input),
-        'Failed to add workspace'
-      )
-      return (await resolveWorkspaceNames([entry]))[0]!
-    },
+    mutationFn: input =>
+      requestJson('/api/workspaces', jsonRequest('POST', input), 'Failed to add workspace'),
     onSuccess: (entry, input) => {
-      if (chatAvailable(workspaceIdentity(entry)))
-        useUiStore.getState().markWorkspacePendingAnalysis(entry.id)
+      // Remote chat support is deferred, so there is no analysis to start.
+      if (!entry.remote) useUiStore.getState().markWorkspacePendingAnalysis(entry.id)
       queryClient.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, previous =>
         upsertWorkspaceEntry(previous, entry)
       )

@@ -1,4 +1,3 @@
-import { workspaceIdentity } from '@/lib/workspace-identity'
 import { describe, expect, test } from 'bun:test'
 import { createNavigationRelay } from './navigation-relay'
 import type { NavigationRequest } from '@/lib/navigation'
@@ -89,37 +88,4 @@ describe('navigation delivery', () => {
     expect(a.requests).toHaveLength(2)
     relay.receive(a, { type: 'navigation:result', requestId: a.requests[1].requestId, ok: true })
   })
-})
-
-test('remote navigation targets the visitor browser by owner and workspace pair', async () => {
-  const relay = createNavigationRelay()
-  const visitor = client(),
-    local = client(),
-    otherOwner = client()
-  const identity = workspaceIdentity({
-    id: 'board',
-    remote: { user_id: 'alice', workspace_id: 'board' }
-  })
-  relay.receive(visitor, presence(identity, true))
-  relay.receive(local, presence('board', true))
-  relay.receive(
-    otherOwner,
-    presence(
-      workspaceIdentity({ id: 'board', remote: { user_id: 'bob', workspace_id: 'board' } }),
-      true
-    )
-  )
-  const done = relay.navigate(identity, 'moi:/views/roadmap?filter=open')
-  expect(local.requests).toHaveLength(0)
-  expect(otherOwner.requests).toHaveLength(0)
-  expect(visitor.requests[0]).toMatchObject({
-    workspaceId: identity,
-    href: 'moi:/views/roadmap?filter=open'
-  })
-  relay.receive(visitor, {
-    type: 'navigation:result',
-    requestId: visitor.requests[0].requestId,
-    ok: true
-  })
-  await done
 })

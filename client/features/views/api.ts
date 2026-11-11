@@ -1,5 +1,3 @@
-import { chatAvailable } from '@/client/features/workspace/chat-availability'
-import { workspaceBase, remoteFromIdentity } from '@/lib/workspace-identity'
 import type { SpeedMode } from '@/lib/types'
 import type {
   CompiledView,
@@ -25,7 +23,7 @@ export function compiledViewsOptions(workspaceId: string) {
   return {
     queryKey: workspaceKeys.views(workspaceId),
     queryFn: async () =>
-      (await requestJson<{ views: CompiledView[] }>(`${workspaceBase(workspaceId)}/views`)).views,
+      (await requestJson<{ views: CompiledView[] }>(`/api/workspaces/${workspaceId}/views`)).views,
     staleTime: 30_000,
     gcTime: 5 * 60_000,
     refetchOnMount: true,
@@ -51,8 +49,6 @@ export function getCachedViews(
   queryClient: QueryClient,
   workspaceId: string
 ): ViewInfo[] | undefined {
-  if (!chatAvailable(workspaceId))
-    return queryClient.getQueryData<CompiledView[]>(workspaceKeys.views(workspaceId))
   return mergeViews(
     queryClient.getQueryData<CompiledView[]>(workspaceKeys.views(workspaceId)),
     getCachedWorkspaceState(queryClient, workspaceId)?.pendingViews
@@ -64,7 +60,6 @@ const selectPendingViews = (state: WorkspaceState) => state.pendingViews
 export function useViews(workspaceId: string) {
   const queryClient = useQueryClient()
   useWorkspaceEvent(event => {
-    if (remoteFromIdentity(workspaceId)) return
     if (event.type === 'view-layout:updated' && event.workspaceId === workspaceId) {
       const queryKey = workspaceKeys.views(workspaceId)
       // The event is newer than an in-flight list request. Apply it immediately
@@ -80,9 +75,7 @@ export function useViews(workspaceId: string) {
   const compiled = useQuery(compiledViewsOptions(workspaceId))
   const pending = useWorkspaceState(workspaceId, selectPendingViews)
   const data = useMemo(() => mergeViews(compiled.data, pending.data), [compiled.data, pending.data])
-  return !chatAvailable(workspaceId)
-    ? { data: compiled.data, isLoading: compiled.isLoading }
-    : { data, isLoading: compiled.isLoading || pending.isLoading }
+  return { data, isLoading: compiled.isLoading || pending.isLoading }
 }
 function useViewMutation<T, Input>(workspaceId: string, mutationFn: (input: Input) => Promise<T>) {
   const queryClient = useQueryClient()
@@ -94,7 +87,7 @@ function useViewMutation<T, Input>(workspaceId: string, mutationFn: (input: Inpu
 export function useRenameView(workspaceId: string) {
   return useViewMutation(workspaceId, ({ viewId, title }: { viewId: string; title: string }) =>
     requestJson<ViewInfo>(
-      `${workspaceBase(workspaceId)}/views/${encodeURIComponent(viewId)}`,
+      `/api/workspaces/${workspaceId}/views/${encodeURIComponent(viewId)}`,
       jsonRequest('PATCH', { title }),
       'Couldn’t rename view'
     )
@@ -103,7 +96,7 @@ export function useRenameView(workspaceId: string) {
 export function useDeleteView(workspaceId: string) {
   return useViewMutation(workspaceId, (viewId: string) =>
     requestVoid(
-      `${workspaceBase(workspaceId)}/views/${encodeURIComponent(viewId)}`,
+      `/api/workspaces/${workspaceId}/views/${encodeURIComponent(viewId)}`,
       { method: 'DELETE' },
       'Couldn’t delete view'
     )
@@ -112,7 +105,7 @@ export function useDeleteView(workspaceId: string) {
 export function useCreateView(workspaceId: string) {
   return useViewMutation(workspaceId, () =>
     requestJson<PendingView>(
-      `${workspaceBase(workspaceId)}/views`,
+      `/api/workspaces/${workspaceId}/views`,
       jsonRequest('POST'),
       'Couldn’t create view'
     )
@@ -123,7 +116,7 @@ export function useSaveViewDraft(workspaceId: string) {
     workspaceId,
     ({ viewId, requirements }: { viewId: string; requirements: string }) =>
       requestJson<PendingView>(
-        `${workspaceBase(workspaceId)}/views/${viewId}`,
+        `/api/workspaces/${workspaceId}/views/${viewId}`,
         jsonRequest('PATCH', { requirements }),
         'Couldn’t save view requirements'
       )
@@ -144,7 +137,7 @@ export type SubmitViewInput = {
 export function useSubmitView(workspaceId: string) {
   return useViewMutation(workspaceId, ({ viewId, ...input }: SubmitViewInput) =>
     requestJson<{ viewId: string; sessionId: string }>(
-      `${workspaceBase(workspaceId)}/views/${viewId}/submit`,
+      `/api/workspaces/${workspaceId}/views/${viewId}/submit`,
       jsonRequest('POST', input),
       'Couldn’t start view chat'
     )

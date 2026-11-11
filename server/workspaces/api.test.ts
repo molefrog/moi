@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { api } from '../api'
 import { requestWorkspace } from './api'
+import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from './registry'
 import { readScratchpadImage, readScratchpadShapes } from '../scratchpad/document'
 
 let target: { id: string; path: string }
@@ -16,9 +17,12 @@ beforeEach(async () => {
     join(path, '.moi/.workspace.json'),
     JSON.stringify({ version: 2, remote: { user_id: 'alice', workspace_id: 'board' } })
   )
+  setRegistryPath(join(path, 'registry.json'))
+  await registerWorkspace(path, { id: target.id })
 })
 const spies: { mockRestore(): void }[] = []
 afterEach(async () => {
+  setRegistryPath(DEFAULT_REGISTRY_PATH)
   await rm(target.path, { recursive: true, force: true })
   for (const spy of spies.splice(0)) spy.mockRestore()
 })
@@ -40,10 +44,14 @@ function mockOwner(handler: (url: string, init?: RequestInit) => Response) {
   )
 }
 
-test('owner requests preserve methods and bodies through the configured gateway', async () => {
-  const requests: { url: string; method?: string; body?: BodyInit | null }[] = []
+test('remote workspace requests reach the owner through the configured gateway', async () => {
+  const requests: { url: string; method?: string; body?: string }[] = []
   mockOwner((url, init) => {
-    requests.push({ url, method: init?.method, body: init?.body })
+    requests.push({
+      url,
+      method: init?.method,
+      body: new TextDecoder().decode(init?.body as ArrayBuffer)
+    })
     expect(init?.redirect).toBe('error')
     return new Response('result')
   })
