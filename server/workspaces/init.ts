@@ -1,3 +1,4 @@
+import { loadWorkspaceFileConfig } from './layout'
 // The one place that knows how to turn a directory into a Moi workspace:
 // bundled skills + the `.moi/` scaffold, with the skills location keyed on the
 // agent backend. `moi init`, `moi openclaw init`, and the HTTP API (UI import /
@@ -47,13 +48,11 @@ export function skillsDirFor(workspaceRoot: string, type?: WorkspaceType): strin
 export type ProvisionResult = {
   // Where the skills were installed (backend-dependent, see skillsDirFor).
   skillsDir: string
-  // 'exists' when `.moi/` was already bootstrapped, 'installing' when bun
-  // install continues in the background, else the install exit code (non-zero
-  // means deps are missing — not fatal, the agent installs on demand).
-  scaffold: 'exists' | 'installing' | number
-  // Unique temporary log for this install attempt; unused when scaffold exists.
-  installLogPath: string
-}
+} & (
+  | { scaffold: 'skipped' | 'exists'; installLogPath?: never }
+  // Dependency installation is running or finished with this exit code.
+  | { scaffold: 'installing' | number; installLogPath: string }
+)
 
 // Lay down everything a workspace needs: reset Claude/Codex's shared skill
 // (or copy skills to other backends' own destinations), and bootstrap `.moi/`.
@@ -65,8 +64,11 @@ export async function provisionWorkspace(
 ): Promise<ProvisionResult> {
   const skillsDir = skillsDirFor(workspaceRoot, type)
   await mkdir(workspaceRoot, { recursive: true })
+  const config = await loadWorkspaceFileConfig(workspaceRoot)
   await installWorkspaceSkills(workspaceRoot, type)
+  if (config.remote) return { skillsDir, scaffold: 'skipped' }
   const installLogPath = createDependencyInstallLogPath()
   const scaffold = await scaffoldMoiDir(workspaceRoot, undefined, undefined, installLogPath)
+  if (scaffold === 'exists') return { skillsDir, scaffold }
   return { skillsDir, scaffold, installLogPath }
 }

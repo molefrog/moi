@@ -167,3 +167,25 @@ describe('workspace import provider', () => {
     })
   })
 })
+
+test('remote import returns its owner reference and preserves the config', async () => {
+  const path = join(tempDir, 'remote-reference')
+  await mkdir(join(path, '.moi'), { recursive: true })
+  const config = {
+    version: 2,
+    remote: { user_id: 'alice', workspace_id: 'board' },
+    layoutMode: 'split'
+  }
+  const file = Bun.file(join(path, '.moi/.workspace.json'))
+  await Bun.write(file, JSON.stringify(config))
+  const response = await api.request('/api/workspaces', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, type: 'codex' })
+  })
+  expect(response.status).toBe(201)
+  expect((await response.json()).remote).toEqual(config.remote)
+  expect(await file.json()).toEqual(config)
+  expect(await Bun.file(join(path, '.agents/skills/moi-workspace/SKILL.md')).exists()).toBe(true)
+  expect(await Bun.file(join(path, '.moi/package.json')).exists()).toBe(false)
+})

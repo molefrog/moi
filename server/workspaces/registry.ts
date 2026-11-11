@@ -1,3 +1,5 @@
+import { workspaceIdentity } from '@/lib/workspace-identity'
+import { loadWorkspaceFileConfig } from './layout'
 import { existsSync, realpathSync } from 'node:fs'
 import { readdir, rename, rm, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
@@ -46,7 +48,14 @@ async function readRegistry(): Promise<WorkspaceEntry[]> {
   if (!existsSync(_registryPath)) return []
   try {
     const text = await Bun.file(_registryPath).text()
-    return JSON.parse(text) as WorkspaceEntry[]
+    const entries = JSON.parse(text) as WorkspaceEntry[]
+    return await Promise.all(
+      entries.map(async ({ remote: _storedRemote, ...entry }) => {
+        const config = await loadWorkspaceFileConfig(entry.path).catch(() => undefined)
+        if (!config?.remote) return entry
+        return { ...entry, id: config.remote.workspace_id, remote: config.remote }
+      })
+    )
   } catch {
     return []
   }
@@ -55,7 +64,9 @@ async function readRegistry(): Promise<WorkspaceEntry[]> {
 async function writeRegistry(entries: WorkspaceEntry[]): Promise<void> {
   const temporaryPath = `${_registryPath}.${crypto.randomUUID()}.tmp`
   try {
-    await Bun.write(temporaryPath, JSON.stringify(entries, null, 2))
+    // Owner routing is derived from each folder's config, never persisted here.
+    const stored = entries.map(({ remote: _remote, ...entry }) => entry)
+    await Bun.write(temporaryPath, JSON.stringify(stored, null, 2))
     await rename(temporaryPath, _registryPath)
   } finally {
     await rm(temporaryPath, { force: true })
@@ -96,7 +107,8 @@ export type RegisterOptions = {
 
 // Why a chosen id can be refused. An id is baked into `/workspace/<id>` URLs
 // and outlives the registration, so it is assigned once: a workspace that
-// already carries an id keeps it, and no two workspaces may share one.
+// already carries a local id keeps it. Remote registrations are keyed by
+// (owner user id, owner workspace id), so they may share the bare workspace id.
 function workspaceIdError(
   entries: WorkspaceEntry[],
   normalPath: string,
@@ -108,7 +120,7 @@ function workspaceIdError(
   if (existing && existing.id !== id) {
     return `${normalPath} is already registered with id ${existing.id}`
   }
-  if (entries.some(e => e.id === id && e.path !== normalPath)) {
+  if (entries.some(e => !e.remote && e.id === id && e.path !== normalPath)) {
     return `Workspace id ${id} is already taken`
   }
   return null
@@ -128,15 +140,26 @@ export async function registerWorkspace(
 ): Promise<WorkspaceEntry> {
   return locked(async () => {
     const normalPath = resolve(absPath)
+    const remote = (await loadWorkspaceFileConfig(normalPath).catch(() => undefined))?.remote
     const entries = await readRegistry()
-    if (opts.id) {
+    if (opts.id && !remote) {
       const error = workspaceIdError(entries, normalPath, opts.id)
       if (error) throw new Error(error)
     }
     const existing = entries.find(e => e.path === normalPath)
     if (existing) return existing
+    if (remote) {
+      const identity = workspaceIdentity({ id: remote.workspace_id, remote })
+      const duplicate = entries.find(entry => workspaceIdentity(entry) === identity)
+      if (duplicate) return withDisplayPath(duplicate)
+    }
     const entry: WorkspaceEntry = {
-      id: opts.id ?? (await previousWorkspaceId(entries, normalPath)) ?? newWorkspaceId(),
+      id:
+        remote?.workspace_id ??
+        opts.id ??
+        (await previousWorkspaceId(entries, normalPath)) ??
+        newWorkspaceId(),
+      ...(remote ? { remote } : {}),
       path: normalPath,
       addedAt: new Date().toISOString(),
       ...(opts.type ? { type: opts.type } : {}),
@@ -152,13 +175,13 @@ export async function registerWorkspace(
 
 export async function getWorkspace(id: string): Promise<WorkspaceEntry | null> {
   const entries = await readRegistry()
-  return entries.find(e => e.id === id) ?? null
+  return entries.find(e => workspaceIdentity(e) === id) ?? null
 }
 
 export async function removeWorkspace(id: string): Promise<boolean> {
   return locked(async () => {
     const entries = await readRegistry()
-    const next = entries.filter(e => e.id !== id)
+    const next = entries.filter(e => workspaceIdentity(e) !== id)
     if (next.length === entries.length) return false
     await writeRegistry(next)
     return true
@@ -179,7 +202,7 @@ export async function reorderWorkspaces(ids: string[]): Promise<WorkspaceEntry[]
     const unique = new Set(ids)
     if (unique.size !== ids.length) throw new Error('Workspace order contains duplicate ids')
 
-    const byId = new Map(entries.map(e => [e.id, e]))
+    const byId = new Map(entries.map(e => [workspaceIdentity(e), e]))
     const next = ids.map(id => byId.get(id))
     if (next.some(e => !e)) throw new Error('Workspace order contains unknown ids')
 
@@ -296,7 +319,7 @@ export async function updateWorkspaceHarness(
 ): Promise<WorkspaceEntry> {
   return locked(async () => {
     const entries = await readRegistry()
-    const entry = entries.find(entry => entry.id === id)
+    const entry = entries.find(entry => workspaceIdentity(entry) === id)
     if (!entry) throw new Error('Workspace not found')
     entry.type = type
     await writeRegistry(entries)

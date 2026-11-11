@@ -1,0 +1,226 @@
+import { symlink } from 'node:fs/promises'
+import { stringify, parse } from 'devalue'
+import { buildAllViews } from '../applets/views'
+import { workspaceIdentity } from '@/lib/workspace-identity'
+import { afterEach, beforeEach, expect, test } from 'bun:test'
+import { mkdtemp, mkdir, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { api } from './index'
+import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
+import { loadWorkspaceFileConfig, loadLayout, saveLayout } from '../workspaces/layout'
+import { killAllWorkers } from '../applets/functions'
+import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
+
+let root: string, owner: string, visitor: string, ownerId: string, visitorId: string, base: string
+beforeEach(async () => {
+  root = await mkdtemp(join(tmpdir(), 'moi-remote-'))
+  owner = join(root, 'owner-board')
+  visitor = join(root, 'visitor-alias')
+  await mkdir(join(owner, '.moi/views'), { recursive: true })
+  await mkdir(join(visitor, '.moi'), { recursive: true })
+  setRegistryPath(join(root, 'registry.json'))
+  ownerId = (await registerWorkspace(owner)).id
+  visitorId = (await registerWorkspace(visitor)).id
+  base = `/api/remote/alice/workspaces/${ownerId}`
+  await saveLayout(
+    {
+      ...createDefaultWorkspaceLayout(),
+      name: 'Owner board',
+      layoutMode: 'fullscreen',
+      selectedModel: 'owner-model'
+    },
+    owner
+  )
+  await Bun.write(
+    join(visitor, '.moi/.workspace.json'),
+    JSON.stringify({
+      version: 2,
+      remote: { user_id: 'alice', workspace_id: ownerId },
+      layoutMode: 'split',
+      selectedModel: 'visitor-model'
+    })
+  )
+  visitorId = workspaceIdentity({
+    id: ownerId,
+    remote: { user_id: 'alice', workspace_id: ownerId }
+  })
+})
+afterEach(async () => {
+  killAllWorkers()
+  setRegistryPath(DEFAULT_REGISTRY_PATH)
+  await rm(root, { recursive: true, force: true })
+})
+const put = (body: unknown) => ({
+  method: 'PUT',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify(body)
+})
+
+test('discovery and two-stage loading preserve visitor identity', async () => {
+  const list = await (await api.request('/api/workspaces')).json()
+  expect(list.find((entry: { remote?: unknown }) => entry.remote).remote.workspace_id).toBe(ownerId)
+  const descriptor = await (await api.request(`/api/workspaces/${visitorId}`)).json()
+  expect(descriptor.selectedModel).toBe('visitor-model')
+  expect(descriptor.widgetGrid).toBeUndefined()
+  const shared = await (await api.request(base)).json()
+  expect(shared.name).toBe('Owner board')
+  expect((await api.request(`${base}/widgets`)).status).toBe(200)
+  expect((await api.request(`/api/workspaces/${visitorId}/widgets`)).status).toBe(409)
+})
+
+test('shared and personal saves leave the other side unchanged', async () => {
+  const before = await loadLayout(owner)
+  expect(
+    (
+      await api.request(
+        base,
+        put({
+          ...before,
+          widgetGrid: [{ i: 'counter', x: 1, y: 2 }],
+          layoutMode: 'split',
+          selectedModel: 'visitor-model'
+        })
+      )
+    ).status
+  ).toBe(204)
+  expect(await loadLayout(owner)).toMatchObject({
+    layoutMode: 'fullscreen',
+    selectedModel: 'owner-model',
+    widgetGrid: [{ i: 'counter', x: 1, y: 2 }]
+  })
+  expect(
+    (
+      await api.request(
+        `/api/workspaces/${visitorId}`,
+        put({ version: 2, layoutMode: 'fullscreen' })
+      )
+    ).status
+  ).toBe(204)
+  expect(await loadWorkspaceFileConfig(visitor)).toMatchObject({
+    remote: { user_id: 'alice', workspace_id: ownerId },
+    layoutMode: 'fullscreen',
+    selectedModel: 'visitor-model'
+  })
+})
+
+test('deferred operations and removing either workspace are blocked', async () => {
+  for (const path of ['/sessions', '/state', '/harness'])
+    expect((await api.request(base + path)).status).toBe(403)
+  expect((await api.request(base, { method: 'DELETE' })).status).toBe(403)
+  expect((await api.request(`/api/workspaces/${visitorId}`, { method: 'DELETE' })).status).toBe(403)
+})
+
+test('remote scratchpad documents and assets stay on the owner', async () => {
+  const document = { store: {}, schema: { schemaVersion: 2, sequences: {} } }
+  expect((await api.request(`${base}/scratchpad`, put({ document }))).status).toBe(204)
+  const loaded = await (await api.request(`${base}/scratchpad`)).json()
+  expect(loaded.document).toEqual(document)
+  expect(await Bun.file(join(visitor, '.moi/.scratchpad.json')).exists()).toBe(false)
+  expect((await api.request(`/api/workspaces/${visitorId}/scratchpad`)).status).toBe(409)
+  const upload = await api.request(`${base}/scratchpad/assets`, {
+    method: 'POST',
+    headers: { 'content-type': 'image/png' },
+    body: new Uint8Array([1, 2, 3])
+  })
+  expect(upload.status).toBe(200)
+  const { src } = await upload.json()
+  const asset = await api.request(`${base}/scratchpad/assets/${src.slice('asset:'.length)}`)
+  expect(asset.status).toBe(200)
+  expect(new Uint8Array(await asset.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]))
+})
+
+test('local and remote log APIs read and clear the selected workspace journal', async () => {
+  const { recordAppletError, getAppletLog } = await import('../applets/log')
+  recordAppletError(visitor, { source: 'runtime', message: 'Visitor error' })
+  for (const prefix of [`/api/workspaces/${ownerId}`, base]) {
+    recordAppletError(owner, { source: 'runtime', message: 'Owner error' })
+    const response = await api.request(`${prefix}/applet-log`)
+    expect(response.status).toBe(200)
+    expect(
+      (await response.json()).entries.some(
+        (entry: { message: string }) => entry.message === 'Owner error'
+      )
+    ).toBe(true)
+    expect(
+      (await (await api.request(`${prefix}/applet-log`, { method: 'DELETE' })).json()).cleared
+    ).toBeGreaterThan(0)
+    expect(getAppletLog(owner)).toHaveLength(0)
+    expect(getAppletLog(visitor)).toHaveLength(1)
+  }
+})
+
+test('local and remote scratchpad edit APIs reuse the executor and preserve visitor data', async () => {
+  const { readScratchpadShapes, readScratchpadImage } = await import('../scratchpad/document')
+  const sharp = (await import('sharp')).default
+  const image = await sharp({
+    create: { width: 10, height: 10, channels: 3, background: '#ff0000' }
+  })
+    .png()
+    .toBuffer()
+  for (const prefix of [`/api/workspaces/${ownerId}`, base]) {
+    const edit = async (op: unknown, bytes?: Uint8Array) => {
+      const body = new FormData()
+      body.set('op', JSON.stringify(op))
+      if (bytes)
+        body.set('image', new Blob([new Uint8Array(bytes)], { type: 'image/png' }), 'visitor.png')
+      return api.request(`${prefix}/scratchpad/ops`, { method: 'POST', body })
+    }
+    expect((await edit({ kind: 'add-text', name: 'note', x: 1, y: 2, text: 'Hello' })).status).toBe(
+      200
+    )
+    expect((await edit({ kind: 'move', name: 'note', x: 30, y: 40 })).status).toBe(200)
+    expect((await edit({ kind: 'set', name: 'note', text: 'Updated' })).status).toBe(200)
+    expect((await readScratchpadShapes(owner))[0]).toMatchObject({
+      id: 'note',
+      x: 30,
+      y: 40,
+      text: 'Updated'
+    })
+    expect(
+      (
+        await edit(
+          { kind: 'add-image', name: 'photo', path: '/visitor-only/image.png', x: 0, y: 0 },
+          image
+        )
+      ).status
+    ).toBe(200)
+    expect(await readScratchpadImage(owner, 'photo')).toMatchObject({
+      src: expect.stringContaining('data:image/')
+    })
+    expect((await edit({ kind: 'delete', name: 'note' })).status).toBe(200)
+    expect((await readScratchpadShapes(owner)).map(shape => shape.id)).toEqual(['photo'])
+    expect((await edit({ kind: 'clear' })).status).toBe(200)
+    expect(await readScratchpadShapes(owner)).toEqual([])
+    expect(await readScratchpadShapes(visitor)).toEqual([])
+    expect((await edit({ kind: 'view' })).status).toBe(400)
+    expect((await edit({ kind: 'unknown' })).status).toBe(400)
+    expect(await readScratchpadShapes(owner)).toEqual([])
+    expect(
+      (await edit({ kind: 'add-image', name: 'bad', path: '/owner/private.png', x: 0, y: 0 }))
+        .status
+    ).toBe(400)
+  }
+})
+test('remote RPC and file requests use owner data', async () => {
+  await symlink(join(import.meta.dir, '../../node_modules'), join(owner, '.moi/node_modules'))
+  await Bun.write(
+    join(owner, '.moi/views/counter.tsx'),
+    `import { increment } from './counter.server'; export const config = { title: 'Counter' }; export default function Counter() { return <button onClick={() => increment()}>Increment</button> }`
+  )
+  await Bun.write(
+    join(owner, '.moi/views/counter.server.ts'),
+    `import { join } from 'node:path'; const path = join(import.meta.dir, '../count.json'); export async function increment() { const n = await Bun.file(path).json().catch(() => 0); await Bun.write(path, JSON.stringify(n + 1)); return n + 1 }`
+  )
+  await buildAllViews(owner)
+  const response = await api.request(`${base}/rpc/views/counter/increment`, {
+    method: 'POST',
+    body: stringify([])
+  })
+  expect(response.status).toBe(200)
+  expect(parse(await response.text())).toBe(1)
+  expect(await Bun.file(join(owner, '.moi/count.json')).json()).toBe(1)
+  expect(await Bun.file(join(visitor, '.moi/count.json')).exists()).toBe(false)
+  await Bun.write(join(owner, 'hello.svg'), '<svg/>')
+  expect(await (await api.request(`${base}/files/hello.svg`)).text()).toBe('<svg/>')
+})

@@ -91,7 +91,7 @@ const openclawInit = defineCommand({
       skillsDir: skillsRoot,
       installLogPath
     } = await provisionWorkspace(target.path, 'openclaw')
-    if (scaffold !== 'exists') {
+    if (scaffold !== 'exists' && scaffold !== 'skipped') {
       if (scaffold === 'installing') {
         console.log('\n' + pc.dim('  Widget dependencies still installing in .moi/ (background)'))
         console.log(pc.dim('  Install log: ' + installLogPath))

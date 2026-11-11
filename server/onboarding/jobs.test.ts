@@ -139,7 +139,7 @@ test('duplicate workspace requests create one workspace and submit one brief', a
     workspacesRoot: () => dir,
     provisionWorkspace: async path => {
       await Bun.write(join(path, '.keep'), '')
-      return { skillsDir: path, scaffold: 'exists', installLogPath: '' }
+      return { skillsDir: path, scaffold: 'exists' }
     },
     getWorkspace: async () => null,
     registerWorkspace: async (path, input) => {
@@ -207,7 +207,7 @@ test('restart reconciles an accepted first message without sending it twice', as
         : null,
     provisionWorkspace: async (path: string) => {
       await Bun.write(join(path, '.keep'), '')
-      return { skillsDir: path, scaffold: 'exists' as const, installLogPath: '' }
+      return { skillsDir: path, scaffold: 'exists' as const }
     },
     registerWorkspace: async (path: string, input?: { id?: string }) => ({
       id: input!.id!,

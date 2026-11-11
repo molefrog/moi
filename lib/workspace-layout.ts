@@ -26,7 +26,7 @@ export function normalizeWorkspaceTabs(value: unknown): WorkspaceTabsState {
 
 export function createDefaultWorkspaceLayout(): WorkspaceLayout {
   return {
-    version: 1,
+    version: 2,
     widgetGrid: createDefaultWidgetGrid(),
     layoutMode: 'split',
     tabs: createDefaultWorkspaceTabs()

@@ -1,3 +1,4 @@
+import type { RemoteWorkspaceTarget } from './workspace-config'
 import type { PreviewBlock, StreamEvent } from './format'
 import type { IdentityIconId } from './identity-icons'
 import type { MoiContext } from './moi-context'
@@ -523,6 +524,8 @@ export type McpServer = {
 }
 
 export type WorkspaceEntry = {
+  // Derived from .moi/.workspace.json; not persisted in workspaces.json.
+  remote?: RemoteWorkspaceTarget
   id: string
   path: string
   addedAt: string
@@ -633,7 +636,7 @@ export type WorkspaceLayoutSave = Omit<WorkspaceLayout, 'tabs'> & {
 }
 
 export type WorkspaceLayout = {
-  version: 1
+  version: 1 | 2
   widgetGrid: LayoutGridItem[]
   layoutMode: LayoutMode
   // Open tabs and active tab for the fullscreen/split workspace chrome. The
@@ -664,6 +667,7 @@ export type WorkspaceLayout = {
 
 // GET /api/workspaces/:id: layout plus the local workspace registration.
 export type WorkspaceLayoutResponse = WorkspaceLayout & {
+  remote?: RemoteWorkspaceTarget
   cwd: string
   name: string
   provider?: WorkspaceType

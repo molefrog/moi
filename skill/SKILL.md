@@ -470,9 +470,8 @@ problem:
 
 - `moi call-server-fn widgets/hello/getGreeting` /
   `moi call-server-fn views/crm/searchUsers '["ann", 10]'` — run one `.server.ts` function
-  directly (args are one JSON array). Each invocation runs in a fresh, isolated one-shot process
-  with the same env, module loading, and timeout as the browser's calls, so a pass means the real
-  path works — handy for trying a function without touching the UI. Server functions only; for
+  through the workspace API (args are one JSON array). Calls share the browser RPC worker pool,
+  environment, and timeout. Use this to try a function without touching the UI. Server functions only; for
   arbitrary scripts use `moi env exec`.
 - `moi debug logs` — the applet errors the workspace has seen since each applet's last good
   build: browser-side load failures and render crashes, plus server-function (rpc) errors. The

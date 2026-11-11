@@ -198,7 +198,7 @@ export const init = defineCommand({
     // package.json + bun install). An existing `.moi/` is left untouched.
     console.log()
     const { scaffold, skillsDir, installLogPath } = await provisionWorkspace(target, type)
-    if (scaffold !== 'exists') {
+    if (scaffold !== 'exists' && scaffold !== 'skipped') {
       if (scaffold === 'installing') {
         console.log(pc.dim('  Widget dependencies still installing in .moi/ (background)'))
         console.log(pc.dim('  Install log: ' + installLogPath))

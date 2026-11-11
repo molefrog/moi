@@ -11,7 +11,7 @@ CLI entry modules live in `server/cli/commands/`.
 - `moi bundle` rebuilds changed widgets and views. `--force` rebuilds even when
   sources appear unchanged; `--only` narrows the selection.
 - `moi call-server-fn widgets/example/getGreeting '["Ann"]'` invokes an exported
-  `.server.ts` function in a separate one-shot worker and prints its result.
+  `.server.ts` function through the workspace RPC API and prints its result.
 - `moi debug logs` prints current applet errors. `--json` emits structured output,
   `--only` filters applets, and `--clear` clears the journal.
 
@@ -38,8 +38,7 @@ reconciliation. Failed and skipped builds do not clear still-relevant errors.
 
 `functions.ts` manages a bounded pool of workspace worker processes;
 `functions-worker.ts` loads `.server.ts` modules and handles calls and reloads.
-Browser RPC uses this pool. `call-server-fn` uses a fresh worker for its one-shot
-call, so it does not share a warm worker's module state.
+Browser RPC and `call-server-fn` use this pool and share its module state.
 
 Workers start from a neutral directory to avoid Bun automatically loading a
 workspace `.env`, then switch to the workspace root. The parent supplies the

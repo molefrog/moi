@@ -122,7 +122,7 @@ test('theme saves broadcast changes and expose the theme in workspace lists', as
   const list = (await (await api.request('/api/workspaces')).json()) as WorkspaceEntry[]
 
   expect(response.status).toBe(204)
-  expect(published).toContain(JSON.stringify({ type: 'theme:updated' }))
+  expect(published).toContain(JSON.stringify({ type: 'theme:updated', workspaceId }))
   expect(list[0]?.theme).toEqual(theme)
 })
 

@@ -91,7 +91,7 @@ test('creation uses a unique slug for the ID and folder while preserving the dis
   const root = spyOn(appConfig, 'createdWorkspacesRoot').mockReturnValue(directory)
   const provision = spyOn(init, 'provisionWorkspace').mockImplementation(async path => {
     await mkdir(path, { recursive: true })
-    return { skillsDir: path, scaffold: 'exists', installLogPath: join(path, 'install.log') }
+    return { skillsDir: path, scaffold: 'exists' }
   })
   try {
     for (const [type, name, displayName] of [

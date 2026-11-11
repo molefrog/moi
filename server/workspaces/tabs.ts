@@ -1,6 +1,10 @@
 // Tab discovery with portable navigation addresses.
 import type { ViewInfo, WorkspaceTabId } from '@/lib/types'
 import { viewTabId } from '@/lib/workspace-tabs'
+import { normalizeWorkspaceTabs } from '@/lib/workspace-layout'
+import { requestWorkspace } from './api'
+import type { WorkspaceRef } from '../workspace-state'
+import { loadWorkspaceFileConfig } from './layout'
 
 // One row of `moi tabs`. `isDefault` marks the workspace's saved default tab
 // (`layout.tabs.active`) — where a bare `/workspace/:id` lands.
@@ -33,10 +37,17 @@ export function assembleTabRows(views: ViewInfo[], defaultTab: WorkspaceTabId): 
 // CLI navigation checks the server's current built-view list before asking a
 // browser to move. The browser repeats the availability check in case its view
 // list is stale in either direction.
-export function assertNavigableTab(tab: WorkspaceTabId, views: ViewInfo[]): void {
-  const rows = assembleTabRows(views, 'overview')
+export function assertNavigableTab(tab: WorkspaceTabId, rows: TabRow[]): void {
   if (rows.some(row => row.id === tab)) return
   throw new Error(
     `Unknown destination "moi:/${tab}". Valid addresses: ${rows.map(row => row.href).join(', ')}`
   )
+}
+
+export async function getWorkspaceTabs(workspace: WorkspaceRef): Promise<TabRow[]> {
+  const config = await loadWorkspaceFileConfig(workspace.path)
+  const { views }: { views: ViewInfo[] } = await (
+    await requestWorkspace(workspace, '/views?includePending=true')
+  ).json()
+  return assembleTabRows(views, normalizeWorkspaceTabs(config.tabs).active)
 }

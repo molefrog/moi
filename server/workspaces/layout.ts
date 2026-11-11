@@ -1,3 +1,9 @@
+import {
+  parseRemoteWorkspaceConfig,
+  personalWorkspaceConfig,
+  type WorkspaceFileConfig,
+  type WorkspacePersonalConfig
+} from '@/lib/workspace-config'
 import { join } from 'path'
 import { isSpeedMode } from '@/lib/speed-mode'
 
@@ -41,17 +47,47 @@ export function getLayoutPath(workspacePath: string): string {
   return join(workspacePath, '.moi', '.workspace.json')
 }
 
+// This module remains the sole owner of workspace config persistence.
+export async function loadWorkspaceFileConfig(workspacePath: string): Promise<WorkspaceFileConfig> {
+  const file = Bun.file(getLayoutPath(workspacePath))
+  if (!(await file.exists())) return { ...createDefaultWorkspaceLayout(), version: 2 }
+  const parsed: unknown = await file.json()
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+    throw new Error('Invalid workspace config')
+  const value = parsed as Record<string, unknown>
+  if ('remote' in value) return parseRemoteWorkspaceConfig(value)
+  if (value.version !== 1 && value.version !== 2)
+    throw new Error('Unsupported workspace config version')
+  const {
+    layoutMode: _mode,
+    selectedModel: _model,
+    selectedEffort: _effort,
+    selectedSpeedMode: _speed,
+    ...shared
+  } = normalizeLayout(value)
+  return { ...shared, ...personalWorkspaceConfig(value), version: 2 }
+}
+
 export async function loadLayout(workspacePath: string): Promise<WorkspaceLayout> {
-  try {
-    const text = await Bun.file(getLayoutPath(workspacePath)).text()
-    const parsed = JSON.parse(text)
-    if (parsed?.version === 1) return normalizeLayout(parsed)
-  } catch {}
-  return createDefaultWorkspaceLayout()
+  const config = await loadWorkspaceFileConfig(workspacePath)
+  if (config.remote) throw new Error('Remote workspace has no local layout')
+  return { ...config, layoutMode: config.layoutMode ?? 'split' }
 }
 
 export async function saveLayout(layout: WorkspaceLayout, workspacePath: string): Promise<void> {
-  await Bun.write(getLayoutPath(workspacePath), JSON.stringify(layout, null, 2))
+  const existing = await loadWorkspaceFileConfig(workspacePath)
+  if (existing.remote)
+    throw new Error('Cannot replace a remote workspace reference with a local layout')
+  await Bun.write(getLayoutPath(workspacePath), JSON.stringify({ ...layout, version: 2 }, null, 2))
+}
+
+export async function saveWorkspacePersonalConfig(
+  patch: WorkspacePersonalConfig,
+  workspacePath: string
+): Promise<void> {
+  const existing = await loadWorkspaceFileConfig(workspacePath)
+  const next = { ...existing, ...personalWorkspaceConfig({ ...existing, ...patch }), version: 2 }
+  await Bun.write(getLayoutPath(workspacePath), JSON.stringify(next, null, 2))
 }
 
 // Merge a client-submitted layout over the stored one for persistence.
