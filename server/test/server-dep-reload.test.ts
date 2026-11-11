@@ -48,7 +48,7 @@ function seed(rel: string, contents: string) {
   writeFileSync(path, contents)
 }
 
-const bundle = () => handleBundle(() => {}, WS)
+const bundle = () => handleBundle(() => {}, 'test', WS)
 const rows = async () => parse(await callFunction('widgets/clock', 'rows', stringify([]), WS))
 
 test('editing a helper imported only by a .server.ts reaches a live worker', async () => {

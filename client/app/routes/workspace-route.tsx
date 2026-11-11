@@ -29,7 +29,6 @@ type WorkspaceRouteProps = {
 export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
   useWorkspaceMembers(id)
   const { environment } = useAppConfig()
-
   return (
     <SidebarLayout>
       <Workspace id={id}>
@@ -46,7 +45,7 @@ export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
 function WorkspaceContent({ id }: WorkspaceRouteProps) {
   const queryClient = useQueryClient()
   const [selectedSessionId] = useSelectedSession()
-  const { isLoading: layoutLoading, layout, provider } = useWorkspaceLayoutCtx()
+  const { isLoading: layoutLoading, layout, provider, chatAvailable } = useWorkspaceLayoutCtx()
   useWorkspaceHarnessChanges(id, provider)
   useWorkspaceTheme(layout.theme)
   const widgets = useWidgets(id)
@@ -54,6 +53,7 @@ function WorkspaceContent({ id }: WorkspaceRouteProps) {
   useAppletCacheInvalidation()
 
   useWorkspaceEvent(event => {
+    if (!('workspaceId' in event) || event.workspaceId !== id) return
     if (event.type === 'theme:updated' || event.type === 'workspace:updated') {
       // Skip our own save: the cache already holds it, and the refetch could
       // land an older value over a newer optimistic change.
@@ -71,7 +71,10 @@ function WorkspaceContent({ id }: WorkspaceRouteProps) {
   })
 
   const contentPending =
-    layoutLoading || selectedSessionId === undefined || widgets.isLoading || views.isLoading
+    layoutLoading ||
+    (chatAvailable && selectedSessionId === undefined) ||
+    widgets.isLoading ||
+    views.isLoading
 
   return (
     <WorkspaceScreen

@@ -1,3 +1,4 @@
+import { chatAvailable } from '@/client/features/workspace/chat-availability'
 import { useState } from 'react'
 
 import { IconChevronRight, IconEggCracked, IconLoader2, IconPlus } from '@tabler/icons-react'
@@ -192,7 +193,7 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
           aria-label={`Open ${name}`}
           className="absolute inset-0 rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         />
-        {previewQuery.data && (
+        {previewQuery.data && chatAvailable(workspace.id) && (
           <Tooltip>
             <TooltipTrigger
               render={

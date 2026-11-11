@@ -1,3 +1,4 @@
+import { chatAvailable } from '../chat-availability'
 import { useHarnessStatus, useRetryHarnessStatus } from '@/client/features/harness/api'
 import { useCallback } from 'react'
 import { useAppConfig } from '@/client/api/app-config'
@@ -21,11 +22,12 @@ export function useWorkspaceSetup(
   contentPending = false,
   welcome: WorkspaceWelcomeStateProps = {}
 ) {
+  const canChat = chatAvailable(workspaceId)
   const { environment, demo } = useAppConfig()
   const workspace = useWorkspaceHarness(workspaceId)
   const { data } = workspace
   const status = useHarnessStatus(
-    data?.hasAuthOverrides || data?.isFolderMissing ? undefined : data?.provider
+    !canChat || data?.hasAuthOverrides || data?.isFolderMissing ? undefined : data?.provider
   )
   const retry = useRetryHarnessStatus()
   const readiness = status.isEnabled ? status : workspace
@@ -83,9 +85,12 @@ export function useWorkspaceSetup(
     )
   }
 
+  const welcoming = useWorkspaceWelcome(workspaceId)
+  if (!canChat) {
+    return { content: <WorkspaceLoadingState />, ready: !contentPending, setupRequired: false }
+  }
   const recovery = renderRecovery()
   const ready = !recovery && !contentPending && !checking
-  const welcoming = useWorkspaceWelcome(workspaceId)
   return {
     content: welcoming ? (
       <WorkspaceWelcomeState {...welcome} />

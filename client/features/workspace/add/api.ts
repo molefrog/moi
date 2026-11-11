@@ -1,6 +1,9 @@
+import { workspaceIdentity } from '@/lib/workspace-identity'
+import { chatAvailable } from '@/client/features/workspace/chat-availability'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { jsonRequest, requestJson } from '@/client/api/http'
+import { resolveWorkspaceNames } from '@/client/features/home/api'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useUiStore } from '@/client/store/ui'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
@@ -18,10 +21,17 @@ export function upsertWorkspaceEntry(
 export function useImportWorkspace() {
   const queryClient = useQueryClient()
   return useMutation<WorkspaceEntry, Error, ImportWorkspaceInput>({
-    mutationFn: input =>
-      requestJson('/api/workspaces', jsonRequest('POST', input), 'Failed to add workspace'),
+    mutationFn: async input => {
+      const entry = await requestJson<WorkspaceEntry>(
+        '/api/workspaces',
+        jsonRequest('POST', input),
+        'Failed to add workspace'
+      )
+      return (await resolveWorkspaceNames([entry]))[0]!
+    },
     onSuccess: (entry, input) => {
-      useUiStore.getState().markWorkspacePendingAnalysis(entry.id)
+      if (chatAvailable(workspaceIdentity(entry)))
+        useUiStore.getState().markWorkspacePendingAnalysis(entry.id)
       queryClient.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, previous =>
         upsertWorkspaceEntry(previous, entry)
       )

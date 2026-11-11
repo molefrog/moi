@@ -3,6 +3,8 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import { workspaceIdentity } from '@/lib/workspace-identity'
+
 import type { WorkspaceSkillsStatus } from '@/lib/types'
 
 import { api } from './index'
@@ -95,4 +97,35 @@ describe('workspace skills API', () => {
     expect(status.updateAvailable).toBe(false)
     expect(await Bun.file(customSkill).text()).toBe('custom\n')
   })
+})
+
+test('remote references update only the visitor skill copy', async () => {
+  const owner = await createOutdatedWorkspace('claude-code')
+  const visitorRoot = join(tempRoot, 'visitor')
+  const skillDir = join(skillsDirFor(visitorRoot, 'codex'), 'moi-workspace')
+  await mkdir(skillDir, { recursive: true })
+  await Bun.write(join(skillDir, 'SKILL.md'), '<moi-skill version="0.7.1" />\n')
+  const config = JSON.stringify({
+    version: 2,
+    remote: { user_id: 'alice', workspace_id: owner.id }
+  })
+  await Bun.write(join(visitorRoot, '.moi', '.workspace.json'), config)
+  const visitor = await registerWorkspace(visitorRoot, { type: 'codex' })
+  const base = `/api/workspaces/${workspaceIdentity(visitor)}`
+  const before = await api.request(`${base}/skills`)
+  expect(before.status).toBe(200)
+  expect((await before.json()).updateAvailable).toBe(true)
+  const updated = await api.request(`${base}/skills/update`, { method: 'POST' })
+  expect(updated.status).toBe(200)
+  expect((await updated.json()).updateAvailable).toBe(false)
+  expect(
+    await readSkillVersion(
+      join(skillsDirFor(owner.path, 'claude-code'), 'moi-workspace', 'SKILL.md')
+    )
+  ).toBe('0.7.1')
+  expect(await Bun.file(join(visitorRoot, '.moi', '.workspace.json')).text()).toBe(config)
+  const ownerUpdate = await api.request(`/api/remote/alice/workspaces/${owner.id}/skills/update`, {
+    method: 'POST'
+  })
+  expect(ownerUpdate.status).toBe(403)
 })

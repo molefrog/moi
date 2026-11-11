@@ -1,14 +1,56 @@
+import { remoteFromIdentity, workspaceIdentity, workspaceBase } from '@/lib/workspace-identity'
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { workspaceKeys } from '@/client/api/workspace-keys'
+import type { WorkspaceLayoutResponse } from '@/lib/types'
 import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspacePreview } from '@/lib/types'
 
+// Registrations identify the visitor's folder; display metadata belongs to the owner.
+export async function resolveWorkspaceNames(
+  entries: WorkspaceEntry[],
+  previous: WorkspaceEntry[] = []
+): Promise<WorkspaceEntry[]> {
+  return Promise.all(
+    entries.map(async registration => {
+      if (!registration.remote) return registration
+      const entry = { ...registration, id: workspaceIdentity(registration) }
+      try {
+        const owner = await requestJson<WorkspaceLayoutResponse>(workspaceBase(entry.id))
+        return {
+          ...entry,
+          name: owner.name,
+          icon: owner.icon,
+          theme: owner.theme,
+          type: owner.provider ?? 'claude-code',
+          agentId: owner.agentId
+        }
+      } catch {
+        // Keep only metadata resolved for this same owner, never visitor presentation.
+        const cached = previous.find(item => item.id === entry.id)
+        return {
+          ...entry,
+          name: cached?.name ?? registration.remote.workspace_id,
+          icon: cached?.icon,
+          theme: cached?.theme,
+          type: cached?.type,
+          agentId: cached?.agentId
+        }
+      }
+    })
+  )
+}
+
 export function useWorkspaces() {
+  const queryClient = useQueryClient()
   return useQuery<WorkspaceEntry[]>({
     queryKey: workspaceKeys.all,
-    queryFn: () => requestJson('/api/workspaces'),
+    queryFn: async () =>
+      resolveWorkspaceNames(
+        await requestJson<WorkspaceEntry[]>('/api/workspaces'),
+        queryClient.getQueryData<WorkspaceEntry[]>(workspaceKeys.all)
+      ),
     // Live events invalidate the list on every change. This only bounds how
     // long a missed event (socket down) can leave it wrong; route switches
     // within the window reuse the cache.
@@ -16,9 +58,25 @@ export function useWorkspaces() {
   })
 }
 
+export async function loadWorkspacePreviews(): Promise<Record<string, WorkspacePreview>> {
+  const previews = await requestJson<Record<string, WorkspacePreview>>('/api/workspaces/previews')
+  await Promise.all(
+    Object.keys(previews).map(async key => {
+      const remote = remoteFromIdentity(key)
+      if (!remote) return
+      try {
+        previews[key] = await requestJson<WorkspacePreview>(`${workspaceBase(key)}/home-preview`)
+      } catch {
+        previews[key] = { thumbnails: [] }
+      }
+    })
+  )
+  return previews
+}
+
 const workspacePreviewsOptions = queryOptions({
   queryKey: workspaceKeys.previews,
-  queryFn: () => requestJson<Record<string, WorkspacePreview>>('/api/workspaces/previews'),
+  queryFn: loadWorkspacePreviews,
   staleTime: 60_000
 })
 
@@ -46,10 +104,15 @@ export function useReorderWorkspaces() {
   return useMutation<WorkspaceEntry[], Error, string[], { previous?: WorkspaceEntry[] }>({
     mutationKey: REORDER_KEY,
     mutationFn: ids =>
-      requestJson(
+      requestJson<WorkspaceEntry[]>(
         '/api/workspaces/order',
         jsonRequest('PUT', { ids, origin: BROWSER_TAB_ID }),
         'Failed to reorder spaces'
+      ).then(entries =>
+        resolveWorkspaceNames(
+          entries,
+          queryClient.getQueryData<WorkspaceEntry[]>(workspaceKeys.all)
+        )
       ),
     onMutate: async ids => {
       // Exact: only pause the workspace list itself — a prefix cancel would

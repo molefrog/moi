@@ -36,7 +36,7 @@ function useUsersSource() {
     engine.getDirectory,
     engine.getDirectory
   )
-  // Live connections describe activity; only the directory establishes membership.
+  // Membership supplies profiles, including users who are currently offline.
   const users = directory ?? EMPTY_USERS
   return { state, self, users, engine }
 }

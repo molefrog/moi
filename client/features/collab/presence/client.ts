@@ -1,3 +1,4 @@
+import { workspaceBase } from '@/lib/workspace-identity'
 import { getWorkspaceDirectory, subscribeWorkspaceDirectory } from '../members/store'
 import { wsUrl } from '@/client/lib/ws-url'
 import { COLLAB_PROTOCOL_VERSION } from '@/lib/collab/protocol'
@@ -160,9 +161,7 @@ export class CollabClient implements CollabEngineApi {
     if (this.socket) return
     clearTimeout(this.retry)
     this.store.connecting()
-    const socket = new WebSocket(
-      wsUrl(`/api/workspaces/${encodeURIComponent(this.workspaceId)}/collab/ws`)
-    )
+    const socket = new WebSocket(wsUrl(`${workspaceBase(this.workspaceId)}/collab`))
     this.socket = socket
     socket.onopen = () => {
       if (socket !== this.socket) return

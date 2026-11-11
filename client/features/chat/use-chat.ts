@@ -51,7 +51,7 @@ const EMPTY: ViewState = emptyViewState()
 export function useChat(address: WorkspaceTabAddress) {
   const workspaceId = useWorkspaceId()
   const qc = useQueryClient()
-  const { layout } = useWorkspaceLayoutCtx()
+  const { layout, chatAvailable } = useWorkspaceLayoutCtx()
   const [selectedSession, selectSession] = useSelectedSession(address.activeTab)
   const cloud = useAppConfig().environment === 'cloud'
   const modelsData = useWorkspaceHarness(workspaceId).data
@@ -109,6 +109,7 @@ export function useChat(address: WorkspaceTabAddress) {
   // the text in, so a keystroke re-renders only the composer.
   const send = useCallback(
     (draft: string, options?: ChatSendOptions) => {
+      if (!chatAvailable) return
       const text = draft.trim()
       // Attachments stay with the selected session. Only fully-uploaded ones are
       // sent; the composer disables send while any are still uploading, so in
@@ -186,6 +187,7 @@ export function useChat(address: WorkspaceTabAddress) {
       }
     },
     [
+      chatAvailable,
       address.activeTab,
       composerSessionId,
       selectedSessionId,

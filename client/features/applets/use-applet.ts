@@ -1,3 +1,4 @@
+import { remoteFromIdentity } from '@/lib/workspace-identity'
 import type { ComponentType } from 'react'
 import { useRouter } from 'wouter'
 import { useCallback, useEffect, useState } from 'react'
@@ -119,12 +120,22 @@ function useApplet(kind: AppletKindSpec, name: string): AppletState {
   // order-independent. The bumped version remounts the component and re-runs its
   // `rpc()` calls.
   useWorkspaceEvent(event => {
+    if (!('workspaceId' in event) || event.workspaceId !== workspaceId) return
     if (kind.shouldReload(event, name)) {
       invalidateApplet(kind.segment, workspaceId, name)
       load()
     }
   })
 
+  useEffect(() => {
+    if (!remoteFromIdentity(workspaceId)) return
+    const refresh = () => {
+      invalidateApplet(kind.segment, workspaceId, name)
+      load()
+    }
+    window.addEventListener('focus', refresh)
+    return () => window.removeEventListener('focus', refresh)
+  }, [kind.segment, workspaceId, name, load])
   return state
 }
 
@@ -144,14 +155,15 @@ export function useView(name: string): AppletState {
 export function useAppletCacheInvalidation(): void {
   const workspaceId = useWorkspaceId()
   useWorkspaceEvent(event => {
+    if (!('workspaceId' in event) || event.workspaceId !== workspaceId) return
     if (event.type === 'view:updated') invalidateApplet('views', workspaceId, event.name)
     else if (event.type === 'widget:updated') invalidateApplet('widgets', workspaceId, event.name)
     else if (event.type === 'applets:refresh') {
       // Segment-wide: `moi refresh` names no applet, so every cached module in
       // the targeted kind(s) is stale — including ones whose tabs are
       // backgrounded right now.
-      if (event.only !== 'views') invalidateAppletSegment('widgets')
-      if (event.only !== 'widgets') invalidateAppletSegment('views')
+      if (event.only !== 'views') invalidateAppletSegment('widgets', workspaceId)
+      if (event.only !== 'widgets') invalidateAppletSegment('views', workspaceId)
     }
   })
 }

@@ -1,3 +1,4 @@
+import { workspaceIdentity } from '@/lib/workspace-identity'
 import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test'
 
 import { colorForId } from '@/lib/collab/colors'
@@ -132,6 +133,7 @@ test('an explicit user enables workspace presence without an applet and clearing
   signIn(profile)
   expect(sockets).toHaveLength(1)
   const socket = sockets[0]!
+  expect(new URL(socket.url).pathname).toBe('/api/workspaces/workspace/collab')
   socket.open()
   expect(socket.sent[0]).toMatchObject({ type: 'join', profile })
   expect(engine.getSnapshot().connections[0]?.userId).toEqual(profile.id)
@@ -412,4 +414,23 @@ test('cloud presence waits for this workspace membership and closes when access 
   expect(sockets[0]!.readyState).toBe(3)
   expect(engine.getSnapshot().connections).toEqual([])
   expect(engine.getDirectory()).toEqual([])
+})
+
+test('remote presence connects to the owner with the same membership rules', () => {
+  signIn({ id: 'visitor', name: 'Visitor' })
+  clearWorkspaceMembers()
+  const id = workspaceIdentity({ id: 'board', remote: { user_id: 'alice', workspace_id: 'board' } })
+  setWorkspaceMembers(id, {
+    members: [{ id: 'visitor', type: 'user', name: 'Visitor', email: '', isAnonymous: false }],
+    invitations: []
+  })
+  const engine = new CollabClient(id)
+  stop = engine.start()
+  expect(sockets).toHaveLength(1)
+  expect(new URL(sockets[0]!.url).pathname).toBe('/api/remote/alice/workspaces/board/collab')
+  sockets[0]!.open()
+  expect(engine.getSnapshot().status).toBe('connected')
+  expect(engine.getSnapshot().users.some(user => user.id === 'visitor')).toBe(true)
+  signOut()
+  expect(engine.getSnapshot().status).toBe('disconnected')
 })

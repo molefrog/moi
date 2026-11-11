@@ -11,7 +11,7 @@ import { ViewsWidget } from './views-widget'
 
 const noop = () => {}
 
-function render(views: ViewInfo[], showOnboarding = true): string {
+function render(views: ViewInfo[], showOnboarding = true, chatAvailable = true): string {
   const queryClient = new QueryClient()
   return renderToStaticMarkup(
     createElement(
@@ -27,6 +27,7 @@ function render(views: ViewInfo[], showOnboarding = true): string {
             cwd: null,
             provider: 'codex',
             workspaceId: 'workspace',
+            chatAvailable,
             isLoading: false
           }
         },
@@ -89,4 +90,10 @@ describe('ViewsWidget', () => {
     expect(html).toContain('aria-label="Create new view"')
     expect(html).not.toContain('Create new views when you need separate pages for focused tasks')
   })
+})
+
+test('chat availability hides creation without hiding onboarding', () => {
+  const html = render([], true, false)
+  expect(html).not.toContain('New view')
+  expect(html).toContain('Create new views when you need separate pages for focused tasks')
 })

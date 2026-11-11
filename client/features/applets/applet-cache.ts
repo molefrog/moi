@@ -1,3 +1,4 @@
+import { workspaceBase } from '@/lib/workspace-identity'
 // Shared load cache for agent-authored applets (widgets / views).
 //
 // An applet is loaded as an ESM module via dynamic `import()`. The browser
@@ -43,7 +44,7 @@ const ENTRY_ROUTE = 'module'
 // Assets + chunks resolve module-relative from the entry (via import.meta.url),
 // so they don't inherit `?v` and aren't re-fetched needlessly.
 export function appletUrl(segment: AppletSegment, workspaceId: string, name: string): string {
-  return `/api/workspaces/${workspaceId}/${segment}/${name}/${ENTRY_ROUTE}?v=${appletVersion(segment, workspaceId, name)}`
+  return `${workspaceBase(workspaceId)}/${segment}/${name}/${ENTRY_ROUTE}?v=${appletVersion(segment, workspaceId, name)}`
 }
 
 // The key an applet bundle registers its CSS under (`window.__moiAppletCss`):
@@ -51,7 +52,7 @@ export function appletUrl(segment: AppletSegment, workspaceId: string, name: str
 // (see injectCss in server/applets/build-applet.ts). Workspace-qualified so two
 // workspaces sharing an applet name never read each other's styles.
 export function appletStyleKey(segment: AppletSegment, workspaceId: string, name: string): string {
-  return `/api/workspaces/${workspaceId}/${segment}/${name}`
+  return `${workspaceBase(workspaceId)}/${segment}/${name}`
 }
 
 // Stable applet identity used by scoped CSS, presence, and thumbnail capture.
@@ -79,12 +80,12 @@ export function invalidateApplet(segment: AppletSegment, workspaceId: string, na
   disposeAppletBridge(key)
 }
 
-// Invalidate every applet of one kind across all workspaces — the
+// Invalidate every applet of one kind in this workspace — the
 // `applets:refresh` path, which names no specific applet. Only keys that have
 // ever been loaded (or bumped) exist in the maps; anything else already loads
 // fresh on first mount.
-export function invalidateAppletSegment(segment: AppletSegment): void {
-  const prefix = `${segment}/`
+export function invalidateAppletSegment(segment: AppletSegment, workspaceId: string): void {
+  const prefix = `${segment}/${workspaceId}/`
   for (const key of new Set([...moduleCache.keys(), ...versions.keys()])) {
     if (key.startsWith(prefix)) {
       moduleCache.delete(key)

@@ -130,6 +130,7 @@ function SetupPreview({ mocks, client, environment, harness, scenario }: SetupPr
           name: 'My workspace',
           cwd: null,
           provider: harness,
+          chatAvailable: true,
           isLoading: false
         }}
       >

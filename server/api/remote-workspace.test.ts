@@ -1,14 +1,13 @@
-import { symlink } from 'node:fs/promises'
-import { stringify, parse } from 'devalue'
-import { buildAllViews } from '../applets/views'
 import { workspaceIdentity } from '@/lib/workspace-identity'
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { mkdtemp, mkdir, rm } from 'node:fs/promises'
+import { mkdtemp, mkdir, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { stringify, parse } from 'devalue'
 import { api } from './index'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
 import { loadWorkspaceFileConfig, loadLayout, saveLayout } from '../workspaces/layout'
+import { buildAllViews } from '../applets/views'
 import { killAllWorkers } from '../applets/functions'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 
@@ -104,11 +103,58 @@ test('shared and personal saves leave the other side unchanged', async () => {
   })
 })
 
+test('remote bundle RPC reads and writes owner data; assets and validators retain the destination', async () => {
+  await symlink(join(import.meta.dir, '../../node_modules'), join(owner, '.moi/node_modules'))
+  await Bun.write(
+    join(owner, '.moi/views/counter.tsx'),
+    `import { increment } from './counter.server'; export const config = { title: 'Counter' }; export default function Counter() { return <button onClick={() => increment()}>Increment</button> }`
+  )
+  await Bun.write(
+    join(owner, '.moi/views/counter.server.ts'),
+    `import { join } from 'node:path'; const path = join(import.meta.dir, '../count.json'); export async function increment() { const n = await Bun.file(path).json().catch(() => 0); await Bun.write(path, JSON.stringify(n + 1)); return n + 1 }`
+  )
+  await buildAllViews(owner)
+  const bundle = await api.request(`${base}/views/counter/module`)
+  expect(bundle.status).toBe(200)
+  const text = await bundle.text()
+  expect(text).toContain(base)
+  expect(text).not.toContain(`"/api/workspaces/${ownerId}"`)
+  const local = await api.request(`/api/workspaces/${ownerId}/views/counter/module`)
+  expect(bundle.headers.get('etag')).not.toBe(local.headers.get('etag'))
+  const response = await api.request(`${base}/rpc/views/counter/increment`, {
+    method: 'POST',
+    body: stringify([])
+  })
+  expect(response.status).toBe(200)
+  expect(parse(await response.text())).toBe(1)
+  expect(await Bun.file(join(owner, '.moi/count.json')).json()).toBe(1)
+  expect(await Bun.file(join(visitor, '.moi/count.json')).exists()).toBe(false)
+  await Bun.write(join(owner, 'hello.svg'), '<svg/>')
+  expect(await (await api.request(`${base}/files/hello.svg`)).text()).toBe('<svg/>')
+})
+
 test('deferred operations and removing either workspace are blocked', async () => {
   for (const path of ['/sessions', '/state', '/harness'])
     expect((await api.request(base + path)).status).toBe(403)
   expect((await api.request(base, { method: 'DELETE' })).status).toBe(403)
   expect((await api.request(`/api/workspaces/${visitorId}`, { method: 'DELETE' })).status).toBe(403)
+})
+
+test('remote home preview reads the owner theme without exposing chats', async () => {
+  await saveLayout(
+    {
+      ...createDefaultWorkspaceLayout(),
+      theme: { color: 'mint', font: 'sans', radius: 'soft', agent: 'boxy' }
+    },
+    owner
+  )
+  const response = await api.request(`${base}/home-preview`)
+  expect(response.status).toBe(200)
+  const preview = await response.json()
+  expect(preview.theme.color).toBe('mint')
+  expect(preview.thumbnails).toEqual([])
+  expect(preview.firstUserMessage).toBeUndefined()
+  expect((await api.request(`/api/workspaces/${visitorId}/home-preview`)).status).toBe(409)
 })
 
 test('remote scratchpad documents and assets stay on the owner', async () => {
@@ -201,26 +247,4 @@ test('local and remote scratchpad edit APIs reuse the executor and preserve visi
         .status
     ).toBe(400)
   }
-})
-test('remote RPC and file requests use owner data', async () => {
-  await symlink(join(import.meta.dir, '../../node_modules'), join(owner, '.moi/node_modules'))
-  await Bun.write(
-    join(owner, '.moi/views/counter.tsx'),
-    `import { increment } from './counter.server'; export const config = { title: 'Counter' }; export default function Counter() { return <button onClick={() => increment()}>Increment</button> }`
-  )
-  await Bun.write(
-    join(owner, '.moi/views/counter.server.ts'),
-    `import { join } from 'node:path'; const path = join(import.meta.dir, '../count.json'); export async function increment() { const n = await Bun.file(path).json().catch(() => 0); await Bun.write(path, JSON.stringify(n + 1)); return n + 1 }`
-  )
-  await buildAllViews(owner)
-  const response = await api.request(`${base}/rpc/views/counter/increment`, {
-    method: 'POST',
-    body: stringify([])
-  })
-  expect(response.status).toBe(200)
-  expect(parse(await response.text())).toBe(1)
-  expect(await Bun.file(join(owner, '.moi/count.json')).json()).toBe(1)
-  expect(await Bun.file(join(visitor, '.moi/count.json')).exists()).toBe(false)
-  await Bun.write(join(owner, 'hello.svg'), '<svg/>')
-  expect(await (await api.request(`${base}/files/hello.svg`)).text()).toBe('<svg/>')
 })

@@ -216,6 +216,7 @@ export function ViewsWidget({ views, onOpenView, onCreateView, showOnboarding }:
   const visibleViews = views.filter(view => view.status !== 'draft')
   const empty = visibleViews.length === 0
 
+  const { chatAvailable } = useWorkspaceLayoutCtx()
   return (
     <div className="relative no-scrollbar flex size-full items-center overflow-hidden bg-muted">
       {empty && (
@@ -234,7 +235,7 @@ export function ViewsWidget({ views, onOpenView, onCreateView, showOnboarding }:
             onOpen={() => onOpenView(view.id)}
           />
         ))}
-        <NewViewButton outlined={empty} onClick={onCreateView} />
+        {chatAvailable && <NewViewButton outlined={empty} onClick={onCreateView} />}
       </div>
       {empty && showOnboarding && (
         <p className="relative mr-8 ml-auto max-w-56 text-right text-sm text-muted-foreground">

@@ -61,6 +61,7 @@ const layoutCtxValue: WorkspaceLayoutContextValue = {
   cwd: DEV_CWD,
   provider: 'openclaw',
   workspaceId: DEV_WORKSPACE_ID,
+  chatAvailable: true,
   isLoading: false
 }
 

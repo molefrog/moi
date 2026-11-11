@@ -50,6 +50,26 @@ User can switch between these, but can access the chat (this conversation and ot
 
 ## Working in the workspace
 
+### Local or remote workspace
+
+Read the `remote` field in `.moi/.workspace.json` before working. This is the only
+exception to the internal-file rule below; do not edit the config. A missing file
+or absent `remote` means local. Resolve parse errors before changing content.
+
+A remote config contains `remote: { user_id, workspace_id }`. Its folder holds the
+visitor's reference, personal tabs/layout/chat defaults, and skills. Shared content
+belongs to the owner; do not create local applet copies to change it.
+
+`moi tabs`, `navigate`, `theme`, `config`, `call-server-fn`, `debug logs`, and `scratch`
+route through the workspace API automatically. Refresh and browser actions target
+the visitor's browser. Skills and environment commands stay local. Source edits,
+builds, and agent-backed commands require the owner's actual workspace.
+
+`moi remote --json` lists accepted workspaces: `id` maps to `workspace_id` and
+`owner.id` to `user_id`. It does not create local references. Remote chats,
+invitation syncing, and settings UI remain unavailable. Never fall back to visitor
+content when the owner is unavailable.
+
 ### Boundaries
 
 - Never read or modify files outside the `.moi` directory, unless the user explicitly asks. If you
@@ -59,7 +79,7 @@ User can switch between these, but can access the chat (this conversation and ot
 
 ### Files and folders
 
-Source of truth - `.moi` folder in the root of "Project" folder. Contains source code of all
+For local workspaces, the source of truth is the `.moi` folder in the root of "Project" folder. Contains source code of all
 Applets, bundled code, settings, etc. Can be committed to version control. Folder is partially
 initialised when Workspace starts, you have full ownership of it.
 
@@ -83,14 +103,14 @@ my-agent-folder/
       users-api.server.ts     <- Server-side async functions the view can call (optional)
       ...
     package.json              <- Applet dependencies that you manage
-    .workspace.json           <- Auto-generated. Do NOT read, edit, or `cat` this file. Use Moi CLI instead.
+    .workspace.json           <- Internal config. Only read `remote` for the check above; do not edit.
     .scratchpad.json          <- Scratchpad canvas snapshot. Internal — inspect only via `moi scratch read`, never open it.
     .scratchpad/              <- Scratchpad image files. Internal — pull pixels via `moi scratch read-image`, never open it.
 ```
 
 Every dot-prefixed file or folder inside `.moi/` (`.build/`, `.cache/`, `.workspace.json`,
 `.scratchpad*`, `.gitignore`, …) is a Moi internal: auto-generated and liable to change format
-without notice. Avoid them as much as possible — do not read, edit, or delete them, and never point
+without notice. Except for the read-only `remote` check above, do not read, edit, or delete them, and never point
 tooling at them; go through the `moi` CLI instead. Version control needs no special handling: the
 scaffolded `.moi/.gitignore` already excludes the machine-local entries (`.build/`, `.cache/`,
 `node_modules/`), while `.workspace.json` and `.scratchpad.json` are workspace state that ships

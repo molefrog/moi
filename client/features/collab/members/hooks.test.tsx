@@ -1,3 +1,4 @@
+import { workspaceIdentity } from '@/lib/workspace-identity'
 import { afterEach, expect, test } from 'bun:test'
 import { act } from 'react'
 import { cleanupAccount, mountAccount } from '../../account/account-test-utils'
@@ -106,3 +107,18 @@ for (const name of ['Weekly Review', '', '   ']) {
     })
   })
 }
+
+function RemoteMembersProbe() {
+  const id = workspaceIdentity({ id: 'board', remote: { user_id: 'alice', workspace_id: 'board' } })
+  const members = useWorkspaceMembers(id)
+  return <span data-enabled>{String(members.isEnabled)}</span>
+}
+
+test('remote workspace membership queries address the owner', async () => {
+  const ui = await mountAccount({ children: <RemoteMembersProbe /> })
+  await ui.settle()
+  expect(ui.document.querySelector('[data-enabled]')?.textContent).toBe('true')
+  expect(
+    ui.calls.some(call => call.path === '/cloud/api/workspaces/board/members?owner_id=alice')
+  ).toBe(true)
+})

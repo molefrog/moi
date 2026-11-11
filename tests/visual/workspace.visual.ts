@@ -81,7 +81,7 @@ test(
       const NativeWebSocket = window.WebSocket
       window.WebSocket = new Proxy(NativeWebSocket, {
         construct(target, args) {
-          if (!String(args[0]).includes('/collab/ws')) return Reflect.construct(target, args)
+          if (!String(args[0]).includes('/collab')) return Reflect.construct(target, args)
           const socket = {
             readyState: 1,
             onopen: undefined as (() => void) | undefined,
@@ -161,6 +161,176 @@ test(
         ],
         invitations: []
       } satisfies WorkspaceMembers
+    }
+  }
+)
+
+const remoteBase = '/api/remote/alice/workspaces/owner-board'
+const remoteKey = 'remote~WyJhbGljZSIsIm93bmVyLWJvYXJkIl0'
+const remotePage = `/#/workspace/${remoteKey}`
+const remoteAnswers = {
+  [`/api/workspaces/${remoteKey}/skills`]: { skills: [], updateAvailable: false },
+  [`/api/workspaces/${remoteKey}`]: {
+    version: 2,
+    remote: { user_id: 'alice', workspace_id: 'owner-board' },
+    layoutMode: 'split',
+    cwd: '/visitor',
+    name: 'Shared board'
+  },
+  [remoteBase]: {
+    version: 2,
+    name: 'Shared board',
+    cwd: '/owner',
+    widgetGrid: [],
+    layoutMode: 'fullscreen',
+    tabs: { open: ['overview'], active: 'overview' }
+  },
+  [`${remoteBase}/widgets`]: { widgets: [] },
+  [`${remoteBase}/views`]: { views: [] },
+  [`${remoteBase}/applet-thumbnails`]: { thumbnails: [] }
+}
+
+test(
+  'remote workspace without chat or setup',
+  async page => {
+    await page.goto(remotePage)
+    await expect(page.getByRole('button', { name: 'Customize', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'New widget', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Create tab', exact: true })).toBeVisible()
+    await expect(
+      page.getByRole('button', { name: 'Users in this workspace', exact: true })
+    ).toHaveCount(0)
+  },
+  { api: remoteAnswers }
+)
+
+test(
+  'remote workspace hides both settings entry points',
+  async page => {
+    await page.goto(remotePage)
+    await expect(page.getByRole('button', { name: 'Customize', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Settings', exact: true })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Shared board menu', exact: true }).click()
+    await expect(page.getByRole('menuitem', { name: 'Theme', exact: true })).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: 'Settings', exact: true })).toHaveCount(0)
+  },
+  { api: remoteAnswers }
+)
+
+test(
+  'remote workspace owner unavailable',
+  async page => {
+    await page.route(`**${remoteBase}`, route =>
+      route.fulfill({ status: 503, body: 'Owner unavailable' })
+    )
+    await page.goto(remotePage)
+    await expect(page.getByRole('alert')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible()
+  },
+  { api: remoteAnswers }
+)
+
+test(
+  'remote view uses the standard workspace chrome',
+  async page => {
+    await page.route(`**${remoteBase}/views/counter/module*`, route =>
+      route.fulfill({
+        contentType: 'text/javascript',
+        body: 'export default function Counter() { return "Owner counter view" }'
+      })
+    )
+    await page.goto(remotePage)
+    await expect(page.getByRole('button', { name: 'Shared board menu', exact: true })).toBeVisible()
+    await expect(page.getByText('Owner counter view', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'View title', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('textbox', { name: 'View title', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Rename', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Delete view', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Dock chat', exact: true })).toHaveCount(0)
+  },
+  {
+    api: {
+      ...remoteAnswers,
+      [`/api/workspaces/${remoteKey}`]: {
+        ...remoteAnswers[`/api/workspaces/${remoteKey}`],
+        tabs: { open: ['overview', 'views/counter'], active: 'views/counter' }
+      },
+      [`${remoteBase}/views`]: { views: [{ id: 'counter', status: 'compiled', title: 'Counter' }] }
+    }
+  }
+)
+
+test(
+  'remote home card uses owner metadata without a chat shortcut',
+  async page => {
+    await page.goto('/#/')
+    await expect(page.getByRole('link', { name: 'Open Shared board', exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Chat in Shared board', exact: true })).toHaveCount(
+      0
+    )
+  },
+  {
+    api: {
+      ...remoteAnswers,
+      '/api/workspaces': [
+        {
+          id: 'owner-board',
+          path: '/visitor-alias',
+          addedAt: '2026-01-01T00:00:00Z',
+          remote: { user_id: 'alice', workspace_id: 'owner-board' }
+        }
+      ],
+      [`${remoteBase}/home-preview`]: { thumbnails: [], theme: { color: 'mint' } }
+    }
+  }
+)
+
+test(
+  'remote scratchpad opens the owner canvas',
+  async page => {
+    await page.goto(remotePage)
+    await expect(page.getByRole('button', { name: 'Rectangle', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Pencil', exact: true })).toBeVisible()
+  },
+  {
+    api: {
+      ...remoteAnswers,
+      [`/api/workspaces/${remoteKey}`]: {
+        ...remoteAnswers[`/api/workspaces/${remoteKey}`],
+        tabs: { open: ['overview', 'scratchpad'], active: 'scratchpad' }
+      },
+      [`${remoteBase}/scratchpad`]: { document: null }
+    }
+  }
+)
+
+test(
+  'remote cloud workspace has the same sharing controls',
+  async page => {
+    await page.goto(remotePage)
+    await page.getByRole('button', { name: 'Users in this workspace', exact: true }).click()
+    await expect(page.getByText('Share this workspace', { exact: true })).toBeVisible()
+    await expect(page.getByRole('textbox', { name: 'Email', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Remove', exact: true }).first()).toBeVisible()
+  },
+  {
+    api: {
+      ...remoteAnswers,
+      '/api/config': { environment: 'cloud', demo: false },
+      '/cloud/api/me': sharingUser,
+      '/cloud/api/workspaces/owner-board/members': {
+        members: [
+          {
+            id: 'alice',
+            type: 'user',
+            name: 'Alice',
+            email: 'alice@example.com',
+            isAnonymous: false
+          },
+          { ...sharingUser, membershipId: 'member-alex' }
+        ],
+        invitations: []
+      }
     }
   }
 )

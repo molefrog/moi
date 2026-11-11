@@ -1,6 +1,7 @@
-import { describe, expect, test } from 'bun:test'
+import { workspaceIdentity } from '@/lib/workspace-identity'
+import { describe, expect, test, spyOn } from 'bun:test'
 
-import { matchBundleUrl } from './applet-log'
+import { matchBundleUrl, reportAppletError } from './applet-log'
 
 const WS = '17c35e98-f9a0-4cc3-bb71-cd8c279edb9b'
 
@@ -45,4 +46,40 @@ describe('matchBundleUrl', () => {
     expect(matchBundleUrl('')).toBeNull()
     expect(matchBundleUrl('TypeError: boom')).toBeNull()
   })
+})
+
+test('remote bundle errors use the owner pair and the normal reporting path', () => {
+  const requests: string[] = []
+  const mocked = spyOn(globalThis, 'fetch').mockImplementation(
+    Object.assign(
+      async (input: RequestInfo | URL) => {
+        requests.push(String(input))
+        return new Response(null, { status: 204 })
+      },
+      { preconnect: fetch.preconnect }
+    )
+  )
+  try {
+    for (const user_id of ['alice', 'bob']) {
+      const ref = matchBundleUrl(`/api/remote/${user_id}/workspaces/board/views/counter/module`)!
+      expect(ref).toEqual({
+        workspaceId: workspaceIdentity({ id: 'board', remote: { user_id, workspace_id: 'board' } }),
+        kind: 'view',
+        name: 'counter'
+      })
+      reportAppletError(ref.workspaceId, {
+        source: 'window',
+        kind: ref.kind,
+        name: ref.name,
+        message: 'Remote test error'
+      })
+    }
+    expect(requests).toEqual([
+      '/api/remote/alice/workspaces/board/applet-log',
+      '/api/remote/bob/workspaces/board/applet-log'
+    ])
+    expect(matchBundleUrl('/api/remote/%ZZ/workspaces/board/views/counter/module')).toBeNull()
+  } finally {
+    mocked.mockRestore()
+  }
 })

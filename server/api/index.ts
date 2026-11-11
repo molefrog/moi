@@ -40,7 +40,7 @@ import { harnesses } from './harnesses'
 import { clientAppConfig, createdWorkspacesRoot, getAppConfig } from '../app-config'
 import { getAppSettings, pickAppSettingsPatch, saveAppSettings } from '../app-settings'
 import { appletForModule, recordAppletError, getAppletLog, clearAppletLog } from '../applets/log'
-import { apiBaseFor, parseAppletTail, serveWorkspaceFile } from '../applets'
+import { parseAppletTail, serveWorkspaceFile } from '../applets'
 import { applyEnvChanged } from '../workspaces/env-apply'
 import { publishEvent } from '../events'
 import { callFunction, parseFunctionPath } from '../applets/functions'
@@ -233,7 +233,13 @@ one.get('/widgets/*', c => {
   const ws = c.get('ws')
   const { name, file } = parseAppletTail(c.req.url, ws.id, 'widgets')
   if (!name) return c.text('Not found', 404)
-  return serveWidget(name, file, ws.path, apiBaseFor(ws.id), c.req.header('if-none-match'))
+  return serveWidget(
+    name,
+    file,
+    ws.path,
+    workspaceApiBase(ws.id, c.req.param('userId')),
+    c.req.header('if-none-match')
+  )
 })
 
 // Views — full-screen agent apps. Mirrors the widget pair above: the exact path
@@ -304,7 +310,13 @@ one.get('/views/*', c => {
   const ws = c.get('ws')
   const { name, file } = parseAppletTail(c.req.url, ws.id, 'views')
   if (!name) return c.text('Not found', 404)
-  return serveView(name, file, ws.path, apiBaseFor(ws.id), c.req.header('if-none-match'))
+  return serveView(
+    name,
+    file,
+    ws.path,
+    workspaceApiBase(ws.id, c.req.param('userId')),
+    c.req.header('if-none-match')
+  )
 })
 
 one.post('/views', async c => {
@@ -949,6 +961,19 @@ one.get('/', async c => {
 
 // Thumbnail freshness records, without image bytes — the capture hook compares
 // these against live bundle revisions. Images are served per-applet below.
+one.get('/home-preview', async c => {
+  const ws = c.get('ws')
+  const views = await listCompiledViews(ws.path).catch(() => [])
+  return c.json(
+    await getWorkspacePreview(ws.path, {
+      // Remote previews expose shared applets, never the owner's chat history.
+      viewIds: views.map(view => view.id),
+      thumbnailUrl: (kind, id, capturedAt) =>
+        `${workspaceApiBase(ws.id, c.req.param('userId'))}/applet-thumbnails/${kind}/${id}:${Date.parse(capturedAt).toString(36)}`
+    })
+  )
+})
+
 one.get('/applet-thumbnails', async c =>
   c.json({ thumbnails: await getAppletThumbnailRecords(c.get('ws').path) })
 )

@@ -1,3 +1,4 @@
+import { workspaceIdentity } from '@/lib/workspace-identity'
 import { memberKeys } from './keys'
 import { afterEach, expect, test } from 'bun:test'
 import { queryClient } from '@/client/api/query-client'
@@ -117,4 +118,13 @@ test('optimistic pending actions are derived over the newest snapshot without mu
   const pushed = { ...current, members: [alex] }
   expect(applyPendingMembership(pushed, pending)?.members).toEqual([alex])
   expect(applyPendingMembership(pushed, [])).toEqual(pushed)
+})
+
+test('local membership bootstrap preserves separately fetched remote members', () => {
+  setIdentity(alex)
+  const id = workspaceIdentity({ id: 'board', remote: { user_id: 'host', workspace_id: 'board' } })
+  expect(getWorkspaceDirectory(id)).toBeUndefined()
+  setWorkspaceMembers(id, { members: [alex, bot], invitations: [] })
+  setAllWorkspaceMembers([])
+  expect(getWorkspaceDirectory(id)?.map(user => user.id)).toHaveLength(2)
 })

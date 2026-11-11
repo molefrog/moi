@@ -413,7 +413,7 @@ describe('attachAppletBridge', () => {
     // segment sweep walks cached keys — mirror that order here.
     setCachedApplet(key, Promise.resolve(mod))
     attachAppletBridge(mod, ws, key, WIDGET)
-    invalidateAppletSegment('widgets')
+    invalidateAppletSegment('widgets', ws)
     mod.navigate('moi:/overview')
     expect(calls).toEqual([])
   })

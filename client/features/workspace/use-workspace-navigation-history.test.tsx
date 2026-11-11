@@ -191,6 +191,7 @@ function mountNavigation(
           cwd: null,
           provider: null,
           workspaceId: 'abc',
+          chatAvailable: true,
           isLoading: false
         }}
       >

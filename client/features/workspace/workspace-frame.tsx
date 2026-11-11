@@ -9,15 +9,23 @@ import { useWorkspaceLayoutCtx } from './workspace-layout-context'
 import { WorkspaceSplitLayout } from './workspace-split-layout'
 
 export function useWorkspaceFrame(expanded = false) {
-  const { layout, setLayout } = useWorkspaceLayoutCtx()
+  const { layout, setLayout, chatAvailable } = useWorkspaceLayoutCtx()
   const { ref, fits, constraints } = useFitsSplitLayout<HTMLDivElement>()
   const chatWidth = useUiStore(state => state.dockedChatWidth)
   const setChatWidth = useUiStore(state => state.setDockedChatWidth)
   const mode: LayoutMode =
-    !expanded && fits && layout.layoutMode === 'split' ? 'split' : 'fullscreen'
+    chatAvailable && !expanded && fits && layout.layoutMode === 'split' ? 'split' : 'fullscreen'
   const setMode = (layoutMode: LayoutMode) => setLayout({ layoutMode })
 
-  return { ref, canUseSplit: fits, constraints, mode, setMode, chatWidth, setChatWidth }
+  return {
+    ref,
+    canUseSplit: chatAvailable && fits,
+    constraints,
+    mode,
+    setMode,
+    chatWidth,
+    setChatWidth
+  }
 }
 
 type WorkspaceFrameProps = {

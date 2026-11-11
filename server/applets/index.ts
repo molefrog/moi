@@ -182,7 +182,7 @@ export async function serveApplet(
   if (HASHED_FILE_RE.test(file)) {
     cache = { 'Cache-Control': IMMUTABLE_CACHE }
   } else {
-    const etag = `"${bunFile.size}-${Math.trunc(bunFile.lastModified)}"`
+    const etag = `"${bunFile.size}-${Math.trunc(bunFile.lastModified)}-${Bun.hash(apiBase)}"`
     cache = { ETag: etag, 'Cache-Control': 'private, no-cache' }
     if (ifNoneMatch === etag) return new Response(null, { status: 304, headers: cache })
   }
@@ -199,12 +199,6 @@ export async function serveApplet(
 // ---- route helpers ----------------------------------------------------------
 // Pure helpers behind the applet/files/rpc HTTP routes, kept here (not web.ts) so
 // they're unit-testable without importing web.ts — which binds ports on load.
-
-// The API base a served bundle's sentinel is rewritten to. RPC and workspace
-// file addresses resolved by `resolveUrl()` use this prefix.
-export function apiBaseFor(id: string): string {
-  return `/api/workspaces/${id}`
-}
 
 // The entry's real name in the bundle dir (`.build/<kind>/<name>/index.js`).
 const ENTRY_DISK_FILE = 'index.js'
@@ -241,7 +235,8 @@ export function parseAppletTail(
   id: string,
   segment: 'widgets' | 'views'
 ): { name: string; file: string } {
-  const tail = new URL(url).pathname.split(`/api/workspaces/${id}/${segment}/`)[1] ?? ''
+  const tail =
+    new URL(url).pathname.split(`/workspaces/${encodeURIComponent(id)}/${segment}/`)[1] ?? ''
   const slash = tail.indexOf('/')
   if (slash === -1) return { name: tail.replace(/\.js$/, ''), file: ENTRY_DISK_FILE }
   const file = tail.slice(slash + 1)

@@ -119,7 +119,7 @@ function tabItemFor(
 
 export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentProps) {
   const { environment } = useAppConfig()
-  const { layout, workspaceId } = useWorkspaceLayoutCtx()
+  const { layout, workspaceId, chatAvailable } = useWorkspaceLayoutCtx()
   const theme = resolveWorkspaceTheme(layout.theme)
   const viewActions = useViewActions()
   const frame = useWorkspaceFrame()
@@ -219,6 +219,7 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
   const startupPending = !pinnedSessionId && activePendingView?.status === 'starting'
   const visibleChatLoaded = chatLoaded && !startupPending
   const canAnnotate =
+    chatAvailable &&
     widgetMode === 'idle' &&
     ((activeTab === 'overview' && hasAppletWidgets) || activeView !== undefined)
   const {
@@ -344,6 +345,7 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
   }
 
   const openChat = (intent?: string) => {
+    if (!chatAvailable) return
     if (intent !== undefined) {
       useUiStore
         .getState()
@@ -387,12 +389,16 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
           onClick: () => openTab(tab)
         })
       ),
-    {
-      key: 'create-view',
-      Icon: IconBrowserPlus,
-      label: 'New view',
-      onClick: createView
-    }
+    ...(chatAvailable
+      ? [
+          {
+            key: 'create-view',
+            Icon: IconBrowserPlus,
+            label: 'New view',
+            onClick: createView
+          }
+        ]
+      : [])
   ]
 
   const removeViewDrawing = useCallback(() => {
@@ -578,10 +584,10 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
     <WorkspaceFrame
       frame={frame}
       workspace={workspacePanel}
-      chat={dockedChat}
+      chat={chatAvailable ? dockedChat : undefined}
       onClick={onNavigationClick}
     >
-      {mode === 'fullscreen' && (
+      {chatAvailable && mode === 'fullscreen' && (
         <ChatPopup
           agent={theme.agent}
           loading={hasRunningSession}

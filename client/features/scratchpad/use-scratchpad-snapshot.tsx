@@ -1,3 +1,5 @@
+import { requestJson } from '@/client/api/http'
+import { workspaceBase } from '@/lib/workspace-identity'
 import { useCallback, useEffect, useState } from 'react'
 
 import { IconVersions } from '@tabler/icons-react'
@@ -63,8 +65,7 @@ export function useScratchpadSnapshot(workspaceId: string): {
 
   useEffect(() => {
     let cancelled = false
-    fetch(`/api/workspaces/${workspaceId}/scratchpad`)
-      .then(response => response.json())
+    requestJson<ScratchpadFetch>(`${workspaceBase(workspaceId)}/scratchpad`)
       .then((data: ScratchpadFetch) => {
         if (cancelled) return
         let snapshot: TLEditorSnapshot['document'] | undefined
@@ -76,7 +77,13 @@ export function useScratchpadSnapshot(workspaceId: string): {
         setResult({ snapshot, skew })
       })
       .catch(() => {
-        if (!cancelled) setResult({ skew: null })
+        if (!cancelled)
+          setResult({
+            skew: {
+              newer: false,
+              detail: 'Couldn’t load the canvas. Reopen Scratchpad to try again.'
+            }
+          })
       })
     return () => {
       cancelled = true

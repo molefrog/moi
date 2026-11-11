@@ -123,6 +123,7 @@ export async function listWidgets(workspacePath: string): Promise<Response> {
 
 export async function handleBundle(
   publish: (msg: unknown) => void,
+  workspaceId: string,
   workspacePath: string,
   force = false,
   target?: string
@@ -151,7 +152,7 @@ export async function handleBundle(
   const changedServerModules = new Set<string>()
   for (const r of results) {
     if (r.status === 'built') {
-      publish({ type: 'widget:updated', name: r.name, config: r.config ?? null })
+      publish({ type: 'widget:updated', workspaceId, name: r.name, config: r.config ?? null })
       for (const m of r.serverModules ?? []) changedServerModules.add(m)
     }
   }
@@ -162,7 +163,7 @@ export async function handleBundle(
 
   if (layoutChanged) {
     const widgets = await getWidgetList(workspacePath)
-    publish({ type: 'widget-layout:updated', widgets })
+    publish({ type: 'widget-layout:updated', workspaceId, widgets })
   }
 
   return results

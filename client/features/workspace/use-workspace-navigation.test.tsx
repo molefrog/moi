@@ -84,6 +84,7 @@ function readNavigation(
                 cwd: null,
                 provider: null,
                 workspaceId: 'abc',
+                chatAvailable: true,
                 isLoading: false
               }}
             >

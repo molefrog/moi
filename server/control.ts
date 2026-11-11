@@ -133,7 +133,13 @@ export const control = Bun.serve({
           }[] = []
           await serializeWorkspaceBundle(workspacePath, async () => {
             if (only?.segment !== 'views') {
-              for (const r of await handleBundle(publishEvent, workspacePath, force, only?.id)) {
+              for (const r of await handleBundle(
+                publishEvent,
+                match.id,
+                workspacePath,
+                force,
+                only?.id
+              )) {
                 if (!only?.id || r.name === only.id) {
                   results.push({ kind: 'widget', name: r.name, status: r.status, error: r.error })
                 }

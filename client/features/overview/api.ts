@@ -1,3 +1,4 @@
+import { workspaceBase } from '@/lib/workspace-identity'
 import { useMemo } from 'react'
 
 import { useQuery } from '@tanstack/react-query'
@@ -16,7 +17,7 @@ export function useWidgets(workspaceId: string) {
     queryKey: workspaceKeys.widgets(workspaceId),
     queryFn: async () => {
       const data = await requestJson<{ widgets: WidgetInfo[] }>(
-        `/api/workspaces/${workspaceId}/widgets`
+        `${workspaceBase(workspaceId)}/widgets`
       )
       return data.widgets
     },

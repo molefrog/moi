@@ -1,8 +1,10 @@
+import { CloudApiError } from '../../account/api'
+import { remoteFromIdentity } from '@/lib/workspace-identity'
 import { useMutation, useMutationState, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useWorkspaces } from '../../home/api'
 import { getAccountGeneration } from '../../identity/store'
 import { useIdentity } from '../../identity/use-identity'
-import { ownerOnlyWorkspaceMembers } from './store'
+import { ownerOnlyWorkspaceMembers, removeWorkspaceMembers } from './store'
 import { memberKeys } from './keys'
 import { identityKey } from '../../identity/types'
 import {
@@ -41,21 +43,36 @@ export function applyPendingMembership(
 export function useWorkspaceMembers(workspaceId: string | undefined) {
   const identity = useIdentity()
   const accountId = identity ? identityKey(identity) : undefined
+  const remote = workspaceId ? remoteFromIdentity(workspaceId) : undefined
   const enabled = !!workspaceId && identity?.type === 'user' && !identity.isAnonymous
   const accountGeneration = getAccountGeneration()
   const mutationKey = ['workspace-members-action', accountGeneration, workspaceId]
   const query = useQuery({
     queryKey: memberKeys.workspace(accountId, workspaceId ?? ''),
-    initialData: ownerOnlyWorkspaceMembers,
+    initialData: remote ? undefined : ownerOnlyWorkspaceMembers,
     queryFn: async ({ signal }) => {
-      const snapshot = await fetchWorkspaceMembers(workspaceId!, signal)
-      if (signal.aborted || accountGeneration !== getAccountGeneration())
-        throw new Error('Identity changed')
-      return snapshot
+      try {
+        const snapshot = await fetchWorkspaceMembers(workspaceId!, signal)
+        if (signal.aborted || accountGeneration !== getAccountGeneration())
+          throw new Error('Identity changed')
+        return snapshot
+      } catch (error) {
+        if (
+          remote &&
+          !signal.aborted &&
+          accountGeneration === getAccountGeneration() &&
+          error instanceof CloudApiError &&
+          (error.status === 403 || error.status === 404)
+        ) {
+          removeWorkspaceMembers(workspaceId!)
+        }
+        throw error
+      }
     },
     enabled,
     retry: false,
-    staleTime: 30_000
+    staleTime: 30_000,
+    refetchInterval: 30_000
   })
   const pending = useMutationState({
     filters: { mutationKey, status: 'pending', exact: true },

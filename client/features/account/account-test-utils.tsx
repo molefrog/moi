@@ -126,7 +126,7 @@ export async function mountAccount({
               ? Response.json(cloudSession)
               : Response.json({ error: 'No session' }, { status: 401 })
         }
-        if (path.endsWith('/members') && (!init?.method || init.method === 'GET')) {
+        if (path.split('?')[0]!.endsWith('/members') && (!init?.method || init.method === 'GET')) {
           if (pendingMembership) await membershipRequest.promise
           return failures.membership
             ? Response.json({ error: 'Members unavailable' }, { status: 503 })

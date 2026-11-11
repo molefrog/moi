@@ -124,6 +124,7 @@ function OverviewHeader({
   onCustomizingChange,
   onThemingChange
 }: OverviewHeaderProps) {
+  const { remote } = useWorkspaceLayoutCtx()
   return (
     <div className="flex size-full items-center gap-4">
       <WorkspaceName />
@@ -140,11 +141,13 @@ function OverviewHeader({
           active={theming}
           onClick={() => onThemingChange(!theming)}
         />
-        <WorkspaceSettingsDialog>
-          <WorkspaceSettingsDialogTrigger
-            render={<OverviewHeaderAction Icon={IconSettings} label="Settings" />}
-          />
-        </WorkspaceSettingsDialog>
+        {!remote && (
+          <WorkspaceSettingsDialog>
+            <WorkspaceSettingsDialogTrigger
+              render={<OverviewHeaderAction Icon={IconSettings} label="Settings" />}
+            />
+          </WorkspaceSettingsDialog>
+        )}
       </div>
     </div>
   )
@@ -189,7 +192,7 @@ export function Overview({
   widgets,
   views
 }: OverviewProps) {
-  const { layout, setLayout } = useWorkspaceLayoutCtx()
+  const { layout, setLayout, chatAvailable } = useWorkspaceLayoutCtx()
   const hasSentMessageFromMoi = useUiStore(state => state.hasSentMessageFromMoi)
   const widgetById = new Map(widgets.map(widget => [widget.id, widget]))
 
@@ -205,7 +208,8 @@ export function Overview({
   const hiddenItems: GridItem[] = widgets
     .filter(w => !gridIds.has(w.id))
     .map(w => ({ id: w.id, w: w.config.colSpan, h: w.config.rowSpan }))
-  const showCreationState = !customizing && visibleItems.every(item => isDefaultWidget(item.id))
+  const showCreationState =
+    chatAvailable && !customizing && visibleItems.every(item => isDefaultWidget(item.id))
   const showOnboarding =
     !hasSentMessageFromMoi && widgets.every(widget => isDefaultWidget(widget.id))
 
@@ -285,7 +289,7 @@ export function Overview({
               ref={panelRef}
               items={hiddenItems}
               renderItem={renderItem}
-              onCreateWidget={onCreateWidget}
+              onCreateWidget={chatAvailable ? onCreateWidget : undefined}
               onClose={() => onCustomizingChange(false)}
               onRestore={restore}
             />

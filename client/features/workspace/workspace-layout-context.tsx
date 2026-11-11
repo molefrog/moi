@@ -1,3 +1,7 @@
+import { chatAvailable } from '@/client/features/workspace/chat-availability'
+import { Button } from '@/client/components/ui/button'
+import { Spinner } from '@/client/components/ui/spinner'
+import type { RemoteWorkspaceTarget } from '@/lib/workspace-config'
 import { type ReactNode, createContext, useCallback, useContext, useMemo, useRef } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
@@ -31,6 +35,8 @@ export type WorkspaceLayoutContextValue = {
   // The workspace's registry id (the route param), so descendants can key
   // their own queries (e.g. the model picker) without prop-drilling.
   workspaceId: string
+  chatAvailable: boolean
+  remote?: RemoteWorkspaceTarget
   isLoading: boolean
 }
 
@@ -55,7 +61,14 @@ export function useWorkspaceThemeSetting(): WorkspaceLayout['theme'] {
 // Strip the server-only metadata so what we PUT back (and expose as `layout`)
 // is just the persisted `WorkspaceLayout`.
 function stripMeta(data: WorkspaceLayoutResponse): WorkspaceLayout {
-  const { cwd: _cwd, name: _name, provider: _provider, agentId: _agentId, ...layout } = data
+  const {
+    cwd: _cwd,
+    name: _name,
+    provider: _provider,
+    agentId: _agentId,
+    remote: _remote,
+    ...layout
+  } = data
   return layout
 }
 
@@ -121,10 +134,21 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
       cwd: query.data?.cwd ?? null,
       provider: query.data ? (query.data.provider ?? 'claude-code') : null,
       workspaceId: id,
+      remote: query.data?.remote,
+      chatAvailable: chatAvailable(id),
       isLoading: query.isLoading
     }),
     [query.data, query.isLoading, setLayout, id]
   )
 
+  if (query.isPending) return <Spinner />
+  if (query.isError)
+    return (
+      <div role="alert" className="p-4">
+        <p>Couldn’t open workspace</p>
+        <p>{query.error.message}</p>
+        <Button onClick={() => void query.refetch()}>Retry</Button>
+      </div>
+    )
   return <WorkspaceLayoutContext value={value}>{children}</WorkspaceLayoutContext>
 }

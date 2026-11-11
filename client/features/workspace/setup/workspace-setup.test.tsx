@@ -37,6 +37,7 @@ function ScreenFixture({ workspaceId = 'test', contentPending = false }: ScreenF
         name: 'Test workspace',
         cwd: null,
         provider: 'codex',
+        chatAvailable: true,
         isLoading: false
       }}
     >

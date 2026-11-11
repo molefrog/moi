@@ -1,3 +1,4 @@
+import { chatAvailable } from '@/client/features/workspace/chat-availability'
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 
 import { requestJson } from '@/client/api/http'
@@ -33,6 +34,7 @@ export function workspaceStateOptions(queryClient: QueryClient, workspaceId: str
   const queryKey = workspaceStateKey(workspaceId)
   return {
     queryKey,
+    enabled: chatAvailable(workspaceId),
     queryFn: async ({ signal }: { signal: AbortSignal }) => {
       const next = await requestJson<WorkspaceState>(`/api/workspaces/${workspaceId}/state`, {
         signal
