@@ -367,6 +367,14 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
   useAppletChatMessage({ sessionId, send, revealChat: openChat, agentAvailability })
   useAppletChatAttachment(composerSessionId, openChat)
 
+  const onCreateView = chatAvailable ? createView : undefined
+  const onCreateWidget = chatAvailable
+    ? () => {
+        selectSession(null)
+        openChat('Create widget')
+      }
+    : undefined
+
   const createItems: CreateWorkspaceTabItem[] = [
     ...(!openSet.has('scratchpad')
       ? ([
@@ -389,13 +397,13 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
           onClick: () => openTab(tab)
         })
       ),
-    ...(chatAvailable
+    ...(onCreateView
       ? [
           {
             key: 'create-view',
             Icon: IconBrowserPlus,
             label: 'New view',
-            onClick: createView
+            onClick: onCreateView
           }
         ]
       : [])
@@ -472,11 +480,8 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
               widgets={widgets}
               views={allViews}
               onOpenView={viewId => openTab(viewTabId(viewId))}
-              onCreateView={createView}
-              onCreateWidget={() => {
-                selectSession(null)
-                openChat('Create widget')
-              }}
+              onCreateView={onCreateView}
+              onCreateWidget={onCreateWidget}
             />
           ) : activeTab === 'scratchpad' ? (
             <Suspense fallback={null}>

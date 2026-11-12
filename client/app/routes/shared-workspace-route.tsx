@@ -4,8 +4,11 @@ import { Link, useLocation } from 'wouter'
 import { SidebarLayout } from '../shell/sidebar-layout'
 import { requestJson, jsonRequest } from '@/client/api/http'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { Button } from '@/client/components/ui/button'
-import { WorkspaceLoadingState } from '@/client/features/workspace/setup/workspace-recovery-states'
+import {
+  RecoveryMessage,
+  WorkspaceLoadingState
+} from '@/client/features/workspace/setup/workspace-recovery-states'
+import { WorkspacePendingScreen } from '@/client/features/workspace/workspace-pending-screen'
 import type { WorkspaceEntry } from '@/lib/types'
 
 type SharedWorkspaceRouteProps = { userId: string; workspaceId: string }
@@ -30,19 +33,23 @@ export function SharedWorkspaceRoute({ userId, workspaceId }: SharedWorkspaceRou
   }, [query.data, client, navigate])
   return (
     <SidebarLayout>
-      <div className="flex flex-1 items-center justify-center">
+      <WorkspacePendingScreen setupRequired={query.isError}>
         {query.isError ? (
-          <div role="alert">
-            <p className="text-sm">{query.error.message}</p>
-            <Button onClick={() => void query.refetch()}>Retry</Button>
+          <RecoveryMessage
+            title="Couldn’t open workspace"
+            retrying={query.isFetching}
+            onRetry={() => void query.refetch()}
+          >
+            {query.error.message}
+            <br />
             <Link href="/">Back</Link>
-          </div>
+          </RecoveryMessage>
         ) : (
-          <div role="status" aria-label="Opening shared workspace">
+          <div className="flex flex-1" role="status" aria-label="Opening shared workspace">
             <WorkspaceLoadingState />
           </div>
         )}
-      </div>
+      </WorkspacePendingScreen>
     </SidebarLayout>
   )
 }

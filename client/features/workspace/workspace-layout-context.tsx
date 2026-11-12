@@ -1,5 +1,5 @@
-import { Button } from '@/client/components/ui/button'
-import { Spinner } from '@/client/components/ui/spinner'
+import { WorkspacePendingScreen } from './workspace-pending-screen'
+import { RecoveryMessage, WorkspaceLoadingState } from './setup/workspace-recovery-states'
 import type { RemoteWorkspaceTarget } from '@/lib/workspace-config'
 import { type ReactNode, createContext, useCallback, useContext, useMemo, useRef } from 'react'
 
@@ -141,14 +141,25 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
     [query.data, query.isLoading, setLayout, id]
   )
 
-  if (query.isPending) return <Spinner />
-  if (query.isError)
-    return (
-      <div role="alert" className="p-4">
-        <p>Couldn’t open workspace</p>
-        <p>{query.error.message}</p>
-        <Button onClick={() => void query.refetch()}>Retry</Button>
-      </div>
-    )
-  return <WorkspaceLayoutContext value={value}>{children}</WorkspaceLayoutContext>
+  return (
+    <WorkspaceLayoutContext value={value}>
+      {query.isPending ? (
+        <WorkspacePendingScreen>
+          <WorkspaceLoadingState />
+        </WorkspacePendingScreen>
+      ) : query.isError ? (
+        <WorkspacePendingScreen setupRequired>
+          <RecoveryMessage
+            title="Couldn’t open workspace"
+            retrying={query.isFetching}
+            onRetry={() => void query.refetch()}
+          >
+            {query.error.message}
+          </RecoveryMessage>
+        </WorkspacePendingScreen>
+      ) : (
+        children
+      )}
+    </WorkspaceLayoutContext>
+  )
 }

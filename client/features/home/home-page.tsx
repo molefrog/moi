@@ -195,7 +195,7 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
           aria-label={`Open ${name}`}
           className="absolute inset-0 rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         />
-        {previewQuery.data && !workspace.remote && (
+        {previewQuery.data && (
           <Tooltip>
             <TooltipTrigger
               render={

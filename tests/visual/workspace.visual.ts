@@ -192,6 +192,9 @@ test(
   async page => {
     await page.goto(remotePage)
     await expect(page.getByRole('button', { name: 'Customize', exact: true })).toBeVisible()
+    await expect(
+      page.getByText('Widgets can surface information, read data, and perform actions')
+    ).toBeVisible()
     await expect(page.getByRole('button', { name: 'New widget', exact: true })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Create tab', exact: true })).toBeVisible()
     await expect(
@@ -222,7 +225,7 @@ test(
     )
     await page.goto(remotePage)
     await expect(page.getByRole('alert')).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible()
   },
   { api: remoteAnswers }
 )
@@ -369,7 +372,7 @@ test('shared workspace setup failed', async page => {
     route.fulfill({ status: 503, body: 'Could not initialize workspace' })
   )
   await page.goto('/#/shared/alice/board')
-  await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Back', exact: true })).toBeVisible()
 })
 

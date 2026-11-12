@@ -93,7 +93,13 @@ type RecoveryMessageProps = RecoveryRetryProps & {
   children: ReactNode
 }
 
-function RecoveryMessage({ title, type, children, retrying, onRetry }: RecoveryMessageProps) {
+export function RecoveryMessage({
+  title,
+  type,
+  children,
+  retrying,
+  onRetry
+}: RecoveryMessageProps) {
   return (
     <div className="flex flex-1 items-center justify-center p-6">
       <div className="flex w-full max-w-md flex-col gap-6">

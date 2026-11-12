@@ -8,7 +8,7 @@ import { ViewsWidget } from './views-widget'
 export type DefaultWidgetRenderContext = {
   views: ViewInfo[]
   onOpenView: (viewId: string) => void
-  onCreateView: () => void
+  onCreateView?: () => void
   showOnboarding: boolean
 }
 
