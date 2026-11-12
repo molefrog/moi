@@ -8,6 +8,8 @@ import { join } from 'node:path'
 import { DATA_DIR } from '../data-dir'
 import { PACKAGE_ROOT } from '../version'
 
+export class CloudSignInRequired extends Error {}
+
 const credentialsSchema = z.object({
   accessToken: z.string().min(1),
   refreshToken: z.string().min(1),
@@ -112,7 +114,7 @@ export function createRemoteClient(directory: string) {
       value = await Bun.file(authFile).json()
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT')
-        throw new Error('Not signed in — run moi remote login')
+        throw new CloudSignInRequired('Sign in with moi remote login to see shared workspaces')
       throw new Error('Could not read remote credentials — run moi remote login')
     }
     const parsed = credentialsSchema.safeParse(value)

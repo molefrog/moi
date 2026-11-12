@@ -1,3 +1,4 @@
+import { SharedWorkspaces } from './shared-workspaces'
 import { useState } from 'react'
 
 import { IconChevronRight, IconEggCracked, IconLoader2, IconPlus } from '@tabler/icons-react'
@@ -68,7 +69,7 @@ export function HomePage() {
     )
   }
 
-  const workspaces = workspacesQuery.data
+  const workspaces = workspacesQuery.data.filter(workspace => !workspace.remote)
   const discovered = discoveredQuery.data
   const count = workspaces.length
 
@@ -118,6 +119,8 @@ export function HomePage() {
           <CreateWorkspaceDialog trigger={<Button>New workspace</Button>} />
         </div>
       )}
+
+      <SharedWorkspaces />
 
       {discovered.length > 0 && (
         <section>

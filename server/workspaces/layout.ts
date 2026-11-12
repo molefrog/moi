@@ -1,6 +1,8 @@
+import { mkdir, writeFile } from 'node:fs/promises'
 import {
   parseRemoteWorkspaceConfig,
   personalWorkspaceConfig,
+  type RemoteWorkspaceTarget,
   type WorkspaceFileConfig,
   type WorkspacePersonalConfig
 } from '@/lib/workspace-config'
@@ -196,4 +198,14 @@ export async function getWorkspacePreview(
   } catch {
     return { thumbnails: [] }
   }
+}
+
+export async function initializeRemoteWorkspaceConfig(
+  workspacePath: string,
+  remote: RemoteWorkspaceTarget
+): Promise<void> {
+  await mkdir(join(workspacePath, '.moi'), { recursive: true })
+  await writeFile(getLayoutPath(workspacePath), JSON.stringify({ version: 2, remote }, null, 2), {
+    flag: 'wx'
+  })
 }

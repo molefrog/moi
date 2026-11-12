@@ -171,6 +171,7 @@ export const API: Record<string, unknown> = {
   '/api/settings': { showOnboarding: false, autoUpdateSkills: false } satisfies AppSettings,
   '/api/harnesses/status': HARNESSES,
   '/api/workspaces': workspaces,
+  '/api/workspaces/shared': [],
   '/api/workspaces/discover': [],
   '/api/workspaces/previews': {
     [WORKSPACE]: {

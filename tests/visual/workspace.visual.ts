@@ -261,7 +261,7 @@ test(
   'remote home card uses owner metadata without a chat shortcut',
   async page => {
     await page.goto('/#/')
-    await expect(page.getByRole('link', { name: 'Open Shared board', exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Shared board Alice', exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Chat in Shared board', exact: true })).toHaveCount(
       0
     )
@@ -269,6 +269,9 @@ test(
   {
     api: {
       ...remoteAnswers,
+      '/api/workspaces/shared': [
+        { id: 'owner-board', owner: { id: 'alice', name: 'Alice' }, name: 'Shared board' }
+      ],
       '/api/workspaces': [
         {
           id: REMOTE,
@@ -332,3 +335,51 @@ test(
     }
   }
 )
+
+for (const state of ['loading', 'error', 'signed-out', 'empty'] as const) {
+  test(
+    `shared workspace list ${state}`,
+    async page => {
+      if (state === 'loading')
+        await page.route('**/api/workspaces/shared', () => new Promise(() => {}))
+      if (state === 'error' || state === 'signed-out')
+        await page.route('**/api/workspaces/shared', route =>
+          route.fulfill({
+            status: state === 'signed-out' ? 401 : 503,
+            body: state === 'signed-out' ? 'Sign in with moi remote login' : 'Cloud unavailable'
+          })
+        )
+      await page.goto('/#/')
+      if (state === 'loading')
+        await expect(page.getByText('Loading shared workspaces…')).toBeVisible()
+      else if (state === 'empty')
+        await expect(page.getByText('Shared with you', { exact: true })).toHaveCount(0)
+      else await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible()
+    },
+    { api: { '/api/workspaces/shared': [] } }
+  )
+}
+test('shared workspace opening', async page => {
+  await page.route('**/api/workspaces/shared/open', () => new Promise(() => {}))
+  await page.goto('/#/shared/alice/board')
+  await expect(page.getByRole('status', { name: 'Opening shared workspace' })).toBeVisible()
+})
+test('shared workspace setup failed', async page => {
+  await page.route('**/api/workspaces/shared/open', route =>
+    route.fulfill({ status: 503, body: 'Could not initialize workspace' })
+  )
+  await page.goto('/#/shared/alice/board')
+  await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Back', exact: true })).toBeVisible()
+})
+
+test('shared workspace opens after setup', async page => {
+  await page.route('**/api/workspaces/shared/open', route =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ id: WORKSPACE, path: '/visitor', addedAt: '' })
+    })
+  )
+  await page.goto('/#/shared/alice/board')
+  await expect(page.getByRole('button', { name: 'Theme', exact: true })).toBeVisible()
+})

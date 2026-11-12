@@ -57,7 +57,7 @@ CLI commands call the same workspace API as the browser, so they need no remote 
 - `refresh` and `scratch view` target visitor browsers. Skills and environment commands stay local.
 - Source editing, builds, and agent-backed commands remain deferred for remote references.
 
-[`moi remote --json`](remote-cli.md) lists accepted shared workspaces: map `id` to `workspace_id` and `owner.id` to `user_id`. Discovery does not create folders, install skills, or register references. Cloud credentials stay in Moi’s data directory.
+[`moi remote --json`](remote-cli.md) lists accepted shared workspaces: map `id` to `workspace_id` and `owner.id` to `user_id`. The home page lists accepted shares in **Shared with you** without changing files. Opening a share creates its reference under the configured workspace root (normally `~/moi`), installs the skill, and registers it. Existing references and personal settings are preserved. Removed shares disappear from this list; their local files remain. Cloud credentials stay in Moi’s data directory.
 
 In cloud mode, presence connects to the owner’s `/collab` endpoint. Owners and accepted members share invite, revoke, and remove controls; the host stays listed. Membership requests use the Cloud API with `owner_id`. Invitation syncing and leaving a workspace remain deferred.
 

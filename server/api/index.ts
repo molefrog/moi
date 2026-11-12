@@ -1,3 +1,5 @@
+import { fetchSharedWorkspaces, CloudSignInRequired } from '../remote/client'
+import { openSharedWorkspace } from '../workspaces/shared'
 import { executeScratchOp } from '../scratchpad/executor'
 import type { ScratchOp, WorkspaceLayoutResponse, WorkspacePreview } from '@/lib/types'
 import { workspaceApiBase, type RemoteWorkspaceTarget } from '@/lib/workspace-config'
@@ -1179,6 +1181,51 @@ async function mergeWorkspaceList(entries: WorkspaceEntry[]) {
     })
   )
 }
+
+workspaces.get('/shared', async c => {
+  if (getAppConfig().demo) return c.json([])
+  try {
+    const shares = await fetchSharedWorkspaces()
+    return c.json(
+      await Promise.all(
+        shares.map(async share => {
+          const metadata = await ownerLayout({
+            user_id: share.owner.id,
+            workspace_id: share.id
+          }).catch(() => undefined)
+          return { ...share, name: metadata?.name || share.id, icon: metadata?.icon }
+        })
+      )
+    )
+  } catch (error) {
+    return c.text(
+      error instanceof Error ? error.message : 'Could not load shared workspaces',
+      error instanceof CloudSignInRequired ? 401 : 503
+    )
+  }
+})
+workspaces.post('/shared/open', async c => {
+  if (getAppConfig().demo) return c.text('Unavailable in demo', 403)
+  const body = await c.req.json().catch(() => null)
+  if (
+    !body ||
+    typeof body.user_id !== 'string' ||
+    typeof body.workspace_id !== 'string' ||
+    !body.user_id ||
+    !body.workspace_id
+  )
+    return c.text('Invalid shared workspace', 400)
+  try {
+    return c.json(
+      await openSharedWorkspace({ user_id: body.user_id, workspace_id: body.workspace_id })
+    )
+  } catch (error) {
+    return c.text(
+      error instanceof Error ? error.message : 'Could not open shared workspace',
+      error instanceof CloudSignInRequired ? 401 : 503
+    )
+  }
+})
 
 workspaces.get('/', async c => {
   // Merge each workspace's live identity and theme over the registry snapshot
