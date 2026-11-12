@@ -66,6 +66,10 @@ test('glyphs and uploads keep their complete presentation in one icon object', a
   expect(list[0]).toMatchObject({ icon: glyph })
 
   expect((await putIcon()).status).toBe(200)
+  expect(published.map(event => JSON.parse(event))).toEqual([
+    { type: 'workspace:updated', workspaceId },
+    { type: 'workspace:updated', workspaceId }
+  ])
   const plain = await loadLayout(workspaceDir)
   expect(plain.icon?.type).toBe('upload')
   if (plain.icon?.type !== 'upload') throw new Error('Expected an uploaded icon')

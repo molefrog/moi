@@ -6,7 +6,7 @@ import { parseHTML } from 'linkedom'
 
 import { AppProvider as EventsProvider } from '@/client/app/app-provider'
 
-import { useWorkspaceEvent } from './use-workspace-events'
+import { useWorkspaceEvent, useWorkspaceScopedEvent } from './use-workspace-events'
 import { WorkspaceEventsClient } from './workspace-events'
 
 type AppProviderProps = { children: ReactNode }
@@ -156,4 +156,36 @@ test('a dropped socket reopens on its own and delivers events again', async () =
   FakeWebSocket.instances[1]!.onmessage?.({ data: JSON.stringify({ type: 'theme:updated' }) })
   expect(received).toEqual(['connection:opened', 'connection:opened', 'theme:updated'])
   client.close()
+})
+
+test('scoped listeners isolate workspaces and still receive global refreshes', async () => {
+  const { root } = installDom()
+  const received: string[] = []
+  function Listener({ id }: { id: string }) {
+    useWorkspaceScopedEvent(id, event => received.push(`${id}:${event.type}`))
+    return null
+  }
+  await act(async () =>
+    root.render(
+      <AppProvider>
+        <Listener id="one" />
+        <Listener id="two" />
+      </AppProvider>
+    )
+  )
+  const socket = FakeWebSocket.instances[0]!
+  const send = (event: object) => socket.onmessage?.({ data: JSON.stringify(event) })
+  send({ type: 'widget:updated', workspaceId: 'one', name: 'counter' })
+  send({ type: 'theme:updated', workspaceId: 'two' })
+  send({ type: 'applets:refresh', workspaceId: 'one' })
+  expect(received).toEqual(['one:widget:updated', 'two:theme:updated', 'one:applets:refresh'])
+  received.length = 0
+  send({ type: 'applets:refresh' })
+  send({ type: 'view:updated', name: 'counter' })
+  expect(received).toEqual([
+    'one:applets:refresh',
+    'two:applets:refresh',
+    'one:view:updated',
+    'two:view:updated'
+  ])
 })

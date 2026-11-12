@@ -162,8 +162,8 @@ export function useAppletCacheInvalidation(): void {
       // Segment-wide: `moi refresh` names no applet, so every cached module in
       // the targeted kind(s) is stale — including ones whose tabs are
       // backgrounded right now.
-      if (event.only !== 'views') invalidateAppletSegment('widgets', workspaceId)
-      if (event.only !== 'widgets') invalidateAppletSegment('views', workspaceId)
+      if (event.only !== 'views') invalidateAppletSegment('widgets', event.workspaceId)
+      if (event.only !== 'widgets') invalidateAppletSegment('views', event.workspaceId)
     }
   })
 }
