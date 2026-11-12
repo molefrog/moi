@@ -109,26 +109,6 @@ function upgrade(server: Upgradable, req: Request, data: WsData) {
     : new Response('Upgrade failed', { status: 500 })
 }
 
-async function upgradeCollab(req: Request, server: Bun.Server<WsData>) {
-  const workspaceId = decodeURIComponent(new URL(req.url).pathname.split('/').at(-2) ?? '')
-  const workspace = await getWorkspace(workspaceId)
-  if (!workspace) return new Response('Workspace not found', { status: 404 })
-  if (getAppConfig().environment !== 'cloud') {
-    return new Response('Collab is not enabled for this workspace', { status: 403 })
-  }
-  // Behind Cloudflare Access, presence is joined only as the verified viewer.
-  const { provider, profile } = await proxyUserState(req)
-  if (provider && !profile) {
-    return new Response('Sign in through Cloudflare Access to join', { status: 401 })
-  }
-  return upgrade(server, req, {
-    channel: 'collab',
-    workspaceId,
-    workspacePath: workspace.path,
-    ...(profile ? { verifiedProfile: profile } : {})
-  })
-}
-
 // Bun owns the fullstack surface: the HTML shell + dev bundler/HMR, and the two
 // WebSocket channels (which need Bun's native `server.upgrade` + pub/sub). Every
 // HTTP API route is delegated to the Hono app (`./api`) via `fetch`.
@@ -200,8 +180,25 @@ export const app = Bun.serve<WsData>({
     '/api/workspaces/ws': (req: Request, server: Bun.Server<WsData>) =>
       upgrade(server, req, { channel: 'events', workspaceId: '' }),
 
-    '/api/workspaces/:id/collab': upgradeCollab,
-    '/api/remote/:userId/workspaces/:id/collab': upgradeCollab
+    '/api/workspaces/:id/collab': async (req: Request, server: Bun.Server<WsData>) => {
+      const workspaceId = decodeURIComponent(new URL(req.url).pathname.split('/')[3] ?? '')
+      const workspace = await getWorkspace(workspaceId)
+      if (!workspace) return new Response('Workspace not found', { status: 404 })
+      if (getAppConfig().environment !== 'cloud') {
+        return new Response('Collab is not enabled for this workspace', { status: 403 })
+      }
+      // Behind Cloudflare Access, presence is joined only as the verified viewer.
+      const { provider, profile } = await proxyUserState(req)
+      if (provider && !profile) {
+        return new Response('Sign in through Cloudflare Access to join', { status: 401 })
+      }
+      return upgrade(server, req, {
+        channel: 'collab',
+        workspaceId,
+        workspacePath: workspace.path,
+        ...(profile ? { verifiedProfile: profile } : {})
+      })
+    }
   },
   // Anything not matched above (the whole HTTP API + prod static assets + 404)
   // is handled by Hono.

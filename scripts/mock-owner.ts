@@ -11,7 +11,7 @@ process.env.MOI_ENVIRONMENT = 'cloud'
 const { collabManager } = await import('../server/collab/manager')
 const { api } = await import('../server/api')
 const { registerWorkspace } = await import('../server/workspaces/registry')
-const { provisionWorkspace } = await import('../server/workspaces/init')
+const { installWorkspaceSkills } = await import('../server/skills/workspace')
 const { saveLayout } = await import('../server/workspaces/layout')
 const { buildAllViews } = await import('../server/applets/views')
 const { buildAllWidgets } = await import('../server/applets/widgets')
@@ -49,7 +49,7 @@ if (!(await Bun.file(join(visitor, '.moi/.workspace.json')).exists()))
       selectedModel: 'sonnet'
     })
   )
-await provisionWorkspace(visitor, 'codex')
+await installWorkspaceSkills(visitor, 'codex')
 const component = `import { useEffect, useState } from 'react'; import { read, increment } from './counter.server'; export const config = { title: 'Counter', colSpan: 1, rowSpan: 1 }; export default function Counter() { const [count, setCount] = useState(0); useEffect(() => { read().then(setCount) }, []); return <div className="p-4"><p>Owner count: {count}</p><button onClick={() => increment().then(setCount)}>Increment owner count</button></div> }`
 const functions = `import { join } from 'node:path'; const file = Bun.file(join(import.meta.dir, '../count.json')); export async function read() { return file.json().catch(() => 0) } export async function increment() { const next = (await read()) + 1; await Bun.write(file, JSON.stringify(next)); return next }`
 for (const kind of ['views', 'widgets']) {
@@ -65,11 +65,11 @@ const ownerServer = Bun.serve({
   port: Number(process.env.MOCK_OWNER_PORT ?? 13340),
   fetch: (request, server) => {
     const { pathname } = new URL(request.url)
-    if (!/^\/api\/remote\/alice\/workspaces\/owner-board(?:\/|$)/.test(pathname)) {
+    if (!/^\/api\/workspaces\/owner-board(?:\/|$)/.test(pathname)) {
       return new Response('Unknown mock owner or workspace', { status: 404 })
     }
     console.log(`OWNER ${request.method} ${pathname}`)
-    if (pathname === '/api/remote/alice/workspaces/owner-board/collab') {
+    if (pathname === '/api/workspaces/owner-board/collab') {
       if (server.upgrade(request)) return
       return new Response('WebSocket upgrade required', { status: 426 })
     }

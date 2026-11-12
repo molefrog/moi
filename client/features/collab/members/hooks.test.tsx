@@ -121,7 +121,7 @@ test('remote workspace membership queries address the owner', async () => {
   const ui = await mountAccount({ children: <RemoteMembersProbe /> })
   await ui.settle()
   expect(ui.document.querySelector('[data-enabled]')?.textContent).toBe('true')
-  expect(
-    ui.calls.some(call => call.path === '/cloud/api/workspaces/board/members?owner_id=alice')
-  ).toBe(true)
+  expect(ui.calls.some(call => call.path === '/cloud/api/workspaces/alice:board/members')).toBe(
+    true
+  )
 })

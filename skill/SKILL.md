@@ -52,23 +52,21 @@ User can switch between these, but can access the chat (this conversation and ot
 
 ### Local or remote workspace
 
-Read the `remote` field in `.moi/.workspace.json` before working. This is the only
-exception to the internal-file rule below; do not edit the config. A missing file
-or absent `remote` means local. Resolve parse errors before changing content.
+Read only `remote` in `.moi/.workspace.json` before working; do not edit the file.
+A missing file or absent `remote` means local. Resolve parse errors before editing.
 
-A remote config contains `remote: { user_id, workspace_id }`. Its folder holds the
-visitor's reference, personal tabs/layout/chat defaults, and skills. Shared content
-belongs to the owner; do not create local applet copies to change it.
+`remote: { user_id, workspace_id }` identifies the owner. The local folder holds
+visitor preferences and skills; shared content lives on the owner. Do not create
+local applet copies or fall back to local content when the owner is unavailable.
 
 `moi tabs`, `navigate`, `theme`, `config`, `call-server-fn`, `debug logs`, and `scratch`
-route through the workspace API automatically. Refresh and browser actions target
-the visitor's browser. Skills and environment commands stay local. Source edits,
-builds, and agent-backed commands require the owner's actual workspace.
+use the workspace API automatically. Browser actions target the visitor. Skills
+and environment commands stay local. Source edits, builds, and agent-backed
+commands require the owner's actual workspace. Remote chat and settings UI are
+unavailable. Cloud authentication and allowed operations may limit owner requests.
 
-`moi remote --json` lists accepted workspaces: `id` maps to `workspace_id` and
-`owner.id` to `user_id`. It does not create local references. Remote chats,
-invitation syncing, and settings UI remain unavailable. Never fall back to visitor
-content when the owner is unavailable.
+`moi remote --json` lists accepted shares under `workspaces`; each entry has `id`
+and `owner.id`. It does not create local references.
 
 ### Boundaries
 

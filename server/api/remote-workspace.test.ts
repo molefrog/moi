@@ -23,7 +23,7 @@ beforeEach(async () => {
   setRegistryPath(join(root, 'registry.json'))
   ownerId = (await registerWorkspace(owner)).id
   visitorId = (await registerWorkspace(visitor)).id
-  base = `/api/remote/alice/workspaces/${ownerId}`
+  base = `/api/workspaces/${ownerId}`
   await saveLayout(
     {
       ...createDefaultWorkspaceLayout(),
@@ -55,7 +55,11 @@ beforeEach(async () => {
         async (input: RequestInfo | URL, init?: RequestInit) => {
           const url = new URL(String(input))
           expect(url.origin).toBe('http://gateway.test')
-          return api.request(url.pathname + url.search, init)
+          expect(url.pathname.startsWith(`/api/workspaces/alice:${ownerId}`)).toBe(true)
+          return api.request(
+            url.pathname.replace(`/api/workspaces/alice:${ownerId}`, base) + url.search,
+            init
+          )
         },
         { preconnect: fetch.preconnect }
       )
@@ -155,10 +159,7 @@ test('remote bundle RPC reads and writes owner data; assets and validators retai
   expect(await (await api.request(`${local}/files/hello.svg`)).text()).toBe('<svg/>')
 })
 
-test('deferred operations and removing either workspace are blocked', async () => {
-  for (const path of ['/sessions', '/state', '/harness'])
-    expect((await api.request(base + path)).status).toBe(403)
-  expect((await api.request(base, { method: 'DELETE' })).status).toBe(403)
+test('remote reference blocks unavailable creation and removal but keeps personal state local', async () => {
   expect((await api.request(local, { method: 'DELETE' })).status).toBe(403)
   expect((await api.request(`${local}/views`, { method: 'POST' })).status).toBe(403)
   // Chat state is the visitor's own and never leaves this Moi.
@@ -202,10 +203,10 @@ test('remote scratchpad documents and assets stay on the owner', async () => {
   expect(new Uint8Array(await asset.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]))
 })
 
-test('local, owner-route, and visitor log APIs read and clear the selected workspace journal', async () => {
+test('owner and visitor log APIs read and clear the selected workspace journal', async () => {
   const { recordAppletError, getAppletLog } = await import('../applets/log')
   recordAppletError(visitor, { source: 'runtime', message: 'Visitor error' })
-  for (const prefix of [`/api/workspaces/${ownerId}`, base, local]) {
+  for (const prefix of [base, local]) {
     recordAppletError(owner, { source: 'runtime', message: 'Owner error' })
     const response = await api.request(`${prefix}/applet-log`)
     expect(response.status).toBe(200)
@@ -222,7 +223,7 @@ test('local, owner-route, and visitor log APIs read and clear the selected works
   }
 })
 
-test('local, owner-route, and visitor scratchpad edit APIs reuse the executor and preserve visitor data', async () => {
+test('owner and visitor scratchpad edit APIs reuse the executor and preserve visitor data', async () => {
   const { readScratchpadShapes, readScratchpadImage } = await import('../scratchpad/document')
   const sharp = (await import('sharp')).default
   const image = await sharp({
@@ -230,7 +231,7 @@ test('local, owner-route, and visitor scratchpad edit APIs reuse the executor an
   })
     .png()
     .toBuffer()
-  for (const prefix of [`/api/workspaces/${ownerId}`, base, local]) {
+  for (const prefix of [base, local]) {
     const edit = async (op: unknown, bytes?: Uint8Array) => {
       const body = new FormData()
       body.set('op', JSON.stringify(op))

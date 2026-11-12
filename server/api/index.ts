@@ -215,9 +215,11 @@ async function forwardToOwner(
   answer.delete('content-length')
   const init = { status: response.status, headers: answer }
   if (!answer.get('content-type')?.includes('javascript')) return new Response(response.body, init)
+  // Rewritten JavaScript is a different representation from the owner's bundle.
+  answer.delete('etag')
   const code = await response.text()
   return new Response(
-    code.replaceAll(workspaceApiBase(remote.workspace_id, remote.user_id), workspaceApiBase(id)),
+    code.replaceAll(workspaceApiBase(remote.workspace_id), workspaceApiBase(id)),
     init
   )
 }
@@ -235,25 +237,21 @@ const withWorkspace = createMiddleware<ApiEnv>(async (c, next) => {
     const ws = await getWorkspace(id)
     if (!ws) return c.text('Workspace not found', 404)
     const config = await loadWorkspaceFileConfig(ws.path)
-    const ownerRoute = Boolean(c.req.param('userId'))
     const suffix = (c.req.path.split(`/workspaces/${encodeURIComponent(id)}`)[1] ?? '').replace(
       /\/$/,
       ''
     )
     const personal = PERSONAL_ROUTE_RE.test(suffix)
     if (
-      ownerRoute &&
-      (personal ||
-        (suffix === '' && c.req.method === 'DELETE') ||
-        (suffix === '/views' && c.req.method === 'POST') ||
-        suffix.endsWith('/submit'))
+      config.remote &&
+      ((suffix === '/views' && c.req.method === 'POST') || suffix.endsWith('/submit'))
     )
       return c.text('This operation is unavailable for remote workspaces', 403)
     if (config.remote && suffix === '' && c.req.method === 'DELETE')
       return c.text('Leaving remote workspaces is not available yet', 403)
     // A remote workspace keeps only its registration and personal routes here;
     // everything else is the owner's, so the client speaks one API for both.
-    if (config.remote && !ownerRoute && suffix !== '' && !personal)
+    if (config.remote && suffix !== '' && !personal)
       return await forwardToOwner(c.req.raw, ws.id, config.remote, suffix)
     c.set('ws', ws)
     await next()
@@ -291,13 +289,7 @@ one.get('/widgets/*', c => {
   const ws = c.get('ws')
   const { name, file } = parseAppletTail(c.req.url, ws.id, 'widgets')
   if (!name) return c.text('Not found', 404)
-  return serveWidget(
-    name,
-    file,
-    ws.path,
-    workspaceApiBase(ws.id, c.req.param('userId')),
-    c.req.header('if-none-match')
-  )
+  return serveWidget(name, file, ws.path, workspaceApiBase(ws.id), c.req.header('if-none-match'))
 })
 
 // Views — full-screen agent apps. Mirrors the widget pair above: the exact path
@@ -368,13 +360,7 @@ one.get('/views/*', c => {
   const ws = c.get('ws')
   const { name, file } = parseAppletTail(c.req.url, ws.id, 'views')
   if (!name) return c.text('Not found', 404)
-  return serveView(
-    name,
-    file,
-    ws.path,
-    workspaceApiBase(ws.id, c.req.param('userId')),
-    c.req.header('if-none-match')
-  )
+  return serveView(name, file, ws.path, workspaceApiBase(ws.id), c.req.header('if-none-match'))
 })
 
 one.post('/views', async c => {
@@ -446,10 +432,7 @@ one.post('/views/:viewId/submit', async c => {
 // localhost binding is NOT the guard.
 one.get('/files/*', c => {
   const ws = c.get('ws')
-  const tail =
-    new URL(c.req.url).pathname.split(
-      `${workspaceApiBase(ws.id, c.req.param('userId'))}/files/`
-    )[1] ?? ''
+  const tail = new URL(c.req.url).pathname.split(`${workspaceApiBase(ws.id)}/files/`)[1] ?? ''
   return serveWorkspaceFile(ws.path, tail, c.req.header('range'), c.req.header('if-none-match'))
 })
 
@@ -458,10 +441,7 @@ one.get('/files/*', c => {
 // `…/rpc/<module>/<fn>`.
 one.post('/rpc/*', c => {
   const ws = c.get('ws')
-  const tail =
-    new URL(c.req.url).pathname.split(
-      `${workspaceApiBase(ws.id, c.req.param('userId'))}/rpc/`
-    )[1] ?? ''
+  const tail = new URL(c.req.url).pathname.split(`${workspaceApiBase(ws.id)}/rpc/`)[1] ?? ''
   return handleFunctionCall(c.req.raw, tail, ws.path)
 })
 
@@ -520,10 +500,7 @@ one.post('/applet-log', async c => {
 // images only, resized server-side (see server/workspaces/preview.ts).
 one.get('/preview/*', c => {
   const ws = c.get('ws')
-  const tail =
-    new URL(c.req.url).pathname.split(
-      `${workspaceApiBase(ws.id, c.req.param('userId'))}/preview/`
-    )[1] ?? ''
+  const tail = new URL(c.req.url).pathname.split(`${workspaceApiBase(ws.id)}/preview/`)[1] ?? ''
   return serveWorkspaceImagePreview(ws.path, tail, c.req.header('if-none-match'))
 })
 
@@ -1044,7 +1021,7 @@ one.get('/home-preview', async c => {
       // Remote previews expose shared applets, never the owner's chat history.
       viewIds: views.map(view => view.id),
       thumbnailUrl: (kind, id, capturedAt) =>
-        `${workspaceApiBase(ws.id, c.req.param('userId'))}/applet-thumbnails/${kind}/${id}:${Date.parse(capturedAt).toString(36)}`
+        `${workspaceApiBase(ws.id)}/applet-thumbnails/${kind}/${id}:${Date.parse(capturedAt).toString(36)}`
     })
   )
 })
@@ -1107,7 +1084,14 @@ one.put('/', async c => {
     await saveWorkspacePersonalConfig(personalWorkspaceConfig({ ...config, ...body }), ws.path)
     // A full layout also carries shared edits (grid, theme) for the owner.
     if (!('widgetGrid' in body)) return c.body(null, 204)
-    const { tabs: _tabs, ...shared } = body
+    const {
+      tabs: _tabs,
+      layoutMode: _layoutMode,
+      selectedModel: _model,
+      selectedEffort: _effort,
+      selectedSpeedMode: _speed,
+      ...shared
+    } = body
     return forwardToOwner(
       new Request(c.req.url, {
         method: 'PUT',
@@ -1121,12 +1105,6 @@ one.put('/', async c => {
   }
   const existing = await loadLayout(ws.path)
   const next = mergeLayoutForSave(existing, layout)
-  if (c.req.param('userId')) {
-    delete next.selectedModel
-    delete next.selectedEffort
-    delete next.selectedSpeedMode
-    Object.assign(next, personalWorkspaceConfig(existing))
-  }
   if (harness !== undefined && harness !== (ws.type ?? 'claude-code')) {
     next.selectedModel = existing.selectedModel
     next.selectedEffort = existing.selectedEffort
@@ -1308,7 +1286,7 @@ workspaces.get('/previews', async c => {
             response.ok
               ? (JSON.parse(
                   (await response.text()).replaceAll(
-                    workspaceApiBase(remote.workspace_id, remote.user_id),
+                    workspaceApiBase(remote.workspace_id),
                     workspaceApiBase(ws.id)
                   )
                 ) as WorkspacePreview)
@@ -1386,7 +1364,6 @@ workspaces.route('/:id', one)
 export const api = new Hono()
 
 api.route('/api/workspaces', workspaces)
-api.route('/api/remote/:userId/workspaces/:id', one)
 api.route('/api/harnesses', harnesses)
 api.route('/api/onboarding', onboarding)
 

@@ -27,7 +27,7 @@ export type WorkspaceFileConfig = LocalWorkspaceConfig | RemoteWorkspaceConfig
 
 export function workspaceApiBase(id: string, userId?: string): string {
   return userId
-    ? `/api/remote/${encodeURIComponent(userId)}/workspaces/${encodeURIComponent(id)}`
+    ? `/api/workspaces/${encodeURIComponent(userId)}:${encodeURIComponent(id)}`
     : `/api/workspaces/${encodeURIComponent(id)}`
 }
 

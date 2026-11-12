@@ -34,9 +34,9 @@ test('remote membership actions use the same host workspace', async () => {
   await removeWorkspaceMember(id, 'member-1')
   await revokeWorkspaceInvitation(id, 'invite-1')
   expect(calls).toEqual([
-    { url: '/cloud/api/workspaces/board/members?owner_id=alice', method: 'GET' },
-    { url: '/cloud/api/workspaces/board/invitations?owner_id=alice', method: 'POST' },
-    { url: '/cloud/api/workspaces/board/members/member-1?owner_id=alice', method: 'DELETE' },
-    { url: '/cloud/api/workspaces/board/invitations/invite-1?owner_id=alice', method: 'DELETE' }
+    { url: '/cloud/api/workspaces/alice:board/members', method: 'GET' },
+    { url: '/cloud/api/workspaces/alice:board/invitations', method: 'POST' },
+    { url: '/cloud/api/workspaces/alice:board/members/member-1', method: 'DELETE' },
+    { url: '/cloud/api/workspaces/alice:board/invitations/invite-1', method: 'DELETE' }
   ])
 })

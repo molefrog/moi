@@ -46,6 +46,6 @@ describe('workspace config', () => {
   })
   test('uses owner identifiers independently of visitor registration', () => {
     expect(workspaceApiBase('visitor')).toBe('/api/workspaces/visitor')
-    expect(workspaceApiBase('board', 'alice')).toBe('/api/remote/alice/workspaces/board')
+    expect(workspaceApiBase('board', 'alice')).toBe('/api/workspaces/alice:board')
   })
 })
