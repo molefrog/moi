@@ -27,26 +27,27 @@ import { update } from './commands/update'
 import { version } from './commands/version'
 import { views } from './commands/views'
 import pc from './pc'
+import { remoteWorkspaceCommand } from './remote-command'
 
 // The root help splits the surface by audience: workspace commands are the
 // agent's day-to-day toolkit (skills tell it to run them); system commands
 // manage Moi itself and are for the human at the keyboard.
 const workspaceCommands = {
-  bundle,
-  check,
-  refresh,
-  views,
-  'call-server-fn': callServerFn,
-  debug,
-  theme,
-  config,
+  bundle: remoteWorkspaceCommand('bundle', bundle),
+  check: remoteWorkspaceCommand('check', check),
+  refresh: remoteWorkspaceCommand('refresh', refresh),
+  views: remoteWorkspaceCommand('views', views),
+  'call-server-fn': remoteWorkspaceCommand('call-server-fn', callServerFn),
+  debug: remoteWorkspaceCommand('debug', debug),
+  theme: remoteWorkspaceCommand('theme', theme),
+  config: remoteWorkspaceCommand('config', config),
   env,
-  scratch,
+  scratch: remoteWorkspaceCommand('scratch', scratch),
   skill,
-  tabs,
+  tabs: remoteWorkspaceCommand('tabs', tabs),
   navigate,
   remote,
-  'ui-components': uiComponents
+  'ui-components': remoteWorkspaceCommand('ui-components', uiComponents)
 }
 
 const systemCommands = {

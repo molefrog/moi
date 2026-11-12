@@ -4,7 +4,11 @@ import { getWorkspace } from '../workspaces/registry'
 import { applyUnifiedPatch, OperationError, workspaceFile, writeWorkspaceFile } from './files'
 import { spawnWorkspaceCommand } from './commands'
 
-const execSchema = z.object({ command: z.string().min(1).max(100_000) }).strict()
+const executionId = z.string().uuid()
+const execSchema = z.union([
+  z.object({ command: z.string().min(1).max(100_000), id: executionId.optional() }).strict(),
+  z.object({ cancel: executionId }).strict()
+])
 const commandSchema = z
   .object({ command: z.string(), args: z.array(z.string().max(100_000)).max(500).default([]) })
   .strict()
@@ -54,6 +58,8 @@ export function stopOperations() {
 
 // Distinct listener: these handlers are never mounted on the browser API.
 export function createOperationsHandler(resolveWorkspace = getWorkspace) {
+  const executions = new Map<string, Bun.Subprocess>()
+  const cancelled = new Map<string, number>()
   return async (request: Request): Promise<Response> => {
     try {
       const url = new URL(request.url)
@@ -78,8 +84,9 @@ export function createOperationsHandler(resolveWorkspace = getWorkspace) {
           })
         }
         if (request.method === 'PUT') {
-          if (!request.body) throw new OperationError('File body required')
-          return Response.json(await writeWorkspaceFile(root, path, request.body))
+          return Response.json(
+            await writeWorkspaceFile(root, path, request.body ?? new Blob([]).stream())
+          )
         }
         if (request.method === 'PATCH') {
           const { patch } = patchSchema.parse(await request.json())
@@ -104,7 +111,24 @@ export function createOperationsHandler(resolveWorkspace = getWorkspace) {
         return Response.json({ exitCode, stdout, stderr })
       }
       if (match[2] === 'exec') {
-        const { command } = execSchema.parse(await request.json())
+        const input = execSchema.parse(await request.json())
+        const key = JSON.stringify([
+          workspace.id,
+          request.headers.get('x-moi-user-id'),
+          'cancel' in input ? input.cancel : input.id
+        ])
+        for (const [id, expires] of cancelled) if (expires < Date.now()) cancelled.delete(id)
+        if ('cancel' in input) {
+          // Retain a short cancellation marker in case it overtakes startup.
+          cancelled.set(key, Date.now() + 60_000)
+          const running = executions.get(key)
+          if (running) stopChild(running)
+          return Response.json({ cancelled: true })
+        }
+        if (cancelled.has(key)) throw new OperationError('Execution was cancelled', 409)
+        if (input.id && executions.has(key))
+          throw new OperationError('Execution already exists', 409)
+        const { command } = input
         const child = Bun.spawn(['/bin/sh', '-c', command], {
           cwd: root,
           stdin: 'ignore',
@@ -113,6 +137,10 @@ export function createOperationsHandler(resolveWorkspace = getWorkspace) {
           detached: true
         })
         track(child, request.signal)
+        if (input.id) {
+          executions.set(key, child)
+          void child.exited.finally(() => executions.delete(key))
+        }
         const encoder = new TextEncoder()
         const stream = new TransformStream<Uint8Array, Uint8Array>()
         const writer = stream.writable.getWriter()
@@ -137,7 +165,8 @@ export function createOperationsHandler(resolveWorkspace = getWorkspace) {
         return new Response(stream.readable, {
           headers: {
             'content-type': 'application/x-ndjson',
-            'cache-control': 'no-store',
+            'cache-control': 'no-store, no-transform',
+            'content-encoding': 'identity',
             'x-content-type-options': 'nosniff'
           }
         })

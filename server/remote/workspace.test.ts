@@ -45,3 +45,37 @@ test('link, report, and unlink preserve workspace files and cloud membership', a
     await rm(root, { recursive: true, force: true })
   }
 })
+
+test('link targets the requested folder even inside a registered parent', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'moi-link-parent-'))
+  const folder = join(root, 'nested')
+  const shares = spyOn(client, 'fetchSharedWorkspaces').mockResolvedValue([
+    { id: 'parent', owner: { id: 'owner', name: 'Owner', email: 'owner@example.com' } },
+    { id: 'child', owner: { id: 'owner', name: 'Owner', email: 'owner@example.com' } }
+  ])
+  setRegistryPath(join(root, 'registry.json'))
+  try {
+    await mkdir(folder)
+    await linkRemoteWorkspace(root, { user_id: 'owner', workspace_id: 'parent' })
+    const before = await Bun.file(join(root, '.moi/.workspace.json')).text()
+    const linked = await linkRemoteWorkspace(folder, { user_id: 'owner', workspace_id: 'child' })
+    expect(linked.path).toBe(folder)
+    expect(await currentRemoteWorkspace(folder)).toEqual({
+      path: folder,
+      user_id: 'owner',
+      workspace_id: 'child'
+    })
+    expect(await Bun.file(join(root, '.moi/.workspace.json')).text()).toBe(before)
+    await expect(
+      linkRemoteWorkspace(join(root, 'another'), {
+        user_id: 'owner',
+        workspace_id: 'child'
+      })
+    ).rejects.toThrow('already linked')
+    expect(await Bun.file(join(root, 'another/.moi/.workspace.json')).exists()).toBe(false)
+  } finally {
+    shares.mockRestore()
+    setRegistryPath(DEFAULT_REGISTRY_PATH)
+    await rm(root, { recursive: true, force: true })
+  }
+})
