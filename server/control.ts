@@ -351,6 +351,9 @@ export const control = Bun.serve({
         // `only` narrows to one kind or applet; default is both kinds.
         // `widget:refresh` is the pre-filter message name older CLIs send.
         if (data.type === 'applets:refresh' || data.type === 'widget:refresh') {
+          const match = data.path ? await resolveWorkspace(ws, data.path) : undefined
+          if (data.path && !match) return
+          const scope = match ? { workspaceId: match.id } : {}
           const only = typeof data.only === 'string' ? parseAppletSelector(data.only) : undefined
           if (data.only && !only) {
             ws.send(JSON.stringify({ error: `Invalid applet selector "${data.only}"` }))
@@ -360,10 +363,15 @@ export const control = Bun.serve({
           if (only?.id) {
             publishEvent({
               type: only.segment === 'widgets' ? 'widget:updated' : 'view:updated',
+              ...scope,
               name: only.id
             })
           } else {
-            publishEvent({ type: 'applets:refresh', ...(data.only ? { only: data.only } : {}) })
+            publishEvent({
+              type: 'applets:refresh',
+              ...scope,
+              ...(data.only ? { only: data.only } : {})
+            })
           }
           ws.send(JSON.stringify({ ok: true }))
           return
