@@ -28,11 +28,12 @@ afterEach(async () => {
 })
 function mockOwner(handler: (url: string, init?: RequestInit) => Response) {
   spies.push(
-    spyOn(client, 'remoteConfig').mockResolvedValue({
-      url: 'http://localhost:8787/cloud',
-      clientId: 'moi-cli',
-      managed: false
-    })
+    spyOn(client, 'fetchWorkspace').mockImplementation((owner, workspace, suffix = '', init) =>
+      fetch(`http://localhost:8787/api/workspaces/${owner}:${workspace}${suffix}`, {
+        ...init,
+        redirect: 'error'
+      })
+    )
   )
   spies.push(
     spyOn(globalThis, 'fetch').mockImplementation(

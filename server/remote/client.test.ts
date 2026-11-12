@@ -26,7 +26,7 @@ beforeEach(async () => {
     async fetch(request) {
       requests++
       const path = new URL(request.url).pathname
-      expect(path).toStartWith('/custom/cloud/api/')
+      if (!path.startsWith('/api/workspaces/')) expect(path).toStartWith('/custom/cloud/api/')
       if (responseMode === 'invalid') return new Response('{"access_token":"secret-example"')
       if (responseMode === 'reject') return new Response(null, { status: 401 })
       if (responseMode === 'redirect') return Response.redirect(server.url.origin + '/leak')
@@ -59,6 +59,11 @@ beforeEach(async () => {
         return new Response(null, { status: 200 })
       }
       expect(request.headers.get('authorization')).toStartWith('Bearer ')
+      if (path.startsWith('/api/workspaces/')) {
+        expect(request.headers.get('cookie')).toBeNull()
+        expect(request.headers.get('authorization')).not.toBe('Bearer untrusted')
+        return Response.json({ ok: true })
+      }
       if (path.endsWith('/me'))
         return Response.json({ id: 'u1', name: 'Test', email: 'test@example.com' })
       return Response.json({
@@ -219,4 +224,23 @@ test('development requires a target; published installs default to production', 
   ]) {
     expect(() => resolveRemoteConfig({ url }, true)).toThrow()
   }
+})
+
+test('owner requests refresh credentials and replace visitor headers', async () => {
+  await credentials()
+  const response = await client.fetchWorkspace('owner', 'workspace', '/config?view=one', {
+    headers: { cookie: 'browser=session', authorization: 'Bearer untrusted' }
+  })
+  expect(response.ok).toBe(true)
+  expect(refreshes).toBe(1)
+  await expect(client.fetchWorkspace('owner', 'workspace', '/../../leak')).rejects.toThrow(
+    'Invalid workspace path'
+  )
+})
+
+test('owner requests never follow redirects with credentials', async () => {
+  await credentials(Date.now() / 1000 + 3600)
+  responseMode = 'redirect'
+  await expect(client.fetchWorkspace('owner', 'workspace')).rejects.toThrow()
+  expect(requests).toBe(1)
 })

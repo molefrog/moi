@@ -92,11 +92,10 @@ async function workspaceFixture(config: unknown) {
 
 function mockOwner(status = 200) {
   spies.push(
-    spyOn(remoteClient, 'remoteConfig').mockResolvedValue({
-      url: 'http://localhost:8787/cloud',
-      clientId: 'moi-cli',
-      managed: false
-    })
+    spyOn(remoteClient, 'fetchWorkspace').mockImplementation(
+      (owner, workspace, suffix = '', init) =>
+        fetch(`http://localhost:8787/api/workspaces/${owner}:${workspace}${suffix}`, init)
+    )
   )
   const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
     Object.assign(
