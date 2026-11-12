@@ -132,6 +132,7 @@ test('an explicit user enables workspace presence without an applet and clearing
   signIn(profile)
   expect(sockets).toHaveLength(1)
   const socket = sockets[0]!
+  expect(socket.url).toBe('ws://localhost/api/workspaces/workspace/collab')
   socket.open()
   expect(socket.sent[0]).toMatchObject({ type: 'join', profile })
   expect(engine.getSnapshot().connections[0]?.userId).toEqual(profile.id)

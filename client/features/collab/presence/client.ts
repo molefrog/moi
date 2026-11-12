@@ -161,7 +161,7 @@ export class CollabClient implements CollabEngineApi {
     clearTimeout(this.retry)
     this.store.connecting()
     const socket = new WebSocket(
-      wsUrl(`/api/workspaces/${encodeURIComponent(this.workspaceId)}/collab/ws`)
+      wsUrl(`/api/workspaces/${encodeURIComponent(this.workspaceId)}/collab`)
     )
     this.socket = socket
     socket.onopen = () => {

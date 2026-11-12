@@ -185,7 +185,7 @@ describe('collab HTTP integration', () => {
         port: 0,
         hostname: '127.0.0.1',
         fetch(req, server) {
-          if (new URL(req.url).pathname.endsWith('/collab/ws') && server.upgrade(req)) return
+          if (new URL(req.url).pathname.endsWith('/collab') && server.upgrade(req)) return
           return api.fetch(req)
         },
         websocket: {
@@ -195,7 +195,7 @@ describe('collab HTTP integration', () => {
         }
       })
       const url = `http://127.0.0.1:${server.port}/api/workspaces/${workspace.id}`
-      const socket = new WebSocket(`${url.replace('http:', 'ws:')}/collab/ws`)
+      const socket = new WebSocket(`${url.replace('http:', 'ws:')}/collab`)
       const messages: CollabServerMessage[] = []
       socket.onmessage = event => {
         messages.push(JSON.parse(String(event.data)) as CollabServerMessage)

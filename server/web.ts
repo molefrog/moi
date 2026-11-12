@@ -174,7 +174,7 @@ export const app = Bun.serve<WsData>({
     '/api/workspaces/ws': (req: Request, server: Bun.Server<WsData>) =>
       upgrade(server, req, { channel: 'events', workspaceId: '' }),
 
-    '/api/workspaces/:id/collab/ws': async (req: Request, server: Bun.Server<WsData>) => {
+    '/api/workspaces/:id/collab': async (req: Request, server: Bun.Server<WsData>) => {
       const workspaceId = decodeURIComponent(new URL(req.url).pathname.split('/')[3] ?? '')
       const workspace = await getWorkspace(workspaceId)
       if (!workspace) return new Response('Workspace not found', { status: 404 })
