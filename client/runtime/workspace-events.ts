@@ -21,7 +21,7 @@ export type WorkspaceEvent =
   | { type: 'widget-layout:updated'; workspaceId: string; widgets: WidgetInfo[] }
   // `moi refresh` — cache-bust and re-fetch applets without a rebuild. `only`
   // narrows to one kind; absent means both widgets and views.
-  | { type: 'applets:refresh'; only?: 'widgets' | 'views' }
+  | { type: 'applets:refresh'; workspaceId?: string; only?: 'widgets' | 'views' }
   | { type: 'view:updated'; workspaceId?: string; name: string }
   | { type: 'view-layout:updated'; workspaceId: string; views: CompiledView[] }
   | { type: 'view:deleted'; workspaceId: string; name: string }

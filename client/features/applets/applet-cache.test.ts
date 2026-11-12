@@ -73,14 +73,19 @@ describe('invalidateApplet drops the cached module', () => {
   })
 })
 
-test('segment refresh only invalidates the addressed workspace', () => {
-  const first = `first-${crypto.randomUUID()}`
-  const second = `second-${crypto.randomUUID()}`
-  invalidateApplet('widgets', first, 'clock')
-  invalidateApplet('widgets', second, 'clock')
-  const before = appletVersion('widgets', second, 'clock')
-  const targetBefore = appletVersion('widgets', first, 'clock')
+test('scoped refresh preserves other workspaces; global refresh clears all cached workspaces', () => {
+  const first = crypto.randomUUID()
+  const second = crypto.randomUUID()
+  const keys = [first, second].map(id => appletKey('widgets', id, 'counter'))
+  for (const key of keys) setCachedApplet(key, Promise.resolve({ default: () => null }))
   invalidateAppletSegment('widgets', first)
-  expect(appletVersion('widgets', first, 'clock')).toBe(targetBefore + 1)
-  expect(appletVersion('widgets', second, 'clock')).toBe(before)
+  expect(getCachedApplet(keys[0]!)).toBeUndefined()
+  expect(getCachedApplet(keys[1]!)).toBeDefined()
+  expect(appletVersion('widgets', first, 'counter')).toBe(1)
+  expect(appletVersion('widgets', second, 'counter')).toBe(0)
+  invalidateAppletSegment('widgets')
+  expect(getCachedApplet(keys[1]!)).toBeUndefined()
+  expect(appletVersion('widgets', first, 'counter')).toBe(2)
+  expect(appletVersion('widgets', second, 'counter')).toBe(1)
+  expect(appletVersion('views', second, 'counter')).toBe(0)
 })
