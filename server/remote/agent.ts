@@ -27,7 +27,8 @@ function canonical(value: unknown): string {
       .join(',')}}`
   return JSON.stringify(value)
 }
-const hash = (value: string) => new Bun.CryptoHasher('sha256').update(value).digest('base64url')
+const hash = (value: string | Uint8Array<ArrayBuffer>) =>
+  new Bun.CryptoHasher('sha256').update(value).digest('base64url')
 export async function createAgentKeys(config: {
   url: string
   clientId: string
@@ -54,7 +55,7 @@ async function sign(
   typ: string,
   url: string,
   method: string,
-  body: string
+  body: string | Uint8Array<ArrayBuffer>
 ) {
   const requestHash = hash(`${method.toUpperCase()}\n${url}\n${hash(body)}`)
   return new SignJWT({ sub: keys.agentId, iss: keys.hostId, requestHash })
@@ -69,7 +70,7 @@ export async function agentAuthorization(
   keys: AgentCredentials,
   url: string,
   method: string,
-  body: string
+  body: string | Uint8Array<ArrayBuffer>
 ) {
   return `Bearer ${await sign(keys, keys.agentKey, 'agent+jwt', url, method, body)}`
 }

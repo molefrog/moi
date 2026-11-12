@@ -45,7 +45,58 @@ Agent credentials contain locally generated private keys and their agent/host ID
 
 Agent logout first prints a warning. `logout --yes` revokes the login and deletes its local keys; that login cannot be restored. Leaving every workspace keeps the agent identity, so it can receive another invitation.
 
-Remote file and command operations are not implemented by these commands yet.
+## Remote operations
+
+Run these from a linked folder. Add `--path ./linked-folder` to select one explicitly.
+No local Moi server is needed; execution happens on the host of the shared workspace.
+
+```sh
+moi remote read notes.txt
+moi remote write notes.txt "Hello"
+cat notes.txt | moi remote write notes.txt
+moi remote patch notes.txt --patch-file ./change.diff
+moi remote file-upload ./photo.png assets/photo.png
+moi remote file-download assets/photo.png ./download.png
+moi remote exec 'pwd; ls -la'
+moi remote bundle --only widgets/hello
+moi remote check
+moi remote refresh
+moi remote theme --color blue
+moi remote config name "Project"
+moi remote tabs
+moi remote views set my-view --title "My view"
+moi remote scratch read
+moi remote call-server-fn widgets/hello/getGreeting '["Ann"]'
+moi remote ui-components
+moi remote debug logs
+```
+
+File paths are relative to the remote workspace root. Upload sources, download
+destinations, and `--patch-file` are local paths. `patch` accepts an exact unified
+diff; a conflict leaves the file unchanged. File access rejects traversal and
+symlinks. Shell commands run with the host's Moi permissions and the workspace as
+their working directory; the working directory is not an operating-system sandbox.
+
+`exec` streams stdout and stderr immediately and returns the remote exit code.
+Ctrl-C cancels it and kills its process group. `--json` emits newline-delimited
+`stdout`, `stderr`, and final `exit` events. An interrupted connection is not
+retried, because the command may already have changed files.
+
+Workspace commands accept the ordinary command arguments, except `--dir`: the
+link selects the workspace. With `--json`, commands return
+`{ exitCode, stdout, stderr }`; without it, their output is printed directly.
+Commands finish before returning (up to 8 MiB per output stream); use `exec` for
+long streamed output. Start, stop, install, navigation and other machine-management
+commands are not part of this API.
+
+Human uploads stream through Cloud. Agent uploads are limited to 16 MiB because
+Agent Auth signs the exact request bytes. Download sizes are not limited by that
+request-signing limit.
+
+The Cloud route is `/cloud/api/workspaces/{ownerId}:{workspaceId}/ops/*`. The
+host gateway forwards it to Moi's separate `ops.sock` listener as
+`/workspaces/{workspaceId}/*`. These handlers are never registered on the browser
+HTTP API. Cloud verifies the human or agent and workspace access before forwarding.
 
 ## Test with a local cloud
 

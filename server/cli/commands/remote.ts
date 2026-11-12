@@ -1,5 +1,6 @@
 import { defineCommand } from 'citty'
 import open from 'open'
+import { remoteOperations } from '../remote-operations'
 import { clearLine, cursorTo } from 'node:readline'
 import { createInterface } from 'node:readline/promises'
 import {
@@ -235,6 +236,7 @@ const leave = defineCommand({
   }
 })
 const remoteSubCommands = {
+  ...remoteOperations(reportErrors),
   login,
   logout,
   join,

@@ -19,7 +19,10 @@ export const refresh = defineCommand({
     const notice = await staleSkillNotice(process.cwd())
     const ws = new WebSocket(CONTROL_URL)
 
-    ws.onopen = () => ws.send(JSON.stringify({ type: 'applets:refresh', only }))
+    ws.onopen = () =>
+      ws.send(
+        JSON.stringify({ type: 'applets:refresh', only, path: process.env.MOI_REMOTE_WORKSPACE })
+      )
 
     ws.onmessage = event => {
       const data = JSON.parse(String(event.data))

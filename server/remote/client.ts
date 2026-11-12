@@ -526,6 +526,67 @@ export function createRemoteClient(directory: string) {
     return result.workspaces
   }
 
+  /** Byte-preserving operations transport; writes are never automatically replayed. */
+  async function operation(
+    ownerId: string,
+    workspaceId: string,
+    suffix: string,
+    options: {
+      method?: string
+      body?: string | Blob | Uint8Array<ArrayBuffer>
+      signal?: AbortSignal
+      contentType?: string
+    } = {}
+  ): Promise<Response> {
+    if (
+      ![ownerId, workspaceId].every(id => /^[A-Za-z0-9_-]+$/.test(id)) ||
+      !/^\/(?:files\/|exec$|commands$)/.test(suffix)
+    )
+      throw new Error('Invalid remote operation')
+    const config = await remoteConfig()
+    const pair = await access(config)
+    const url = `${config.url}/api/workspaces/${ownerId}:${workspaceId}/ops${suffix}`
+    const method = options.method ?? 'GET'
+    let body = options.body
+    if (isAgent(pair) && body instanceof Blob) {
+      if (body.size > 16 * 1024 * 1024) throw new Error('Agent uploads are limited to 16 MiB')
+      body = new Uint8Array(await body.arrayBuffer())
+    }
+    if (
+      isAgent(pair) &&
+      body &&
+      (typeof body === 'string'
+        ? Buffer.byteLength(body)
+        : body instanceof Blob
+          ? body.size
+          : body.byteLength) >
+        16 * 1024 * 1024
+    )
+      throw new Error('Agent uploads are limited to 16 MiB')
+    const authorization = isAgent(pair)
+      ? await agentAuthorization(pair, url, method, body instanceof Blob ? '' : (body ?? ''))
+      : `Bearer ${pair.accessToken}`
+    const response = await fetch(url, {
+      method,
+      body,
+      redirect: 'error',
+      signal: options.signal,
+      headers: {
+        authorization,
+        ...(options.contentType ? { 'content-type': options.contentType } : {})
+      }
+    })
+    if (!response.ok) {
+      await response.body?.cancel()
+      throw new Error(
+        response.status === 401
+          ? 'Cloud login expired or revoked — run moi remote login'
+          : `Remote operation failed (${response.status})`
+      )
+    }
+    return response
+  }
+
   async function remoteStatus(): Promise<RemoteStatus> {
     const config = await remoteConfig()
     const pair = await access(config)
@@ -542,6 +603,7 @@ export function createRemoteClient(directory: string) {
     logout,
     fetchSharedWorkspaces,
     remoteStatus,
+    operation,
     invitations,
     accept,
     joinAgent,
@@ -556,6 +618,7 @@ export const {
   logout,
   fetchSharedWorkspaces,
   remoteStatus,
+  operation,
   invitations,
   accept,
   joinAgent,
