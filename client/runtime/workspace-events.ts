@@ -17,12 +17,12 @@ export type WorkspaceEvent =
       status: HarnessStatus
     }
   | { type: 'workspace-harness:switched'; workspaceId: string; harness: WorkspaceType }
-  | { type: 'widget:updated'; name: string }
-  | { type: 'widget-layout:updated'; widgets: WidgetInfo[] }
+  | { type: 'widget:updated'; workspaceId?: string; name: string }
+  | { type: 'widget-layout:updated'; workspaceId: string; widgets: WidgetInfo[] }
   // `moi refresh` — cache-bust and re-fetch applets without a rebuild. `only`
   // narrows to one kind; absent means both widgets and views.
-  | { type: 'applets:refresh'; only?: 'widgets' | 'views' }
-  | { type: 'view:updated'; name: string }
+  | { type: 'applets:refresh'; workspaceId?: string; only?: 'widgets' | 'views' }
+  | { type: 'view:updated'; workspaceId?: string; name: string }
   | { type: 'view-layout:updated'; workspaceId: string; views: CompiledView[] }
   | { type: 'view:deleted'; workspaceId: string; name: string }
   // A workspace's chat state changed (pin, selection, chat settings, views
@@ -31,8 +31,8 @@ export type WorkspaceEvent =
   // `origin` on an event is the browser tab whose write caused it (absent for
   // CLI and agent changes), so that tab can skip its own echo. See
   // client/lib/browser-tab-id.ts.
-  | { type: 'theme:updated'; origin?: string }
-  | { type: 'workspace:updated'; origin?: string }
+  | { type: 'theme:updated'; workspaceId: string; origin?: string }
+  | { type: 'workspace:updated'; workspaceId: string; origin?: string }
   // The registry list changed (reorder, create) without touching any open
   // workspace's layout — clients refetch just the sidebar list.
   | { type: 'workspaces-list:updated'; origin?: string }

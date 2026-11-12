@@ -48,7 +48,7 @@ function seed(rel: string, contents: string) {
   writeFileSync(path, contents)
 }
 
-const bundle = () => handleBundle(() => {}, WS)
+const bundle = () => handleBundle(() => {}, 'test-workspace', WS)
 const rows = async () => parse(await callFunction('widgets/clock', 'rows', stringify([]), WS))
 
 test('editing a helper imported only by a .server.ts reaches a live worker', async () => {
@@ -67,7 +67,21 @@ test('editing a helper imported only by a .server.ts reaches a live worker', asy
   )
   seed('.moi/widgets/_schema.ts', `export const table = 'v1'`)
 
-  await bundle()
+  const events: unknown[] = []
+  await handleBundle(event => events.push(event), 'test-workspace', WS)
+  expect(events).toContainEqual(
+    expect.objectContaining({
+      type: 'widget:updated',
+      workspaceId: 'test-workspace',
+      name: 'clock'
+    })
+  )
+  expect(events).toContainEqual(
+    expect.objectContaining({
+      type: 'widget-layout:updated',
+      workspaceId: 'test-workspace'
+    })
+  )
   // Spawns the worker and caches both modules in it — the state that used to
   // go stale and stay stale.
   expect(await rows()).toBe('v1')

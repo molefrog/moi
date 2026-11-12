@@ -138,7 +138,13 @@ export const control = Bun.serve({
           }[] = []
           await serializeWorkspaceBundle(workspacePath, async () => {
             if (only?.segment !== 'views') {
-              for (const r of await handleBundle(publishEvent, workspacePath, force, only?.id)) {
+              for (const r of await handleBundle(
+                publishEvent,
+                match.id,
+                workspacePath,
+                force,
+                only?.id
+              )) {
                 if (!only?.id || r.name === only.id) {
                   results.push({ kind: 'widget', name: r.name, status: r.status, error: r.error })
                 }
@@ -437,7 +443,7 @@ export const control = Bun.serve({
           }
 
           await saveLayout({ ...layout, theme: result.theme }, workspacePath)
-          publishEvent({ type: 'theme:updated' })
+          publishEvent({ type: 'theme:updated', workspaceId: match.id })
           ws.send(JSON.stringify({ ok: true, ...result.applied }))
           return
         }
@@ -480,7 +486,7 @@ export const control = Bun.serve({
           }
 
           await setWorkspaceConfig(workspacePath, patch)
-          publishEvent({ type: 'workspace:updated' })
+          publishEvent({ type: 'workspace:updated', workspaceId: match.id })
           ws.send(
             JSON.stringify({
               ok: true,

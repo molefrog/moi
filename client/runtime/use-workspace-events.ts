@@ -16,6 +16,20 @@ export function useWorkspaceEvent(handler: WorkspaceEventHandler) {
   useEffect(() => events?.subscribe(event => handlerRef.current(event)), [events, handlerRef])
 }
 
+// Listen to events for one workspace. Events that name no workspace (such as
+// `moi refresh`) reach every open workspace.
+export function useWorkspaceScopedEvent(workspaceId: string, handler: WorkspaceEventHandler) {
+  useWorkspaceEvent(event => {
+    if (
+      'workspaceId' in event &&
+      event.workspaceId !== undefined &&
+      event.workspaceId !== workspaceId
+    )
+      return
+    handler(event)
+  })
+}
+
 // This hook owns presence for the displayed workspace, including reconnects.
 // Requests received after a workspace switch never act on the new workspace.
 export function useNavigationClient(

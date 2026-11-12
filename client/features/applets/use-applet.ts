@@ -14,7 +14,7 @@ import {
 import { attachAppletBridge } from '@/client/features/applets/applet-runtime'
 import { reportAppletError } from '@/client/features/applets/applet-log'
 import { useWorkspaceId } from '@/client/features/workspace/workspace-context'
-import { type WorkspaceEvent, useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
+import { type WorkspaceEvent, useWorkspaceScopedEvent } from '@/client/runtime/use-workspace-events'
 import type { AppletKind } from '@/lib/types'
 
 // Views receive URL query params. Widgets mount without params; applets must
@@ -118,7 +118,7 @@ function useApplet(kind: AppletKindSpec, name: string): AppletState {
   // unmounted case, but doing it here keeps this self-sufficient and
   // order-independent. The bumped version remounts the component and re-runs its
   // `rpc()` calls.
-  useWorkspaceEvent(event => {
+  useWorkspaceScopedEvent(workspaceId, event => {
     if (kind.shouldReload(event, name)) {
       invalidateApplet(kind.segment, workspaceId, name)
       load()
@@ -143,15 +143,15 @@ export function useView(name: string): AppletState {
 // fires while that applet is on screen; this covers the (common) rest.
 export function useAppletCacheInvalidation(): void {
   const workspaceId = useWorkspaceId()
-  useWorkspaceEvent(event => {
+  useWorkspaceScopedEvent(workspaceId, event => {
     if (event.type === 'view:updated') invalidateApplet('views', workspaceId, event.name)
     else if (event.type === 'widget:updated') invalidateApplet('widgets', workspaceId, event.name)
     else if (event.type === 'applets:refresh') {
       // Segment-wide: `moi refresh` names no applet, so every cached module in
       // the targeted kind(s) is stale — including ones whose tabs are
       // backgrounded right now.
-      if (event.only !== 'views') invalidateAppletSegment('widgets')
-      if (event.only !== 'widgets') invalidateAppletSegment('views')
+      if (event.only !== 'views') invalidateAppletSegment('widgets', event.workspaceId)
+      if (event.only !== 'widgets') invalidateAppletSegment('views', event.workspaceId)
     }
   })
 }

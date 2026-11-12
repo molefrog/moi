@@ -779,7 +779,7 @@ one.put('/config', async c => {
     return c.text('Expected a workspace config field', 400)
   }
   await setWorkspaceConfig(ws.path, { name, icon })
-  publishEvent({ type: 'workspace:updated', origin: eventOrigin(body.origin) })
+  publishEvent({ type: 'workspace:updated', workspaceId: ws.id, origin: eventOrigin(body.origin) })
   return c.json(await getWorkspaceConfig(ws.path))
 })
 
@@ -860,13 +860,13 @@ one.put('/icon', async c => {
   }
   const workspaceIcon = { type: 'upload', value: icon } as const
   await setWorkspaceConfig(ws.path, { icon: workspaceIcon })
-  publishEvent({ type: 'workspace:updated' })
+  publishEvent({ type: 'workspace:updated', workspaceId: c.get('ws').id })
   return c.json({ icon: workspaceIcon })
 })
 
 one.delete('/icon', async c => {
   await setWorkspaceConfig(c.get('ws').path, { icon: null })
-  publishEvent({ type: 'workspace:updated' })
+  publishEvent({ type: 'workspace:updated', workspaceId: c.get('ws').id })
   return c.body(null, 204)
 })
 
@@ -953,7 +953,7 @@ one.put('/', async c => {
     JSON.stringify(resolveWorkspaceTheme(existing.theme)) !==
     JSON.stringify(resolveWorkspaceTheme(next.theme))
   ) {
-    publishEvent({ type: 'theme:updated', origin: eventOrigin(origin) })
+    publishEvent({ type: 'theme:updated', workspaceId: ws.id, origin: eventOrigin(origin) })
   }
   return c.body(null, 204)
 })

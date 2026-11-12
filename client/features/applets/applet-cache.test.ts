@@ -6,6 +6,7 @@ import {
   appletVersion,
   getCachedApplet,
   invalidateApplet,
+  invalidateAppletSegment,
   setCachedApplet
 } from './applet-cache'
 
@@ -70,4 +71,21 @@ describe('invalidateApplet drops the cached module', () => {
     // And the URL the next load uses is now a fresh version.
     expect(appletUrl('views', ws, 'board')).toBe(`/api/workspaces/${ws}/views/board/module?v=1`)
   })
+})
+
+test('scoped refresh preserves other workspaces; global refresh clears all cached workspaces', () => {
+  const first = crypto.randomUUID()
+  const second = crypto.randomUUID()
+  const keys = [first, second].map(id => appletKey('widgets', id, 'counter'))
+  for (const key of keys) setCachedApplet(key, Promise.resolve({ default: () => null }))
+  invalidateAppletSegment('widgets', first)
+  expect(getCachedApplet(keys[0]!)).toBeUndefined()
+  expect(getCachedApplet(keys[1]!)).toBeDefined()
+  expect(appletVersion('widgets', first, 'counter')).toBe(1)
+  expect(appletVersion('widgets', second, 'counter')).toBe(0)
+  invalidateAppletSegment('widgets')
+  expect(getCachedApplet(keys[1]!)).toBeUndefined()
+  expect(appletVersion('widgets', first, 'counter')).toBe(2)
+  expect(appletVersion('widgets', second, 'counter')).toBe(1)
+  expect(appletVersion('views', second, 'counter')).toBe(0)
 })

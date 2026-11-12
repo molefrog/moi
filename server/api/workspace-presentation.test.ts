@@ -66,6 +66,10 @@ test('glyphs and uploads keep their complete presentation in one icon object', a
   expect(list[0]).toMatchObject({ icon: glyph })
 
   expect((await putIcon()).status).toBe(200)
+  expect(published.map(event => JSON.parse(event))).toEqual([
+    { type: 'workspace:updated', workspaceId },
+    { type: 'workspace:updated', workspaceId }
+  ])
   const plain = await loadLayout(workspaceDir)
   expect(plain.icon?.type).toBe('upload')
   if (plain.icon?.type !== 'upload') throw new Error('Expected an uploaded icon')
@@ -122,7 +126,7 @@ test('theme saves broadcast changes and expose the theme in workspace lists', as
   const list = (await (await api.request('/api/workspaces')).json()) as WorkspaceEntry[]
 
   expect(response.status).toBe(204)
-  expect(published).toContain(JSON.stringify({ type: 'theme:updated' }))
+  expect(published).toContain(JSON.stringify({ type: 'theme:updated', workspaceId }))
   expect(list[0]?.theme).toEqual(theme)
 })
 

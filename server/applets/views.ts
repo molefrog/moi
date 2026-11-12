@@ -222,7 +222,7 @@ export async function handleBundleViews(
   const changedServerModules = new Set<string>()
   for (const r of results) {
     if (r.status === 'built') {
-      publish({ type: 'view:updated', name: r.name, config: r.config ?? null })
+      publish({ type: 'view:updated', workspaceId, name: r.name, config: r.config ?? null })
       await completeViewBuild({ id: workspaceId, path: workspacePath }, r.name)
       for (const m of r.serverModules ?? []) changedServerModules.add(m)
     }
@@ -321,7 +321,7 @@ export async function deleteView(
     )
 
     publish({ type: 'view:deleted', workspaceId, name: viewId })
-    publish({ type: 'workspace:updated' })
+    publish({ type: 'workspace:updated', workspaceId })
     await handleBundleViews(publish, workspaceId, workspacePath, false, viewId)
   })
 }

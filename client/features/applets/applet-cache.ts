@@ -83,8 +83,8 @@ export function invalidateApplet(segment: AppletSegment, workspaceId: string, na
 // `applets:refresh` path, which names no specific applet. Only keys that have
 // ever been loaded (or bumped) exist in the maps; anything else already loads
 // fresh on first mount.
-export function invalidateAppletSegment(segment: AppletSegment): void {
-  const prefix = `${segment}/`
+export function invalidateAppletSegment(segment: AppletSegment, workspaceId?: string): void {
+  const prefix = workspaceId === undefined ? `${segment}/` : `${segment}/${workspaceId}/`
   for (const key of new Set([...moduleCache.keys(), ...versions.keys()])) {
     if (key.startsWith(prefix)) {
       moduleCache.delete(key)
