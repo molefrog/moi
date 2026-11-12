@@ -209,3 +209,18 @@ export async function initializeRemoteWorkspaceConfig(
     flag: 'wx'
   })
 }
+
+/** Disconnect the reference without deleting workspace files or cloud membership. */
+export async function unlinkRemoteWorkspaceConfig(
+  workspacePath: string
+): Promise<RemoteWorkspaceTarget> {
+  const config = await loadWorkspaceFileConfig(workspacePath)
+  if (!config.remote) throw new Error('This folder is not linked to a remote workspace')
+  const replacement = {
+    ...createDefaultWorkspaceLayout(),
+    ...personalWorkspaceConfig(config as unknown as Record<string, unknown>),
+    version: 2
+  }
+  await writeFile(getLayoutPath(workspacePath), JSON.stringify(replacement, null, 2))
+  return config.remote
+}
