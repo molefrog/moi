@@ -112,6 +112,8 @@ export function mergeLayoutForSave(
   // never let a layout PUT resurrect them in `.workspace.json`.
   delete (editor as Record<string, unknown>).appletThumbnails
   return {
+    // Shared edits omit personal preferences; preserve them unless explicitly supplied.
+    ...personalWorkspaceConfig(existing),
     ...editor,
     // Personal navigation never writes tabs. Other layout edits must not
     // round-trip a stale copy of the workspace's authored defaults.

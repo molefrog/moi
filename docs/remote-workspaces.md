@@ -38,42 +38,37 @@ Shared layout, name, icon, harness, theme, and content come from the owner. Icon
 
 ## Routing and CLI
 
-A remote workspace is registered like any other folder and gets an ordinary local ID. The browser and CLI use `/api/workspaces/{workspace_id}` for local and remote workspaces alike; only the visitor’s server knows the difference.
+Each reference has a local registration ID. Browser and CLI requests use `/api/workspaces/{localRegistrationId}`. Moi keeps skills, chat state, tabs, and personal preferences on the visitor; shared content goes to `/api/workspaces/{user_id}:{workspace_id}` at `remote.url`.
 
-For a folder whose config has `remote`, the visitor’s server:
+Batiok resolves that address and forwards `/api/workspaces/{workspace_id}` to the owner. Moi rewrites returned applet API URLs to the visitor’s registration so RPC and file requests follow the same route. Shared saves preserve the owner’s personal preferences. Workspace removal and agent-backed view creation/submission are unavailable; existing views can be renamed or deleted.
 
-- answers the registration itself (`GET` merges the owner’s layout with the visitor’s tabs and chat options; `PUT` saves the visitor’s part and sends shared edits to the owner);
-- answers the personal routes (`/skills`, `/state`, `/sessions`, `/harness`) from the visitor’s folder;
-- forwards every other request to `/api/remote/{user_id}/workspaces/{workspace_id}` at the configured Cloud URL and relays the answer.
+- `tabs` and `navigate` use owner views and visitor tabs; navigation targets the visitor’s browser.
+- `theme`, `config`, `call-server-fn`, `debug logs`, and scratchpad reads/edits use owner APIs. `refresh` and `scratch view` target the visitor’s browser.
+- Skills and environment commands stay local. Source editing, builds, and agent-backed commands require the owner’s actual workspace.
 
-Owner-served applet code carries the owner’s API prefix; the visitor’s server rewrites it to the local prefix, so applet RPC and file URLs come back through the same API. The owner refuses personal routes, view creation, and removal on the remote prefix. Presence is the one connection a visitor’s browser opens to the owner directly.
+Production integration is incomplete: owner requests do not yet attach saved Cloud access tokens. Forwarded browser requests carry cookies only in cloud mode; metadata requests carry no browser credentials. Batiok’s current allowlist also excludes home previews, reading/clearing applet logs, and scratchpad operations. The local mock bypasses those Cloud checks.
 
-The gateway routes the remote prefix to the owner and preserves it. In cloud mode the visitor’s server passes the browser’s cookies along; elsewhere it sends none. Production gateway routing and access checks remain deferred.
+## Discovery and collaboration
 
-CLI commands call the same workspace API as the browser, so they need no remote handling of their own:
+[`moi remote --json`](remote-cli.md) returns `{ me, workspaces }`; each workspace has `id` and `owner.id`. The home page lists accepted shares in **Shared with you** without creating folders. Opening one creates a reference under the configured workspace root (normally `~/moi`), installs the skill, and registers it. Existing registrations keep their config and skill version. Shares removed from the Cloud list disappear on refresh; local references remain.
 
-- `tabs` lists owner views and marks the visitor’s saved active tab. `navigate` validates against those views and moves the visitor’s browser.
-- `theme`, `config`, `call-server-fn`, `debug logs`, and scratchpad reads/edits use owner data. Function calls share the normal RPC worker pool; image edits upload visitor file bytes.
-- `refresh` and `scratch view` target visitor browsers. Skills and environment commands stay local.
-- Source editing, builds, and agent-backed commands remain deferred for remote references.
+In cloud mode, presence uses `/api/workspaces/{user_id}:{workspace_id}/collab`. Membership controls use `/cloud/api/workspaces/{user_id}:{workspace_id}/...`; local workspaces use a plain ID. The host and accepted human members can invite and remove members; the host stays listed. Remote chat and leaving a workspace remain deferred.
 
-[`moi remote --json`](remote-cli.md) lists accepted shared workspaces: map `id` to `workspace_id` and `owner.id` to `user_id`. The home page lists accepted shares in **Shared with you** without changing files. Opening a share creates its reference under the configured workspace root (normally `~/moi`), installs the skill, and registers it. Existing references and personal settings are preserved. Removed shares disappear from this list; their local files remain. Cloud credentials stay in Moi’s data directory.
+Scratchpad documents and assets stay on the owner. Reopen the canvas to load edits made elsewhere; live owner-event updates and simultaneous editing are not supported. Browser saves replace the full document.
 
-In cloud mode, presence connects to the owner’s `/collab` endpoint. Owners and accepted members share invite, revoke, and remove controls; the host stays listed. Membership requests use the Cloud API with `owner_id`. Invitation syncing and leaving a workspace remain deferred.
+## Local mock owner
 
-Scratchpad documents and assets stay on the owner. Reopen the canvas for edits made elsewhere; live owner-event updates and simultaneous editing are not supported. Browser saves replace the full document.
+Use your local Batiok port below; these examples use `8787`.
 
-## Mock owner for localhost:8787
+1. Start Moi and Batiok. Set `MOCK_REMOTE_ORIGIN=http://127.0.0.1:13340` in Batiok’s `.dev.vars` and restart Wrangler.
+2. Set Moi’s `remote.url` to `http://localhost:8787/cloud` in its data-directory `config.json` (see [Cloud CLI setup](remote-cli.md)).
+3. Run `bun scripts/mock-owner.ts` from Moi.
+4. Open Moi through Batiok or at `http://localhost:13337` and add the printed folder, normally `~/moi/shared-counter`. Existing references to `alice/owner-board` still work.
 
-1. Start Moi and Batiok normally. Set `MOCK_REMOTE_ORIGIN=http://127.0.0.1:13340` in Batiok’s `.dev.vars` and restart Wrangler.
-2. Set `remote.url` to `http://localhost:8787/cloud` in Moi’s data-directory `config.json` (see [Cloud CLI setup](remote-cli.md)); the visitor’s server reaches the owner through it. The mock needs no login.
-3. Run `bun scripts/mock-owner.ts` from the Moi repository.
-4. Open Moi (`http://localhost:8787`, or `http://localhost:13337` directly) and add the printed folder, normally `~/moi/shared-counter`. Existing references to `alice/owner-board` also work.
+The script preserves existing configs, installs the visitor’s skill, and creates owner applets only if missing. Owner files and an isolated registry live in `moi-mock-owner` under the OS temporary directory. Restarts preserve the counter; the normal registry is untouched. Files remain after exit until removed or cleaned up by the OS.
 
-The script creates the visitor config only if missing and installs `moi-workspace` without scaffolding applets. Existing configs are preserved. Owner data and an isolated registry live in `moi-mock-owner` under the OS temporary directory; restarts preserve the counter and sources. The normal registry is untouched.
+`MOCK_VISITOR_DIR`, `MOCK_OWNER_DATA_DIR`, and `MOCK_OWNER_PORT` override those defaults. Update Batiok’s mock origin if changing the port. The override requires local request and app hostnames and a loopback mock origin; remove it to restore production routing. Restart the mock after code changes.
 
-`MOCK_VISITOR_DIR`, `MOCK_OWNER_DATA_DIR`, and `MOCK_OWNER_PORT` override those defaults. Update Batiok’s origin if changing the port. Forwarding requires a local request hostname, local `APP_URL`, and a loopback mock origin. Remove `MOCK_REMOTE_ORIGIN` to disable it. Restart the script after code changes.
+Increment **Shared counter** in Overview and the **Counter** view, then refresh to verify persistence. The script logs owner requests and prints the counter file. It supports collaboration WebSockets but does not simulate Cloud discovery, memberships, or invitations. Mock owner requests need no Cloud credentials; Batiok’s normal UI sign-in still applies.
 
-To test, increment **Shared counter** in Overview and the **Counter** view. Check the script’s `OWNER` logs and printed counter file, then refresh or restart to verify persistence. The mock supports presence WebSockets, but does not simulate Cloud membership or invitations. Owner files remain after Ctrl+C until removed or cleaned up by the OS.
-
-Coverage: [forwarding and owner API](../server/api/remote-workspace.test.ts), [CLI requests](../server/workspaces/api.test.ts), and [visual states](../tests/visual/workspace.visual.ts).
+Coverage: [owner API forwarding](../server/api/remote-workspace.test.ts), [CLI requests](../server/workspaces/api.test.ts), and [visual states](../tests/visual/workspace.visual.ts).

@@ -62,7 +62,7 @@ test('remote workspace requests reach the owner through the configured gateway',
   expect(await response.text()).toBe('result')
   expect(requests).toEqual([
     {
-      url: 'http://localhost:8787/api/remote/alice/workspaces/board/rpc/views/counter/increment',
+      url: 'http://localhost:8787/api/workspaces/alice:board/rpc/views/counter/increment',
       method: 'POST',
       body: 'payload'
     }
@@ -112,7 +112,7 @@ test('remote scratchpad reads use owner snapshots and image bytes without visito
     src: `data:image/png;base64,${Buffer.from('image-bytes').toString('base64')}`
   })
   expect(requests).toContain(
-    'http://localhost:8787/api/remote/alice/workspaces/board/scratchpad/assets/asset-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png'
+    'http://localhost:8787/api/workspaces/alice:board/scratchpad/assets/asset-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png'
   )
 })
 

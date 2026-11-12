@@ -122,8 +122,4 @@ test('remote references update only the visitor skill copy', async () => {
     )
   ).toBe('0.7.1')
   expect(await Bun.file(join(visitorRoot, '.moi', '.workspace.json')).text()).toBe(config)
-  const ownerUpdate = await api.request(`/api/remote/alice/workspaces/${owner.id}/skills/update`, {
-    method: 'POST'
-  })
-  expect(ownerUpdate.status).toBe(403)
 })

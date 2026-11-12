@@ -118,7 +118,7 @@ test('remote discovery uses owner views and the visitor saved default', async ()
   const fetchSpy = mockOwner()
   const rows = await getWorkspaceTabs(workspace)
   expect(String(fetchSpy.mock.calls[0]?.[0])).toBe(
-    'http://localhost:8787/api/remote/alice/workspaces/owner-board/views?includePending=true'
+    'http://localhost:8787/api/workspaces/alice:owner-board/views?includePending=true'
   )
   expect(rows.map(row => row.id)).toEqual([
     'overview',
