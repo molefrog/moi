@@ -40,16 +40,14 @@ Presence uses `{prefix}/collab`. Membership controls use `/cloud${apiBase}/membe
 
 Scratchpad documents and assets stay on the owner. Browser saves replace the full document, and there is no live sync: reopen the canvas to load edits made elsewhere.
 
-## Local mock owner
+## Local mock workspace
 
-`scripts/mock-owner.ts` runs an owner on this machine so the remote path can be tried without a second computer. These examples use Batiok on port `8787`.
+With Moi running in Cloud mode and Batiok on `8787`, run from the Moi repo:
 
-1. Start Moi and Batiok. Set `MOCK_REMOTE_ORIGIN=http://127.0.0.1:13340` in Batiok’s `.dev.vars` and restart Wrangler.
-2. Run `bun scripts/mock-owner.ts` from Moi.
-3. Open Moi through Batiok and add the printed folder, normally `~/moi/shared-counter`.
+```sh
+bun scripts/mock-remote-workspace.ts
+```
 
-Increment **Shared counter** in Overview and in the **Counter** view, then refresh to check it persisted. The script logs owner requests.
+Open [localhost:9898](http://localhost:9898). No Batiok environment changes or restart needed.
 
-Owner files and an isolated registry live in `moi-mock-owner` under the OS temporary directory; your normal registry is untouched. `MOCK_VISITOR_DIR`, `MOCK_OWNER_DATA_DIR`, and `MOCK_OWNER_PORT` override the defaults. Membership is a fixture that resets on restart, and Cloud discovery is not simulated. Restart the mock after code changes, and remove `MOCK_REMOTE_ORIGIN` to restore production routing.
-
-Coverage: [owner API boundaries](../server/api/remote-workspace.test.ts), [CLI requests](../server/cli/remote-control.test.ts), and [visual states](../tests/visual/workspace.visual.ts).
+Coverage: [mock workspace flow](../scripts/mock-remote-workspace.test.ts), [owner API boundaries](../server/api/remote-workspace.test.ts), [CLI requests](../server/cli/remote-control.test.ts), and [visual states](../tests/visual/workspace.visual.ts).
