@@ -4,70 +4,52 @@ A remote workspace is a registered local folder whose `.moi/.workspace.json` poi
 
 ## Config
 
-Both forms use version 2. Version 1 local configs remain readable and upgrade on their next save.
-
-Local:
-
 ```json
 {
   "version": 2,
-  "name": "Team board",
-  "icon": { "type": "emoji", "value": "🌱" },
-  "widgetGrid": [],
-  "tabs": { "open": ["overview"], "active": "overview" },
-  "layoutMode": "split",
-  "selectedModel": "sonnet"
+  "remote": { "user_id": "alice", "workspace_id": "team-board" }
 }
 ```
 
-Remote:
+A remote config contains only `version` and `remote`; any other field is ignored. Local configs keep their existing shape, also at version 2. Version 1 local configs remain readable and upgrade on their next save.
 
-```json
-{
-  "version": 2,
-  "remote": { "user_id": "alice", "workspace_id": "team-board" },
-  "tabs": { "open": ["overview"], "active": "overview" },
-  "layoutMode": "split",
-  "selectedModel": "sonnet"
-}
-```
+Name, icon, layout, harness, theme, and content come from the owner. The folder holds only the config and the workspace skill. Open tabs and the active tab live in browser-tab storage. Remote workspaces open in fullscreen mode; chat and settings are unavailable.
 
-Both forms support `layoutMode`, `selectedModel`, `selectedEffort`, and `selectedSpeedMode`. Layout mode defaults to `split`; missing chat options use the usual defaults. Remote preferences and tabs (open set, order, active tab) stay in the visitor’s config. Local cloud workspaces keep tabs in browser-tab storage.
+## Routing
 
-Shared layout, name, icon, harness, theme, and content come from the owner. Icons use Moi’s standard fallback. Remote workspaces use the normal UI; settings entry points and chat are unavailable.
+The browser URL uses the local registration ID: `/workspace/{localId}`. The workspace loader resolves the API prefix once and shares it through context and a single React Query address record:
 
-## Routing and CLI
+- local: `/api/workspaces/{localId}`
+- remote: `/api/workspaces/{user_id}:{workspace_id}`
 
-Standalone Moi supports local workspaces only: no Cloud discovery, sharing, or collaboration calls. Through Batiok, browser requests use its existing session.
+The browser calls the remote prefix directly with its Batiok session. Batiok checks access and forwards to the owner's ordinary API; the visitor's Moi is not in the path. Applet RPC and file URLs follow the address the module was loaded from. For a remote reference, the visitor's own API serves only the reference and personal chat state. It answers 404 for shared content and rejects layout writes.
 
-Each remote reference has a local registration ID for its folder, skills, tabs, and preferences. Shared content is requested directly at `/api/workspaces/{user_id}:{workspace_id}`. Batiok checks access and forwards to the owner's ordinary API. Applet RPC and file URLs follow the address from which the module was loaded. The browser combines owner layout with visitor preferences and saves each to its own endpoint.
+The standalone Moi UI supports local workspaces only: it hides remote registrations and makes no Cloud discovery, sharing, or collaboration calls.
 
-CLI requests resolve the same config and authenticate through the existing Cloud client. They do not depend on browser cookies or a visitor-side HTTP relay.
-
-- `tabs` and `navigate` use owner views and visitor tabs; navigation targets the visitor’s browser.
-- `theme`, `config`, `call-server-fn`, `debug logs`, and scratchpad reads/edits use owner APIs. `refresh` and `scratch view` target the visitor’s browser.
-- Skills and environment commands stay local. Source editing, builds, and agent-backed commands require the owner’s actual workspace.
+CLI commands in a linked folder resolve the same config and authenticate through the Cloud login. See [Remote operations](remote-cli.md#remote-operations) for which command runs where.
 
 ## Discovery and collaboration
 
-[`moi remote --json`](remote-cli.md) returns `{ me, workspaces }`; each workspace has `id` and `owner.id`. In Cloud mode, the home page calls `/cloud/api/workspaces/shared` with the browser session and mixes accepted shares with registered workspaces in one grid without creating folders. Registered workspaces keep the saved sidebar order; unopened shares appear first. Registered shares appear once and open directly. Pending invitations can be accepted on the homepage through Cloud. Acceptance refreshes the list and stays on the homepage; it creates no local files. Opening a share needs no machine login and creates a reference under the configured workspace root (normally `~/moi`), installs the skill, and registers it. Existing registrations keep their config and skill version. Unregistered shares removed from the Cloud list disappear on refresh; registered references remain in the grid and sidebar.
+In Cloud mode the home page lists accepted shares from `/cloud/api/workspaces/shared` in the same grid as registered workspaces.
 
-In cloud mode, presence uses `/api/workspaces/{user_id}:{workspace_id}/collab`. Membership controls use `/cloud/api/workspaces/{user_id}:{workspace_id}/...`; local workspaces use a plain ID. The host and accepted human members can invite and remove members; the host stays listed. Remote chat and leaving a workspace remain deferred.
+- Listing never contacts or starts an owner machine. A share shows its workspace ID until it has been opened once.
+- Accepting an invitation creates no local files. Opening a share creates the reference under the workspace root (normally `~/moi`), installs the skill, and registers it. Later opens leave an existing reference and skill untouched.
+- A registered reference stays in the grid and sidebar after the share disappears from Cloud.
 
-Scratchpad documents and assets stay on the owner. Reopen the canvas to load edits made elsewhere; live owner-event updates and simultaneous editing are not supported. Browser saves replace the full document.
+Presence uses `{prefix}/collab`. Membership controls use `/cloud/api/workspaces/{id}/...` with the same ID form as the prefix. The host and accepted human members can invite and remove members. Leaving a workspace from the UI is not available yet.
+
+Scratchpad documents and assets stay on the owner. Browser saves replace the full document, and there is no live sync: reopen the canvas to load edits made elsewhere.
 
 ## Local mock owner
 
-Use your local Batiok port below; these examples use `8787`.
+`scripts/mock-owner.ts` runs an owner on this machine so the remote path can be tried without a second computer. These examples use Batiok on port `8787`.
 
 1. Start Moi and Batiok. Set `MOCK_REMOTE_ORIGIN=http://127.0.0.1:13340` in Batiok’s `.dev.vars` and restart Wrangler.
 2. Run `bun scripts/mock-owner.ts` from Moi.
-3. Open Moi through Batiok and add the printed folder, normally `~/moi/shared-counter`. Existing references to `alice/owner-board` still work.
+3. Open Moi through Batiok and add the printed folder, normally `~/moi/shared-counter`.
 
-The script preserves existing configs, installs the visitor’s skill, and creates owner applets only if missing. Owner files and an isolated registry live in `moi-mock-owner` under the OS temporary directory. Restarts preserve the counter; the normal registry is untouched. Files remain after exit until removed or cleaned up by the OS.
+Increment **Shared counter** in Overview and in the **Counter** view, then refresh to check it persisted. The script logs owner requests.
 
-`MOCK_VISITOR_DIR`, `MOCK_OWNER_DATA_DIR`, and `MOCK_OWNER_PORT` override those defaults. Update Batiok’s mock origin if changing the port. The override requires local request and app hostnames and a loopback mock origin; remove it to restore production routing. Restart the mock after code changes.
+Owner files and an isolated registry live in `moi-mock-owner` under the OS temporary directory; your normal registry is untouched. `MOCK_VISITOR_DIR`, `MOCK_OWNER_DATA_DIR`, and `MOCK_OWNER_PORT` override the defaults. Membership is a fixture that resets on restart, and Cloud discovery is not simulated. Restart the mock after code changes, and remove `MOCK_REMOTE_ORIGIN` to restore production routing.
 
-Increment **Shared counter** in Overview and the **Counter** view, then refresh to verify persistence. The script logs owner requests and prints the counter file. It includes the default Views widget and collaboration WebSockets. The local membership fixture lists Alice, Jamie, and the signed-in visitor; invites and removals are simulated without sending email and reset on restart. Cloud discovery is not simulated. Mock owner requests need no Cloud credentials; Batiok’s normal UI sign-in still applies.
-
-Coverage: [owner API boundaries](../server/api/remote-workspace.test.ts), [CLI requests](../server/workspaces/api.test.ts), and [visual states](../tests/visual/workspace.visual.ts).
+Coverage: [owner API boundaries](../server/api/remote-workspace.test.ts), [CLI requests](../server/cli/remote-control.test.ts), and [visual states](../tests/visual/workspace.visual.ts).

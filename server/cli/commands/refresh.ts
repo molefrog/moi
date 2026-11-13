@@ -1,3 +1,4 @@
+import { currentRemoteWorkspace } from '../../remote/workspace'
 import { defineCommand } from 'citty'
 import { CONTROL_URL } from '../../constants'
 import { staleSkillNotice } from '../../skills/version'
@@ -17,11 +18,16 @@ export const refresh = defineCommand({
   async run({ args }) {
     const only = readAppletSelector(args.only)
     const notice = await staleSkillNotice(process.cwd())
+    const linked = await currentRemoteWorkspace()
     const ws = new WebSocket(CONTROL_URL)
 
     ws.onopen = () =>
       ws.send(
-        JSON.stringify({ type: 'applets:refresh', only, path: process.env.MOI_REMOTE_WORKSPACE })
+        JSON.stringify({
+          type: 'applets:refresh',
+          only,
+          path: linked?.path ?? process.env.MOI_REMOTE_WORKSPACE
+        })
       )
 
     ws.onmessage = event => {

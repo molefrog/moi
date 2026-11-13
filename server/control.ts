@@ -1,33 +1,39 @@
-import { requestWorkspace } from './workspaces/api'
 import { stringify as devalueStringify } from 'devalue'
 import { resolve } from 'path'
 
 import { parseAppletSelector } from '@/lib/applet-selector'
 import { resolveWorkspaceTheme } from '@/lib/themes'
-import type { WorkspaceEntry, WorkspaceLayoutResponse } from '@/lib/types'
+import type { WorkspaceEntry } from '@/lib/types'
 import { resolveUrl } from '@/lib/navigation'
 import { isWorkspaceTabId } from '@/lib/workspace-tabs'
 import { navigationRelay } from './navigation-relay'
 
 import { getAppConfig } from './app-config'
-import { getAppletLogCount } from './applets/log'
+import { clearAppletLog, getAppletLog, getAppletLogCount } from './applets/log'
 import { serializeWorkspaceBundle } from './applets/bundle-queue'
 import { CONTROL_HOST, CONTROL_PORT, PORT } from './constants'
 import { applyEnvChanged } from './workspaces/env-apply'
-import { parseFunctionPath } from './applets/functions'
+import { callFunctionEphemeral, parseFunctionPath } from './applets/functions'
+import { processIcon } from './workspaces/icon'
+import { loadLayout, saveLayout } from './workspaces/layout'
 import { publishEvent } from './events'
 import { findWorkspaceForPath, listWorkspaces, registerWorkspace } from './workspaces/registry'
 import { requiredEnvFor } from './workspaces/required-env'
+import { executeScratchOp } from './scratchpad/executor'
 import { readScratchpadImage, readScratchpadShapes } from './scratchpad/document'
 import { relayScratchOp } from './scratchpad/relay'
 import { broadcastAll } from './state'
-import { getWorkspaceTabs, assertNavigableTab } from './workspaces/tabs'
+import { assembleTabRows, assertNavigableTab } from './workspaces/tabs'
 import { applyThemeUpdate } from './workspaces/theme'
 import { handleBundle } from './applets/widgets'
-import { handleBundleViews } from './applets/views'
+import { getWorkspaceViews, handleBundleViews } from './applets/views'
 import { updatePendingView, PendingViewError } from './sessions/pending-views'
 import { createViewFromSession, ViewStartupError } from './sessions/view-sessions'
-import { type WorkspaceConfig, type WorkspaceConfigPatch } from './workspaces/config'
+import {
+  getWorkspaceConfig,
+  setWorkspaceConfig,
+  type WorkspaceConfigPatch
+} from './workspaces/config'
 import { VERSION } from './version'
 import {
   getWorkspaceEnvView,
@@ -179,17 +185,18 @@ export const control = Bun.serve({
         if (data.type === 'debug:logs') {
           const match = await resolveWorkspace(ws, data.path)
           if (!match) return
-          const result = await (
-            await requestWorkspace(match, '/applet-log', {
-              method: data.clear === true ? 'DELETE' : 'GET'
-            })
-          ).json()
-          ws.send(JSON.stringify({ ok: true, ...result }))
+          if (data.clear === true) {
+            ws.send(JSON.stringify({ ok: true, cleared: clearAppletLog(match.path) }))
+            return
+          }
+          ws.send(JSON.stringify({ ok: true, entries: getAppletLog(match.path) }))
           return
         }
 
         // Direct server-function invocation — `moi call-server-fn <module>/<fn>`.
-        // Uses the same workspace RPC endpoint as applets.
+        // Runs in an EPHEMERAL worker: a fresh process spawned for this one call
+        // and killed after, so a debug invocation is fully isolated from the
+        // warm pool the widgets use (same env/timeout/wire format otherwise).
         // Args arrive as plain JSON (easier to hand-write than devalue's wire
         // format) and are re-encoded for the worker; the result goes back
         // devalue-encoded for the CLI to render.
@@ -224,13 +231,12 @@ export const control = Bun.serve({
           }
           const t0 = performance.now()
           try {
-            const result = await (
-              await requestWorkspace(match, `/rpc/${parsed.module}/${parsed.name}`, {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: devalueStringify(args)
-              })
-            ).text()
+            const result = await callFunctionEphemeral(
+              parsed.module,
+              parsed.name,
+              devalueStringify(args),
+              match.path
+            )
             ws.send(JSON.stringify({ ok: true, result, ms: Math.round(performance.now() - t0) }))
           } catch (err) {
             ws.send(
@@ -319,7 +325,11 @@ export const control = Bun.serve({
         if (data.type === 'tabs') {
           const match = await resolveWorkspace(ws, data.path)
           if (!match) return
-          ws.send(JSON.stringify({ ok: true, tabs: await getWorkspaceTabs(match) }))
+          const [layout, views] = await Promise.all([
+            loadLayout(match.path),
+            getWorkspaceViews(match)
+          ])
+          ws.send(JSON.stringify({ ok: true, tabs: assembleTabRows(views, layout.tabs.active) }))
           return
         }
 
@@ -332,7 +342,9 @@ export const control = Bun.serve({
             if (!href.startsWith('moi:/') || href.startsWith('moi:/files/'))
               throw new Error('Navigation needs a workspace page address')
             const tab = href.slice(5).split('?', 1)[0]
-            if (isWorkspaceTabId(tab)) assertNavigableTab(tab, await getWorkspaceTabs(match))
+            // A linked folder's views live on the owner; the browser checks the tab itself.
+            if (isWorkspaceTabId(tab) && !match.remote)
+              assertNavigableTab(tab, await getWorkspaceViews(match))
             await navigationRelay.navigate(match.id, href)
             ws.send(JSON.stringify({ ok: true, href }))
           } catch (error) {
@@ -413,7 +425,8 @@ export const control = Bun.serve({
           // Theme is per-workspace — resolve to the real root (subdir-safe).
           const match = await resolveWorkspace(ws, data.path)
           if (!match) return
-          const layout: WorkspaceLayoutResponse = await (await requestWorkspace(match, '')).json()
+          const workspacePath = match.path
+          const layout = await loadLayout(workspacePath)
 
           // Listing mode — no theme setting requested
           if (!data.font && !data.color && !data.radius && !data.agent) {
@@ -440,19 +453,7 @@ export const control = Bun.serve({
             return
           }
 
-          const {
-            tabs: _tabs,
-            cwd: _cwd,
-            provider: _provider,
-            agentId: _agentId,
-            remote: _remote,
-            ...shared
-          } = layout
-          await requestWorkspace(match, '', {
-            method: 'PUT',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ ...shared, theme: result.theme })
-          })
+          await saveLayout({ ...layout, theme: result.theme }, workspacePath)
           publishEvent({ type: 'theme:updated', workspaceId: match.id })
           ws.send(JSON.stringify({ ok: true, ...result.applied }))
           return
@@ -470,7 +471,7 @@ export const control = Bun.serve({
 
           // Listing mode — no field requested.
           if (!hasName && !hasIcon && !clearName && !clearIcon) {
-            const cfg: WorkspaceConfig = await (await requestWorkspace(match, '/config')).json()
+            const cfg = await getWorkspaceConfig(workspacePath)
             ws.send(
               JSON.stringify({ name: cfg.name ?? null, hasIcon: !!cfg.icon, path: workspacePath })
             )
@@ -482,17 +483,20 @@ export const control = Bun.serve({
           if (clearName) patch.name = null
           else if (hasName) patch.name = String(data.name)
           if (clearIcon) patch.icon = null
-          if (patch.name !== undefined || clearIcon)
-            await requestWorkspace(match, '/config', {
-              method: 'PUT',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify(patch)
-            })
-          if (hasIcon && !clearIcon)
-            await requestWorkspace(match, '/icon', {
-              method: 'PUT',
-              body: Bun.file(String(data.iconPath))
-            })
+          else if (hasIcon) {
+            try {
+              patch.icon = {
+                type: 'upload',
+                value: await processIcon(String(data.iconPath))
+              }
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err)
+              ws.send(JSON.stringify({ error: `Could not read image: ${msg}` }))
+              return
+            }
+          }
+
+          await setWorkspaceConfig(workspacePath, patch)
           publishEvent({ type: 'workspace:updated', workspaceId: match.id })
           ws.send(
             JSON.stringify({
@@ -517,16 +521,16 @@ export const control = Bun.serve({
           const match = await resolveWorkspace(ws, data.path)
           if (!match) return
 
-          // Reads use the workspace API snapshot — no live tab needed.
+          // `read` is served straight off the disk snapshot — no live tab needed.
           if (op.kind === 'read') {
-            ws.send(JSON.stringify({ shapes: await readScratchpadShapes(match) }))
+            ws.send(JSON.stringify({ shapes: await readScratchpadShapes(match.path) }))
             return
           }
 
           // `read-image` resolves one image shape's data off disk too — `read`
           // omits the blob, so this is how the agent pulls a specific image.
           if (op.kind === 'read-image') {
-            ws.send(JSON.stringify(await readScratchpadImage(match, String(op.name))))
+            ws.send(JSON.stringify(await readScratchpadImage(match.path, String(op.name))))
             return
           }
 
@@ -540,16 +544,10 @@ export const control = Bun.serve({
             // `view` renders pixels — only the browser can do that, so it relays to
             // a live tab (and fails if none is open). Every mutation runs headlessly
             // against the disk snapshot, so drawing never needs an open canvas.
-            let result
-            if (op.kind === 'view') result = await relayScratchOp(match.id, op)
-            else {
-              const body = new FormData()
-              body.set('op', JSON.stringify(op))
-              if (op.kind === 'add-image') body.set('image', Bun.file(op.path))
-              result = await (
-                await requestWorkspace(match, '/scratchpad/ops', { method: 'POST', body })
-              ).json()
-            }
+            const result =
+              op.kind === 'view'
+                ? await relayScratchOp(match.id, op)
+                : await executeScratchOp(match.path, match.id, op)
             ws.send(JSON.stringify({ ok: true, result }))
           } catch (err) {
             ws.send(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }))

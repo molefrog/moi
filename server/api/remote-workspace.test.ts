@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { stringify, parse } from 'devalue'
 import { api } from './index'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
-import { loadWorkspaceFileConfig, loadLayout, saveLayout } from '../workspaces/layout'
+import { loadLayout, saveLayout } from '../workspaces/layout'
 import { buildAllViews } from '../applets/views'
 import { killAllWorkers } from '../applets/functions'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
@@ -62,7 +62,7 @@ const put = (body: unknown) => ({
   body: JSON.stringify(body)
 })
 
-test('visitor API returns only the descriptor and personal preferences', async () => {
+test('visitor API returns only the reference and folder', async () => {
   const list = await (await api.request('/api/workspaces')).json()
   expect(list.find((entry: { id: string }) => entry.id === visitorId)).toMatchObject({
     remote: { user_id: 'alice', workspace_id: ownerId },
@@ -71,43 +71,28 @@ test('visitor API returns only the descriptor and personal preferences', async (
   const layout = await (await api.request(local)).json()
   expect(layout).toMatchObject({
     cwd: visitor,
-    remote: { user_id: 'alice', workspace_id: ownerId },
-    layoutMode: 'split',
-    selectedModel: 'visitor-model'
+    remote: { user_id: 'alice', workspace_id: ownerId }
   })
   expect(layout.widgetGrid).toBeUndefined()
-  expect((await api.request(`${local}/widgets`)).status).toBe(404)
+  expect(layout.selectedModel).toBeUndefined()
+  expect(layout.tabs).toBeUndefined()
   expect((await api.request(`${base}/widgets`)).status).toBe(200)
 })
 
-test('visitor saves change only personal settings', async () => {
-  const before = await loadLayout(owner)
-  const saved = await api.request(
+test('visitor layout writes cannot add preferences or overwrite the reference', async () => {
+  const before = await Bun.file(join(visitor, '.moi/.workspace.json')).text()
+  const ownerBefore = await loadLayout(owner)
+  const response = await api.request(
     local,
     put({
-      ...before,
-      widgetGrid: [{ i: 'counter', x: 1, y: 2 }],
-      tabs: { open: ['overview', 'scratchpad'], active: 'scratchpad' },
-      layoutMode: 'split',
-      selectedModel: 'visitor-model'
+      version: 2,
+      layoutMode: 'fullscreen',
+      tabs: { open: ['scratchpad'], active: 'scratchpad' }
     })
   )
-  expect(saved.status).toBe(204)
-  expect(await loadLayout(owner)).toMatchObject({
-    layoutMode: 'fullscreen',
-    selectedModel: 'owner-model',
-    tabs: before.tabs,
-    widgetGrid: before.widgetGrid
-  })
-  // A preferences-only save never touches the owner.
-  expect((await api.request(local, put({ version: 2, layoutMode: 'fullscreen' }))).status).toBe(204)
-  expect(await loadWorkspaceFileConfig(visitor)).toMatchObject({
-    remote: { user_id: 'alice', workspace_id: ownerId },
-    tabs: { active: 'scratchpad' },
-    layoutMode: 'fullscreen',
-    selectedModel: 'visitor-model'
-  })
-  expect((await loadLayout(owner)).widgetGrid).toEqual(before.widgetGrid)
+  expect(response.status).toBe(403)
+  expect(await Bun.file(join(visitor, '.moi/.workspace.json')).text()).toBe(before)
+  expect(await loadLayout(owner)).toEqual(ownerBefore)
 })
 
 test('remote bundle RPC reads and writes owner data; assets and validators retain the destination', async () => {
@@ -161,27 +146,13 @@ test('remote bundle RPC reads and writes owner data; assets and validators retai
   expect(await (await api.request(`${base}/files/hello.svg`)).text()).toBe('<svg/>')
 })
 
-test('remote reference blocks unavailable creation and removal but keeps personal state local', async () => {
+test('remote reference serves no shared content and keeps personal state local', async () => {
+  for (const path of ['/widgets', '/views', '/scratchpad', '/config'])
+    expect([path, (await api.request(local + path)).status]).toEqual([path, 404])
+  expect((await api.request(`${local}/views`, { method: 'POST' })).status).toBe(404)
   expect((await api.request(local, { method: 'DELETE' })).status).toBe(403)
-  expect((await api.request(`${local}/views`, { method: 'POST' })).status).toBe(403)
   // Chat state is the visitor's own and never leaves this Moi.
   expect((await api.request(`${local}/state`)).status).toBe(200)
-})
-
-test('remote home preview reads the owner theme without exposing chats', async () => {
-  await saveLayout(
-    {
-      ...createDefaultWorkspaceLayout(),
-      theme: { color: 'mint', font: 'sans', radius: 'soft', agent: 'boxy' }
-    },
-    owner
-  )
-  const response = await api.request(`${base}/home-preview`)
-  expect(response.status).toBe(200)
-  const preview = await response.json()
-  expect(preview.theme.color).toBe('mint')
-  expect(preview.thumbnails).toEqual([])
-  expect(preview.firstUserMessage).toBeUndefined()
   const previews = await (await api.request('/api/workspaces/previews')).json()
   expect(previews[visitorId]).toEqual({ thumbnails: [] })
 })
@@ -192,7 +163,6 @@ test('remote scratchpad documents and assets stay on the owner', async () => {
   const loaded = await (await api.request(`${base}/scratchpad`)).json()
   expect(loaded.document).toEqual(document)
   expect(await Bun.file(join(visitor, '.moi/.scratchpad.json')).exists()).toBe(false)
-  expect((await api.request(`${local}/scratchpad`)).status).toBe(404)
   const upload = await api.request(`${base}/scratchpad/assets`, {
     method: 'POST',
     headers: { 'content-type': 'image/png' },
@@ -205,27 +175,7 @@ test('remote scratchpad documents and assets stay on the owner', async () => {
   expect(new Uint8Array(await asset.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]))
 })
 
-test('owner and visitor log APIs read and clear the selected workspace journal', async () => {
-  const { recordAppletError, getAppletLog } = await import('../applets/log')
-  recordAppletError(visitor, { source: 'runtime', message: 'Visitor error' })
-  for (const prefix of [base]) {
-    recordAppletError(owner, { source: 'runtime', message: 'Owner error' })
-    const response = await api.request(`${prefix}/applet-log`)
-    expect(response.status).toBe(200)
-    expect(
-      (await response.json()).entries.some(
-        (entry: { message: string }) => entry.message === 'Owner error'
-      )
-    ).toBe(true)
-    expect(
-      (await (await api.request(`${prefix}/applet-log`, { method: 'DELETE' })).json()).cleared
-    ).toBeGreaterThan(0)
-    expect(getAppletLog(owner)).toHaveLength(0)
-    expect(getAppletLog(visitor)).toHaveLength(1)
-  }
-})
-
-test('owner and visitor scratchpad edit APIs reuse the executor and preserve visitor data', async () => {
+test('scratchpad edit API runs ops on the owner and never reads caller paths', async () => {
   const { readScratchpadShapes, readScratchpadImage } = await import('../scratchpad/document')
   const sharp = (await import('sharp')).default
   const image = await sharp({
@@ -233,49 +183,46 @@ test('owner and visitor scratchpad edit APIs reuse the executor and preserve vis
   })
     .png()
     .toBuffer()
-  for (const prefix of [base]) {
-    const edit = async (op: unknown, bytes?: Uint8Array) => {
-      const body = new FormData()
-      body.set('op', JSON.stringify(op))
-      if (bytes)
-        body.set('image', new Blob([new Uint8Array(bytes)], { type: 'image/png' }), 'visitor.png')
-      return api.request(`${prefix}/scratchpad/ops`, { method: 'POST', body })
-    }
-    expect((await edit({ kind: 'add-text', name: 'note', x: 1, y: 2, text: 'Hello' })).status).toBe(
-      200
-    )
-    expect((await edit({ kind: 'move', name: 'note', x: 30, y: 40 })).status).toBe(200)
-    expect((await edit({ kind: 'set', name: 'note', text: 'Updated' })).status).toBe(200)
-    expect((await readScratchpadShapes(owner))[0]).toMatchObject({
-      id: 'note',
-      x: 30,
-      y: 40,
-      text: 'Updated'
-    })
-    expect(
-      (
-        await edit(
-          { kind: 'add-image', name: 'photo', path: '/visitor-only/image.png', x: 0, y: 0 },
-          image
-        )
-      ).status
-    ).toBe(200)
-    expect(await readScratchpadImage(owner, 'photo')).toMatchObject({
-      src: expect.stringContaining('data:image/')
-    })
-    expect((await edit({ kind: 'delete', name: 'note' })).status).toBe(200)
-    expect((await readScratchpadShapes(owner)).map(shape => shape.id)).toEqual(['photo'])
-    expect((await edit({ kind: 'clear' })).status).toBe(200)
-    expect(await readScratchpadShapes(owner)).toEqual([])
-    expect(await readScratchpadShapes(visitor)).toEqual([])
-    expect((await edit({ kind: 'view' })).status).toBe(400)
-    expect((await edit({ kind: 'unknown' })).status).toBe(400)
-    expect(await readScratchpadShapes(owner)).toEqual([])
-    expect(
-      (await edit({ kind: 'add-image', name: 'bad', path: '/owner/private.png', x: 0, y: 0 }))
-        .status
-    ).toBe(400)
+  const edit = async (op: unknown, bytes?: Uint8Array) => {
+    const body = new FormData()
+    body.set('op', JSON.stringify(op))
+    if (bytes)
+      body.set('image', new Blob([new Uint8Array(bytes)], { type: 'image/png' }), 'visitor.png')
+    return api.request(`${base}/scratchpad/ops`, { method: 'POST', body })
   }
+  expect((await edit({ kind: 'add-text', name: 'note', x: 1, y: 2, text: 'Hello' })).status).toBe(
+    200
+  )
+  expect((await edit({ kind: 'move', name: 'note', x: 30, y: 40 })).status).toBe(200)
+  expect((await edit({ kind: 'set', name: 'note', text: 'Updated' })).status).toBe(200)
+  expect((await readScratchpadShapes(owner))[0]).toMatchObject({
+    id: 'note',
+    x: 30,
+    y: 40,
+    text: 'Updated'
+  })
+  expect(
+    (
+      await edit(
+        { kind: 'add-image', name: 'photo', path: '/visitor-only/image.png', x: 0, y: 0 },
+        image
+      )
+    ).status
+  ).toBe(200)
+  expect(await readScratchpadImage(owner, 'photo')).toMatchObject({
+    src: expect.stringContaining('data:image/')
+  })
+  expect((await edit({ kind: 'delete', name: 'note' })).status).toBe(200)
+  expect((await readScratchpadShapes(owner)).map(shape => shape.id)).toEqual(['photo'])
+  expect((await edit({ kind: 'clear' })).status).toBe(200)
+  expect(await readScratchpadShapes(owner)).toEqual([])
+  expect(await readScratchpadShapes(visitor)).toEqual([])
+  expect((await edit({ kind: 'view' })).status).toBe(400)
+  expect((await edit({ kind: 'unknown' })).status).toBe(400)
+  expect(await readScratchpadShapes(owner)).toEqual([])
+  expect(
+    (await edit({ kind: 'add-image', name: 'bad', path: '/owner/private.png', x: 0, y: 0 })).status
+  ).toBe(400)
 })
 
 test('standalone hides remote registrations and refuses remote opening', async () => {

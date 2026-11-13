@@ -1,10 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { useAppConfig } from '@/client/api/app-config'
-import { requestJson } from '@/client/api/http'
 import { cloudRequest } from '@/client/features/account/api'
 import { workspaceDisplayName } from '@/client/features/workspace/workspace-presentation'
-import { workspaceAddress, workspaceApiBase } from '@/lib/workspace-config'
-import type { WorkspaceEntry, WorkspaceLayoutResponse } from '@/lib/types'
+import { workspaceAddress } from '@/lib/workspace-config'
+import type { WorkspaceEntry } from '@/lib/types'
 
 export type SharedWorkspace = {
   id: string
@@ -24,20 +23,7 @@ export function useSharedWorkspaces() {
       const { workspaces } = (await (await cloudRequest('workspaces/shared')).json()) as {
         workspaces: SharedWorkspace[]
       }
-      return Promise.all(
-        workspaces.map(async share => {
-          const owner = await requestJson<WorkspaceLayoutResponse>(
-            workspaceApiBase(share.id, share.owner.id)
-          ).catch(() => undefined)
-          return {
-            ...share,
-            name: owner?.name || share.id,
-            icon: owner?.icon,
-            theme: owner?.theme,
-            type: owner?.provider ?? 'claude-code'
-          }
-        })
-      )
+      return workspaces
     },
     staleTime: 60_000,
     refetchOnWindowFocus: true,

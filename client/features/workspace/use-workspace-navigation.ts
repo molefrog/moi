@@ -1,4 +1,3 @@
-import { ownerApiBase } from '@/client/features/workspace/remote'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import type { MouseEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -46,7 +45,7 @@ type UseWorkspaceNavigationOptions = {
 
 export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNavigationOptions) {
   const queryClient = useQueryClient()
-  const { workspaceId, chatAvailable } = useWorkspaceLayoutCtx()
+  const { workspaceId, chatAvailable, apiBase } = useWorkspaceLayoutCtx()
   const [tabsState, saveTabs] = useWorkspaceTabs()
   const latest = useRef({ views, tabsState, onOpenChat })
   useLayoutEffect(() => {
@@ -100,7 +99,7 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
       { replace = false }: NavigationOptions = {},
       controller = new AbortController()
     ) => {
-      const target = resolveUrl(href, { workspaceId, base, apiBase: ownerApiBase(workspaceId) })
+      const target = resolveUrl(href, { workspaceId, base, apiBase })
       navigationRequest.current?.controller.abort()
       if (!target.startsWith(prefix)) {
         navigationRequest.current = null
@@ -133,9 +132,7 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
                 )
           const destinationHref =
             destination && destination !== tab ? tabUrl(remembered, destination) : href
-          commit(
-            resolveUrl(destinationHref, { workspaceId, base, apiBase: ownerApiBase(workspaceId) })
-          )
+          commit(resolveUrl(destinationHref, { workspaceId, base, apiBase }))
           if (destination) latest.current.onOpenChat()
           return
         }
@@ -166,6 +163,7 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
       queryClient,
       remembered,
       chatAvailable,
+      apiBase,
       selectLinkedChat,
       setLocation,
       workspaceId

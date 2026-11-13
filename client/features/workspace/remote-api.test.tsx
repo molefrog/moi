@@ -1,3 +1,4 @@
+import { setWorkspaceApiAddress } from '@/client/features/workspace/remote'
 import { expect, spyOn, test } from 'bun:test'
 import { act, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -6,7 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useSaveLayout, useWorkspaceLayout, type WorkspaceLayoutMutation } from './api'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 
-test('Cloud layout combines owner content and visitor preferences, then saves each destination separately', async () => {
+test('Cloud layout resolves the owner prefix once and saves only shared changes', async () => {
   const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>')
   const globals = {
     window,
@@ -77,7 +78,7 @@ test('Cloud layout combines owner content and visitor preferences, then saves ea
       remote,
       cwd: '/visitor',
       layoutMode: 'fullscreen',
-      tabs: visitor.tabs
+      tabs: createDefaultWorkspaceLayout().tabs
     })
     expect(loaded?.selectedModel).toBeUndefined()
     await act(async () => {
@@ -87,18 +88,14 @@ test('Cloud layout combines owner content and visitor preferences, then saves ea
         saveShared: false
       })
     })
-    expect(writes.map(write => write.url)).toEqual(['/api/workspaces/visitor'])
-    expect(writes[0]!.body).not.toHaveProperty('widgetGrid')
+    expect(writes).toEqual([])
     writes.length = 0
     await act(async () => {
       await save({ ...owner, saveShared: true })
     })
-    expect(writes.map(write => write.url)).toEqual([
-      '/api/workspaces/visitor',
-      '/api/workspaces/alice:board'
-    ])
+    expect(writes.map(write => write.url)).toEqual(['/api/workspaces/alice:board'])
     for (const field of ['tabs', 'layoutMode', 'selectedModel', 'saveShared', 'remote'])
-      expect(writes[1]!.body).not.toHaveProperty(field)
+      expect(writes[0]!.body).not.toHaveProperty(field)
   } finally {
     await act(async () => root.unmount())
     client.clear()
@@ -119,9 +116,25 @@ test('unknown workspace identity cannot silently select the visitor API', async 
   const { workspaceKeys } = await import('@/client/api/workspace-keys')
   const id = 'cold-remote'
   expect(() => ownerApiBase(id)).toThrow('Workspace identity is not loaded')
-  queryClient.setQueryData(workspaceKeys.descriptor(id), {
-    remote: { user_id: 'alice', workspace_id: 'board' }
-  })
+  setWorkspaceApiAddress(id, { user_id: 'alice', workspace_id: 'board' })
   expect(ownerApiBase(id)).toBe('/api/workspaces/alice:board')
-  queryClient.removeQueries({ queryKey: workspaceKeys.descriptor(id) })
+  queryClient.removeQueries({ queryKey: workspaceKeys.address(id) })
+})
+
+test('the resolved prefix is independent of layout and list cache changes', async () => {
+  const { ownerApiBase } = await import('./remote')
+  const { workspaceKeys } = await import('@/client/api/workspace-keys')
+  const client = new QueryClient()
+  try {
+    const remote = { user_id: 'alice', workspace_id: 'board' }
+    const address = setWorkspaceApiAddress('visitor', remote, client)
+    expect(setWorkspaceApiAddress('visitor', remote, client)).toBe(address)
+    client.setQueryData(workspaceKeys.all, [{ id: 'visitor' }])
+    client.setQueryData(workspaceKeys.layout('visitor'), {})
+    expect(ownerApiBase('visitor', client)).toBe('/api/workspaces/alice:board')
+    setWorkspaceApiAddress('visitor', undefined, client)
+    expect(ownerApiBase('visitor', client)).toBe('/api/workspaces/visitor')
+  } finally {
+    client.clear()
+  }
 })

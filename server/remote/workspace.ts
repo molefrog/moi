@@ -7,7 +7,7 @@ import {
   unlinkRemoteWorkspaceConfig
 } from '../workspaces/layout'
 import { provisionWorkspace } from '../workspaces/init'
-import { listWorkspaces, registerWorkspace } from '../workspaces/registry'
+import { listWorkspaces, registerWorkspace, removeWorkspace } from '../workspaces/registry'
 import { resolveWorkspaceRoot } from '../skills/version'
 
 export async function currentRemoteWorkspace(path = process.cwd()) {
@@ -55,5 +55,8 @@ export async function unlinkRemoteWorkspace(path = process.cwd()) {
   const current = await currentRemoteWorkspace(path)
   if (!current) throw new Error('This folder is not linked to a remote workspace')
   await unlinkRemoteWorkspaceConfig(current.path)
+  // Without its reference the folder is no workspace; drop it from the list too.
+  const entry = (await listWorkspaces()).find(workspace => resolve(workspace.path) === current.path)
+  if (entry) await removeWorkspace(entry.id)
   return current
 }

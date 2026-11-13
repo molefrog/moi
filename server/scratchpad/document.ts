@@ -1,4 +1,4 @@
-import type { WorkspaceRef } from '../workspace-state'
+import type { WorkspaceApiTarget } from '../workspaces/api'
 import { requestWorkspace } from '../workspaces/api'
 import { readdir } from 'node:fs/promises'
 import { join } from 'path'
@@ -187,7 +187,7 @@ function extractText(props: unknown): string | undefined {
 // them for one image. Ids match with or without the `shape:` prefix (read
 // surfaces them stripped).
 export async function readScratchpadImage(
-  workspace: string | WorkspaceRef,
+  workspace: string | WorkspaceApiTarget,
   id: string
 ): Promise<{ src: string } | { error: string }> {
   const { document } = await readSnapshot(workspace)
@@ -228,7 +228,7 @@ export async function readScratchpadImage(
 // no browser needed. Ids are reported without tldraw's `shape:` prefix so they
 // round-trip with `createShapeId(name)` on the draw side.
 export async function readScratchpadShapes(
-  workspace: string | WorkspaceRef
+  workspace: string | WorkspaceApiTarget
 ): Promise<ScratchShape[]> {
   const { document } = await readSnapshot(workspace)
   const store = document?.store
@@ -291,14 +291,14 @@ export async function readScratchpadShapes(
   return shapes
 }
 
-async function readSnapshot(workspace: string | WorkspaceRef): Promise<ScratchpadSnapshot> {
+async function readSnapshot(workspace: string | WorkspaceApiTarget): Promise<ScratchpadSnapshot> {
   return typeof workspace === 'string'
     ? loadScratchpadDoc(workspace)
     : (await requestWorkspace(workspace, '/scratchpad')).json()
 }
 
 async function readAsset(
-  workspace: string | WorkspaceRef,
+  workspace: string | WorkspaceApiTarget,
   fileName: string
 ): Promise<Blob | undefined> {
   if (typeof workspace !== 'string')

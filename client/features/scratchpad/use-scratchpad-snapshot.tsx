@@ -1,4 +1,4 @@
-import { ownerApiBase } from '@/client/features/workspace/remote'
+import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-layout-context'
 import { requestJson } from '@/client/api/http'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -55,17 +55,18 @@ export function detectScratchpadSkew(
   return { newer: false, writer, detail: 'The saved snapshot failed to load.' }
 }
 
-export function useScratchpadSnapshot(workspaceId: string): {
+export function useScratchpadSnapshot(): {
   loaded: boolean
   snapshot: TLEditorSnapshot['document'] | undefined
   skew: ScratchpadSkew | null
   flagSkew: (skew: ScratchpadSkew) => void
 } {
+  const { apiBase } = useWorkspaceLayoutCtx()
   const [result, setResult] = useState<SnapshotResult | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    requestJson<ScratchpadFetch>(`${ownerApiBase(workspaceId)}/scratchpad`)
+    requestJson<ScratchpadFetch>(`${apiBase}/scratchpad`)
       .then((data: ScratchpadFetch) => {
         if (cancelled) return
         let snapshot: TLEditorSnapshot['document'] | undefined
@@ -88,7 +89,7 @@ export function useScratchpadSnapshot(workspaceId: string): {
     return () => {
       cancelled = true
     }
-  }, [workspaceId])
+  }, [apiBase])
 
   const flagSkew = useCallback((skew: ScratchpadSkew) => {
     setResult(previous => ({ snapshot: previous?.snapshot, skew }))

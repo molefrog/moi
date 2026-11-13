@@ -1,4 +1,4 @@
-import { queryClient } from '@/client/api/query-client'
+import { setWorkspaceApiAddress } from '@/client/features/workspace/remote'
 import { afterEach, expect, test } from 'bun:test'
 import { act } from 'react'
 import { cleanupAccount, mountAccount } from '../../account/account-test-utils'
@@ -110,9 +110,7 @@ for (const name of ['Weekly Review', '', '   ']) {
 
 function RemoteMembersProbe() {
   const id = 'visitor-board'
-  queryClient.setQueryData(workspaceKeys.all, [
-    { id, path: '/visitor-board', addedAt: '', remote: { user_id: 'alice', workspace_id: 'board' } }
-  ])
+  setWorkspaceApiAddress(id, { user_id: 'alice', workspace_id: 'board' })
   const members = useWorkspaceMembers(id)
   return <span data-enabled>{String(members.isEnabled)}</span>
 }

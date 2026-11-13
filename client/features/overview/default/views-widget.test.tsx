@@ -27,6 +27,7 @@ function render(views: ViewInfo[], showOnboarding = true, canCreate = true): str
             cwd: null,
             provider: 'codex',
             workspaceId: 'workspace',
+            apiBase: '/api/workspaces/test',
             chatAvailable: true,
             isLoading: false
           }

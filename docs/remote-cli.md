@@ -23,7 +23,7 @@ moi remote leave --owner-id <owner> --workspace-id <workspace>
 
 Humans accept human invitations with `accept`. `link` offers a workspace selection in an interactive terminal; agents and scripts supply both IDs. It records the remote target in `.moi/.workspace.json`, installs the workspace skill, and registers the folder with Moi. It refuses to overwrite a different workspace configuration. It does not download remote files.
 
-`unlink` removes the folder's remote link and keeps its files and cloud membership. `leave` removes cloud membership and keeps local files. Without IDs, `leave` uses the current folder's link. Folder commands also accept `--path`, and status, invitation, and folder commands support `--json`.
+`unlink` removes the folder's remote link and its entry in Moi's workspace list, and keeps its other files and cloud membership. The folder can be linked again. `leave` removes cloud membership and keeps local files. Without IDs, `leave` uses the current folder's link. Folder commands also accept `--path`, and status, invitation, and folder commands support `--json`.
 
 ## Invited agents
 
@@ -47,11 +47,7 @@ Agent logout first prints a warning. `logout --yes` revokes the login and delete
 
 ## Remote operations
 
-Run these from a linked folder. Add `--path ./linked-folder` to select one explicitly.
-No local Moi server is needed; execution happens on the host of the shared workspace.
-Workspace commands automatically use the linked remote host; in local workspaces
-they keep their existing local behavior. There are no `moi remote bundle`,
-`moi remote check`, or equivalent aliases.
+Run these from a linked folder, or add `--path ./linked-folder`.
 
 ```sh
 moi remote read notes.txt
@@ -61,48 +57,26 @@ moi remote patch notes.txt --patch-file ./change.diff
 moi remote file-upload ./photo.png assets/photo.png
 moi remote file-download assets/photo.png ./download.png
 moi remote exec 'pwd; ls -la'
-moi bundle --only widgets/hello
-moi check
-moi refresh
-moi theme --color blue
-moi config name "Project"
-moi tabs
-moi views set my-view --title "My view"
-moi scratch read
-moi call-server-fn widgets/hello/getGreeting '["Ann"]'
-moi ui-components
-moi debug logs
 ```
 
-File paths are relative to the remote workspace root. Upload sources, download
-destinations, and `--patch-file` are local paths. `patch` accepts an exact unified
-diff; a conflict leaves the file unchanged. File access rejects traversal and
-symlinks. Shell commands run with the host's Moi permissions and the workspace as
-their working directory; the working directory is not an operating-system sandbox.
+The ordinary workspace commands also work in a linked folder, with their usual arguments and output. There are no `moi remote bundle` or similar aliases. Where each one runs:
 
-`exec` streams stdout and stderr immediately and returns the remote exit code.
-Ctrl-C cancels it and kills its process group. `--json` emits newline-delimited
-`stdout`, `stderr`, and final `exit` events. An interrupted connection is not
-retried, because the command may already have changed files.
-Ctrl-C sends a signed cancellation request for that execution ID before closing
-the stream. Only the same caller in the same workspace can cancel that command.
+| Commands                                                                             | Runs on                           | Through                                                |
+| ------------------------------------------------------------------------------------ | --------------------------------- | ------------------------------------------------------ |
+| `remote read`, `write`, `patch`, `file-upload`, `file-download`, `exec`              | owner                             | operations API                                         |
+| `bundle`, `check`, `views`, `theme`, `call-server-fn`, `debug logs`, `ui-components` | owner                             | operations API, returns `{ exitCode, stdout, stderr }` |
+| `config`, `tabs`, `scratch` reads and edits                                          | owner                             | ordinary workspace API                                 |
+| `refresh`, `navigate`, `scratch view`                                                | visitor's running Moi and browser | local control server                                   |
 
-Workspace commands keep their ordinary arguments and output, including native
-`--json` options where supported. Their directory argument selects a local linked
-folder; it is never passed to the remote host. The operations API returns
-`{ exitCode, stdout, stderr }`, which the CLI displays as ordinary command output.
-Commands finish before returning (up to 8 MiB per output stream); use `exec` for
-long streamed output. Start, stop, install, navigation and other machine-management
-commands are not part of this API.
+Only the last row needs a local Moi server. Skills, environment, start, stop, and install commands stay local.
 
-Human uploads stream through Cloud. Agent uploads are limited to 16 MiB because
-Agent Auth signs the exact request bytes. Download sizes are not limited by that
-request-signing limit.
+File paths are relative to the remote workspace root. Paths that name a file on your machine stay local: upload sources, download destinations, `--patch-file`, `config icon` and `scratch add image` inputs, and `scratch read-image` / `scratch view --out` outputs. `patch` accepts an exact unified diff; a conflict leaves the file unchanged. File access rejects traversal and symlinks.
 
-The Cloud route is `/cloud/api/workspaces/{ownerId}:{workspaceId}/ops/*`. The
-host gateway forwards it to Moi's separate `ops.sock` listener as
-`/workspaces/{workspaceId}/*`. These handlers are never registered on the browser
-HTTP API. Cloud verifies the human or agent and workspace access before forwarding.
+`exec` runs with the host's Moi permissions in the workspace directory, which is not an operating-system sandbox. It streams stdout and stderr and returns the remote exit code; `--json` emits newline-delimited `stdout`, `stderr`, and final `exit` events. Ctrl-C sends a signed cancellation for that execution and kills its process group; only the same caller in the same workspace can cancel it. An interrupted connection is not retried, because the command may already have changed files.
+
+Owner-executed workspace commands finish before returning, with up to 8 MiB per output stream; use `exec` for long streamed output. Human uploads stream through Cloud. Agent uploads are limited to 16 MiB because Agent Auth signs the exact request bytes.
+
+The Cloud route is `/cloud/api/workspaces/{ownerId}:{workspaceId}/ops/*`. Cloud verifies the caller and workspace access, then the host gateway forwards to Moi's separate `ops.sock` listener as `/workspaces/{workspaceId}/*`. These handlers are never registered on the browser HTTP API.
 
 ## Test with a local cloud
 

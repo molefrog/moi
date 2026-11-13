@@ -1,4 +1,4 @@
-import { workspaceApiBase } from '@/lib/workspace-config'
+import { setWorkspaceApiAddress } from '../workspace/remote'
 import type { WorkspaceLayoutResponse } from '@/lib/types'
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
@@ -8,26 +8,25 @@ import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspacePreview } from '@/lib/types'
 
 export function useWorkspaces() {
+  const client = useQueryClient()
   return useQuery<WorkspaceEntry[]>({
     queryKey: workspaceKeys.all,
     queryFn: async () => {
       const entries = await requestJson<WorkspaceEntry[]>('/api/workspaces')
-      return Promise.all(
-        entries.map(async entry => {
-          if (!entry.remote) return entry
-          const owner = await requestJson<WorkspaceLayoutResponse>(
-            workspaceApiBase(entry.remote.workspace_id, entry.remote.user_id)
-          ).catch(() => undefined)
-          return {
-            ...entry,
-            name: owner?.name || entry.remote.workspace_id,
-            icon: owner?.icon,
-            theme: owner?.theme,
-            type: owner ? (owner.provider ?? 'claude-code') : entry.type,
-            agentId: owner?.agentId
-          }
-        })
-      )
+      // Opening the home page must never wake owner machines. Reuse metadata
+      // only from workspaces that have already been opened in this browser.
+      return entries.map(entry => {
+        setWorkspaceApiAddress(entry.id, entry.remote, client)
+        if (!entry.remote) return entry
+        const owner = client.getQueryData<WorkspaceLayoutResponse>(workspaceKeys.layout(entry.id))
+        if (
+          !owner ||
+          owner.remote?.user_id !== entry.remote.user_id ||
+          owner.remote?.workspace_id !== entry.remote.workspace_id
+        )
+          return entry
+        return { ...entry, name: owner.name || entry.name, icon: owner.icon, theme: owner.theme }
+      })
     },
     // Live events invalidate the list on every change. This only bounds how
     // long a missed event (socket down) can leave it wrong; route switches

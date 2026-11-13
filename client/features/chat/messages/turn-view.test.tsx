@@ -16,6 +16,7 @@ test('renders Markdown in user message bubbles', () => {
           cwd: null,
           provider: 'codex',
           workspaceId: 'test',
+          apiBase: '/api/workspaces/test',
           chatAvailable: true,
           isLoading: false
         }}

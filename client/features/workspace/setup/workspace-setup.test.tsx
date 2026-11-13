@@ -42,6 +42,7 @@ function ScreenFixture({
         name: 'Test workspace',
         cwd: null,
         provider: 'codex',
+        apiBase: '/api/workspaces/test',
         chatAvailable,
         isLoading: false
       }}

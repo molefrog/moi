@@ -8,7 +8,7 @@ import pc from '../pc'
 export const callServerFn = defineCommand({
   meta: {
     name: 'call-server-fn',
-    description: 'Invoke an applet .server.ts function through the workspace API'
+    description: 'Invoke an applet .server.ts function in an isolated one-shot worker (smoke test)'
   },
   args: {
     fn: {

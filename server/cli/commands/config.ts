@@ -1,8 +1,6 @@
 import { defineCommand } from 'citty'
 import { resolve } from 'path'
-import { CONTROL_URL } from '../../constants'
-import { staleSkillNotice } from '../../skills/version'
-import { exitControlUnreachable } from '../control'
+import { sendControl } from '../control'
 import pc from '../pc'
 
 async function sendConfig(payload: {
@@ -12,27 +10,21 @@ async function sendConfig(payload: {
   clearName?: boolean
   clearIcon?: boolean
 }) {
-  const notice = await staleSkillNotice(payload.path)
-  const ws = new WebSocket(CONTROL_URL)
-  ws.onopen = () => ws.send(JSON.stringify({ type: 'config', ...payload }))
-  ws.onmessage = event => {
-    const res = JSON.parse(String(event.data))
-    if (res.error) {
-      console.error('\n' + pc.red(pc.bold('Error:')) + ' ' + res.error + '\n')
-      ws.close()
-      process.exit(1)
-    }
+  await sendControl(payload.path, { type: 'config', ...payload }, res => {
     console.log()
     if (res.ok) {
       if (res.clearedName) console.log(pc.green('✓') + ' Name reset to ' + pc.dim('(folder name)'))
-      else if (res.name) console.log(pc.green('✓') + ' Name set to ' + pc.bold(res.name))
+      else if (res.name) console.log(pc.green('✓') + ' Name set to ' + pc.bold(String(res.name)))
       if (res.clearedIcon)
         console.log(pc.green('✓') + ' Icon reset to ' + pc.dim('default (provider)'))
       else if (res.icon) console.log(pc.green('✓') + ' Icon updated ' + pc.dim('(128×128 webp)'))
     } else {
       console.log(pc.bold('moi config') + ' — workspace identity\n')
       console.log(
-        '  ' + pc.dim('name') + '  ' + (res.name ? pc.bold(res.name) : pc.dim('(folder name)'))
+        '  ' +
+          pc.dim('name') +
+          '  ' +
+          (res.name ? pc.bold(String(res.name)) : pc.dim('(folder name)'))
       )
       console.log(
         '  ' +
@@ -42,11 +34,7 @@ async function sendConfig(payload: {
       )
     }
     console.log()
-    if (notice) console.log(pc.yellow(notice) + '\n')
-    ws.close()
-    process.exit(0)
-  }
-  ws.onerror = () => void exitControlUnreachable()
+  })
 }
 
 // A terse cheat sheet — one line per command — so an agent can grasp the

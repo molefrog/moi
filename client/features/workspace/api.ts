@@ -1,5 +1,5 @@
-import { workspaceApiBase, personalWorkspaceConfig } from '@/lib/workspace-config'
-import { remoteTarget } from './remote'
+import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
+import { ownerApiBase, remoteTarget, setWorkspaceApiAddress } from './remote'
 import { toast } from '@/client/components/ui/toast'
 import { receiveWorkspaceHarness } from './harness-transition'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -30,11 +30,15 @@ export function useWorkspaceLayout(workspaceId: string) {
         signal
       })
       if (signal.aborted) throw signal.reason
-      client.setQueryData(workspaceKeys.descriptor(workspaceId), local)
+      const address = setWorkspaceApiAddress(workspaceId, local.remote, client)
       if (!local.remote) return local
-      const owner = await requestJson<WorkspaceLayoutResponse>(
-        workspaceApiBase(local.remote.workspace_id, local.remote.user_id),
-        { signal }
+      const owner = await requestJson<WorkspaceLayoutResponse>(address.apiBase, { signal })
+      client.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, entries =>
+        entries?.map(entry =>
+          entry.id === workspaceId
+            ? { ...entry, name: owner.name || entry.name, icon: owner.icon, theme: owner.theme }
+            : entry
+        )
       )
       const {
         selectedModel: _model,
@@ -44,8 +48,8 @@ export function useWorkspaceLayout(workspaceId: string) {
       } = owner
       return {
         ...shared,
-        ...personalWorkspaceConfig(local as unknown as Record<string, unknown>),
-        tabs: local.tabs,
+        layoutMode: 'fullscreen',
+        tabs: createDefaultWorkspaceLayout().tabs,
         remote: local.remote,
         cwd: local.cwd
       }
@@ -150,22 +154,19 @@ export function useSaveLayout(workspaceId: string) {
           `/api/workspaces/${workspaceId}`,
           jsonRequest('PUT', { ...layout, origin: BROWSER_TAB_ID })
         )
-      const { tabs, layoutMode, selectedModel, selectedEffort, selectedSpeedMode, ...shared } =
-        layout
-      await requestVoid(
-        `/api/workspaces/${workspaceId}`,
-        jsonRequest('PUT', {
-          version: 2,
-          tabs,
-          layoutMode,
-          selectedModel,
-          selectedEffort,
-          selectedSpeedMode
-        })
-      )
       if (!saveShared) return
+      const {
+        tabs: _tabs,
+        layoutMode: _mode,
+        selectedModel: _model,
+        selectedEffort: _effort,
+        selectedSpeedMode: _speed,
+        // The harness is the owner's to choose; a stale visitor tab must not revert it.
+        harness: _harness,
+        ...shared
+      } = layout
       await requestVoid(
-        workspaceApiBase(remote.workspace_id, remote.user_id),
+        ownerApiBase(workspaceId, queryClient),
         jsonRequest('PUT', { ...shared, origin: BROWSER_TAB_ID })
       )
     },

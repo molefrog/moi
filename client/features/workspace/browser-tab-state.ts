@@ -28,8 +28,8 @@ export function writeWorkspaceTabs(workspaceId: string, tabs: WorkspaceTabsState
 }
 
 export function useWorkspaceTabs() {
-  const { workspaceId, layout, setLayout, remote } = useWorkspaceLayoutCtx()
-  const storeTabsInBrowser = useAppConfig().environment === 'cloud' && !remote
+  const { workspaceId, layout, setLayout } = useWorkspaceLayoutCtx()
+  const storeTabsInBrowser = useAppConfig().environment === 'cloud'
   const defaults = useMemo(() => normalizeWorkspaceTabs(layout.tabs), [layout.tabs])
   const [local, setLocal] = useState<WorkspaceTabsState>(() =>
     storeTabsInBrowser ? readWorkspaceTabs(workspaceId, defaults) : defaults

@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import * as client from './client'
 import { linkRemoteWorkspace, unlinkRemoteWorkspace, currentRemoteWorkspace } from './workspace'
-import { setRegistryPath, DEFAULT_REGISTRY_PATH } from '../workspaces/registry'
+import { setRegistryPath, DEFAULT_REGISTRY_PATH, listWorkspaces } from '../workspaces/registry'
 
 test('link, report, and unlink preserve workspace files and cloud membership', async () => {
   const root = await mkdtemp(join(tmpdir(), 'moi-link-')),
@@ -33,9 +33,11 @@ test('link, report, and unlink preserve workspace files and cloud membership', a
     await unlinkRemoteWorkspace(folder)
     expect(await currentRemoteWorkspace(folder)).toBeUndefined()
     expect(await Bun.file(join(folder, 'notes.txt')).text()).toBe('keep me')
-    await expect(
-      linkRemoteWorkspace(folder, { user_id: 'owner', workspace_id: 'board' })
-    ).rejects.toThrow('different workspace configuration')
+    expect(await Bun.file(join(folder, '.moi/.workspace.json')).exists()).toBe(false)
+    expect(await listWorkspaces()).toEqual([])
+    // An unlinked folder can be linked again.
+    await linkRemoteWorkspace(folder, { user_id: 'owner', workspace_id: 'board' })
+    expect((await listWorkspaces()).map(workspace => workspace.path)).toEqual([folder])
     await expect(
       linkRemoteWorkspace(join(root, 'other'), { user_id: 'stranger', workspace_id: 'board' })
     ).rejects.toThrow('not shared')

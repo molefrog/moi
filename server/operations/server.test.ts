@@ -97,7 +97,17 @@ test('cancelling exec kills shell descendants', async () => {
   expect(await Bun.file(join(root, 'should-not-exist')).exists()).toBe(false)
 })
 test('commands are allowlisted; workspace cannot be overridden', async () => {
-  for (const command of ['start', 'stop', 'navigate', 'remote', 'install'])
+  for (const command of [
+    'start',
+    'stop',
+    'navigate',
+    'remote',
+    'install',
+    'refresh',
+    'tabs',
+    'scratch',
+    'config'
+  ])
     expect(
       (await request('commands', { method: 'POST', body: JSON.stringify({ command, args: [] }) }))
         .status

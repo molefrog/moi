@@ -48,16 +48,17 @@ async function readRegistry(): Promise<WorkspaceEntry[]> {
   try {
     const text = await Bun.file(_registryPath).text()
     const entries = JSON.parse(text) as WorkspaceEntry[]
-    return await Promise.all(
-      entries.map(async ({ remote: _storedRemote, ...entry }) => {
-        const config = await loadWorkspaceFileConfig(entry.path).catch(() => undefined)
-        if (!config?.remote) return entry
-        return { ...entry, remote: config.remote }
-      })
-    )
+    return entries.map(({ remote: _storedRemote, ...entry }) => entry)
   } catch {
     return []
   }
+}
+
+// Owner routing lives in each folder's config. Reading it costs a file per
+// entry, so only listings and single lookups pay for it, never every registry read.
+async function withRemote(entry: WorkspaceEntry): Promise<WorkspaceEntry> {
+  const config = await loadWorkspaceFileConfig(entry.path).catch(() => undefined)
+  return config?.remote ? { ...entry, remote: config.remote } : entry
 }
 
 async function writeRegistry(entries: WorkspaceEntry[]): Promise<void> {
@@ -145,10 +146,10 @@ export async function registerWorkspace(
       if (error) throw new Error(error)
     }
     const existing = entries.find(e => e.path === normalPath)
-    if (existing) return existing
+    if (existing) return remote ? { ...existing, remote } : existing
     if (remote) {
       // One registration per owner workspace, whichever folder points at it.
-      const duplicate = entries.find(
+      const duplicate = (await Promise.all(entries.map(withRemote))).find(
         entry =>
           entry.remote?.user_id === remote.user_id &&
           entry.remote.workspace_id === remote.workspace_id
@@ -172,8 +173,8 @@ export async function registerWorkspace(
 }
 
 export async function getWorkspace(id: string): Promise<WorkspaceEntry | null> {
-  const entries = await readRegistry()
-  return entries.find(e => e.id === id) ?? null
+  const entry = (await readRegistry()).find(e => e.id === id)
+  return entry ? withRemote(entry) : null
 }
 
 export async function removeWorkspace(id: string): Promise<boolean> {
@@ -187,7 +188,7 @@ export async function removeWorkspace(id: string): Promise<boolean> {
 }
 
 export async function listWorkspaces(): Promise<WorkspaceEntry[]> {
-  const entries = await readRegistry()
+  const entries = await Promise.all((await readRegistry()).map(withRemote))
   return entries.map(withDisplayPath)
 }
 
@@ -206,7 +207,7 @@ export async function reorderWorkspaces(ids: string[]): Promise<WorkspaceEntry[]
 
     const ordered = next as WorkspaceEntry[]
     await writeRegistry(ordered)
-    return ordered.map(withDisplayPath)
+    return (await Promise.all(ordered.map(withRemote))).map(withDisplayPath)
   })
 }
 

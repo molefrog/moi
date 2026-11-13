@@ -52,21 +52,22 @@ User can switch between these, but can access the chat (this conversation and ot
 
 ### Local or remote workspace
 
-Read only `remote` in `.moi/.workspace.json` before working; do not edit the file.
-A missing file or absent `remote` means local. Resolve parse errors before editing.
+Before working, read `remote` in `.moi/.workspace.json` (read only; never edit the file). A missing
+file or absent `remote` means local, and the rest of this section does not apply.
 
-`remote: { user_id, workspace_id }` identifies the owner. The local folder holds
-visitor preferences and skills; shared content lives on the owner. Do not create
-local applet copies or fall back to local content when the owner is unavailable.
+`remote: { user_id, workspace_id }` means the workspace lives on its owner's machine. This folder
+holds only the reference and skills.
 
-`moi tabs`, `navigate`, `theme`, `config`, `call-server-fn`, `debug logs`, and `scratch`
-use the workspace API automatically. Browser actions target the visitor. Skills
-and environment commands stay local. Source edits, builds, and agent-backed
-commands require the owner's actual workspace. Remote chat and settings UI are
-unavailable. Cloud authentication and allowed operations may limit owner requests.
-
-`moi remote --json` lists accepted shares under `workspaces`; each entry has `id`
-and `owner.id`. It does not create local references.
+- Edit shared files with `moi remote read`, `write`, `patch`, `file-upload`, and `file-download`;
+  paths are relative to the owner's workspace root. `moi remote exec '<command>'` runs there.
+- Use the ordinary commands from this folder as usual. `moi check`, `bundle`, `views`, `theme`,
+  `config`, `tabs`, `call-server-fn`, `debug logs`, and scratchpad reads/edits act on the owner.
+- `moi refresh`, `navigate`, and `scratch view` act on your user's running Moi and browser. Refresh
+  after remote changes.
+- Paths to images you pass in or write out (`config icon`, `scratch add image`,
+  `scratch read-image`, `scratch view --out`) are on this machine.
+- Never create local applet copies or fall back to local content when the owner is unavailable.
+  Remote chat and the settings UI are unavailable.
 
 ### Boundaries
 
@@ -488,8 +489,9 @@ problem:
 
 - `moi call-server-fn widgets/hello/getGreeting` /
   `moi call-server-fn views/crm/searchUsers '["ann", 10]'` — run one `.server.ts` function
-  through the workspace API (args are one JSON array). Calls share the browser RPC worker pool,
-  environment, and timeout. Use this to try a function without touching the UI. Server functions only; for
+  directly (args are one JSON array). Each invocation runs in a fresh, isolated one-shot process
+  with the same env, module loading, and timeout as the browser's calls, so a pass means the real
+  path works — handy for trying a function without touching the UI. Server functions only; for
   arbitrary scripts use `moi env exec`.
 - `moi debug logs` — the applet errors the workspace has seen since each applet's last good
   build: browser-side load failures and render crashes, plus server-function (rpc) errors. The
@@ -539,4 +541,4 @@ This skill is installed with Moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.20.2" />
+<moi-skill version="0.21.0" />

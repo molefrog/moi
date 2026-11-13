@@ -2,8 +2,9 @@ import type { ArgsDef, CommandDef } from 'citty'
 import { resolve } from 'node:path'
 import { runLinkedWorkspaceCommand } from './remote-operations'
 
-// Keep each command's existing parser and help. Only its execution changes when
-// the selected folder is linked, including nested commands such as scratch add.
+// Wrap owner-executed commands only. Preserve their parser/help while running
+// them on the linked host. Commands with caller file IO or browser actions use
+// their ordinary handlers and remote-control instead.
 export function remoteWorkspaceCommand<T extends ArgsDef>(
   name: string,
   command: CommandDef<T>,

@@ -2,8 +2,7 @@ import { openSharedWorkspace } from '../workspaces/shared'
 import { executeScratchOp } from '../scratchpad/executor'
 import type { ScratchOp } from '@/lib/types'
 import { workspaceApiBase } from '@/lib/workspace-config'
-import { loadWorkspaceFileConfig, saveWorkspacePersonalConfig } from '../workspaces/layout'
-import { personalWorkspaceConfig } from '@/lib/workspace-config'
+import { loadWorkspaceFileConfig } from '../workspaces/layout'
 import { resolveWorkspaceEnv } from '../workspaces/env'
 import { changeWorkspaceHarness } from '../workspaces/change-harness'
 import { HarnessTransitionError, reserveWorkspaceOperation } from '../workspaces/harness-transition'
@@ -39,7 +38,7 @@ import { harnessStore } from '../harness/auth'
 import { harnesses } from './harnesses'
 import { clientAppConfig, createdWorkspacesRoot, getAppConfig } from '../app-config'
 import { getAppSettings, pickAppSettingsPatch, saveAppSettings } from '../app-settings'
-import { appletForModule, recordAppletError, getAppletLog, clearAppletLog } from '../applets/log'
+import { appletForModule, recordAppletError } from '../applets/log'
 import { parseAppletTail, serveWorkspaceFile } from '../applets'
 import { applyEnvChanged } from '../workspaces/env-apply'
 import { publishEvent } from '../events'
@@ -190,11 +189,6 @@ const withWorkspace = createMiddleware<ApiEnv>(async (c, next) => {
       ''
     )
     const personal = PERSONAL_ROUTE_RE.test(suffix)
-    if (
-      config.remote &&
-      ((suffix === '/views' && c.req.method === 'POST') || suffix.endsWith('/submit'))
-    )
-      return c.text('This operation is unavailable for remote workspaces', 403)
     if (config.remote && suffix === '' && c.req.method === 'DELETE')
       return c.text('Leaving remote workspaces is not available yet', 403)
     if (config.remote && getAppConfig().environment !== 'cloud')
@@ -400,9 +394,6 @@ one.post('/rpc/*', c => {
 // sources (`build`/`rpc` are server-recorded and can't be spoofed by a tab),
 // pattern-check the applet name, cap the batch size; applets/log.ts caps string
 // lengths.
-one.get('/applet-log', c => c.json({ entries: getAppletLog(c.get('ws').path) }))
-one.delete('/applet-log', c => c.json({ cleared: clearAppletLog(c.get('ws').path) }))
-
 one.post('/applet-log', async c => {
   let body: { events?: unknown }
   try {
@@ -932,7 +923,6 @@ one.get('/', async c => {
   const config = await loadWorkspaceFileConfig(ws.path)
   if (config.remote) {
     return c.json({
-      ...personalWorkspaceConfig(config),
       version: 2,
       remote: config.remote,
       cwd: ws.path
@@ -952,19 +942,6 @@ one.get('/', async c => {
 
 // Thumbnail freshness records, without image bytes — the capture hook compares
 // these against live bundle revisions. Images are served per-applet below.
-one.get('/home-preview', async c => {
-  const ws = c.get('ws')
-  const views = await listCompiledViews(ws.path).catch(() => [])
-  return c.json(
-    await getWorkspacePreview(ws.path, {
-      // Remote previews expose shared applets, never the owner's chat history.
-      viewIds: views.map(view => view.id),
-      thumbnailUrl: (kind, id, capturedAt) =>
-        `${workspaceApiBase(ws.id)}/applet-thumbnails/${kind}/${id}:${Date.parse(capturedAt).toString(36)}`
-    })
-  )
-})
-
 one.get('/applet-thumbnails', async c =>
   c.json({ thumbnails: await getAppletThumbnailRecords(c.get('ws').path) })
 )
@@ -1020,8 +997,10 @@ one.put('/', async c => {
   // client's PUT can't erase a `moi config`-set name. See mergeLayoutForSave.
   const config = await loadWorkspaceFileConfig(ws.path)
   if (config.remote) {
-    await saveWorkspacePersonalConfig(personalWorkspaceConfig({ ...config, ...body }), ws.path)
-    return c.body(null, 204)
+    return c.text(
+      'Remote references contain only the owner address; save shared content to the owner',
+      403
+    )
   }
 
   const existing = await loadLayout(ws.path)

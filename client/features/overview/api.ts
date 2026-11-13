@@ -1,4 +1,3 @@
-import { ownerApiBase } from '@/client/features/workspace/remote'
 import { useMemo } from 'react'
 
 import { useQuery } from '@tanstack/react-query'
@@ -12,13 +11,11 @@ import { withDefaultWidgets } from '@/lib/default-widgets'
 import type { WidgetInfo } from '@/lib/types'
 
 export function useWidgets(workspaceId: string) {
-  const { layout, setLayout } = useWorkspaceLayoutCtx()
+  const { layout, setLayout, apiBase } = useWorkspaceLayoutCtx()
   const query = useQuery<WidgetInfo[]>({
     queryKey: workspaceKeys.widgets(workspaceId),
     queryFn: async () => {
-      const data = await requestJson<{ widgets: WidgetInfo[] }>(
-        `${ownerApiBase(workspaceId)}/widgets`
-      )
+      const data = await requestJson<{ widgets: WidgetInfo[] }>(`${apiBase}/widgets`)
       return data.widgets
     },
     ...WORKSPACE_RESOURCE_OPTIONS

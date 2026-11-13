@@ -5,12 +5,8 @@ import { OperationError } from './files'
 export const workspaceCommands = [
   'bundle',
   'check',
-  'refresh',
-  'scratch',
   'call-server-fn',
   'theme',
-  'config',
-  'tabs',
   'ui-components',
   'views',
   'debug'

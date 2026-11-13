@@ -1,3 +1,4 @@
+import { setWorkspaceApiAddress } from '@/client/features/workspace/remote'
 import { afterEach, expect, spyOn, test } from 'bun:test'
 import { queryClient } from '@/client/api/query-client'
 import { workspaceKeys } from '@/client/api/workspace-keys'
@@ -26,9 +27,7 @@ test('remote membership actions use the same host workspace', async () => {
     )
   )
   const id = 'visitor-board'
-  queryClient.setQueryData(workspaceKeys.all, [
-    { id, path: '/visitor-board', addedAt: '', remote: { user_id: 'alice', workspace_id: 'board' } }
-  ])
+  setWorkspaceApiAddress(id, { user_id: 'alice', workspace_id: 'board' })
   await fetchWorkspaceMembers(id)
   await inviteWorkspaceMember(id, 'new@example.com')
   await removeWorkspaceMember(id, 'member-1')

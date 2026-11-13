@@ -1,3 +1,4 @@
+import { setWorkspaceApiAddress } from '@/client/features/workspace/remote'
 import { expect, spyOn, test } from 'bun:test'
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -7,7 +8,6 @@ import * as cache from './applet-cache'
 import * as journal from './applet-log'
 import { Workspace } from '../workspace/workspace-context'
 import { queryClient } from '@/client/api/query-client'
-import { workspaceKeys } from '@/client/api/workspace-keys'
 
 test('focus refresh keeps a view visible and ignores stale loads after navigation', async () => {
   const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>')
@@ -28,9 +28,7 @@ test('focus refresh keeps a view visible and ignores stale loads after navigatio
   let next = Promise.resolve(first)
   const load = spyOn(cache, 'getCachedApplet').mockImplementation(() => next)
   const log = spyOn(journal, 'reportAppletError').mockImplementation(() => {})
-  queryClient.setQueryData(workspaceKeys.descriptor('visitor'), {
-    remote: { user_id: 'alice', workspace_id: 'board' }
-  })
+  setWorkspaceApiAddress('visitor', { user_id: 'alice', workspace_id: 'board' })
   type ProbeProps = { name: string }
   function Probe({ name }: ProbeProps) {
     const state = useView(name)

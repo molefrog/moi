@@ -1,6 +1,6 @@
+import { setWorkspaceApiAddress } from '@/client/features/workspace/remote'
 import { afterEach } from 'bun:test'
 import { queryClient } from '@/client/api/query-client'
-import { workspaceKeys } from '@/client/api/workspace-keys'
 import { describe, expect, test } from 'bun:test'
 
 import {
@@ -30,7 +30,7 @@ describe('appletUrl + version', () => {
   test('starts at v=0 and bumps on each invalidate', () => {
     const seg = 'views'
     const ws = `wsv-${crypto.randomUUID()}`
-    queryClient.setQueryData(workspaceKeys.descriptor(ws), {})
+    setWorkspaceApiAddress(ws)
     expect(appletVersion(seg, ws, 'a')).toBe(0)
     expect(appletUrl(seg, ws, 'a')).toBe(`/api/workspaces/${ws}/views/a/module?v=0`)
 
@@ -47,7 +47,7 @@ describe('appletUrl + version', () => {
     // the url extension, and a `.js` entry gets its `no-cache` overwritten by the
     // zone's Browser Cache TTL — which pins a stale bundle in the browser.
     const ws = `wsv-${crypto.randomUUID()}`
-    queryClient.setQueryData(workspaceKeys.descriptor(ws), {})
+    setWorkspaceApiAddress(ws)
     const path = new URL(appletUrl('widgets', ws, 'clock'), 'http://h').pathname
     expect(path).toBe(`/api/workspaces/${ws}/widgets/clock/module`)
     expect(path).not.toMatch(/\.\w+$/)
@@ -55,7 +55,7 @@ describe('appletUrl + version', () => {
 
   test('versions are independent per applet', () => {
     const ws = `wsv-${crypto.randomUUID()}`
-    queryClient.setQueryData(workspaceKeys.descriptor(ws), {})
+    setWorkspaceApiAddress(ws)
     invalidateApplet('views', ws, 'a')
     expect(appletVersion('views', ws, 'a')).toBe(1)
     expect(appletVersion('views', ws, 'b')).toBe(0)
@@ -66,7 +66,7 @@ describe('appletUrl + version', () => {
 describe('invalidateApplet drops the cached module', () => {
   test('a previously-cached module is evicted so the next load re-fetches', () => {
     const ws = `wsc-${crypto.randomUUID()}`
-    queryClient.setQueryData(workspaceKeys.descriptor(ws), {})
+    setWorkspaceApiAddress(ws)
     const key = appletKey('views', ws, 'board')
     const mod = Promise.resolve({ default: () => null })
     setCachedApplet(key, mod)

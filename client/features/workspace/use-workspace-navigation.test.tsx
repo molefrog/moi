@@ -1,3 +1,4 @@
+import { setWorkspaceApiAddress } from '@/client/features/workspace/remote'
 import { queryClient as appQueryClient } from '@/client/api/query-client'
 import * as appConfig from '@/client/api/app-config'
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test'
@@ -24,8 +25,8 @@ import * as workspaceEvents from '@/client/runtime/use-workspace-events'
 import { WorkspaceLayoutContext } from './workspace-layout-context'
 import { useWorkspaceNavigation } from './use-workspace-navigation'
 
-beforeEach(() => appQueryClient.setQueryData(workspaceKeys.descriptor('abc'), {}))
-afterEach(() => appQueryClient.removeQueries({ queryKey: workspaceKeys.descriptor('abc') }))
+beforeEach(() => setWorkspaceApiAddress('abc'))
+afterEach(() => appQueryClient.removeQueries({ queryKey: workspaceKeys.address('abc') }))
 
 type ReadNavigationOptions = {
   base?: string
@@ -88,6 +89,7 @@ function readNavigation(
                 cwd: null,
                 provider: null,
                 workspaceId: 'abc',
+                apiBase: '/api/workspaces/abc',
                 chatAvailable: true,
                 isLoading: false
               }}

@@ -7,7 +7,7 @@ import {
 } from './workspace-config'
 
 describe('workspace config', () => {
-  test('personal defaults are identical for local and remote configs', () => {
+  test('remote references contain only version and destination', () => {
     expect(personalWorkspaceConfig({ version: 2 })).toEqual({ layoutMode: 'split' })
     expect(
       parseRemoteWorkspaceConfig({
@@ -16,11 +16,10 @@ describe('workspace config', () => {
       })
     ).toEqual({
       version: 2,
-      remote: { user_id: 'alice', workspace_id: 'board' },
-      layoutMode: 'split'
+      remote: { user_id: 'alice', workspace_id: 'board' }
     })
   })
-  test('remote config retains personal fields without copying shared layout', () => {
+  test('remote config drops legacy preferences and shared layout', () => {
     expect(
       parseRemoteWorkspaceConfig({
         version: 2,
@@ -31,9 +30,7 @@ describe('workspace config', () => {
       })
     ).toEqual({
       version: 2,
-      remote: { user_id: 'alice', workspace_id: 'board' },
-      layoutMode: 'fullscreen',
-      selectedModel: 'sonnet'
+      remote: { user_id: 'alice', workspace_id: 'board' }
     })
   })
   test('requires a complete remote destination', () => {

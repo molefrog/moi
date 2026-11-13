@@ -1,15 +1,9 @@
-import type { WorkspaceTabsState } from '@/lib/types'
 import { provisionWorkspace } from './init'
 import { afterEach, expect, test } from 'bun:test'
 import { mkdtemp, rm, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import {
-  loadLayout,
-  loadWorkspaceFileConfig,
-  saveLayout,
-  saveWorkspacePersonalConfig
-} from './layout'
+import { loadLayout, saveLayout } from './layout'
 
 const directories: string[] = []
 afterEach(async () => {
@@ -32,19 +26,8 @@ test('reads legacy layouts without rewriting and upgrades on save', async () => 
   expect((await Bun.file(join(path, '.moi/.workspace.json')).json()).version).toBe(2)
 })
 
-test('personal updates preserve remote reference and reject layout replacement', async () => {
-  const path = await fixture({
-    version: 2,
-    remote: { user_id: 'owner', workspace_id: 'board' },
-    selectedModel: 'sonnet'
-  })
-  await saveWorkspacePersonalConfig({ layoutMode: 'fullscreen' }, path)
-  expect(await loadWorkspaceFileConfig(path)).toEqual({
-    version: 2,
-    remote: { user_id: 'owner', workspace_id: 'board' },
-    selectedModel: 'sonnet',
-    layoutMode: 'fullscreen'
-  })
+test('remote references have no local layout to load or replace', async () => {
+  const path = await fixture({ version: 2, remote: { user_id: 'owner', workspace_id: 'board' } })
   await expect(loadLayout(path)).rejects.toThrow('no local layout')
   await expect(
     saveLayout(
@@ -77,20 +60,4 @@ test('existing local scaffolding omits the install log path', async () => {
   const result = await provisionWorkspace(path, 'codex')
   expect(result.scaffold).toBe('exists')
   expect(result).not.toHaveProperty('installLogPath')
-})
-
-test('remote tabs survive saves of other personal preferences', async () => {
-  const path = await fixture({ version: 2, remote: { user_id: 'alice', workspace_id: 'board' } })
-  const tabs: WorkspaceTabsState = {
-    open: ['overview', 'views/second', 'views/first'],
-    active: 'views/first'
-  }
-  await saveWorkspacePersonalConfig({ tabs }, path)
-  await saveWorkspacePersonalConfig({ layoutMode: 'fullscreen' }, path)
-  expect(await loadWorkspaceFileConfig(path)).toEqual({
-    version: 2,
-    remote: { user_id: 'alice', workspace_id: 'board' },
-    layoutMode: 'fullscreen',
-    tabs
-  })
 })

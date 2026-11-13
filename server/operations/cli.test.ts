@@ -120,11 +120,7 @@ test.each(
   [
     ['check', '--only', 'views/example'],
     ['theme', '--font', 'mono'],
-    ['config', 'name', 'My project'],
-    ['tabs'],
-    ['refresh'],
     ['debug', 'logs'],
-    ['scratch', 'add', 'text', '--text', 'Hello', '--at', '0,0'],
     ['views', 'set', 'example', '--title', 'Hello'],
     ['call-server-fn', 'views/example/test', '[]'],
     ['ui-components', 'docs', 'button']

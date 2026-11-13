@@ -1,3 +1,4 @@
+import { ownerApiBase } from './remote'
 import { WorkspacePendingScreen } from './workspace-pending-screen'
 import { RecoveryMessage, WorkspaceLoadingState } from './setup/workspace-recovery-states'
 import type { RemoteWorkspaceTarget } from '@/lib/workspace-config'
@@ -35,6 +36,7 @@ export type WorkspaceLayoutContextValue = {
   // The workspace's registry id (the route param), so descendants can key
   // their own queries (e.g. the model picker) without prop-drilling.
   workspaceId: string
+  apiBase: string
   chatAvailable: boolean
   remote?: RemoteWorkspaceTarget
   isLoading: boolean
@@ -135,12 +137,13 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
       cwd: query.data?.cwd ?? null,
       provider: query.data ? (query.data.provider ?? 'claude-code') : null,
       workspaceId: id,
+      apiBase: query.data ? ownerApiBase(id, qc) : '',
       remote: query.data?.remote,
       // Remote chat support is deferred.
       chatAvailable: !query.data?.remote,
       isLoading: query.isLoading
     }),
-    [query.data, query.isLoading, setLayout, id]
+    [query.data, query.isLoading, setLayout, id, qc]
   )
 
   return (

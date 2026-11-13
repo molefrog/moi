@@ -33,7 +33,7 @@ afterEach(async () => {
   setRegistryPath(DEFAULT_REGISTRY_PATH)
   await rm(root, { recursive: true, force: true })
 })
-test('concurrent opens provision once and preserve personal config and skill edits', async () => {
+test('concurrent opens provision once and later opens leave the reference and skill untouched', async () => {
   const [first, second] = await Promise.all([
     openSharedWorkspace(target),
     openSharedWorkspace(target)

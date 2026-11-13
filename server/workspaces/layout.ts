@@ -1,10 +1,9 @@
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import {
   parseRemoteWorkspaceConfig,
   personalWorkspaceConfig,
   type RemoteWorkspaceTarget,
-  type WorkspaceFileConfig,
-  type WorkspacePersonalConfig
+  type WorkspaceFileConfig
 } from '@/lib/workspace-config'
 import { join } from 'path'
 import { isSpeedMode } from '@/lib/speed-mode'
@@ -81,15 +80,6 @@ export async function saveLayout(layout: WorkspaceLayout, workspacePath: string)
   if (existing.remote)
     throw new Error('Cannot replace a remote workspace reference with a local layout')
   await Bun.write(getLayoutPath(workspacePath), JSON.stringify({ ...layout, version: 2 }, null, 2))
-}
-
-export async function saveWorkspacePersonalConfig(
-  patch: WorkspacePersonalConfig,
-  workspacePath: string
-): Promise<void> {
-  const existing = await loadWorkspaceFileConfig(workspacePath)
-  const next = { ...existing, ...personalWorkspaceConfig({ ...existing, ...patch }), version: 2 }
-  await Bun.write(getLayoutPath(workspacePath), JSON.stringify(next, null, 2))
 }
 
 // Merge a client-submitted layout over the stored one for persistence.
@@ -218,11 +208,7 @@ export async function unlinkRemoteWorkspaceConfig(
 ): Promise<RemoteWorkspaceTarget> {
   const config = await loadWorkspaceFileConfig(workspacePath)
   if (!config.remote) throw new Error('This folder is not linked to a remote workspace')
-  const replacement = {
-    ...createDefaultWorkspaceLayout(),
-    ...personalWorkspaceConfig(config as unknown as Record<string, unknown>),
-    version: 2
-  }
-  await writeFile(getLayoutPath(workspacePath), JSON.stringify(replacement, null, 2))
+  // A reference holds nothing but the owner address, so unlinking leaves no config behind.
+  await rm(getLayoutPath(workspacePath))
   return config.remote
 }

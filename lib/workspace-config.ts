@@ -15,7 +15,7 @@ export type RemoteWorkspaceTarget = {
   workspace_id: string
 }
 
-export type RemoteWorkspaceConfig = WorkspacePersonalConfig & {
+export type RemoteWorkspaceConfig = {
   version: 2
   remote: RemoteWorkspaceTarget
 }
@@ -59,7 +59,6 @@ export function parseRemoteWorkspaceConfig(value: Record<string, unknown>): Remo
     throw new Error('Remote workspace requires valid user_id and workspace_id')
   return {
     version: 2,
-    remote: { user_id: target.user_id, workspace_id: target.workspace_id },
-    ...personalWorkspaceConfig(value)
+    remote: { user_id: target.user_id, workspace_id: target.workspace_id }
   }
 }
