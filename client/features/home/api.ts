@@ -1,3 +1,4 @@
+import { workspaceApiBase, type RemoteWorkspaceTarget } from '@/lib/workspace-config'
 import type { WorkspaceLayoutResponse } from '@/lib/types'
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
@@ -6,25 +7,31 @@ import { workspaceKeys } from '@/client/api/workspace-keys'
 import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspacePreview } from '@/lib/types'
 
+// Home cards load current owner metadata, waking the machine when needed.
+export async function remoteWorkspaceMetadata(remote: RemoteWorkspaceTarget) {
+  const owner = await requestJson<WorkspaceLayoutResponse>(
+    workspaceApiBase(remote.workspace_id, remote.user_id)
+  ).catch(() => undefined)
+  if (!owner) return {}
+  return {
+    ...(owner.name && { name: owner.name }),
+    icon: owner.icon,
+    theme: owner.theme,
+    type: owner.provider,
+    agentId: owner.agentId
+  }
+}
+
 export function useWorkspaces() {
-  const client = useQueryClient()
   return useQuery<WorkspaceEntry[]>({
     queryKey: workspaceKeys.all,
     queryFn: async () => {
       const entries = await requestJson<WorkspaceEntry[]>('/api/workspaces')
-      // Opening the home page must never wake owner machines. Reuse metadata
-      // only from workspaces that have already been opened in this browser.
-      return entries.map(entry => {
-        if (!entry.remote) return entry
-        const owner = client.getQueryData<WorkspaceLayoutResponse>(workspaceKeys.layout(entry.id))
-        if (
-          !owner ||
-          owner.remote?.user_id !== entry.remote.user_id ||
-          owner.remote?.workspace_id !== entry.remote.workspace_id
+      return Promise.all(
+        entries.map(async entry =>
+          entry.remote ? { ...entry, ...(await remoteWorkspaceMetadata(entry.remote)) } : entry
         )
-          return entry
-        return { ...entry, name: owner.name || entry.name, icon: owner.icon, theme: owner.theme }
-      })
+      )
     },
     // Live events invalidate the list on every change. This only bounds how
     // long a missed event (socket down) can leave it wrong; route switches

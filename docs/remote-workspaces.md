@@ -32,7 +32,7 @@ CLI commands in a linked folder resolve the same config and authenticate through
 
 In Cloud mode the home page lists accepted shares from `/cloud/api/workspaces/shared` in the same grid as registered workspaces.
 
-- Listing never contacts or starts an owner machine. A share shows its workspace ID until it has been opened once.
+- Listing requests current names, icons, and themes from owner machines and wakes them when needed. If an owner request fails, the card keeps its registered metadata or falls back to the workspace ID.
 - Accepting an invitation creates no local files. Opening a share creates the reference under the workspace root (normally `~/moi`), installs the skill, and registers it. Later opens leave an existing reference and skill untouched.
 - A registered reference stays in the grid and sidebar after the share disappears from Cloud.
 

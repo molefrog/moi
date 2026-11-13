@@ -307,11 +307,11 @@ test(
     await page.goto('/#/')
     const cards = page.getByRole('link', { name: /^Open / })
     await expect(cards).toHaveCount(3)
-    await expect(page.getByRole('link', { name: 'Open board', exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Open Alpha', exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Open Bravo', exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Open Zebra', exact: true })).toBeVisible()
     await takeSnapshot('mixed workspace grid')
-    await page.getByRole('link', { name: 'Open board', exact: true }).click()
+    await page.getByRole('link', { name: 'Open Alpha', exact: true }).click()
     await expect(page.getByRole('status', { name: 'Opening shared workspace' })).toBeVisible()
   },
   {
@@ -327,6 +327,8 @@ test(
           remote: { user_id: 'alice', workspace_id: 'board' }
         }
       ],
+      '/api/workspaces/alice:board': { name: 'Bravo' },
+      '/api/workspaces/bob:board': { name: 'Alpha' },
       '/cloud/api/workspaces/shared': {
         workspaces: [
           { id: 'board', owner: { id: 'alice', name: 'Alice' } },
@@ -372,12 +374,14 @@ test(
     await expect(page.getByRole('button', { name: 'Accept', exact: true })).toBeVisible()
     await takeSnapshot('pending invitation')
     await page.getByRole('button', { name: 'Accept', exact: true }).click()
-    // Listing never contacts the owner, so an unopened share shows its workspace ID.
-    await expect(page.getByRole('link', { name: 'Open notes', exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Open Team notes', exact: true })).toBeVisible()
     expect(provisioned).toBe(false)
   },
   {
-    api: { '/api/config': { environment: 'cloud', demo: false } }
+    api: {
+      '/api/config': { environment: 'cloud', demo: false },
+      '/api/workspaces/alice:notes': { name: 'Team notes' }
+    }
   }
 )
 
