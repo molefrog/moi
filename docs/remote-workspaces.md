@@ -11,13 +11,13 @@ A remote workspace is a registered local folder whose `.moi/.workspace.json` poi
 }
 ```
 
-A remote config contains only `version` and `remote`; any other field is ignored. Local configs keep their existing shape, also at version 2. Version 1 local configs remain readable and upgrade on their next save.
+A remote config contains only `version` and `remote`; any other field is ignored. Local configs keep their existing format at version 1; opening or saving them does not migrate them.
 
 Name, icon, layout, harness, theme, and content come from the owner. The folder holds only the config and the workspace skill. Open tabs and the active tab live in browser-tab storage. Remote workspaces open in fullscreen mode; chat and settings are unavailable.
 
 ## Routing
 
-An unopened share uses `/workspace/{userId}:{workspaceId}`. That route creates or reuses the local reference, then redirects to `/workspace/{localId}`, preserving the destination path and query. Registered workspaces use the local registration ID directly. The workspace info response includes `apiBase` and `isRemote`. The loader keeps them in the workspace query and exposes the prefix through context:
+An unopened share uses `/workspace/{userId}:{workspaceId}`. That route creates or reuses the local reference, then redirects to `/workspace/{localId}`, preserving the destination path and query. Registered workspaces use the local registration ID directly. The workspace info response includes `apiBase` and `isRemote`: local responses contain a complete layout, while remote responses contain the reference. The client loads the owner layout before mounting workspace content. The loader keeps them in the workspace query and exposes the prefix through context:
 
 - local: `/api/workspaces/{localId}`
 - remote: `/api/workspaces/{user_id}:{workspace_id}`
@@ -32,7 +32,7 @@ CLI commands in a linked folder resolve the same config and authenticate through
 
 In Cloud mode the home page lists accepted shares from `/cloud/api/workspaces/shared` in the same grid as registered workspaces.
 
-- Listing requests current names, icons, and themes from owner machines and wakes them when needed. If an owner request fails, the card keeps its registered metadata or falls back to the workspace ID.
+- Discovery lists are merged and deduplicated before requesting current names, icons, and themes from each owner. These requests wake machines when needed, run independently, and use the same workspace info queries as the workspace loader, home, and sidebar, so slow owners do not delay other cards. Cards select their display fields from the full info response; there is no separate metadata cache. If an owner request fails, the card keeps its registered metadata or falls back to the workspace ID.
 - Accepting an invitation creates no local files. Opening a share creates the reference under the workspace root (normally `~/moi`), installs the skill, and registers it. Later opens leave an existing reference and skill untouched.
 - A registered reference stays in the grid and sidebar after the share disappears from Cloud.
 

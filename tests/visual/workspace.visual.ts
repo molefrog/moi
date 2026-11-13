@@ -184,7 +184,7 @@ const remoteAnswers = {
   [ownerBase]: {
     apiBase: '/api/workspaces/owner-board',
     isRemote: false,
-    version: 2,
+    version: 1,
     name: 'Shared board',
     widgetGrid: [],
     layoutMode: 'fullscreen',
@@ -298,6 +298,34 @@ test(
     expect(registrations).toBe(1)
   },
   { api: remoteAnswers }
+)
+
+test(
+  'home shows local cards while an owner wakes',
+  async page => {
+    await page.route(`**${ownerBase}`, () => new Promise(() => {}))
+    await page.goto('/#/')
+    await expect(
+      page.getByRole('link', { name: 'Open Local workspace', exact: true })
+    ).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Open owner-board', exact: true })).toBeVisible()
+    await takeSnapshot('home while owner wakes')
+  },
+  {
+    api: {
+      ...remoteAnswers,
+      '/api/workspaces': [
+        { id: WORKSPACE, path: '/local', addedAt: '', name: 'Local workspace' },
+        {
+          id: REMOTE,
+          path: '/visitor',
+          addedAt: '',
+          name: 'owner-board',
+          remote: { user_id: 'alice', workspace_id: 'owner-board' }
+        }
+      ]
+    }
+  }
 )
 
 test(

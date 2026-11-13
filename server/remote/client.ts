@@ -1,4 +1,8 @@
-import { workspaceAddress, workspaceApiBase } from '@/lib/workspace-config'
+import {
+  workspaceAddress,
+  workspaceApiBase,
+  parseRemoteWorkspaceTarget
+} from '@/lib/workspace-config'
 import { decodeJwt } from 'jose'
 import { Mutex } from 'async-mutex'
 import { lock } from 'proper-lockfile'
@@ -517,6 +521,7 @@ export function createRemoteClient(directory: string) {
     return cloudJson(config, pair, '/me', { name }, agentProfileSchema, 'PATCH')
   }
   async function leave(ownerId: string, workspaceId: string) {
+    parseRemoteWorkspaceTarget({ user_id: ownerId, workspace_id: workspaceId })
     return request(
       `/workspaces/${workspaceAddress(workspaceId, ownerId)}/leave`,
       {},
@@ -541,11 +546,8 @@ export function createRemoteClient(directory: string) {
     suffix: string,
     options: RemoteRequestOptions = {}
   ): Promise<Response> {
-    if (
-      ![ownerId, workspaceId].every(id => /^[A-Za-z0-9_-]+$/.test(id)) ||
-      !/^\/(?:files\/|exec$|commands$)/.test(suffix)
-    )
-      throw new Error('Invalid remote operation')
+    parseRemoteWorkspaceTarget({ user_id: ownerId, workspace_id: workspaceId })
+    if (!/^\/(?:files\/|exec$|commands$)/.test(suffix)) throw new Error('Invalid remote operation')
     return authenticatedTransport(
       `api/workspaces/${workspaceAddress(workspaceId, ownerId)}/ops${suffix}`,
       options
@@ -558,6 +560,7 @@ export function createRemoteClient(directory: string) {
     suffix: string,
     options: RemoteRequestOptions = {}
   ) {
+    parseRemoteWorkspaceTarget({ user_id: ownerId, workspace_id: workspaceId })
     const base = new URL(workspaceApiBase(workspaceId, ownerId), 'http://workspace.local')
     const url = new URL(base.href + suffix)
     if (

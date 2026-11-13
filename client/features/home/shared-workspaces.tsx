@@ -1,4 +1,3 @@
-import { remoteWorkspaceMetadata } from './api'
 import { useQuery } from '@tanstack/react-query'
 import { useAppConfig } from '@/client/api/app-config'
 import { cloudRequest } from '@/client/features/account/api'
@@ -24,12 +23,7 @@ export function useSharedWorkspaces() {
       const { workspaces } = (await (await cloudRequest('/api/workspaces/shared')).json()) as {
         workspaces: SharedWorkspace[]
       }
-      return Promise.all(
-        workspaces.map(async share => ({
-          ...share,
-          ...(await remoteWorkspaceMetadata({ user_id: share.owner.id, workspace_id: share.id }))
-        }))
-      )
+      return workspaces
     },
     staleTime: 60_000,
     refetchOnWindowFocus: true,

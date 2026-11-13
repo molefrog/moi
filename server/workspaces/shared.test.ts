@@ -1,3 +1,4 @@
+import { linkRemoteWorkspace } from '../remote/workspace'
 import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -59,7 +60,7 @@ test('manual references are reused and malformed addresses create nothing', asyn
   const entry = await registerWorkspace(path)
   expect((await openSharedWorkspace(target)).id).toBe(entry.id)
   await expect(openSharedWorkspace({ ...target, user_id: '../unknown' })).rejects.toThrow(
-    'Invalid shared workspace address'
+    'Invalid remote owner ID'
   )
   expect(await listWorkspaces()).toHaveLength(1)
 })
@@ -87,3 +88,14 @@ test('provisioning needs no machine Cloud credentials', async () => {
     spy.mockRestore()
   }
 })
+
+test.each(['a b', '-board', 'a:b', 'create'])(
+  'UI and CLI reject the same invalid workspace ID: %s',
+  async workspace_id => {
+    const invalid = { user_id: 'alice', workspace_id }
+    await expect(openSharedWorkspace(invalid)).rejects.toThrow()
+    await expect(linkRemoteWorkspace(join(root, 'invalid'), invalid)).rejects.toThrow()
+    expect(await listWorkspaces()).toEqual([])
+    expect(await Bun.file(join(root, 'invalid/.moi/.workspace.json')).exists()).toBe(false)
+  }
+)

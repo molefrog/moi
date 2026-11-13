@@ -9,7 +9,8 @@ import {
   useDiscoveredWorkspaces,
   useWorkspacePreview,
   useWorkspacePreviews,
-  useWorkspaces
+  useWorkspaces,
+  useWorkspaceMetadata
 } from './api'
 import { CreateWorkspaceDialog } from '@/client/features/workspace/add/create-workspace-dialog'
 import { ImportWorkspaceDialog } from '@/client/features/workspace/add/import-workspace-dialog'
@@ -55,6 +56,13 @@ export function HomePage() {
   const discoveredWorkspacesOpen = useUiStore(state => state.discoveredWorkspacesOpen)
   const setDiscoveredWorkspacesOpen = useUiStore(state => state.setDiscoveredWorkspacesOpen)
 
+  const workspaces = useWorkspaceMetadata(
+    homeWorkspaces(
+      workspacesQuery.data ?? [],
+      appConfig.environment === 'cloud' ? (sharedQuery.data ?? []) : []
+    )
+  )
+
   if (workspacesQuery.isPending || discoveredQuery.isPending) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
@@ -71,10 +79,6 @@ export function HomePage() {
     )
   }
 
-  const workspaces = homeWorkspaces(
-    workspacesQuery.data,
-    appConfig.environment === 'cloud' ? (sharedQuery.data ?? []) : []
-  )
   const discovered = discoveredQuery.data
   const count = workspaces.length
 

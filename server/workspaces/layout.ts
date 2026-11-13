@@ -1,7 +1,7 @@
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import {
   parseRemoteWorkspaceConfig,
-  personalWorkspaceConfig,
+  parseRemoteWorkspaceTarget,
   type RemoteWorkspaceTarget,
   type WorkspaceFileConfig
 } from '@/lib/workspace-config'
@@ -26,6 +26,8 @@ function normalizeLayout(parsed: Record<string, unknown>): WorkspaceLayout {
     layout.layoutMode = defaults.layoutMode
   }
   layout.tabs = normalizeWorkspaceTabs(layout.tabs)
+  if (typeof layout.selectedModel !== 'string') delete layout.selectedModel
+  if (typeof layout.selectedEffort !== 'string') delete layout.selectedEffort
   if (!isSpeedMode(layout.selectedSpeedMode)) delete layout.selectedSpeedMode
   delete layout.selectedFastMode
   if (typeof layout.icon === 'string') {
@@ -51,35 +53,27 @@ export function getLayoutPath(workspacePath: string): string {
 // This module remains the sole owner of workspace config persistence.
 export async function loadWorkspaceFileConfig(workspacePath: string): Promise<WorkspaceFileConfig> {
   const file = Bun.file(getLayoutPath(workspacePath))
-  if (!(await file.exists())) return { ...createDefaultWorkspaceLayout(), version: 2 }
+  if (!(await file.exists())) return createDefaultWorkspaceLayout()
   const parsed: unknown = await file.json()
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
     throw new Error('Invalid workspace config')
   const value = parsed as Record<string, unknown>
   if ('remote' in value) return parseRemoteWorkspaceConfig(value)
-  if (value.version !== 1 && value.version !== 2)
-    throw new Error('Unsupported workspace config version')
-  const {
-    layoutMode: _mode,
-    selectedModel: _model,
-    selectedEffort: _effort,
-    selectedSpeedMode: _speed,
-    ...shared
-  } = normalizeLayout(value)
-  return { ...shared, ...personalWorkspaceConfig(value), version: 2 }
+  if (value.version !== 1) throw new Error('Unsupported workspace config version')
+  return normalizeLayout(value)
 }
 
 export async function loadLayout(workspacePath: string): Promise<WorkspaceLayout> {
   const config = await loadWorkspaceFileConfig(workspacePath)
   if (config.remote) throw new Error('Remote workspace has no local layout')
-  return { ...config, layoutMode: config.layoutMode ?? 'split' }
+  return config
 }
 
 export async function saveLayout(layout: WorkspaceLayout, workspacePath: string): Promise<void> {
   const existing = await loadWorkspaceFileConfig(workspacePath)
   if (existing.remote)
     throw new Error('Cannot replace a remote workspace reference with a local layout')
-  await Bun.write(getLayoutPath(workspacePath), JSON.stringify({ ...layout, version: 2 }, null, 2))
+  await Bun.write(getLayoutPath(workspacePath), JSON.stringify(layout, null, 2))
 }
 
 // Merge a client-submitted layout over the stored one for persistence.
@@ -103,7 +97,7 @@ export function mergeLayoutForSave(
   delete (editor as Record<string, unknown>).appletThumbnails
   return {
     // Shared edits omit personal preferences; preserve them unless explicitly supplied.
-    ...personalWorkspaceConfig(existing),
+    ...existing,
     ...editor,
     // Personal navigation never writes tabs. Other layout edits must not
     // round-trip a stale copy of the workspace's authored defaults.
@@ -196,6 +190,7 @@ export async function initializeRemoteWorkspaceConfig(
   workspacePath: string,
   remote: RemoteWorkspaceTarget
 ): Promise<void> {
+  remote = parseRemoteWorkspaceTarget(remote)
   await mkdir(join(workspacePath, '.moi'), { recursive: true })
   await writeFile(getLayoutPath(workspacePath), JSON.stringify({ version: 2, remote }, null, 2), {
     flag: 'wx'

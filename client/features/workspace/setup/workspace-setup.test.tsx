@@ -44,6 +44,7 @@ function ScreenFixture({
         provider: 'codex',
         apiBase: '/api/workspaces/test',
         chatAvailable,
+        isRemote: !chatAvailable,
         isLoading: false
       }}
     >

@@ -63,6 +63,7 @@ const layoutCtxValue: WorkspaceLayoutContextValue = {
   workspaceId: DEV_WORKSPACE_ID,
   apiBase: '/api/workspaces/test',
   chatAvailable: true,
+  isRemote: false,
   isLoading: false
 }
 

@@ -123,3 +123,20 @@ test('remote workspace membership queries address the owner', async () => {
     true
   )
 })
+
+test('remote invitations use the resolved owner name', async () => {
+  const ui = await mountAccount({ children: <Probe /> })
+  await ui.settle()
+  await act(async () => {
+    ui.qc.setQueryData(workspaceKeys.layout('one'), {
+      apiBase: '/api/workspaces/alice:board',
+      isRemote: true,
+      name: 'Owner board'
+    })
+  })
+  await ui.click('Invite Tony')
+  expect(ui.calls.find(call => call.path.endsWith('/invitations'))).toEqual({
+    path: '/cloud/api/workspaces/alice:board/invitations',
+    body: { email: 'tony@example.com', workspaceName: 'Owner board' }
+  })
+})

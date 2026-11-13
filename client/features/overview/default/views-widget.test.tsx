@@ -29,6 +29,7 @@ function render(views: ViewInfo[], showOnboarding = true, canCreate = true): str
             workspaceId: 'workspace',
             apiBase: '/api/workspaces/test',
             chatAvailable: true,
+            isRemote: false,
             isLoading: false
           }
         },

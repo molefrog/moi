@@ -4,13 +4,12 @@ import { createRoot } from 'react-dom/client'
 import { parseHTML } from 'linkedom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import * as appConfig from '@/client/api/app-config'
-import { workspaceKeys } from '@/client/api/workspace-keys'
-import { useWorkspaces } from './api'
-import { useSharedWorkspaces } from './shared-workspaces'
+import { useWorkspaces, useWorkspaceMetadata } from './api'
+import { useSharedWorkspaces, homeWorkspaces } from './shared-workspaces'
 
-test.each([false, true])(
-  'home requests owner metadata and tolerates failures (%s)',
-  async unavailable => {
+test.each(['ready', 'failed', 'slow'] as const)(
+  'home deduplicates owner requests and keeps cards available (%s)',
+  async state => {
     const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>')
     const globals = {
       window,
@@ -24,9 +23,9 @@ test.each([false, true])(
     for (const [key, value] of Object.entries(globals))
       Object.defineProperty(globalThis, key, { configurable: true, value })
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    client.setQueryData(workspaceKeys.layout('visitor'), {
-      name: 'Cached owner name',
-      remote: { user_id: 'alice', workspace_id: 'board' }
+    let wakeOwner: (response: Response) => void = () => {}
+    const sleepingOwner = new Promise<Response>(resolve => {
+      wakeOwner = resolve
     })
     const calls: string[] = []
     const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
@@ -47,12 +46,18 @@ test.each([false, true])(
             ])
           if (path === '/cloud/api/workspaces/shared')
             return Response.json({
-              workspaces: [{ id: 'other', owner: { id: 'bob', name: 'Bob' } }]
+              workspaces: [
+                { id: 'board', owner: { id: 'alice', name: 'Alice' } },
+                { id: 'other', owner: { id: 'bob', name: 'Bob' } }
+              ]
             })
-          if (unavailable) return new Response('Owner unavailable', { status: 503 })
-          if (path === '/api/workspaces/alice:board')
-            return Response.json({ name: 'Fresh owner name' })
-          if (path === '/api/workspaces/bob:other') return Response.json({ name: 'Other owner' })
+          if (path === '/api/workspaces/alice:board') {
+            if (state === 'slow') return sleepingOwner
+            if (state === 'failed') return new Response('Owner unavailable', { status: 503 })
+            return Response.json({ name: 'Fresh owner name', isRemote: false })
+          }
+          if (path === '/api/workspaces/bob:other')
+            return Response.json({ name: 'Other owner', isRemote: false })
           throw new Error(`Unexpected request: ${path}`)
         },
         { preconnect: fetch.preconnect }
@@ -66,12 +71,10 @@ test.each([false, true])(
     function Probe() {
       const entries = useWorkspaces()
       const shares = useSharedWorkspaces()
-      return (
-        <p>
-          {entries.data?.map(entry => entry.name).join(',')}|
-          {shares.data?.map(share => share.name || share.id).join(',')}
-        </p>
-      )
+      const cards = useWorkspaceMetadata(homeWorkspaces(entries.data ?? [], shares.data ?? []))
+      // Sidebar and home observe the same owner without issuing duplicate requests.
+      useWorkspaceMetadata(entries.data ?? [])
+      return <p>{cards.map(card => card.name).join(',')}</p>
     }
     const root = createRoot(document.getElementById('root')!)
     try {
@@ -82,17 +85,21 @@ test.each([false, true])(
           </QueryClientProvider>
         )
       )
-      for (
-        let i = 0;
-        i < 20 && !document.body.textContent?.includes(unavailable ? 'other' : 'Other owner');
-        i++
-      )
+      for (let i = 0; i < 20 && !document.body.textContent?.includes('Other owner'); i++)
         await act(async () => {
           await Bun.sleep(10)
         })
       expect(document.body.textContent).toContain(
-        unavailable ? 'Local,board|other' : 'Local,Fresh owner name|Other owner'
+        state === 'ready' ? 'Other owner,Local,Fresh owner name' : 'Other owner,Local,board'
       )
+      if (state === 'slow') {
+        wakeOwner(Response.json({ name: 'Awake owner', isRemote: false }))
+        for (let i = 0; i < 20 && !document.body.textContent?.includes('Awake owner'); i++)
+          await act(async () => {
+            await Bun.sleep(10)
+          })
+        expect(document.body.textContent).toContain('Other owner,Local,Awake owner')
+      }
       expect(calls.sort()).toEqual([
         '/api/workspaces',
         '/api/workspaces/alice:board',

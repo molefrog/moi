@@ -132,6 +132,7 @@ function SetupPreview({ mocks, client, environment, harness, scenario }: SetupPr
           provider: harness,
           apiBase: '/api/workspaces/test',
           chatAvailable: true,
+          isRemote: false,
           isLoading: false
         }}
       >

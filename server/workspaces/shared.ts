@@ -3,16 +3,15 @@ import { join } from 'node:path'
 import { Mutex } from 'async-mutex'
 import { createdWorkspacesRoot } from '../app-config'
 import { workspaceIdFromName } from '@/lib/workspace-name'
-import type { RemoteWorkspaceTarget } from '@/lib/workspace-config'
+import { parseRemoteWorkspaceTarget, type RemoteWorkspaceTarget } from '@/lib/workspace-config'
 import { listWorkspaces, registerWorkspace } from './registry'
 import { provisionWorkspace } from './init'
-import { initializeRemoteWorkspaceConfig, loadWorkspaceFileConfig } from './layout'
+import { getLayoutPath, initializeRemoteWorkspaceConfig, loadWorkspaceFileConfig } from './layout'
 import { publishEvent } from '../events'
 
 const opening = new Mutex()
 export async function openSharedWorkspace(remote: RemoteWorkspaceTarget) {
-  if (![remote.user_id, remote.workspace_id].every(id => /^[A-Za-z0-9_-]{1,64}$/.test(id)))
-    throw new Error('Invalid shared workspace address')
+  remote = parseRemoteWorkspaceTarget(remote)
   return opening.runExclusive(async () => {
     const matches = (target?: RemoteWorkspaceTarget) =>
       target?.user_id === remote.user_id && target.workspace_id === remote.workspace_id
@@ -32,19 +31,41 @@ export async function openSharedWorkspace(remote: RemoteWorkspaceTarget) {
         return false
       }
     )
-    if (created) {
-      try {
-        await initializeRemoteWorkspaceConfig(path, remote)
-      } catch (error) {
-        await rm(path, { recursive: true, force: true })
-        throw error
-      }
-    } else if (!matches((await loadWorkspaceFileConfig(path)).remote)) {
-      throw new Error('The shared workspace folder already contains different content')
+    if (!created) {
+      const config = await loadWorkspaceFileConfig(path)
+      if (!matches(config.remote))
+        throw new Error('The shared workspace folder already contains different content')
     }
-    await provisionWorkspace(path)
-    const entry = await registerWorkspace(path)
+    let entry
+    try {
+      entry = await registerRemoteWorkspaceReference(path, remote)
+    } catch (error) {
+      // Only remove an empty directory we created; keep a provisioned reference for retry.
+      if (created && !(await Bun.file(getLayoutPath(path)).exists()))
+        await rm(path, { recursive: true, force: true })
+      throw error
+    }
     publishEvent({ type: 'workspaces-list:updated' })
     return entry
   })
+}
+
+// Shared filesystem operation for UI opening and CLI linking. Callers choose the folder
+// and authenticate separately; a matching reference is safe to reuse after a partial failure.
+export async function registerRemoteWorkspaceReference(
+  path: string,
+  remote: RemoteWorkspaceTarget
+) {
+  remote = parseRemoteWorkspaceTarget(remote)
+  const file = Bun.file(getLayoutPath(path))
+  if (await file.exists()) {
+    const config = await loadWorkspaceFileConfig(path)
+    if (
+      config.remote?.user_id !== remote.user_id ||
+      config.remote.workspace_id !== remote.workspace_id
+    )
+      throw new Error('This folder already has a different workspace configuration')
+  } else await initializeRemoteWorkspaceConfig(path, remote)
+  await provisionWorkspace(path)
+  return registerWorkspace(path)
 }

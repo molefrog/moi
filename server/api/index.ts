@@ -1,6 +1,6 @@
 import { openSharedWorkspace } from '../workspaces/shared'
 import { executeScratchOp } from '../scratchpad/executor'
-import type { ScratchOp } from '@/lib/types'
+import type { ScratchOp, WorkspaceInfoResponse } from '@/lib/types'
 import { workspaceApiBase } from '@/lib/workspace-config'
 import { loadWorkspaceFileConfig } from '../workspaces/layout'
 import { resolveWorkspaceEnv } from '../workspaces/env'
@@ -928,7 +928,7 @@ one.get('/', async c => {
       apiBase: workspaceApiBase(config.remote.workspace_id, config.remote.user_id),
       isRemote: true,
       cwd: ws.path
-    })
+    } satisfies WorkspaceInfoResponse)
   }
 
   const layout = config
@@ -941,7 +941,7 @@ one.get('/', async c => {
     cwd: ws.path,
     provider: ws.type,
     agentId: ws.agentId
-  })
+  } satisfies WorkspaceInfoResponse)
 })
 
 // Thumbnail freshness records, without image bytes — the capture hook compares
@@ -994,7 +994,7 @@ one.put('/applet-thumbnails', async c => {
 one.put('/', async c => {
   const ws = c.get('ws')
   const body = await c.req.json()
-  if (!body || (body.version !== 1 && body.version !== 2)) return c.text('Bad request', 400)
+  if (!body) return c.text('Bad request', 400)
   // `origin` is the writing tab's id, echoed so that tab skips its own event.
   const { origin, harness, apiBase: _apiBase, isRemote: _isRemote, ...layout } = body
   // Preserve server-owned identity (name/icon) across a grid/theme save so the
@@ -1007,6 +1007,7 @@ one.put('/', async c => {
     )
   }
 
+  if (body.version !== 1) return c.text('Bad request', 400)
   const existing = await loadLayout(ws.path)
   const next = mergeLayoutForSave(existing, layout)
   if (harness !== undefined && harness !== (ws.type ?? 'claude-code')) {

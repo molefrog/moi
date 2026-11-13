@@ -636,7 +636,7 @@ export type WorkspaceLayoutSave = Omit<WorkspaceLayout, 'tabs'> & {
 }
 
 export type WorkspaceLayout = {
-  version: 1 | 2
+  version: 1
   widgetGrid: LayoutGridItem[]
   layoutMode: LayoutMode
   // Open tabs and active tab for the fullscreen/split workspace chrome. The
@@ -665,16 +665,19 @@ export type WorkspaceLayout = {
   theme?: WorkspaceTheme
 }
 
-// GET /api/workspaces/:id: layout plus the local workspace registration.
-export type WorkspaceLayoutResponse = WorkspaceLayout & {
-  apiBase: string
-  isRemote: boolean
-  remote?: RemoteWorkspaceTarget
-  cwd: string
-  name: string
-  provider?: WorkspaceType
-  agentId?: string
-}
+// GET /api/workspaces/:id returns either a complete local layout or a remote reference.
+type WorkspaceRouting = { apiBase: string; cwd: string }
+type WorkspaceMetadata = { name: string; provider?: WorkspaceType; agentId?: string }
+export type WorkspaceInfoResponse =
+  | (WorkspaceLayout & WorkspaceRouting & WorkspaceMetadata & { isRemote: false })
+  | (WorkspaceRouting & { version: 2; isRemote: true; remote: RemoteWorkspaceTarget })
+
+// The client resolves a remote reference before exposing a complete layout to consumers.
+export type WorkspaceLayoutResponse = WorkspaceLayout &
+  WorkspaceRouting &
+  WorkspaceMetadata & {
+    isRemote: boolean
+  }
 
 // One applet's thumbnail freshness record. Image bytes live as files in the
 // workspace's `.moi/.cache/thumbnails/` (server/applets/thumbnails.ts), never in

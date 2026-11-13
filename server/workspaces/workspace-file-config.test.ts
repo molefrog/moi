@@ -17,13 +17,13 @@ async function fixture(config: unknown) {
   return path
 }
 
-test('reads legacy layouts without rewriting and upgrades on save', async () => {
+test('reads and saves local layouts at version 1', async () => {
   const path = await fixture({ version: 1, widgetGrid: [], layoutMode: 'fullscreen' })
   const layout = await loadLayout(path)
   expect(layout.layoutMode).toBe('fullscreen')
   expect((await Bun.file(join(path, '.moi/.workspace.json')).json()).version).toBe(1)
   await saveLayout(layout, path)
-  expect((await Bun.file(join(path, '.moi/.workspace.json')).json()).version).toBe(2)
+  expect((await Bun.file(join(path, '.moi/.workspace.json')).json()).version).toBe(1)
 })
 
 test('remote references have no local layout to load or replace', async () => {
@@ -32,7 +32,7 @@ test('remote references have no local layout to load or replace', async () => {
   await expect(
     saveLayout(
       {
-        version: 2,
+        version: 1,
         widgetGrid: [],
         layoutMode: 'split',
         tabs: { open: ['overview'], active: 'overview' }
@@ -55,9 +55,14 @@ test('remote provisioning reports skipped and preserves its config', async () =>
 })
 
 test('existing local scaffolding omits the install log path', async () => {
-  const path = await fixture({ version: 2, widgetGrid: [] })
+  const path = await fixture({ version: 1, widgetGrid: [] })
   await Bun.write(join(path, '.moi/package.json'), '{}')
   const result = await provisionWorkspace(path, 'codex')
   expect(result.scaffold).toBe('exists')
   expect(result).not.toHaveProperty('installLogPath')
+})
+
+test('version 2 is reserved for remote references', async () => {
+  const path = await fixture({ version: 2, widgetGrid: [] })
+  await expect(loadLayout(path)).rejects.toThrow('Unsupported workspace config version')
 })

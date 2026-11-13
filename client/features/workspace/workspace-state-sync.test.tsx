@@ -144,6 +144,7 @@ test('a finished view stays visible through pending cleanup and a stale list rep
         workspaceId: WORKSPACE_ID,
         apiBase: `/api/workspaces/${WORKSPACE_ID}`,
         chatAvailable: true,
+        isRemote: false,
         isLoading: false
       }}
     >

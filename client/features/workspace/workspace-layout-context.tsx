@@ -1,6 +1,5 @@
 import { WorkspacePendingScreen } from './workspace-pending-screen'
 import { RecoveryMessage, WorkspaceLoadingState } from './setup/workspace-recovery-states'
-import type { RemoteWorkspaceTarget } from '@/lib/workspace-config'
 import { type ReactNode, createContext, useCallback, useContext, useMemo, useRef } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
@@ -37,7 +36,7 @@ export type WorkspaceLayoutContextValue = {
   workspaceId: string
   apiBase: string
   chatAvailable: boolean
-  remote?: RemoteWorkspaceTarget
+  isRemote: boolean
   isLoading: boolean
 }
 
@@ -67,7 +66,6 @@ function stripMeta(data: WorkspaceLayoutResponse): WorkspaceLayout {
     name: _name,
     provider: _provider,
     agentId: _agentId,
-    remote: _remote,
     apiBase: _apiBase,
     isRemote: _isRemote,
     ...layout
@@ -139,7 +137,7 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
       provider: query.data ? (query.data.provider ?? 'claude-code') : null,
       workspaceId: id,
       apiBase: query.data?.apiBase ?? '',
-      remote: query.data?.remote,
+      isRemote: query.data?.isRemote ?? false,
       // Remote chat support is deferred.
       chatAvailable: !query.data?.isRemote,
       isLoading: query.isLoading

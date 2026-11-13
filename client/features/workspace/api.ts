@@ -10,9 +10,10 @@ import { workspaceKeys } from '@/client/api/workspace-keys'
 import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
 import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
 import type {
-  WorkspaceHarness,
   WorkspaceEntry,
+  WorkspaceHarness,
   WorkspaceLayoutResponse,
+  WorkspaceInfoResponse,
   WorkspaceLayoutSave,
   WorkspaceSkillsStatus,
   WorkspaceSkillsUpdateFailure,
@@ -21,24 +22,30 @@ import type {
 
 export type { WorkspaceLayoutResponse } from '@/lib/types'
 
+// One info query per API address, shared by discovery and the workspace loader.
+export function workspaceInfoOptions(apiBase: string) {
+  const address = decodeURIComponent(apiBase.slice('/api/workspaces/'.length))
+  return {
+    queryKey: workspaceKeys.layout(address),
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      requestJson<WorkspaceInfoResponse>(apiBase, { signal }),
+    staleTime: 60_000,
+    retry: false
+  }
+}
+
 export function useWorkspaceLayout(workspaceId: string) {
   const client = useQueryClient()
+  const options = workspaceInfoOptions(`/api/workspaces/${workspaceId}`)
   return useQuery<WorkspaceLayoutResponse>({
-    queryKey: workspaceKeys.layout(workspaceId),
-    queryFn: async ({ signal }) => {
-      const local = await requestJson<WorkspaceLayoutResponse>(`/api/workspaces/${workspaceId}`, {
-        signal
-      })
-      if (signal.aborted) throw signal.reason
+    queryKey: options.queryKey,
+    queryFn: async context => {
+      const local = await options.queryFn(context)
+      if (context.signal.aborted) throw context.signal.reason
       if (!local.isRemote) return local
-      const owner = await requestJson<WorkspaceLayoutResponse>(local.apiBase, { signal })
-      client.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, entries =>
-        entries?.map(entry =>
-          entry.id === workspaceId
-            ? { ...entry, name: owner.name || entry.name, icon: owner.icon, theme: owner.theme }
-            : entry
-        )
-      )
+      const owner = await client.fetchQuery(workspaceInfoOptions(local.apiBase))
+      if (context.signal.aborted) throw context.signal.reason
+      if (owner.isRemote) throw new Error('The owner address points to another remote reference')
       const {
         selectedModel: _model,
         selectedEffort: _effort,
@@ -49,7 +56,6 @@ export function useWorkspaceLayout(workspaceId: string) {
         ...shared,
         layoutMode: 'fullscreen',
         tabs: createDefaultWorkspaceLayout().tabs,
-        remote: local.remote,
         apiBase: local.apiBase,
         isRemote: local.isRemote,
         cwd: local.cwd
@@ -173,9 +179,18 @@ export function useSaveLayout(workspaceId: string) {
     },
     onError: error => {
       toast.add({ title: 'Couldn’t save workspace', description: error.message, type: 'error' })
+      if (isRemoteWorkspace(workspaceId, queryClient))
+        void queryClient.invalidateQueries({
+          queryKey: workspaceInfoOptions(ownerApiBase(workspaceId, queryClient)).queryKey,
+          refetchType: 'none'
+        })
       void queryClient.invalidateQueries({ queryKey: workspaceKeys.layout(workspaceId) })
     },
-    onSuccess: () => {
+    onSuccess: (_, { saveShared }) => {
+      if (saveShared && isRemoteWorkspace(workspaceId, queryClient))
+        void queryClient.invalidateQueries({
+          queryKey: workspaceInfoOptions(ownerApiBase(workspaceId, queryClient)).queryKey
+        })
       void queryClient.invalidateQueries({ queryKey: workspaceKeys.all, exact: true })
       queryClient.invalidateQueries({ queryKey: workspaceKeys.previews })
     }

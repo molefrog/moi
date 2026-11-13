@@ -545,6 +545,6 @@ test('remote routing comes only from config and is omitted from registry writes'
   expect((await registryFile.json())[0]).not.toHaveProperty('remote')
   // Removing the reference in config must not resurrect a stored remote value.
   await Bun.write(registryFile, JSON.stringify(stored))
-  await Bun.write(configFile, JSON.stringify({ version: 2, widgetGrid: [] }))
+  await Bun.write(configFile, JSON.stringify({ version: 1, widgetGrid: [] }))
   expect((await listWorkspaces())[0]).not.toHaveProperty('remote')
 })

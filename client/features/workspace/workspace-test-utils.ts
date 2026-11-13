@@ -16,8 +16,7 @@ export function seedWorkspaceInfo(
     name: id,
     cwd: `/workspaces/${id}`,
     apiBase: workspaceApiBase(remote?.workspace_id ?? id, remote?.user_id),
-    isRemote: !!remote,
-    remote
+    isRemote: !!remote
   }
   client.setQueryData(workspaceKeys.layout(id), info)
   return info

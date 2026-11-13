@@ -196,7 +196,7 @@ function mountNavigation(
           provider: null,
           workspaceId: 'abc',
           apiBase: remote ? '/api/workspaces/alice:board' : '/api/workspaces/abc',
-          remote: remote ? { user_id: 'alice', workspace_id: 'board' } : undefined,
+          isRemote: remote,
           chatAvailable: true,
           isLoading: false
         }}

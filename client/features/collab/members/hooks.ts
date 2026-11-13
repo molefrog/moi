@@ -1,3 +1,5 @@
+import { workspaceKeys } from '@/client/api/workspace-keys'
+import type { WorkspaceLayoutResponse } from '@/lib/types'
 import { useAppConfig } from '@/client/api/app-config'
 import { CloudApiError } from '../../account/api'
 import { isRemoteWorkspace } from '@/client/features/workspace/remote'
@@ -104,7 +106,12 @@ export function useMembershipAction(workspaceId: string) {
       )
         throw new Error('Sign in to manage workspace members')
       if (action.type === 'invite') {
-        const name = workspaces.data?.find(workspace => workspace.id === workspaceId)?.name
+        const layout = client.getQueryData<WorkspaceLayoutResponse>(
+          workspaceKeys.layout(workspaceId)
+        )
+        const name = layout?.isRemote
+          ? layout.name
+          : workspaces.data?.find(workspace => workspace.id === workspaceId)?.name
         return inviteWorkspaceMember(workspaceId, action.email, name?.trim() || undefined)
       }
       if (action.type === 'remove') return removeWorkspaceMember(workspaceId, action.membershipId)

@@ -126,7 +126,7 @@ function OverviewHeader({
   onCustomizingChange,
   onThemingChange
 }: OverviewHeaderProps) {
-  const { remote } = useWorkspaceLayoutCtx()
+  const { isRemote } = useWorkspaceLayoutCtx()
   return (
     <div className="flex size-full items-center gap-4">
       <WorkspaceName />
@@ -143,7 +143,7 @@ function OverviewHeader({
           active={theming}
           onClick={() => onThemingChange(!theming)}
         />
-        {!remote && (
+        {!isRemote && (
           <WorkspaceSettingsDialog>
             <WorkspaceSettingsDialogTrigger
               render={<OverviewHeaderAction Icon={IconSettings} label="Settings" />}

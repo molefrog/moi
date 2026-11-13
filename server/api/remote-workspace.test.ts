@@ -276,3 +276,18 @@ test('standalone can reorder visible workspaces while preserving remote registra
   const { listWorkspaces } = await import('../workspaces/registry')
   expect((await listWorkspaces()).map(entry => entry.id)).toEqual([ownerId, visitorId])
 })
+
+test('shared layout edits preserve owner preferences and local config version', async () => {
+  const previous = await loadLayout(owner)
+  await saveLayout({ ...previous, selectedEffort: 'high', selectedSpeedMode: 'fast' }, owner)
+  expect((await api.request(base, put({ version: 1, widgetGrid: [] }))).status).toBe(204)
+  expect(await loadLayout(owner)).toMatchObject({
+    version: 1,
+    selectedModel: 'owner-model',
+    selectedEffort: 'high',
+    selectedSpeedMode: 'fast',
+    tabs: previous.tabs,
+    layoutMode: previous.layoutMode,
+    widgetGrid: []
+  })
+})
