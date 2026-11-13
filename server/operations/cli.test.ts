@@ -116,30 +116,28 @@ test('CLI relays stdout, stderr, JSON events, nonzero exit and commands', async 
   expect((await cli(['read', '../outside'])).code).toBe(1)
 })
 
-test('workspace commands dispatch directly and removed remote aliases fail', async () => {
-  const cases = [
-    ['check', '--only', 'views/example'],
-    ['theme', '--font', 'mono'],
-    ['config', 'name', 'My project'],
-    ['tabs'],
-    ['refresh'],
-    ['debug', 'logs'],
-    ['scratch', 'add', 'text', '--text', 'Hello', '--at', '0,0'],
-    ['views', 'set', 'example', '--title', 'Hello'],
-    ['call-server-fn', 'views/example/test', '[]'],
-    ['ui-components', 'docs', 'button']
-  ]
-  for (const args of cases) {
-    const before = bundleCalls.length
-    const result = await cli(args, undefined, true)
-    expect(result.code).toBe(0)
-    expect(bundleCalls.slice(before)).toEqual([{ command: args[0], args: args.slice(1) }])
-  }
-  for (const command of ['bundle', 'theme', 'views', 'check']) {
-    const before = bundleCalls.length
-    const result = await cli([command])
-    expect(result.code).toBe(1)
-    expect(result.stderr).toContain('Unknown command')
-    expect(bundleCalls.length).toBe(before)
-  }
+test.each([
+  ['check', '--only', 'views/example'],
+  ['theme', '--font', 'mono'],
+  ['config', 'name', 'My project'],
+  ['tabs'],
+  ['refresh'],
+  ['debug', 'logs'],
+  ['scratch', 'add', 'text', '--text', 'Hello', '--at', '0,0'],
+  ['views', 'set', 'example', '--title', 'Hello'],
+  ['call-server-fn', 'views/example/test', '[]'],
+  ['ui-components', 'docs', 'button']
+])('workspace command %s dispatches directly', async (...args) => {
+  const before = bundleCalls.length
+  const result = await cli(args, undefined, true)
+  expect(result.code).toBe(0)
+  expect(bundleCalls.slice(before)).toEqual([{ command: args[0], args: args.slice(1) }])
+})
+
+test.each(['bundle', 'theme', 'views', 'check'])('removed remote alias %s fails', async command => {
+  const before = bundleCalls.length
+  const result = await cli([command])
+  expect(result.code).toBe(1)
+  expect(result.stderr).toContain('Unknown command')
+  expect(bundleCalls.length).toBe(before)
 })
