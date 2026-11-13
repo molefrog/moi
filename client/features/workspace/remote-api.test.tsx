@@ -163,23 +163,23 @@ test.each([false, true])(
 )
 
 test('unknown workspace identity cannot silently select the visitor API', async () => {
-  const { ownerApiBase } = await import('./remote')
+  const { getWorkspaceApiBase } = await import('./remote')
   const { queryClient } = await import('@/client/api/query-client')
   const { workspaceKeys } = await import('@/client/api/workspace-keys')
   const id = 'cold-remote'
-  expect(() => ownerApiBase(id)).toThrow('Workspace identity is not loaded')
+  expect(() => getWorkspaceApiBase(id)).toThrow('Workspace identity is not loaded')
   seedWorkspaceInfo(id, { user_id: 'alice', workspace_id: 'board' })
-  expect(ownerApiBase(id)).toBe('/api/workspaces/alice:board')
+  expect(getWorkspaceApiBase(id)).toBe('/api/workspaces/alice:board')
   queryClient.removeQueries({ queryKey: workspaceKeys.layout(id) })
 })
 
 test('non-React consumers use the workspace info cache and follow its updates', async () => {
-  const { ownerApiBase, isRemoteWorkspace } = await import('./remote')
+  const { getWorkspaceApiBase, isRemoteWorkspace } = await import('./remote')
   const { workspaceKeys } = await import('@/client/api/workspace-keys')
   const client = new QueryClient()
   try {
     seedWorkspaceInfo('visitor', { user_id: 'alice', workspace_id: 'board' }, client)
-    expect(ownerApiBase('visitor', client)).toBe('/api/workspaces/alice:board')
+    expect(getWorkspaceApiBase('visitor', client)).toBe('/api/workspaces/alice:board')
     expect(isRemoteWorkspace('visitor', client)).toBe(true)
     expect(
       client
@@ -188,12 +188,12 @@ test('non-React consumers use the workspace info cache and follow its updates', 
         .map(query => query.queryKey)
     ).toEqual([workspaceKeys.layout('visitor')])
     seedWorkspaceInfo('visitor', { user_id: 'bob', workspace_id: 'board' }, client)
-    expect(ownerApiBase('visitor', client)).toBe('/api/workspaces/bob:board')
+    expect(getWorkspaceApiBase('visitor', client)).toBe('/api/workspaces/bob:board')
     seedWorkspaceInfo('visitor', undefined, client)
-    expect(ownerApiBase('visitor', client)).toBe('/api/workspaces/visitor')
+    expect(getWorkspaceApiBase('visitor', client)).toBe('/api/workspaces/visitor')
     expect(isRemoteWorkspace('visitor', client)).toBe(false)
     client.removeQueries({ queryKey: workspaceKeys.layout('visitor') })
-    expect(() => ownerApiBase('visitor', client)).toThrow('Workspace identity is not loaded')
+    expect(() => getWorkspaceApiBase('visitor', client)).toThrow('Workspace identity is not loaded')
   } finally {
     client.clear()
   }

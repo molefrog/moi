@@ -1,10 +1,10 @@
-import { ownerApiBase } from '@/client/features/workspace/remote'
+import { getWorkspaceApiBase } from '@/client/features/workspace/remote'
 import { cloudRequest } from '../../account/api'
 import { jsonRequest } from '@/client/api/http'
 import { parseWorkspaceMembers } from './types'
 
 function workspaceMembersPath(id: string, suffix: string) {
-  return `${ownerApiBase(id)}/${suffix}`
+  return `${getWorkspaceApiBase(id)}/${suffix}`
 }
 export async function fetchWorkspaceMembers(id: string, signal?: AbortSignal) {
   const response = await cloudRequest(workspaceMembersPath(id, 'members'), { signal })

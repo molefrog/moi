@@ -10,7 +10,7 @@ export function isRemoteWorkspace(localId: string, client: QueryClient = appQuer
   )
 }
 
-export function ownerApiBase(localId: string, client: QueryClient = appQueryClient): string {
+export function getWorkspaceApiBase(localId: string, client: QueryClient = appQueryClient): string {
   const workspace = client.getQueryData<WorkspaceLayoutResponse>(workspaceKeys.layout(localId))
   if (!workspace?.apiBase) throw new Error('Workspace identity is not loaded')
   return workspace.apiBase

@@ -1,4 +1,4 @@
-import { ownerApiBase } from '@/client/features/workspace/remote'
+import { getWorkspaceApiBase } from '@/client/features/workspace/remote'
 import { createRateLimiter } from '@/client/lib/rate-limit'
 import type { AppletClientError, AppletKind } from '@/lib/types'
 
@@ -22,7 +22,7 @@ export function reportAppletError(workspaceId: string, event: AppletClientError)
   const key = [workspaceId, event.source, event.kind, event.name, event.message].join('\0')
   if (limiter.admit(key) !== 'ok') return
 
-  void fetch(`${ownerApiBase(workspaceId)}/applet-log`, {
+  void fetch(`${getWorkspaceApiBase(workspaceId)}/applet-log`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ events: [event] })

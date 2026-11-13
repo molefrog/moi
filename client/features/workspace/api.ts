@@ -1,5 +1,5 @@
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
-import { ownerApiBase, isRemoteWorkspace } from './remote'
+import { getWorkspaceApiBase, isRemoteWorkspace } from './remote'
 import { toast } from '@/client/components/ui/toast'
 import { receiveWorkspaceHarness } from './harness-transition'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -173,7 +173,7 @@ export function useSaveLayout(workspaceId: string) {
         ...shared
       } = layout
       await requestVoid(
-        ownerApiBase(workspaceId, queryClient),
+        getWorkspaceApiBase(workspaceId, queryClient),
         jsonRequest('PUT', { ...shared, origin: BROWSER_TAB_ID })
       )
     },
@@ -181,7 +181,7 @@ export function useSaveLayout(workspaceId: string) {
       toast.add({ title: 'Couldn’t save workspace', description: error.message, type: 'error' })
       if (isRemoteWorkspace(workspaceId, queryClient))
         void queryClient.invalidateQueries({
-          queryKey: workspaceInfoOptions(ownerApiBase(workspaceId, queryClient)).queryKey,
+          queryKey: workspaceInfoOptions(getWorkspaceApiBase(workspaceId, queryClient)).queryKey,
           refetchType: 'none'
         })
       void queryClient.invalidateQueries({ queryKey: workspaceKeys.layout(workspaceId) })
@@ -189,7 +189,7 @@ export function useSaveLayout(workspaceId: string) {
     onSuccess: (_, { saveShared }) => {
       if (saveShared && isRemoteWorkspace(workspaceId, queryClient))
         void queryClient.invalidateQueries({
-          queryKey: workspaceInfoOptions(ownerApiBase(workspaceId, queryClient)).queryKey
+          queryKey: workspaceInfoOptions(getWorkspaceApiBase(workspaceId, queryClient)).queryKey
         })
       void queryClient.invalidateQueries({ queryKey: workspaceKeys.all, exact: true })
       queryClient.invalidateQueries({ queryKey: workspaceKeys.previews })
