@@ -1,5 +1,5 @@
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
-import { ownerApiBase, remoteTarget, setWorkspaceApiAddress } from './remote'
+import { ownerApiBase, isRemoteWorkspace, setWorkspaceApiTarget } from './remote'
 import { toast } from '@/client/components/ui/toast'
 import { receiveWorkspaceHarness } from './harness-transition'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -30,9 +30,9 @@ export function useWorkspaceLayout(workspaceId: string) {
         signal
       })
       if (signal.aborted) throw signal.reason
-      const address = setWorkspaceApiAddress(workspaceId, local.remote, client)
+      const target = setWorkspaceApiTarget(workspaceId, local.remote, client)
       if (!local.remote) return local
-      const owner = await requestJson<WorkspaceLayoutResponse>(address.apiBase, { signal })
+      const owner = await requestJson<WorkspaceLayoutResponse>(target.apiBase, { signal })
       client.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, entries =>
         entries?.map(entry =>
           entry.id === workspaceId
@@ -76,7 +76,7 @@ export function useWorkspaceHarness(workspaceId: string) {
   return useQuery<WorkspaceHarness>({
     queryKey: workspaceKeys.harness(workspaceId),
     // Remote chat support is deferred, so the visitor's agent is never consulted.
-    enabled: !remoteTarget(workspaceId, queryClient),
+    enabled: !isRemoteWorkspace(workspaceId, queryClient),
     queryFn: async ({ signal }) => {
       const previous = queryClient.getQueryData<WorkspaceHarness>(
         workspaceKeys.harness(workspaceId)
@@ -148,7 +148,7 @@ export function useSaveLayout(workspaceId: string) {
   const queryClient = useQueryClient()
   return useMutation<void, Error, WorkspaceLayoutMutation>({
     mutationFn: async ({ saveShared, ...layout }) => {
-      const remote = remoteTarget(workspaceId, queryClient)
+      const remote = isRemoteWorkspace(workspaceId, queryClient)
       if (!remote)
         return requestVoid(
           `/api/workspaces/${workspaceId}`,

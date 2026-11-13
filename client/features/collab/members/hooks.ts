@@ -1,6 +1,6 @@
 import { useAppConfig } from '@/client/api/app-config'
 import { CloudApiError } from '../../account/api'
-import { remoteTarget } from '@/client/features/workspace/remote'
+import { isRemoteWorkspace } from '@/client/features/workspace/remote'
 import { useMutation, useMutationState, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useWorkspaces } from '../../home/api'
 import { getAccountGeneration } from '../../identity/store'
@@ -45,7 +45,7 @@ export function useWorkspaceMembers(workspaceId: string | undefined) {
   const cloud = useAppConfig().environment === 'cloud'
   const identity = useIdentity()
   const accountId = identity ? identityKey(identity) : undefined
-  const remote = workspaceId ? remoteTarget(workspaceId) : undefined
+  const remote = workspaceId ? isRemoteWorkspace(workspaceId) : undefined
   const enabled = cloud && !!workspaceId && identity?.type === 'user' && !identity.isAnonymous
   const accountGeneration = getAccountGeneration()
   const mutationKey = ['workspace-members-action', accountGeneration, workspaceId]

@@ -1,4 +1,4 @@
-import { setWorkspaceApiAddress } from '@/client/features/workspace/remote'
+import { setWorkspaceApiTarget } from '@/client/features/workspace/remote'
 import { memberKeys } from './keys'
 import { afterEach, expect, test } from 'bun:test'
 import { queryClient } from '@/client/api/query-client'
@@ -123,7 +123,7 @@ test('optimistic pending actions are derived over the newest snapshot without mu
 test('local membership bootstrap preserves separately fetched remote members', () => {
   setIdentity(alex)
   const id = 'visitor-board'
-  setWorkspaceApiAddress(id, { user_id: 'host', workspace_id: 'board' })
+  setWorkspaceApiTarget(id, { user_id: 'host', workspace_id: 'board' })
   expect(getWorkspaceDirectory(id)).toBeUndefined()
   setWorkspaceMembers(id, { members: [alex, bot], invitations: [] })
   setAllWorkspaceMembers([])

@@ -17,7 +17,7 @@ export function WorkspaceInvitations() {
     queryKey: invitationsKey,
     enabled: cloud,
     queryFn: async () =>
-      (await (await cloudRequest('workspaces/invitations')).json()) as {
+      (await (await cloudRequest('/api/workspaces/invitations')).json()) as {
         invitations: WorkspaceInvitation[]
       },
     staleTime: 60_000,
@@ -52,7 +52,7 @@ function InvitationRow({ invitation }: InvitationRowProps) {
   const accept = useMutation({
     mutationFn: () =>
       cloudRequest(
-        `invitations/${encodeURIComponent(invitation.id)}/accept`,
+        `/api/invitations/${encodeURIComponent(invitation.id)}/accept`,
         jsonRequest('POST', {})
       ),
     onSuccess: async () => {

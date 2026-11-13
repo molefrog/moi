@@ -1,4 +1,4 @@
-import { setWorkspaceApiAddress } from '@/client/features/workspace/remote'
+import { setWorkspaceApiTarget } from '@/client/features/workspace/remote'
 import { afterEach, expect, test } from 'bun:test'
 import { act } from 'react'
 import { cleanupAccount, mountAccount } from '../../account/account-test-utils'
@@ -110,7 +110,7 @@ for (const name of ['Weekly Review', '', '   ']) {
 
 function RemoteMembersProbe() {
   const id = 'visitor-board'
-  setWorkspaceApiAddress(id, { user_id: 'alice', workspace_id: 'board' })
+  setWorkspaceApiTarget(id, { user_id: 'alice', workspace_id: 'board' })
   const members = useWorkspaceMembers(id)
   return <span data-enabled>{String(members.isEnabled)}</span>
 }

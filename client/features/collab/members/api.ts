@@ -1,13 +1,10 @@
-import { workspaceAddress } from '@/lib/workspace-config'
-import { remoteTarget } from '@/client/features/workspace/remote'
+import { ownerApiBase } from '@/client/features/workspace/remote'
 import { cloudRequest } from '../../account/api'
 import { jsonRequest } from '@/client/api/http'
-import { parseWorkspaceMembers, validWorkspaceId } from './types'
+import { parseWorkspaceMembers } from './types'
 
 function workspaceMembersPath(id: string, suffix: string) {
-  const remote = remoteTarget(id)
-  const workspaceId = validWorkspaceId(remote?.workspace_id ?? id)
-  return `workspaces/${workspaceAddress(workspaceId, remote?.user_id)}/${suffix}`
+  return `${ownerApiBase(id)}/${suffix}`
 }
 export async function fetchWorkspaceMembers(id: string, signal?: AbortSignal) {
   const response = await cloudRequest(workspaceMembersPath(id, 'members'), { signal })

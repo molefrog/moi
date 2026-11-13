@@ -1,4 +1,4 @@
-import { setWorkspaceApiAddress } from '@/client/features/workspace/remote'
+import { setWorkspaceApiTarget } from '@/client/features/workspace/remote'
 import { queryClient as appQueryClient } from '@/client/api/query-client'
 import * as appConfig from '@/client/api/app-config'
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test'
@@ -25,8 +25,8 @@ import * as workspaceEvents from '@/client/runtime/use-workspace-events'
 import { WorkspaceLayoutContext } from './workspace-layout-context'
 import { useWorkspaceNavigation } from './use-workspace-navigation'
 
-beforeEach(() => setWorkspaceApiAddress('abc'))
-afterEach(() => appQueryClient.removeQueries({ queryKey: workspaceKeys.address('abc') }))
+beforeEach(() => setWorkspaceApiTarget('abc'))
+afterEach(() => appQueryClient.removeQueries({ queryKey: workspaceKeys.apiTarget('abc') }))
 
 type ReadNavigationOptions = {
   base?: string

@@ -19,7 +19,7 @@ export class CloudApiError extends Error {
   }
 }
 export async function cloudRequest(path: string, init?: RequestInit): Promise<Response> {
-  const response = await fetch(`/cloud/api/${path}`, { ...init, credentials: 'same-origin' })
+  const response = await fetch(`/cloud${path}`, { ...init, credentials: 'same-origin' })
   if (!response.ok) {
     const body: unknown = await response.json().catch(() => undefined)
     const message = isRecord(body)
@@ -42,7 +42,7 @@ export const identityRefreshQuery = queryOptions({
     const identityRevision = getIdentityRevision()
     let identity: Identity | null
     try {
-      identity = parseIdentity(await (await cloudRequest('me', { signal })).json())
+      identity = parseIdentity(await (await cloudRequest('/api/me', { signal })).json())
     } catch (error) {
       if (!(error instanceof CloudApiError) || error.status !== 401) throw error
       identity = null
@@ -56,12 +56,12 @@ export const identityRefreshQuery = queryOptions({
 })
 type ProfilePatch = { name: string }
 export const updateCloudProfile = async (patch: ProfilePatch) =>
-  parseIdentity(await (await cloudRequest('me', jsonRequest('PATCH', patch))).json())
+  parseIdentity(await (await cloudRequest('/api/me', jsonRequest('PATCH', patch))).json())
 export async function uploadCloudAvatar(file: File) {
   const body = new FormData()
   body.set('file', file)
-  return parseIdentity(await (await cloudRequest('me/avatar', { method: 'PUT', body })).json())
+  return parseIdentity(await (await cloudRequest('/api/me/avatar', { method: 'PUT', body })).json())
 }
 export const removeCloudAvatar = async () =>
-  parseIdentity(await (await cloudRequest('me/avatar', { method: 'DELETE' })).json())
-export const signOutCloud = () => cloudRequest('auth/sign-out', jsonRequest('POST'))
+  parseIdentity(await (await cloudRequest('/api/me/avatar', { method: 'DELETE' })).json())
+export const signOutCloud = () => cloudRequest('/api/auth/sign-out', jsonRequest('POST'))

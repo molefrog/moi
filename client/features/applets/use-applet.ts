@@ -1,4 +1,4 @@
-import { remoteTarget } from '@/client/features/workspace/remote'
+import { isRemoteWorkspace } from '@/client/features/workspace/remote'
 import type { ComponentType } from 'react'
 import { useRouter } from 'wouter'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -148,7 +148,7 @@ function useApplet(kind: AppletKindSpec, name: string): AppletState {
   })
 
   // Owner events don't reach visitors yet, so a remote applet reloads on focus.
-  const remote = !!remoteTarget(workspaceId)
+  const remote = isRemoteWorkspace(workspaceId)
   useEffect(() => {
     if (!remote) return
     const refresh = () => {

@@ -1,4 +1,4 @@
-import { setWorkspaceApiAddress } from '@/client/features/workspace/remote'
+import { setWorkspaceApiTarget } from '@/client/features/workspace/remote'
 import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test'
 
 import { colorForId } from '@/lib/collab/colors'
@@ -87,7 +87,7 @@ class TestSocket {
 
 beforeEach(() => {
   signOut()
-  for (const id of ['workspace', 'other-workspace']) setWorkspaceApiAddress(id)
+  for (const id of ['workspace', 'other-workspace']) setWorkspaceApiTarget(id)
   sockets = []
   service = new CollabService((connectionId, message) => {
     sockets
@@ -421,7 +421,7 @@ test('remote presence connects to the owner with the same membership rules', () 
   signIn({ id: 'visitor', name: 'Visitor' })
   clearWorkspaceMembers()
   const id = 'visitor-board'
-  setWorkspaceApiAddress(id, { user_id: 'alice', workspace_id: 'board' })
+  setWorkspaceApiTarget(id, { user_id: 'alice', workspace_id: 'board' })
   setWorkspaceMembers(id, {
     members: [{ id: 'visitor', type: 'user', name: 'Visitor', email: '', isAnonymous: false }],
     invitations: []

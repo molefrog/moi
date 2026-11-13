@@ -1,4 +1,4 @@
-import { setWorkspaceApiAddress } from '@/client/features/workspace/remote'
+import { setWorkspaceApiTarget } from '@/client/features/workspace/remote'
 import { expect, spyOn, test } from 'bun:test'
 import { act, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -116,9 +116,9 @@ test('unknown workspace identity cannot silently select the visitor API', async 
   const { workspaceKeys } = await import('@/client/api/workspace-keys')
   const id = 'cold-remote'
   expect(() => ownerApiBase(id)).toThrow('Workspace identity is not loaded')
-  setWorkspaceApiAddress(id, { user_id: 'alice', workspace_id: 'board' })
+  setWorkspaceApiTarget(id, { user_id: 'alice', workspace_id: 'board' })
   expect(ownerApiBase(id)).toBe('/api/workspaces/alice:board')
-  queryClient.removeQueries({ queryKey: workspaceKeys.address(id) })
+  queryClient.removeQueries({ queryKey: workspaceKeys.apiTarget(id) })
 })
 
 test('the resolved prefix is independent of layout and list cache changes', async () => {
@@ -127,13 +127,21 @@ test('the resolved prefix is independent of layout and list cache changes', asyn
   const client = new QueryClient()
   try {
     const remote = { user_id: 'alice', workspace_id: 'board' }
-    const address = setWorkspaceApiAddress('visitor', remote, client)
-    expect(setWorkspaceApiAddress('visitor', remote, client)).toBe(address)
+    const target = setWorkspaceApiTarget('visitor', remote, client)
+    expect(workspaceKeys.apiTarget('visitor')).toEqual(['workspaces', 'api-target', 'visitor'])
+    expect(target).toEqual({ apiBase: '/api/workspaces/alice:board', isRemote: true })
+    expect(setWorkspaceApiTarget('visitor', remote, client)).toBe(target)
     client.setQueryData(workspaceKeys.all, [{ id: 'visitor' }])
     client.setQueryData(workspaceKeys.layout('visitor'), {})
     expect(ownerApiBase('visitor', client)).toBe('/api/workspaces/alice:board')
-    setWorkspaceApiAddress('visitor', undefined, client)
+    setWorkspaceApiTarget('visitor', { user_id: 'bob', workspace_id: 'board' }, client)
+    expect(ownerApiBase('visitor', client)).toBe('/api/workspaces/bob:board')
+    setWorkspaceApiTarget('visitor', undefined, client)
     expect(ownerApiBase('visitor', client)).toBe('/api/workspaces/visitor')
+    expect(client.getQueryData<typeof target>(workspaceKeys.apiTarget('visitor'))).toEqual({
+      apiBase: '/api/workspaces/visitor',
+      isRemote: false
+    })
   } finally {
     client.clear()
   }

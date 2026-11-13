@@ -20,7 +20,7 @@ export function useSharedWorkspaces() {
     queryKey: ['shared-workspaces'],
     enabled: cloud,
     queryFn: async () => {
-      const { workspaces } = (await (await cloudRequest('workspaces/shared')).json()) as {
+      const { workspaces } = (await (await cloudRequest('/api/workspaces/shared')).json()) as {
         workspaces: SharedWorkspace[]
       }
       return workspaces

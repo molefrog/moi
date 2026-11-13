@@ -4,42 +4,36 @@ import type { QueryClient } from '@tanstack/react-query'
 import { workspaceApiBase } from '@/lib/workspace-config'
 import type { RemoteWorkspaceTarget } from '@/lib/workspace-config'
 
-export type WorkspaceApiAddress = {
-  localId: string
+export type WorkspaceApiTarget = {
   apiBase: string
-  remote?: RemoteWorkspaceTarget
+  isRemote: boolean
 }
 
 // The workspace loader resolves routing before mounting content. Non-React
-// consumers (applet modules, presence, logs) read that same resolved address.
-export function setWorkspaceApiAddress(
+// consumers (applet modules, presence, logs) read that same resolved target.
+export function setWorkspaceApiTarget(
   localId: string,
   remote?: RemoteWorkspaceTarget,
   client: QueryClient = appQueryClient
-): WorkspaceApiAddress {
-  const previous = client.getQueryData<WorkspaceApiAddress>(workspaceKeys.address(localId))
-  if (
-    previous &&
-    previous.remote?.user_id === remote?.user_id &&
-    previous.remote?.workspace_id === remote?.workspace_id
-  )
-    return previous
-  client.setQueryDefaults(workspaceKeys.address(localId), { gcTime: Infinity })
-  const address = {
-    localId,
-    apiBase: workspaceApiBase(remote?.workspace_id ?? localId, remote?.user_id),
-    remote
-  }
-  client.setQueryData(workspaceKeys.address(localId), address)
-  return address
+): WorkspaceApiTarget {
+  const apiBase = workspaceApiBase(remote?.workspace_id ?? localId, remote?.user_id)
+  const isRemote = !!remote
+  const previous = client.getQueryData<WorkspaceApiTarget>(workspaceKeys.apiTarget(localId))
+  if (previous?.apiBase === apiBase && previous.isRemote === isRemote) return previous
+  client.setQueryDefaults(workspaceKeys.apiTarget(localId), { gcTime: Infinity })
+  const target = { apiBase, isRemote }
+  client.setQueryData(workspaceKeys.apiTarget(localId), target)
+  return target
 }
 
-export function remoteTarget(localId: string, client: QueryClient = appQueryClient) {
-  return client.getQueryData<WorkspaceApiAddress>(workspaceKeys.address(localId))?.remote
+export function isRemoteWorkspace(localId: string, client: QueryClient = appQueryClient) {
+  return (
+    client.getQueryData<WorkspaceApiTarget>(workspaceKeys.apiTarget(localId))?.isRemote ?? false
+  )
 }
 
 export function ownerApiBase(localId: string, client: QueryClient = appQueryClient): string {
-  const address = client.getQueryData<WorkspaceApiAddress>(workspaceKeys.address(localId))
-  if (!address) throw new Error('Workspace identity is not loaded')
-  return address.apiBase
+  const target = client.getQueryData<WorkspaceApiTarget>(workspaceKeys.apiTarget(localId))
+  if (!target) throw new Error('Workspace identity is not loaded')
+  return target.apiBase
 }

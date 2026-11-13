@@ -1,4 +1,4 @@
-import { setWorkspaceApiAddress } from '@/client/features/workspace/remote'
+import { setWorkspaceApiTarget } from '@/client/features/workspace/remote'
 import { queryClient as appQueryClient } from '@/client/api/query-client'
 import * as appConfig from '@/client/api/app-config'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
@@ -84,7 +84,7 @@ function mountNavigation(
     act(callback)
   })
 
-  setWorkspaceApiAddress('abc', remote ? { user_id: 'alice', workspace_id: 'board' } : undefined)
+  setWorkspaceApiTarget('abc', remote ? { user_id: 'alice', workspace_id: 'board' } : undefined)
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   // The fake server's copy of the workspace state.
   let server: WorkspaceState = {
@@ -215,7 +215,7 @@ function mountNavigation(
     await act(async () => {
       root.unmount()
       queryClient.clear()
-      appQueryClient.removeQueries({ queryKey: workspaceKeys.address('abc') })
+      appQueryClient.removeQueries({ queryKey: workspaceKeys.apiTarget('abc') })
       await Bun.sleep(0)
     })
     notifyManager.setNotifyFunction(callback => callback())
