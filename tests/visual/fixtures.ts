@@ -61,6 +61,8 @@ const workspaces: WorkspaceEntry[] = [
 ]
 
 const layout: WorkspaceLayoutResponse = {
+  apiBase: `/api/workspaces/${WORKSPACE}`,
+  isRemote: false,
   version: 1,
   widgetGrid: [{ i: '_moi_views', x: 0, y: 0 }],
   layoutMode: 'split',

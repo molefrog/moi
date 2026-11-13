@@ -17,7 +17,7 @@ Name, icon, layout, harness, theme, and content come from the owner. The folder 
 
 ## Routing
 
-The browser URL uses the local registration ID: `/workspace/{localId}`. The workspace loader resolves the API prefix once and shares it through context and a single React Query `api-target` record:
+The browser URL uses the local registration ID: `/workspace/{localId}`. The workspace info response includes `apiBase` and `isRemote`. The loader keeps them in the workspace query and exposes the prefix through context:
 
 - local: `/api/workspaces/{localId}`
 - remote: `/api/workspaces/{user_id}:{workspace_id}`
@@ -36,7 +36,7 @@ In Cloud mode the home page lists accepted shares from `/cloud/api/workspaces/sh
 - Accepting an invitation creates no local files. Opening a share creates the reference under the workspace root (normally `~/moi`), installs the skill, and registers it. Later opens leave an existing reference and skill untouched.
 - A registered reference stays in the grid and sidebar after the share disappears from Cloud.
 
-Presence uses `{prefix}/collab`. Membership controls use `/cloud${apiBase}/members` and `/cloud${apiBase}/invitations`. The cached API target contains only `apiBase` and `isRemote`. The host and accepted human members can invite and remove members. Leaving a workspace from the UI is not available yet.
+Presence uses `{prefix}/collab`. Membership controls use `/cloud${apiBase}/members` and `/cloud${apiBase}/invitations`. Non-React consumers read the same workspace query; there is no separate routing cache. These fields are response metadata and are never saved in the workspace config. The host and accepted human members can invite and remove members. Leaving a workspace from the UI is not available yet.
 
 Scratchpad documents and assets stay on the owner. Browser saves replace the full document, and there is no live sync: reopen the canvas to load edits made elsewhere.
 

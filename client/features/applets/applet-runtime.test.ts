@@ -1,4 +1,4 @@
-import { setWorkspaceApiTarget } from '@/client/features/workspace/remote'
+import { seedWorkspaceInfo } from '@/client/features/workspace/workspace-test-utils'
 import { beforeEach, afterEach } from 'bun:test'
 import { queryClient } from '@/client/api/query-client'
 import * as appletLog from './applet-log'
@@ -26,7 +26,7 @@ import {
 // after a rebuild) must never act again.
 
 beforeEach(() => {
-  for (const id of ['ws-1', 'prefixed']) setWorkspaceApiTarget(id)
+  for (const id of ['ws-1', 'prefixed']) seedWorkspaceInfo(id)
 })
 afterEach(() => queryClient.clear())
 
@@ -48,7 +48,7 @@ function subscribeChat(workspaceId: string) {
 describe('bridge validation', () => {
   test('emits URL navigation and rejects malformed addresses', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    setWorkspaceApiTarget(ws)
+    seedWorkspaceInfo(ws)
     const { calls } = subscribeNavigation(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
     const log = spyOn(appletLog, 'reportAppletError').mockImplementation(() => {})
@@ -91,7 +91,7 @@ describe('bridge validation', () => {
 
   test('drops calls with malformed addresses instead of emitting', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    setWorkspaceApiTarget(ws)
+    seedWorkspaceInfo(ws)
     const { calls } = subscribeNavigation(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
 
@@ -105,14 +105,14 @@ describe('bridge validation', () => {
 
   test('emitting with no subscribers (screen unmounted) is a no-op', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    setWorkspaceApiTarget(ws)
+    seedWorkspaceInfo(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
     expect(() => bridge.navigate('moi:/scratchpad')).not.toThrow()
   })
 
   test('an unbound subscriber stops receiving; others keep receiving', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    setWorkspaceApiTarget(ws)
+    seedWorkspaceInfo(ws)
     const first = subscribeNavigation(ws)
     const second = subscribeNavigation(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
@@ -129,7 +129,7 @@ describe('bridge validation', () => {
 describe('sendChatMessage validation', () => {
   test('trims the message and stamps the applet identity and attachment source', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    setWorkspaceApiTarget(ws)
+    seedWorkspaceInfo(ws)
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(WIDGET)
 
@@ -150,7 +150,7 @@ describe('sendChatMessage validation', () => {
 
   test('normalizes legacy calls through the same validation and rate limiter', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    setWorkspaceApiTarget(ws)
+    seedWorkspaceInfo(ws)
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(WIDGET)
 
@@ -181,7 +181,7 @@ describe('sendChatMessage validation', () => {
 
   test('drops a message that is empty, blank, or not a string', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    setWorkspaceApiTarget(ws)
+    seedWorkspaceInfo(ws)
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
     const notices = spyOn(toast, 'add').mockImplementation(() => crypto.randomUUID())
@@ -207,7 +207,7 @@ describe('sendChatMessage validation', () => {
 
   test('drops a message too long to be a chat bubble', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    setWorkspaceApiTarget(ws)
+    seedWorkspaceInfo(ws)
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
     const notices = spyOn(toast, 'add').mockImplementation(() => crypto.randomUUID())
@@ -225,7 +225,7 @@ describe('sendChatMessage validation', () => {
 
   test('legacy serialization failures reject the entire call', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    setWorkspaceApiTarget(ws)
+    seedWorkspaceInfo(ws)
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
     const cyclic: Record<string, unknown> = {}
@@ -244,7 +244,7 @@ describe('sendChatMessage validation', () => {
 
   test('rejects the removed object context field with a clear error', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    setWorkspaceApiTarget(ws)
+    seedWorkspaceInfo(ws)
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
     const log = spyOn(appletLog, 'reportAppletError').mockImplementation(() => {})
@@ -259,7 +259,7 @@ describe('sendChatMessage validation', () => {
 
   test('validates all attachments before emitting and snapshots all input fields', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    setWorkspaceApiTarget(ws)
+    seedWorkspaceInfo(ws)
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
     const file = new File(['hello'], 'hello.txt')
@@ -293,7 +293,7 @@ describe('sendChatMessage validation', () => {
 
   test('an applet cannot send through a disposed bridge', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    setWorkspaceApiTarget(ws)
+    seedWorkspaceInfo(ws)
     const { calls } = subscribeChat(ws)
     const { bridge, dispose } = appletRuntime(ws).connect(VIEW)
 
@@ -310,7 +310,7 @@ describe('sendChatMessage rate limiting', () => {
   // responsible for what a render loop or a double-mounted bundle can spend.
   test('collapses an identical message repeated inside the cooldown', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    setWorkspaceApiTarget(ws)
+    seedWorkspaceInfo(ws)
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(WIDGET)
 
@@ -323,7 +323,7 @@ describe('sendChatMessage rate limiting', () => {
 
   test('the cooldown is per applet and message, not a global mute', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    setWorkspaceApiTarget(ws)
+    seedWorkspaceInfo(ws)
     const { calls } = subscribeChat(ws)
     const widget = appletRuntime(ws).connect(WIDGET)
     const view = appletRuntime(ws).connect(VIEW)
@@ -342,7 +342,7 @@ describe('sendChatMessage rate limiting', () => {
 
   test('caps a loop that varies its message every call', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    setWorkspaceApiTarget(ws)
+    seedWorkspaceInfo(ws)
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(WIDGET)
 
@@ -388,7 +388,7 @@ describe('disposal', () => {
 
   test('a disposed connection is inert even while subscribers are live', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    setWorkspaceApiTarget(ws)
+    seedWorkspaceInfo(ws)
     const { calls } = subscribeNavigation(ws)
 
     const { bridge, dispose } = appletRuntime(ws).connect(VIEW)
@@ -414,7 +414,7 @@ function fakeModule() {
 describe('attachAppletBridge', () => {
   test('wires a module to its workspace runtime; invalidateApplet neuters it', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    setWorkspaceApiTarget(ws)
+    seedWorkspaceInfo(ws)
     const { calls } = subscribeNavigation(ws)
 
     const mod = fakeModule()
@@ -430,7 +430,7 @@ describe('attachAppletBridge', () => {
 
   test('invalidateAppletSegment disposes bridges kind-wide', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    setWorkspaceApiTarget(ws)
+    seedWorkspaceInfo(ws)
     const { calls } = subscribeNavigation(ws)
 
     const mod = fakeModule()
@@ -446,14 +446,14 @@ describe('attachAppletBridge', () => {
 
   test('no-ops on a bundle without the bridge exports (built before this change)', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    setWorkspaceApiTarget(ws)
+    seedWorkspaceInfo(ws)
     expect(() => attachAppletBridge({ default: () => null }, ws, 'views/x/y', VIEW)).not.toThrow()
     expect(() => disposeAppletBridge('views/x/y')).not.toThrow()
   })
 
   test('re-attaching under a key disposes the previous connection', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    setWorkspaceApiTarget(ws)
+    seedWorkspaceInfo(ws)
     const { calls } = subscribeNavigation(ws)
     const key = appletKey('views', ws, 'board')
 
@@ -484,7 +484,7 @@ describe('workspace isolation', () => {
 describe('addChatAttachment', () => {
   test('accepts text and both file sources, stamps source, and ignores disposed bridges', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    setWorkspaceApiTarget(ws)
+    seedWorkspaceInfo(ws)
     const received: unknown[] = []
     const runtime = appletRuntime(ws)
     const off = runtime.on('addChatAttachment', value => received.push(value))
@@ -512,7 +512,7 @@ describe('addChatAttachment', () => {
 
   test('rejects invalid attachments with a toast and without emitting', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    setWorkspaceApiTarget(ws)
+    seedWorkspaceInfo(ws)
     const received: unknown[] = []
     const runtime = appletRuntime(ws)
     const off = runtime.on('addChatAttachment', value => received.push(value))
@@ -557,7 +557,7 @@ describe('addChatAttachment', () => {
 
   test('does not cooldown repeated attachment intents', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    setWorkspaceApiTarget(ws)
+    seedWorkspaceInfo(ws)
     const received: unknown[] = []
     const runtime = appletRuntime(ws)
     const off = runtime.on('addChatAttachment', value => received.push(value))

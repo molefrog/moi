@@ -1,4 +1,3 @@
-import { ownerApiBase } from './remote'
 import { WorkspacePendingScreen } from './workspace-pending-screen'
 import { RecoveryMessage, WorkspaceLoadingState } from './setup/workspace-recovery-states'
 import type { RemoteWorkspaceTarget } from '@/lib/workspace-config'
@@ -69,6 +68,8 @@ function stripMeta(data: WorkspaceLayoutResponse): WorkspaceLayout {
     provider: _provider,
     agentId: _agentId,
     remote: _remote,
+    apiBase: _apiBase,
+    isRemote: _isRemote,
     ...layout
   } = data
   return layout
@@ -137,10 +138,10 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
       cwd: query.data?.cwd ?? null,
       provider: query.data ? (query.data.provider ?? 'claude-code') : null,
       workspaceId: id,
-      apiBase: query.data ? ownerApiBase(id, qc) : '',
+      apiBase: query.data?.apiBase ?? '',
       remote: query.data?.remote,
       // Remote chat support is deferred.
-      chatAvailable: !query.data?.remote,
+      chatAvailable: !query.data?.isRemote,
       isLoading: query.isLoading
     }),
     [query.data, query.isLoading, setLayout, id, qc]

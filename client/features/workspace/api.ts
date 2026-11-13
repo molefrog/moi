@@ -1,5 +1,5 @@
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
-import { ownerApiBase, isRemoteWorkspace, setWorkspaceApiTarget } from './remote'
+import { ownerApiBase, isRemoteWorkspace } from './remote'
 import { toast } from '@/client/components/ui/toast'
 import { receiveWorkspaceHarness } from './harness-transition'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -30,9 +30,8 @@ export function useWorkspaceLayout(workspaceId: string) {
         signal
       })
       if (signal.aborted) throw signal.reason
-      const target = setWorkspaceApiTarget(workspaceId, local.remote, client)
-      if (!local.remote) return local
-      const owner = await requestJson<WorkspaceLayoutResponse>(target.apiBase, { signal })
+      if (!local.isRemote) return local
+      const owner = await requestJson<WorkspaceLayoutResponse>(local.apiBase, { signal })
       client.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, entries =>
         entries?.map(entry =>
           entry.id === workspaceId
@@ -51,6 +50,8 @@ export function useWorkspaceLayout(workspaceId: string) {
         layoutMode: 'fullscreen',
         tabs: createDefaultWorkspaceLayout().tabs,
         remote: local.remote,
+        apiBase: local.apiBase,
+        isRemote: local.isRemote,
         cwd: local.cwd
       }
     },

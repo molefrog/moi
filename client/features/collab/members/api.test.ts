@@ -1,4 +1,4 @@
-import { setWorkspaceApiTarget } from '@/client/features/workspace/remote'
+import { seedWorkspaceInfo } from '@/client/features/workspace/workspace-test-utils'
 import { afterEach, expect, spyOn, test } from 'bun:test'
 import { queryClient } from '@/client/api/query-client'
 import { workspaceKeys } from '@/client/api/workspace-keys'
@@ -29,11 +29,11 @@ test.each([false, true])(
       )
     )
     const id = 'visitor-board'
-    const target = setWorkspaceApiTarget(
+    const target = seedWorkspaceInfo(
       id,
       remote ? { user_id: 'alice', workspace_id: 'board' } : undefined
     )
-    expect(target).toEqual({
+    expect(target).toMatchObject({
       apiBase: remote ? '/api/workspaces/alice:board' : '/api/workspaces/visitor-board',
       isRemote: remote
     })

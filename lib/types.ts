@@ -667,6 +667,8 @@ export type WorkspaceLayout = {
 
 // GET /api/workspaces/:id: layout plus the local workspace registration.
 export type WorkspaceLayoutResponse = WorkspaceLayout & {
+  apiBase: string
+  isRemote: boolean
   remote?: RemoteWorkspaceTarget
   cwd: string
   name: string

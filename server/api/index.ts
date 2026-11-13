@@ -925,6 +925,8 @@ one.get('/', async c => {
     return c.json({
       version: 2,
       remote: config.remote,
+      apiBase: workspaceApiBase(config.remote.workspace_id, config.remote.user_id),
+      isRemote: true,
       cwd: ws.path
     })
   }
@@ -932,6 +934,8 @@ one.get('/', async c => {
   const layout = config
   return c.json({
     ...layout,
+    apiBase: workspaceApiBase(ws.id),
+    isRemote: false,
     // Resolved display name: the settings override, or the folder name.
     name: layout.name || basename(ws.path),
     cwd: ws.path,
@@ -992,7 +996,7 @@ one.put('/', async c => {
   const body = await c.req.json()
   if (!body || (body.version !== 1 && body.version !== 2)) return c.text('Bad request', 400)
   // `origin` is the writing tab's id, echoed so that tab skips its own event.
-  const { origin, harness, ...layout } = body
+  const { origin, harness, apiBase: _apiBase, isRemote: _isRemote, ...layout } = body
   // Preserve server-owned identity (name/icon) across a grid/theme save so the
   // client's PUT can't erase a `moi config`-set name. See mergeLayoutForSave.
   const config = await loadWorkspaceFileConfig(ws.path)

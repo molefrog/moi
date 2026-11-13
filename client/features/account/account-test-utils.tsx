@@ -1,4 +1,4 @@
-import { setWorkspaceApiTarget } from '@/client/features/workspace/remote'
+import { seedWorkspaceInfo } from '@/client/features/workspace/workspace-test-utils'
 import { expect, spyOn } from 'bun:test'
 import { act, useLayoutEffect } from 'react'
 import type { ReactNode } from 'react'
@@ -199,7 +199,7 @@ export async function mountAccount({
   )
   const qc = queryClient
   qc.clear()
-  for (const id of ['one', 'two']) setWorkspaceApiTarget(id, undefined, qc)
+  for (const id of ['one', 'two']) seedWorkspaceInfo(id, undefined, qc)
   qc.setDefaultOptions({ queries: { retry: false }, mutations: { retry: false } })
   setIdentity(null)
   if (!loadingSession && !failSession && environment === 'cloud') setIdentity(cloudSession)

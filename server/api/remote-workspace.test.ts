@@ -62,7 +62,7 @@ const put = (body: unknown) => ({
   body: JSON.stringify(body)
 })
 
-test('visitor API returns only the reference and folder', async () => {
+test('visitor API returns the reference, folder and resolved routing', async () => {
   const list = await (await api.request('/api/workspaces')).json()
   expect(list.find((entry: { id: string }) => entry.id === visitorId)).toMatchObject({
     remote: { user_id: 'alice', workspace_id: ownerId },
@@ -71,12 +71,23 @@ test('visitor API returns only the reference and folder', async () => {
   const layout = await (await api.request(local)).json()
   expect(layout).toMatchObject({
     cwd: visitor,
+    apiBase: `/api/workspaces/alice:${ownerId}`,
+    isRemote: true,
     remote: { user_id: 'alice', workspace_id: ownerId }
   })
   expect(layout.widgetGrid).toBeUndefined()
   expect(layout.selectedModel).toBeUndefined()
   expect(layout.tabs).toBeUndefined()
   expect((await api.request(`${base}/widgets`)).status).toBe(200)
+})
+
+test('local workspace info includes routing without persisting response metadata', async () => {
+  const info = await (await api.request(base)).json()
+  expect(info).toMatchObject({ apiBase: base, isRemote: false, name: 'Owner board' })
+  expect((await api.request(base, put(info))).status).toBe(204)
+  const saved = await Bun.file(join(owner, '.moi/.workspace.json')).json()
+  expect(saved).not.toHaveProperty('apiBase')
+  expect(saved).not.toHaveProperty('isRemote')
 })
 
 test('visitor layout writes cannot add preferences or overwrite the reference', async () => {

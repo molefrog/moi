@@ -1,4 +1,3 @@
-import { setWorkspaceApiTarget } from '../workspace/remote'
 import type { WorkspaceLayoutResponse } from '@/lib/types'
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
@@ -16,7 +15,6 @@ export function useWorkspaces() {
       // Opening the home page must never wake owner machines. Reuse metadata
       // only from workspaces that have already been opened in this browser.
       return entries.map(entry => {
-        setWorkspaceApiTarget(entry.id, entry.remote, client)
         if (!entry.remote) return entry
         const owner = client.getQueryData<WorkspaceLayoutResponse>(workspaceKeys.layout(entry.id))
         if (

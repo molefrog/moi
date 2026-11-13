@@ -182,6 +182,8 @@ const remoteAnswers = {
   '/cloud/api/me': sharingUser,
   '/cloud/api/workspaces/alice:owner-board/members': { members: [sharingUser], invitations: [] },
   [ownerBase]: {
+    apiBase: '/api/workspaces/owner-board',
+    isRemote: false,
     version: 2,
     name: 'Shared board',
     widgetGrid: [],
@@ -190,6 +192,8 @@ const remoteAnswers = {
   },
   [`${remoteBase}/skills`]: { skills: [], updateAvailable: false },
   [remoteBase]: {
+    apiBase: ownerBase,
+    isRemote: true,
     version: 2,
     remote: { user_id: 'alice', workspace_id: 'owner-board' },
     cwd: '/visitor'

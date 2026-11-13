@@ -1,4 +1,4 @@
-import { setWorkspaceApiTarget } from '@/client/features/workspace/remote'
+import { seedWorkspaceInfo } from '@/client/features/workspace/workspace-test-utils'
 import { expect, spyOn, test } from 'bun:test'
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -28,7 +28,7 @@ test('focus refresh keeps a view visible and ignores stale loads after navigatio
   let next = Promise.resolve(first)
   const load = spyOn(cache, 'getCachedApplet').mockImplementation(() => next)
   const log = spyOn(journal, 'reportAppletError').mockImplementation(() => {})
-  setWorkspaceApiTarget('visitor', { user_id: 'alice', workspace_id: 'board' })
+  seedWorkspaceInfo('visitor', { user_id: 'alice', workspace_id: 'board' })
   type ProbeProps = { name: string }
   function Probe({ name }: ProbeProps) {
     const state = useView(name)
