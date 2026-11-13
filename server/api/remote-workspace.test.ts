@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test'
-import * as client from '../remote/client'
+import * as appConfig from '../app-config'
 import { mkdtemp, mkdir, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -43,25 +43,11 @@ beforeEach(async () => {
     })
   )
   local = `/api/workspaces/${visitorId}`
-  // The gateway: owner-prefixed requests land on the owner's API (this same process).
   spies.push(
-    spyOn(client, 'fetchWorkspace').mockImplementation((owner, workspace, suffix = '', init) =>
-      fetch(`http://gateway.test/api/workspaces/${owner}:${workspace}${suffix}`, init)
-    ),
-    spyOn(globalThis, 'fetch').mockImplementation(
-      Object.assign(
-        async (input: RequestInfo | URL, init?: RequestInit) => {
-          const url = new URL(String(input))
-          expect(url.origin).toBe('http://gateway.test')
-          expect(url.pathname.startsWith(`/api/workspaces/alice:${ownerId}`)).toBe(true)
-          return api.request(
-            url.pathname.replace(`/api/workspaces/alice:${ownerId}`, base) + url.search,
-            init
-          )
-        },
-        { preconnect: fetch.preconnect }
-      )
-    )
+    spyOn(appConfig, 'getAppConfig').mockReturnValue({
+      ...appConfig.getAppConfig(),
+      environment: 'cloud'
+    })
   )
 })
 afterEach(async () => {
@@ -76,26 +62,25 @@ const put = (body: unknown) => ({
   body: JSON.stringify(body)
 })
 
-test('one workspace API serves owner content with the visitor\u2019s preferences', async () => {
+test('visitor API returns only the descriptor and personal preferences', async () => {
   const list = await (await api.request('/api/workspaces')).json()
   expect(list.find((entry: { id: string }) => entry.id === visitorId)).toMatchObject({
     remote: { user_id: 'alice', workspace_id: ownerId },
-    name: 'Owner board'
+    name: ownerId
   })
   const layout = await (await api.request(local)).json()
   expect(layout).toMatchObject({
-    name: 'Owner board',
     cwd: visitor,
     remote: { user_id: 'alice', workspace_id: ownerId },
     layoutMode: 'split',
     selectedModel: 'visitor-model'
   })
-  expect(layout.widgetGrid).toBeDefined()
-  expect((await api.request(`${local}/widgets`)).status).toBe(200)
+  expect(layout.widgetGrid).toBeUndefined()
+  expect((await api.request(`${local}/widgets`)).status).toBe(404)
   expect((await api.request(`${base}/widgets`)).status).toBe(200)
 })
 
-test('one save keeps shared edits on the owner and preferences with the visitor', async () => {
+test('visitor saves change only personal settings', async () => {
   const before = await loadLayout(owner)
   const saved = await api.request(
     local,
@@ -112,7 +97,7 @@ test('one save keeps shared edits on the owner and preferences with the visitor'
     layoutMode: 'fullscreen',
     selectedModel: 'owner-model',
     tabs: before.tabs,
-    widgetGrid: [{ i: 'counter', x: 1, y: 2 }]
+    widgetGrid: before.widgetGrid
   })
   // A preferences-only save never touches the owner.
   expect((await api.request(local, put({ version: 2, layoutMode: 'fullscreen' }))).status).toBe(204)
@@ -122,7 +107,7 @@ test('one save keeps shared edits on the owner and preferences with the visitor'
     layoutMode: 'fullscreen',
     selectedModel: 'visitor-model'
   })
-  expect((await loadLayout(owner)).widgetGrid).toEqual([{ i: 'counter', x: 1, y: 2 }])
+  expect((await loadLayout(owner)).widgetGrid).toEqual(before.widgetGrid)
 })
 
 test('remote bundle RPC reads and writes owner data; assets and validators retain the destination', async () => {
@@ -136,16 +121,35 @@ test('remote bundle RPC reads and writes owner data; assets and validators retai
     `import { join } from 'node:path'; const path = join(import.meta.dir, '../count.json'); export async function increment() { const n = await Bun.file(path).json().catch(() => 0); await Bun.write(path, JSON.stringify(n + 1)); return n + 1 }`
   )
   await buildAllViews(owner)
-  const bundle = await api.request(`${local}/views/counter/module`)
+  const bundle = await api.request(`${base}/views/counter/module`)
   expect(bundle.status).toBe(200)
+  const etag = bundle.headers.get('etag')!
+  const legacyEtag = etag.replace('-url-base-v2', '')
+  expect(
+    (
+      await api.request(`${base}/views/counter/module`, {
+        headers: { 'if-none-match': legacyEtag }
+      })
+    ).status
+  ).toBe(200)
+  expect(
+    (
+      await api.request(`${base}/views/counter/module`, {
+        headers: { 'if-none-match': etag }
+      })
+    ).status
+  ).toBe(304)
   const text = await bundle.text()
-  // Applet RPC and file URLs come back through the visitor's own API.
-  expect(text).toContain(local)
-  expect(text).not.toContain(base)
-  expect(text).not.toContain(`"/api/workspaces/${ownerId}"`)
-  const direct = await api.request(`/api/workspaces/${ownerId}/views/counter/module`)
-  expect(bundle.headers.get('etag')).not.toBe(direct.headers.get('etag'))
-  const response = await api.request(`${local}/rpc/views/counter/increment`, {
+  expect(text).toContain('new URL(import.meta.url)')
+  // Execute the served module with the URL it has behind Batiok, without a DOM.
+  // Parsing the entire bundle also catches invalid substitutions in minified code.
+  const publicUrl = `http://cloud.test/api/workspaces/alice:${ownerId}/views/counter/module`
+  const source = text.replaceAll('import.meta.url', JSON.stringify(publicUrl))
+  new Bun.Transpiler({ loader: 'js' }).scan(source)
+  const expression = source.match(/\(new URL\([^\n]+?\?\.\[0\] \?\? [^\n]+?\)/)?.[0]
+  expect(expression).toBeDefined()
+  expect(new Function(`return ${expression}`)()).toBe(`/api/workspaces/alice:${ownerId}`)
+  const response = await api.request(`${base}/rpc/views/counter/increment`, {
     method: 'POST',
     body: stringify([])
   })
@@ -154,7 +158,7 @@ test('remote bundle RPC reads and writes owner data; assets and validators retai
   expect(await Bun.file(join(owner, '.moi/count.json')).json()).toBe(1)
   expect(await Bun.file(join(visitor, '.moi/count.json')).exists()).toBe(false)
   await Bun.write(join(owner, 'hello.svg'), '<svg/>')
-  expect(await (await api.request(`${local}/files/hello.svg`)).text()).toBe('<svg/>')
+  expect(await (await api.request(`${base}/files/hello.svg`)).text()).toBe('<svg/>')
 })
 
 test('remote reference blocks unavailable creation and removal but keeps personal state local', async () => {
@@ -179,7 +183,7 @@ test('remote home preview reads the owner theme without exposing chats', async (
   expect(preview.thumbnails).toEqual([])
   expect(preview.firstUserMessage).toBeUndefined()
   const previews = await (await api.request('/api/workspaces/previews')).json()
-  expect(previews[visitorId].theme.color).toBe('mint')
+  expect(previews[visitorId]).toEqual({ thumbnails: [] })
 })
 
 test('remote scratchpad documents and assets stay on the owner', async () => {
@@ -188,7 +192,7 @@ test('remote scratchpad documents and assets stay on the owner', async () => {
   const loaded = await (await api.request(`${base}/scratchpad`)).json()
   expect(loaded.document).toEqual(document)
   expect(await Bun.file(join(visitor, '.moi/.scratchpad.json')).exists()).toBe(false)
-  expect((await (await api.request(`${local}/scratchpad`)).json()).document).toEqual(document)
+  expect((await api.request(`${local}/scratchpad`)).status).toBe(404)
   const upload = await api.request(`${base}/scratchpad/assets`, {
     method: 'POST',
     headers: { 'content-type': 'image/png' },
@@ -204,7 +208,7 @@ test('remote scratchpad documents and assets stay on the owner', async () => {
 test('owner and visitor log APIs read and clear the selected workspace journal', async () => {
   const { recordAppletError, getAppletLog } = await import('../applets/log')
   recordAppletError(visitor, { source: 'runtime', message: 'Visitor error' })
-  for (const prefix of [base, local]) {
+  for (const prefix of [base]) {
     recordAppletError(owner, { source: 'runtime', message: 'Owner error' })
     const response = await api.request(`${prefix}/applet-log`)
     expect(response.status).toBe(200)
@@ -229,7 +233,7 @@ test('owner and visitor scratchpad edit APIs reuse the executor and preserve vis
   })
     .png()
     .toBuffer()
-  for (const prefix of [base, local]) {
+  for (const prefix of [base]) {
     const edit = async (op: unknown, bytes?: Uint8Array) => {
       const body = new FormData()
       body.set('op', JSON.stringify(op))
@@ -272,4 +276,45 @@ test('owner and visitor scratchpad edit APIs reuse the executor and preserve vis
         .status
     ).toBe(400)
   }
+})
+
+test('standalone hides remote registrations and refuses remote opening', async () => {
+  const spy = spyOn(appConfig, 'getAppConfig').mockReturnValue({
+    ...appConfig.getAppConfig(),
+    environment: 'local'
+  })
+  try {
+    expect((await api.request(local)).status).toBe(403)
+    expect(
+      (await (await api.request('/api/workspaces')).json()).some(
+        (entry: { id: string }) => entry.id === visitorId
+      )
+    ).toBe(false)
+    expect(
+      (
+        await api.request('/api/workspaces/shared/open', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ user_id: 'alice', workspace_id: ownerId })
+        })
+      ).status
+    ).toBe(403)
+    expect((await api.request(base)).status).toBe(200)
+  } finally {
+    spy.mockRestore()
+  }
+})
+
+test('standalone can reorder visible workspaces while preserving remote registrations', async () => {
+  spies.push(
+    spyOn(appConfig, 'getAppConfig').mockReturnValue({
+      ...appConfig.getAppConfig(),
+      environment: 'local'
+    })
+  )
+  const response = await api.request('/api/workspaces/order', put({ ids: [ownerId] }))
+  expect(response.status).toBe(200)
+  expect((await response.json()).map((entry: { id: string }) => entry.id)).toEqual([ownerId])
+  const { listWorkspaces } = await import('../workspaces/registry')
+  expect((await listWorkspaces()).map(entry => entry.id)).toEqual([ownerId, visitorId])
 })

@@ -1,3 +1,4 @@
+import { ownerApiBase } from '@/client/features/workspace/remote'
 // The workspace applet runtime — the host side of the applet `moi` module.
 //
 // Every applet bundle inlines its own copy of the `moi` runtime module (see
@@ -152,7 +153,7 @@ function createRuntime(workspaceId: string) {
         },
         resolveUrl(url) {
           if (!alive) return ''
-          return resolveUrl(url, { workspaceId, base })
+          return resolveUrl(url, { workspaceId, base, apiBase: ownerApiBase(workspaceId) })
         },
         sendChatMessage(input, legacyContext) {
           if (!alive) return

@@ -165,12 +165,22 @@ test(
   }
 )
 
-// A remote workspace is served through the same API as a local one; the
-// visitor's Moi merges the owner's layout with the visitor's preferences.
+// Cloud browsers fetch owner content directly and keep visitor preferences local.
 const REMOTE = 'shared-board'
 const remoteBase = `/api/workspaces/${REMOTE}`
+const ownerBase = '/api/workspaces/alice:owner-board'
 const remotePage = `/#/workspace/${REMOTE}`
 const remoteAnswers = {
+  '/api/config': { environment: 'cloud', demo: false },
+  '/cloud/api/me': sharingUser,
+  '/cloud/api/workspaces/alice:owner-board/members': { members: [sharingUser], invitations: [] },
+  [ownerBase]: {
+    version: 2,
+    name: 'Shared board',
+    widgetGrid: [],
+    layoutMode: 'fullscreen',
+    tabs: { open: ['overview'], active: 'overview' }
+  },
   [`${remoteBase}/skills`]: { skills: [], updateAvailable: false },
   [remoteBase]: {
     version: 2,
@@ -182,9 +192,9 @@ const remoteAnswers = {
     tabs: { open: ['overview'], active: 'overview' }
   },
   [`${remoteBase}/state`]: { revision: 1, selected: {}, sessions: {}, pendingViews: {} },
-  [`${remoteBase}/widgets`]: { widgets: [] },
-  [`${remoteBase}/views`]: { views: [] },
-  [`${remoteBase}/applet-thumbnails`]: { thumbnails: [] }
+  [`${ownerBase}/widgets`]: { widgets: [] },
+  [`${ownerBase}/views`]: { views: [] },
+  [`${ownerBase}/applet-thumbnails`]: { thumbnails: [] }
 }
 
 test(
@@ -199,7 +209,7 @@ test(
     await expect(page.getByRole('button', { name: 'Create tab', exact: true })).toBeVisible()
     await expect(
       page.getByRole('button', { name: 'Users in this workspace', exact: true })
-    ).toHaveCount(0)
+    ).toBeVisible()
   },
   { api: remoteAnswers }
 )
@@ -220,7 +230,7 @@ test(
 test(
   'remote workspace owner unavailable',
   async page => {
-    await page.route(`**${remoteBase}`, route =>
+    await page.route(`**${ownerBase}`, route =>
       route.fulfill({ status: 502, body: 'Couldn’t reach the workspace owner' })
     )
     await page.goto(remotePage)
@@ -233,7 +243,7 @@ test(
 test(
   'remote view uses the standard workspace chrome',
   async page => {
-    await page.route(`**${remoteBase}/views/counter/module*`, route =>
+    await page.route(`**${ownerBase}/views/counter/module*`, route =>
       route.fulfill({
         contentType: 'text/javascript',
         body: 'export default function Counter() { return "Owner counter view" }'
@@ -255,7 +265,7 @@ test(
         ...remoteAnswers[remoteBase],
         tabs: { open: ['overview', 'views/counter'], active: 'views/counter' }
       },
-      [`${remoteBase}/views`]: { views: [{ id: 'counter', status: 'compiled', title: 'Counter' }] }
+      [`${ownerBase}/views`]: { views: [{ id: 'counter', status: 'compiled', title: 'Counter' }] }
     }
   }
 )
@@ -264,7 +274,7 @@ test(
   'remote home card uses owner metadata without a chat shortcut',
   async page => {
     await page.goto('/#/')
-    await expect(page.getByRole('link', { name: 'Shared board Alice', exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Open Shared board', exact: true })).toHaveCount(1)
     await expect(page.getByRole('link', { name: 'Chat in Shared board', exact: true })).toHaveCount(
       0
     )
@@ -272,9 +282,9 @@ test(
   {
     api: {
       ...remoteAnswers,
-      '/api/workspaces/shared': [
-        { id: 'owner-board', owner: { id: 'alice', name: 'Alice' }, name: 'Shared board' }
-      ],
+      '/cloud/api/workspaces/shared': {
+        workspaces: [{ id: 'owner-board', owner: { id: 'alice', name: 'Alice' } }]
+      },
       '/api/workspaces': [
         {
           id: REMOTE,
@@ -303,7 +313,7 @@ test(
         ...remoteAnswers[remoteBase],
         tabs: { open: ['overview', 'scratchpad'], active: 'scratchpad' }
       },
-      [`${remoteBase}/scratchpad`]: { document: null }
+      [`${ownerBase}/scratchpad`]: { document: null }
     }
   }
 )
@@ -322,7 +332,7 @@ test(
       ...remoteAnswers,
       '/api/config': { environment: 'cloud', demo: false },
       '/cloud/api/me': sharingUser,
-      '/cloud/api/workspaces/owner-board/members': {
+      '/cloud/api/workspaces/alice:owner-board/members': {
         members: [
           {
             id: 'alice',
@@ -344,12 +354,15 @@ for (const state of ['loading', 'error', 'signed-out', 'empty'] as const) {
     `shared workspace list ${state}`,
     async page => {
       if (state === 'loading')
-        await page.route('**/api/workspaces/shared', () => new Promise(() => {}))
+        await page.route('**/cloud/api/workspaces/shared', () => new Promise(() => {}))
       if (state === 'error' || state === 'signed-out')
-        await page.route('**/api/workspaces/shared', route =>
+        await page.route('**/cloud/api/workspaces/shared', route =>
           route.fulfill({
             status: state === 'signed-out' ? 401 : 503,
-            body: state === 'signed-out' ? 'Sign in with moi remote login' : 'Cloud unavailable'
+            contentType: 'application/json',
+            body: JSON.stringify({
+              error: state === 'signed-out' ? 'Sign in required' : 'Cloud unavailable'
+            })
           })
         )
       await page.goto('/#/')
@@ -359,30 +372,207 @@ for (const state of ['loading', 'error', 'signed-out', 'empty'] as const) {
         await expect(page.getByText('Shared with you', { exact: true })).toHaveCount(0)
       else await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible()
     },
-    { api: { '/api/workspaces/shared': [] } }
+    {
+      api: {
+        '/api/config': { environment: 'cloud', demo: false },
+        '/cloud/api/workspaces/shared': { workspaces: [] }
+      }
+    }
   )
 }
-test('shared workspace opening', async page => {
-  await page.route('**/api/workspaces/shared/open', () => new Promise(() => {}))
-  await page.goto('/#/shared/alice/board')
-  await expect(page.getByRole('status', { name: 'Opening shared workspace' })).toBeVisible()
-})
-test('shared workspace setup failed', async page => {
-  await page.route('**/api/workspaces/shared/open', route =>
-    route.fulfill({ status: 503, body: 'Could not initialize workspace' })
-  )
-  await page.goto('/#/shared/alice/board')
-  await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Back', exact: true })).toBeVisible()
+test(
+  'shared workspace opening',
+  async page => {
+    await page.route('**/api/workspaces/shared/open', () => new Promise(() => {}))
+    await page.goto('/#/shared/alice/board')
+    await expect(page.getByRole('status', { name: 'Opening shared workspace' })).toBeVisible()
+  },
+  { api: { '/api/config': { environment: 'cloud', demo: false }, '/cloud/api/me': sharingUser } }
+)
+test(
+  'shared workspace setup failed',
+  async page => {
+    await page.route('**/api/workspaces/shared/open', route =>
+      route.fulfill({ status: 503, body: 'Could not initialize workspace' })
+    )
+    await page.goto('/#/shared/alice/board')
+    await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Back', exact: true })).toBeVisible()
+  },
+  { api: { '/api/config': { environment: 'cloud', demo: false }, '/cloud/api/me': sharingUser } }
+)
+
+test(
+  'shared workspace opens after setup',
+  async page => {
+    await page.route('**/api/workspaces/shared/open', route =>
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ id: WORKSPACE, path: '/visitor', addedAt: '' })
+      })
+    )
+    await page.goto('/#/shared/alice/board')
+    await expect(page.getByRole('button', { name: 'Theme', exact: true })).toBeVisible()
+  },
+  { api: { '/api/config': { environment: 'cloud', demo: false }, '/cloud/api/me': sharingUser } }
+)
+
+test('standalone home never requests Cloud discovery', async page => {
+  const cloudRequests: string[] = []
+  await page.route('**/cloud/api/workspaces/**', route => {
+    cloudRequests.push('unexpected Cloud call')
+    return route.fulfill({ status: 500, body: 'Unexpected Cloud request' })
+  })
+  await page.goto('/#/')
+  await expect(page.getByText('acme-store').first()).toBeVisible()
+  await expect(page.getByText('Shared with you', { exact: true })).toHaveCount(0)
+  expect(cloudRequests).toEqual([])
 })
 
-test('shared workspace opens after setup', async page => {
-  await page.route('**/api/workspaces/shared/open', route =>
-    route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({ id: WORKSPACE, path: '/visitor', addedAt: '' })
+test(
+  'home mixes unopened shares with registered workspaces',
+  async page => {
+    await page.route('**/api/workspaces/shared/open', () => new Promise(() => {}))
+    await page.goto('/#/')
+    const cards = page.getByRole('link', { name: /^Open / })
+    await expect(cards).toHaveCount(3)
+    await expect(page.getByRole('link', { name: 'Open Alpha', exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Open Bravo', exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Open Zebra', exact: true })).toBeVisible()
+    await takeSnapshot('mixed workspace grid')
+    await page.getByRole('link', { name: 'Open Alpha', exact: true }).click()
+    await expect(page.getByRole('status', { name: 'Opening shared workspace' })).toBeVisible()
+  },
+  {
+    api: {
+      '/api/config': { environment: 'cloud', demo: false },
+      '/api/workspaces': [
+        { id: 'local', path: '/Zebra', name: 'Zebra', addedAt: '2026-01-01T00:00:00Z' },
+        {
+          id: 'registered',
+          path: '/visitor',
+          name: 'Bravo',
+          addedAt: '2026-01-01T00:00:00Z',
+          remote: { user_id: 'alice', workspace_id: 'board' }
+        }
+      ],
+      '/cloud/api/workspaces/shared': {
+        workspaces: [
+          { id: 'board', owner: { id: 'alice', name: 'Alice' } },
+          { id: 'board', owner: { id: 'bob', name: 'Bob' } }
+        ]
+      },
+      '/api/workspaces/alice:board': { name: 'Bravo' },
+      '/api/workspaces/bob:board': { name: 'Alpha' }
+    }
+  }
+)
+
+test(
+  'accept invitation stays home and does not provision',
+  async page => {
+    let accepted = false
+    let provisioned = false
+    await page.route('**/cloud/api/workspaces/invitations', route =>
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          invitations: accepted
+            ? []
+            : [{ id: 'invite', workspaceName: 'Team notes', inviter: { name: 'Alice' } }]
+        })
+      })
+    )
+    await page.route('**/cloud/api/invitations/invite/accept', route => {
+      accepted = true
+      return route.fulfill({ contentType: 'application/json', body: '{"success":true}' })
     })
-  )
-  await page.goto('/#/shared/alice/board')
-  await expect(page.getByRole('button', { name: 'Theme', exact: true })).toBeVisible()
-})
+    await page.route('**/cloud/api/workspaces/shared', route =>
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          workspaces: accepted ? [{ id: 'notes', owner: { id: 'alice', name: 'Alice' } }] : []
+        })
+      })
+    )
+    await page.route('**/api/workspaces/shared/open', route => {
+      provisioned = true
+      return route.fulfill({ status: 500, body: 'Should not provision yet' })
+    })
+    await page.goto('/#/')
+    await expect(page.getByRole('button', { name: 'Accept', exact: true })).toBeVisible()
+    await takeSnapshot('pending invitation')
+    await page.getByRole('button', { name: 'Accept', exact: true }).click()
+    await expect(page.getByRole('link', { name: 'Open Team notes', exact: true })).toBeVisible()
+    expect(provisioned).toBe(false)
+  },
+  {
+    api: {
+      '/api/config': { environment: 'cloud', demo: false },
+      '/api/workspaces/alice:notes': { name: 'Team notes' }
+    }
+  }
+)
+
+test(
+  'invitation failure can be retried without leaving home',
+  async page => {
+    await page.route('**/cloud/api/invitations/invite/accept', route =>
+      route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: '{"error":"Could not accept invitation"}'
+      })
+    )
+    await page.goto('/#/')
+    await page.getByRole('button', { name: 'Accept', exact: true }).click()
+    await expect(page.getByText('Could not accept invitation', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible()
+  },
+  {
+    api: {
+      '/api/config': { environment: 'cloud', demo: false },
+      '/cloud/api/workspaces/invitations': {
+        invitations: [{ id: 'invite', workspaceName: 'Team notes', inviter: { name: 'Alice' } }]
+      }
+    }
+  }
+)
+
+test(
+  'failed owner view discovery preserves visitor tabs for retry',
+  async page => {
+    let unavailable = true
+    let personalSaves = 0
+    await page.route(`**${remoteBase}`, async route => {
+      if (route.request().method() === 'PUT') personalSaves++
+      await route.fulfill({
+        json: {
+          ...remoteAnswers[remoteBase],
+          tabs: { open: ['overview', 'views/counter'], active: 'views/counter' }
+        }
+      })
+    })
+    await page.route(`**${ownerBase}/views`, route =>
+      route.fulfill(
+        unavailable
+          ? { status: 503, body: 'Owner unavailable' }
+          : { json: { views: [{ id: 'counter', status: 'compiled', title: 'Counter' }] } }
+      )
+    )
+    await page.route(`**${ownerBase}/views/counter/module*`, route =>
+      route.fulfill({
+        contentType: 'text/javascript',
+        body: 'export default function Counter() { return "Recovered owner view" }'
+      })
+    )
+    await page.goto(remotePage)
+    await expect(page.getByText('Couldn’t load workspace content', { exact: true })).toBeVisible()
+    expect(personalSaves).toBe(0)
+    unavailable = false
+    await page.getByRole('button', { name: 'Try again', exact: true }).click()
+    await expect(page.getByText('Recovered owner view', { exact: true })).toBeVisible()
+    expect(personalSaves).toBe(0)
+  },
+  { api: remoteAnswers }
+)

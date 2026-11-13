@@ -60,7 +60,8 @@ import { composerDraftKey, draftSessionId } from '@/lib/session-drafts'
 import type { CompiledView, PendingView, ViewInfo, WidgetInfo, WorkspaceTabId } from '@/lib/types'
 import { viewIdFromTab, viewTabId } from '@/lib/workspace-tabs'
 
-import { WorkspaceFrame, WorkspacePane, useWorkspaceFrame } from './workspace-frame'
+import { WorkspaceFrame, useWorkspaceFrame } from './workspace-frame'
+import { WorkspacePane } from './workspace-pane'
 import { UnavailablePage } from './unavailable-page'
 
 const Scratchpad = lazy(() =>

@@ -1,3 +1,4 @@
+import { ownerApiBase } from '@/client/features/workspace/remote'
 import { useMemo } from 'react'
 
 import { useQuery } from '@tanstack/react-query'
@@ -16,7 +17,7 @@ export function useWidgets(workspaceId: string) {
     queryKey: workspaceKeys.widgets(workspaceId),
     queryFn: async () => {
       const data = await requestJson<{ widgets: WidgetInfo[] }>(
-        `/api/workspaces/${workspaceId}/widgets`
+        `${ownerApiBase(workspaceId)}/widgets`
       )
       return data.widgets
     },
@@ -26,5 +27,5 @@ export function useWidgets(workspaceId: string) {
 
   useGridReconcile(workspaceId, query.data ? widgets : undefined, layout, setLayout)
 
-  return { ...query, data: widgets }
+  return { ...query, data: widgets, hasData: query.data !== undefined }
 }

@@ -1,3 +1,5 @@
+import { RecoveryMessage } from '@/client/features/workspace/setup/workspace-recovery-states'
+import { WorkspacePendingScreen } from '@/client/features/workspace/workspace-pending-screen'
 import { useWorkspaceMembers } from '@/client/features/collab/members/hooks'
 import { useWorkspaceHarnessChanges } from '@/client/features/workspace/harness-transition'
 import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
@@ -27,7 +29,6 @@ type WorkspaceRouteProps = {
 // Navigation reads the raw browser address so encoded paths and query params
 // are decoded exactly once; the route only owns the workspace ID.
 export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
-  useWorkspaceMembers(id)
   const { environment } = useAppConfig()
   return (
     <SidebarLayout>
@@ -43,6 +44,7 @@ export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
 }
 
 function WorkspaceContent({ id }: WorkspaceRouteProps) {
+  useWorkspaceMembers(id)
   const queryClient = useQueryClient()
   const [selectedSessionId] = useSelectedSession()
   const { isLoading: layoutLoading, layout, provider } = useWorkspaceLayoutCtx()
@@ -71,6 +73,23 @@ function WorkspaceContent({ id }: WorkspaceRouteProps) {
 
   const contentPending =
     layoutLoading || selectedSessionId === undefined || widgets.isLoading || views.isLoading
+
+  if ((!views.data && views.isError) || (widgets.isError && !widgets.hasData)) {
+    return (
+      <WorkspacePendingScreen setupRequired>
+        <RecoveryMessage
+          title="Couldn’t load workspace content"
+          retrying={views.isFetching || widgets.isFetching}
+          onRetry={() => {
+            void views.refetch()
+            void widgets.refetch()
+          }}
+        >
+          Please try again.
+        </RecoveryMessage>
+      </WorkspacePendingScreen>
+    )
+  }
 
   return (
     <WorkspaceScreen

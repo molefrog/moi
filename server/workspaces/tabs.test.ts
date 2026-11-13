@@ -91,19 +91,10 @@ async function workspaceFixture(config: unknown) {
 }
 
 function mockOwner(status = 200) {
-  spies.push(
-    spyOn(remoteClient, 'fetchWorkspace').mockImplementation(
-      (owner, workspace, suffix = '', init) =>
-        fetch(`http://localhost:8787/api/workspaces/${owner}:${workspace}${suffix}`, init)
-    )
-  )
-  const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
-    Object.assign(
-      async () =>
-        status === 200 ? Response.json({ views }) : new Response('Unavailable', { status }),
-      { preconnect: fetch.preconnect }
-    )
-  )
+  const fetchSpy = spyOn(remoteClient, 'workspaceRequest').mockImplementation(async () => {
+    if (status !== 200) throw new Error(`Remote operation failed (${status})`)
+    return Response.json({ views })
+  })
   spies.push(fetchSpy)
   return fetchSpy
 }
@@ -116,9 +107,11 @@ test('remote discovery uses owner views and the visitor saved default', async ()
   })
   const fetchSpy = mockOwner()
   const rows = await getWorkspaceTabs(workspace)
-  expect(String(fetchSpy.mock.calls[0]?.[0])).toBe(
-    'http://localhost:8787/api/workspaces/alice:owner-board/views?includePending=true'
-  )
+  expect(fetchSpy.mock.calls[0]?.slice(0, 3)).toEqual([
+    'alice',
+    'owner-board',
+    '/views?includePending=true'
+  ])
   expect(rows.map(row => row.id)).toEqual([
     'overview',
     'scratchpad',
@@ -147,7 +140,7 @@ test('remote discovery reports owner failure without reading visitor views', asy
   mockOwner(503)
   const local = spyOn(workspaceViews, 'getWorkspaceViews')
   spies.push(local)
-  await expect(getWorkspaceTabs(workspace)).rejects.toThrow('Workspace request failed (503)')
+  await expect(getWorkspaceTabs(workspace)).rejects.toThrow('Remote operation failed (503)')
   expect(local).not.toHaveBeenCalled()
 })
 

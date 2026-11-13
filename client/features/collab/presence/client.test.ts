@@ -88,6 +88,8 @@ class TestSocket {
 
 beforeEach(() => {
   signOut()
+  for (const id of ['workspace', 'other-workspace'])
+    queryClient.setQueryData(workspaceKeys.descriptor(id), {})
   sockets = []
   service = new CollabService((connectionId, message) => {
     sockets

@@ -1,3 +1,4 @@
+import { workspaceAddress, workspaceApiBase } from '@/lib/workspace-config'
 import { decodeJwt } from 'jose'
 import { Mutex } from 'async-mutex'
 import { lock } from 'proper-lockfile'
@@ -8,6 +9,13 @@ import { join } from 'node:path'
 import { DATA_DIR } from '../data-dir'
 import { PACKAGE_ROOT } from '../version'
 import { agentCredentialsSchema, agentAuthorization, agentJoinBody, createAgentKeys } from './agent'
+
+type RemoteRequestOptions = {
+  method?: string
+  body?: string | Blob | Uint8Array<ArrayBuffer>
+  signal?: AbortSignal
+  contentType?: string
+}
 
 export class CloudSignInRequired extends Error {}
 
@@ -510,7 +518,7 @@ export function createRemoteClient(directory: string) {
   }
   async function leave(ownerId: string, workspaceId: string) {
     return request(
-      `/workspaces/${encodeURIComponent(ownerId)}:${encodeURIComponent(workspaceId)}/leave`,
+      `/workspaces/${workspaceAddress(workspaceId, ownerId)}/leave`,
       {},
       z.object({ success: z.literal(true) })
     )
@@ -531,21 +539,39 @@ export function createRemoteClient(directory: string) {
     ownerId: string,
     workspaceId: string,
     suffix: string,
-    options: {
-      method?: string
-      body?: string | Blob | Uint8Array<ArrayBuffer>
-      signal?: AbortSignal
-      contentType?: string
-    } = {}
+    options: RemoteRequestOptions = {}
   ): Promise<Response> {
     if (
       ![ownerId, workspaceId].every(id => /^[A-Za-z0-9_-]+$/.test(id)) ||
       !/^\/(?:files\/|exec$|commands$)/.test(suffix)
     )
       throw new Error('Invalid remote operation')
+    return authenticatedTransport(
+      `api/workspaces/${workspaceAddress(workspaceId, ownerId)}/ops${suffix}`,
+      options
+    )
+  }
+
+  async function workspaceRequest(
+    ownerId: string,
+    workspaceId: string,
+    suffix: string,
+    options: RemoteRequestOptions = {}
+  ) {
+    const base = new URL(workspaceApiBase(workspaceId, ownerId), 'http://workspace.local')
+    const url = new URL(base.href + suffix)
+    if (
+      url.origin !== base.origin ||
+      (url.pathname !== base.pathname && !url.pathname.startsWith(base.pathname + '/'))
+    )
+      throw new Error('Invalid workspace path')
+    return authenticatedTransport(url.pathname + url.search, options)
+  }
+
+  async function authenticatedTransport(path: string, options: RemoteRequestOptions) {
     const config = await remoteConfig()
     const pair = await access(config)
-    const url = `${config.url}/api/workspaces/${ownerId}:${workspaceId}/ops${suffix}`
+    const url = new URL(path, config.url.replace(/\/+$/, '') + '/').href
     const method = options.method ?? 'GET'
     let body = options.body
     if (isAgent(pair) && body instanceof Blob) {
@@ -587,49 +613,6 @@ export function createRemoteClient(directory: string) {
     return response
   }
 
-  /** Read or forward the owner's browser API using this installation's identity. */
-  async function fetchWorkspace(
-    ownerId: string,
-    workspaceId: string,
-    suffix = '',
-    init: RequestInit = {}
-  ): Promise<Response> {
-    if (![ownerId, workspaceId].every(id => /^[A-Za-z0-9_-]+$/.test(id)))
-      throw new Error('Invalid remote workspace')
-    if (suffix && (!/^[/?]/.test(suffix) || suffix.startsWith('//')))
-      throw new Error('Invalid workspace path')
-    const config = await remoteConfig()
-    const base = new URL(`/api/workspaces/${ownerId}:${workspaceId}`, config.url)
-    const url = new URL(base.href + suffix)
-    if (
-      url.origin !== base.origin ||
-      (url.pathname !== base.pathname && !url.pathname.startsWith(base.pathname + '/'))
-    )
-      throw new Error('Invalid workspace path')
-    const pair = await access(config)
-    const method = init.method ?? 'GET'
-    const body =
-      init.body == null ? undefined : new Uint8Array(await new Response(init.body).arrayBuffer())
-    if (isAgent(pair) && body && body.byteLength > 16 * 1024 * 1024)
-      throw new Error('Agent uploads are limited to 16 MiB')
-    const headers = new Headers(init.headers)
-    for (const name of ['cookie', 'authorization', 'host', 'content-length']) headers.delete(name)
-    headers.set(
-      'authorization',
-      isAgent(pair)
-        ? await agentAuthorization(pair, url.href, method, body ?? '')
-        : `Bearer ${pair.accessToken}`
-    )
-    return fetch(url, {
-      ...init,
-      method,
-      body,
-      headers,
-      redirect: 'error',
-      signal: init.signal ?? AbortSignal.timeout(30_000)
-    })
-  }
-
   async function remoteStatus(): Promise<RemoteStatus> {
     const config = await remoteConfig()
     const pair = await access(config)
@@ -645,8 +628,8 @@ export function createRemoteClient(directory: string) {
     login,
     logout,
     fetchSharedWorkspaces,
+    workspaceRequest,
     remoteStatus,
-    fetchWorkspace,
     operation,
     invitations,
     accept,
@@ -661,8 +644,8 @@ export const {
   login,
   logout,
   fetchSharedWorkspaces,
+  workspaceRequest,
   remoteStatus,
-  fetchWorkspace,
   operation,
   invitations,
   accept,

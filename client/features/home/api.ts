@@ -1,3 +1,5 @@
+import { workspaceApiBase } from '@/lib/workspace-config'
+import type { WorkspaceLayoutResponse } from '@/lib/types'
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
@@ -8,7 +10,25 @@ import type { DiscoveredWorkspace, WorkspaceEntry, WorkspacePreview } from '@/li
 export function useWorkspaces() {
   return useQuery<WorkspaceEntry[]>({
     queryKey: workspaceKeys.all,
-    queryFn: () => requestJson('/api/workspaces'),
+    queryFn: async () => {
+      const entries = await requestJson<WorkspaceEntry[]>('/api/workspaces')
+      return Promise.all(
+        entries.map(async entry => {
+          if (!entry.remote) return entry
+          const owner = await requestJson<WorkspaceLayoutResponse>(
+            workspaceApiBase(entry.remote.workspace_id, entry.remote.user_id)
+          ).catch(() => undefined)
+          return {
+            ...entry,
+            name: owner?.name || entry.remote.workspace_id,
+            icon: owner?.icon,
+            theme: owner?.theme,
+            type: owner ? (owner.provider ?? 'claude-code') : entry.type,
+            agentId: owner?.agentId
+          }
+        })
+      )
+    },
     // Live events invalidate the list on every change. This only bounds how
     // long a missed event (socket down) can leave it wrong; route switches
     // within the window reuse the cache.
@@ -75,7 +95,12 @@ export function useReorderWorkspaces() {
     onSuccess: entries => {
       // An earlier drag's response must not land over a newer optimistic order.
       if (queryClient.isMutating({ mutationKey: REORDER_KEY }) > 1) return
-      queryClient.setQueryData(workspaceKeys.all, entries)
+      // Reordering returns local descriptors; retain resolved owner metadata.
+      queryClient.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, previous =>
+        entries.map(entry =>
+          entry.remote ? (previous?.find(item => item.id === entry.id) ?? entry) : entry
+        )
+      )
     }
   })
 }

@@ -182,13 +182,24 @@ export async function serveApplet(
   if (HASHED_FILE_RE.test(file)) {
     cache = { 'Cache-Control': IMMUTABLE_CACHE }
   } else {
-    const etag = `"${bunFile.size}-${Math.trunc(bunFile.lastModified)}-${Bun.hash(apiBase)}"`
+    // The served representation also depends on the API-base substitution format.
+    const etag = `"${bunFile.size}-${Math.trunc(bunFile.lastModified)}-${Bun.hash(apiBase)}-url-base-v2"`
     cache = { ETag: etag, 'Cache-Control': 'private, no-cache' }
     if (ifNoneMatch === etag) return new Response(null, { status: 304, headers: cache })
   }
 
   if (CODE_FILE_RE.test(file)) {
-    const swapped = (await bunFile.text()).replaceAll(APPLET_API_BASE_SENTINEL, apiBase)
+    const runtimeBase = `(new URL(import.meta.url).pathname.match(/^\\/api\\/workspaces\\/[^/]+/)?.[0] ?? ${JSON.stringify(apiBase)})`
+    const swapped = (await bunFile.text()).replace(
+      /(["'])([^"'\n]*%%MOI_APPLET_API_BASE%%[^"'\n]*)\1/g,
+      (_match, _quote: string, value: string) =>
+        '(' +
+        value
+          .split(APPLET_API_BASE_SENTINEL)
+          .map(part => JSON.stringify(part))
+          .join(' + ' + runtimeBase + ' + ') +
+        ')'
+    )
     return new Response(swapped, { headers: { 'Content-Type': JS_CONTENT_TYPE, ...cache } })
   }
   return new Response(bunFile, {

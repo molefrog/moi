@@ -7,12 +7,13 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import {
   type WorkspaceLayoutResponse,
+  type WorkspaceLayoutMutation,
   useSaveLayout,
   useWorkspaceLayout
 } from '@/client/features/workspace/api'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
-import type { WorkspaceLayout, WorkspaceLayoutSave, WorkspaceType } from '@/lib/types'
+import type { WorkspaceLayout, WorkspaceType } from '@/lib/types'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 
 import { accumulateLayoutSave } from './layout-save'
@@ -87,7 +88,7 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
   // reconcile), so reach the latest mutate via a ref instead of closing over it.
   const saveRef = useLatestRef(save.mutate)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pendingSave = useRef<WorkspaceLayoutSave | null>(null)
+  const pendingSave = useRef<WorkspaceLayoutMutation | null>(null)
 
   const setLayout = useCallback(
     (update: Partial<WorkspaceLayout>) => {
@@ -101,7 +102,8 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
       qc.setQueryData<WorkspaceLayoutResponse>(key, next)
       pendingSave.current = {
         ...accumulateLayoutSave(stripMeta(next), update, pendingSave.current),
-        harness: next.provider ?? 'claude-code'
+        harness: next.provider ?? 'claude-code',
+        saveShared: Boolean(pendingSave.current?.saveShared || update.widgetGrid || update.theme)
       }
 
       if (timer.current) clearTimeout(timer.current)
@@ -147,7 +149,7 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
         <WorkspacePendingScreen>
           <WorkspaceLoadingState />
         </WorkspacePendingScreen>
-      ) : query.isError ? (
+      ) : query.isError && !query.data ? (
         <WorkspacePendingScreen setupRequired>
           <RecoveryMessage
             title="Couldn’t open workspace"

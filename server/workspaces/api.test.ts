@@ -28,19 +28,19 @@ afterEach(async () => {
 })
 function mockOwner(handler: (url: string, init?: RequestInit) => Response) {
   spies.push(
-    spyOn(client, 'fetchWorkspace').mockImplementation((owner, workspace, suffix = '', init) =>
-      fetch(`http://localhost:8787/api/workspaces/${owner}:${workspace}${suffix}`, {
-        ...init,
-        redirect: 'error'
-      })
-    )
-  )
-  spies.push(
-    spyOn(globalThis, 'fetch').mockImplementation(
-      Object.assign(
-        async (input: RequestInfo | URL, init?: RequestInit) => handler(String(input), init),
-        { preconnect: fetch.preconnect }
-      )
+    spyOn(client, 'workspaceRequest').mockImplementation(
+      async (userId, workspaceId, path, options) => {
+        const response = handler(
+          `http://localhost:8787/api/workspaces/${userId}:${workspaceId}${path}`,
+          {
+            method: options?.method,
+            body: options?.body,
+            redirect: 'error'
+          }
+        )
+        if (!response.ok) throw new Error(`Remote operation failed (${response.status})`)
+        return response
+      }
     )
   )
 }
@@ -119,9 +119,7 @@ test('remote scratchpad reads use owner snapshots and image bytes without visito
 
 test('owner request failures include the status and response message', async () => {
   mockOwner(() => new Response('Unavailable', { status: 503 }))
-  await expect(requestWorkspace(target, '/config')).rejects.toThrow(
-    'Workspace request failed (503): Unavailable'
-  )
+  await expect(requestWorkspace(target, '/config')).rejects.toThrow('Remote operation failed (503)')
 })
 
 test('local configs use the local API handler and registration id', async () => {

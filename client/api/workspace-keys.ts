@@ -3,6 +3,7 @@ export const workspaceKeys = {
   discover: ['workspaces', 'discover'] as const,
   // Every workspace's home-card preview, fetched in one batch.
   previews: ['workspaces', 'previews'] as const,
+  descriptor: (id: string) => ['workspaces', 'descriptor', id] as const,
   layout: (id: string) => ['workspaces', 'layout', id] as const,
   widgets: (id: string) => ['workspaces', 'widgets', id] as const,
   appletThumbnails: (id: string) => ['workspaces', 'applet-thumbnails', id] as const,

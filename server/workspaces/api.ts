@@ -1,24 +1,26 @@
 import { PORT } from '../constants'
-import { workspaceApiBase, type RemoteWorkspaceTarget } from '@/lib/workspace-config'
-import { fetchWorkspace } from '../remote/client'
+import { workspaceApiBase } from '@/lib/workspace-config'
+import { workspaceRequest } from '../remote/client'
+import { getWorkspace } from './registry'
 
-// The owner's API for a remote workspace, reached through the gateway.
-// Authorization at the production gateway remains separate from the local mock.
-export async function requestOwner(
-  remote: RemoteWorkspaceTarget,
-  path: string,
-  init?: RequestInit
-): Promise<Response> {
-  return fetchWorkspace(remote.user_id, remote.workspace_id, path, init)
-}
-
-// CLI commands use the same workspace API as the browser. That API forwards a
-// remote workspace's requests to its owner, so callers never pick a destination.
+// Shared-content CLI commands use one API; config selects local handlers or the owner.
+// Personal operations (tabs, skills, navigation) stay with their existing local handlers.
 export async function requestWorkspace(
   workspace: { id: string },
   path: string,
   init?: RequestInit
 ): Promise<Response> {
+  const remote = (await getWorkspace(workspace.id))?.remote
+  if (remote) {
+    // Serialize multipart bodies once so the signature and content type match the bytes sent.
+    const payload = new Response(init?.body, { headers: init?.headers })
+    return workspaceRequest(remote.user_id, remote.workspace_id, path, {
+      method: init?.method,
+      body: init?.body == null ? undefined : new Uint8Array(await payload.arrayBuffer()),
+      signal: init?.signal ?? undefined,
+      contentType: payload.headers.get('content-type') ?? undefined
+    })
+  }
   const { api } = await import('../api')
   const response = await api.fetch(
     new Request(`http://127.0.0.1:${PORT}${workspaceApiBase(workspace.id)}${path}`, init)

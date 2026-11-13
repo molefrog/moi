@@ -2,7 +2,8 @@ import { describe, expect, test } from 'bun:test'
 import {
   parseRemoteWorkspaceConfig,
   personalWorkspaceConfig,
-  workspaceApiBase
+  workspaceApiBase,
+  workspaceAddress
 } from './workspace-config'
 
 describe('workspace config', () => {
@@ -45,6 +46,8 @@ describe('workspace config', () => {
       expect(() => parseRemoteWorkspaceConfig({ version: 2, remote })).toThrow()
   })
   test('uses owner identifiers independently of visitor registration', () => {
+    expect(workspaceAddress('board', 'alice')).toBe('alice:board')
+    expect(workspaceAddress('a b', 'owner:id')).toBe('owner%3Aid:a%20b')
     expect(workspaceApiBase('visitor')).toBe('/api/workspaces/visitor')
     expect(workspaceApiBase('board', 'alice')).toBe('/api/workspaces/alice:board')
   })

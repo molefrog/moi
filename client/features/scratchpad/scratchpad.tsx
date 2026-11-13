@@ -1,3 +1,4 @@
+import { ownerApiBase } from '@/client/features/workspace/remote'
 import { useCallback, useRef, useState } from 'react'
 
 import {
@@ -72,7 +73,7 @@ function makeExecutor(editor: Editor) {
 // snapshots still holding data URLs pass through `resolve` untouched (the
 // server extracts them to files on the next save). See server/scratchpad/assets.ts.
 function makeAssetStore(workspaceId: string): TLAssetStore {
-  const base = `/api/workspaces/${workspaceId}/scratchpad/assets`
+  const base = `${ownerApiBase(workspaceId)}/scratchpad/assets`
   return {
     async upload(_asset, file) {
       const res = await fetch(base, {
@@ -215,7 +216,7 @@ function WorkspaceScratchpad({ workspaceId }: { workspaceId: string }) {
     } catch {
       return
     }
-    void fetch(`/api/workspaces/${workspaceId}/scratchpad`, {
+    void fetch(`${ownerApiBase(workspaceId)}/scratchpad`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ document, origin: BROWSER_TAB_ID })
@@ -232,7 +233,7 @@ function WorkspaceScratchpad({ workspaceId }: { workspaceId: string }) {
     if (e.type !== 'scratchpad:updated' || e.workspaceId !== workspaceId) return
     if (e.origin && e.origin === BROWSER_TAB_ID) return
     if (!editorRef.current) return
-    fetch(`/api/workspaces/${workspaceId}/scratchpad`)
+    fetch(`${ownerApiBase(workspaceId)}/scratchpad`)
       .then(r => r.json())
       .then((d: ScratchpadFetch) => {
         const editor = editorRef.current

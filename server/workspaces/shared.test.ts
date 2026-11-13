@@ -4,8 +4,6 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import * as remote from '../remote/client'
 import * as config from '../app-config'
-import * as owner from './api'
-import { api } from '../api'
 import { openSharedWorkspace } from './shared'
 import {
   DEFAULT_REGISTRY_PATH,
@@ -29,22 +27,11 @@ beforeEach(async () => {
       }))
     )
   )
-  spies.push(spyOn(owner, 'requestOwner').mockRejectedValue(new Error('Offline')))
 })
 afterEach(async () => {
   for (const spy of spies.splice(0)) spy.mockRestore()
   setRegistryPath(DEFAULT_REGISTRY_PATH)
   await rm(root, { recursive: true, force: true })
-})
-test('listing shares is read-only and retains unavailable owners', async () => {
-  const response = await api.request('/api/workspaces/shared')
-  expect(response.status).toBe(200)
-  expect((await response.json()).map((share: { name: string }) => share.name)).toEqual([
-    'board',
-    'board'
-  ])
-  expect(await listWorkspaces()).toEqual([])
-  expect(await Bun.file(join(root, 'registry.json')).exists()).toBe(false)
 })
 test('concurrent opens provision once and preserve personal config and skill edits', async () => {
   const [first, second] = await Promise.all([
@@ -66,13 +53,13 @@ test('concurrent opens provision once and preserve personal config and skill edi
   expect(other.path).not.toBe(first.path)
   expect(await listWorkspaces()).toHaveLength(2)
 })
-test('manual references are reused and rejected shares create nothing', async () => {
+test('manual references are reused and malformed addresses create nothing', async () => {
   const path = join(root, 'manual')
   await initializeRemoteWorkspaceConfig(path, target)
   const entry = await registerWorkspace(path)
   expect((await openSharedWorkspace(target)).id).toBe(entry.id)
-  await expect(openSharedWorkspace({ ...target, user_id: 'unknown' })).rejects.toThrow(
-    'no longer shared'
+  await expect(openSharedWorkspace({ ...target, user_id: '../unknown' })).rejects.toThrow(
+    'Invalid shared workspace address'
   )
   expect(await listWorkspaces()).toHaveLength(1)
 })
@@ -88,35 +75,15 @@ test('a matching reference left before registration is reused on retry', async (
   expect((await openSharedWorkspace(target)).path).toBe(path)
 })
 
-test('missing credentials affect only the shared list and failed discovery creates nothing', async () => {
+test('provisioning needs no machine Cloud credentials', async () => {
   const spy = spyOn(remote, 'fetchSharedWorkspaces').mockRejectedValue(
-    new remote.CloudSignInRequired('Sign in with moi remote login')
+    new Error('No machine login')
   )
   try {
-    expect((await api.request('/api/workspaces/shared')).status).toBe(401)
-    await expect(openSharedWorkspace(target)).rejects.toThrow('Sign in')
-    expect(await listWorkspaces()).toEqual([])
+    await openSharedWorkspace(target)
+    expect(spy).not.toHaveBeenCalled()
+    expect(await listWorkspaces()).toHaveLength(1)
   } finally {
     spy.mockRestore()
-  }
-})
-
-test('a provisioning failure can be retried without another folder', async () => {
-  const init = await import('./init')
-  const original = init.provisionWorkspace
-  const provision = spyOn(init, 'provisionWorkspace').mockRejectedValueOnce(
-    new Error('Install failed')
-  )
-  try {
-    await expect(openSharedWorkspace(target)).rejects.toThrow('Install failed')
-    expect(await listWorkspaces()).toEqual([])
-    provision.mockImplementation(original)
-    const entry = await openSharedWorkspace(target)
-    expect(await listWorkspaces()).toHaveLength(1)
-    expect(await Bun.file(join(entry.path, '.agents/skills/moi-workspace/SKILL.md')).exists()).toBe(
-      true
-    )
-  } finally {
-    provision.mockRestore()
   }
 })

@@ -1,4 +1,5 @@
-import { SharedWorkspaces } from './shared-workspaces'
+import { WorkspaceInvitations } from './workspace-invitations'
+import { homeWorkspaces, useSharedWorkspaces, type HomeWorkspace } from './shared-workspaces'
 import { useState } from 'react'
 
 import { IconChevronRight, IconEggCracked, IconLoader2, IconPlus } from '@tabler/icons-react'
@@ -34,7 +35,7 @@ import {
   workspaceDisplayName
 } from '@/client/features/workspace/workspace-presentation'
 import { resolveWorkspaceTheme } from '@/lib/themes'
-import type { DiscoveredWorkspace, WorkspaceEntry } from '@/lib/types'
+import type { DiscoveredWorkspace } from '@/lib/types'
 import { resolveUrl } from '@/lib/navigation'
 
 import { WorkspacePreview } from './workspace-preview'
@@ -43,6 +44,7 @@ export function HomePage() {
   usePreloadWorkspaceFonts()
   const [, navigate] = useLocation()
   const workspacesQuery = useWorkspaces()
+  const sharedQuery = useSharedWorkspaces()
   useWorkspacePreviews()
   const discoveredQuery = useDiscoveredWorkspaces()
   const importFlow = useWorkspaceImport({
@@ -69,7 +71,10 @@ export function HomePage() {
     )
   }
 
-  const workspaces = workspacesQuery.data.filter(workspace => !workspace.remote)
+  const workspaces = homeWorkspaces(
+    workspacesQuery.data,
+    appConfig.environment === 'cloud' ? (sharedQuery.data ?? []) : []
+  )
   const discovered = discoveredQuery.data
   const count = workspaces.length
 
@@ -85,6 +90,7 @@ export function HomePage() {
   return (
     <div className="mx-auto w-full max-w-3xl px-8 pt-14 pb-16">
       <HomeLogo className="mb-10" />
+      <WorkspaceInvitations />
 
       {count > 0 ? (
         <section className="mb-12">
@@ -120,7 +126,17 @@ export function HomePage() {
         </div>
       )}
 
-      <SharedWorkspaces />
+      {appConfig.environment === 'cloud' && sharedQuery.isPending && (
+        <p className="mb-12 text-sm text-muted-foreground">Loading shared workspaces…</p>
+      )}
+      {appConfig.environment === 'cloud' && sharedQuery.isError && (
+        <div className="mb-12" role="alert">
+          <p className="text-sm text-muted-foreground">{sharedQuery.error.message}</p>
+          <Button variant="ghost" onClick={() => void sharedQuery.refetch()}>
+            Retry
+          </Button>
+        </div>
+      )}
 
       {discovered.length > 0 && (
         <section>
@@ -174,17 +190,19 @@ export function HomePage() {
 }
 
 type WorkspaceCardProps = {
-  workspace: WorkspaceEntry
+  workspace: HomeWorkspace
 }
 
 function WorkspaceCard({ workspace }: WorkspaceCardProps) {
-  const name = workspaceDisplayName(workspace)
+  const name = workspace.name
   const previewQuery = useWorkspacePreview(workspace.id)
   const theme = workspace.theme ?? previewQuery.data?.theme
   const agent = resolveWorkspaceTheme(theme).agent
   const running = useLive(state => hasRunningWorkspaceActivity(state.activity, workspace.id))
-  const updatedAt = previewQuery.data?.updatedAt ?? new Date(workspace.addedAt).getTime()
-  const workspaceHref = `/workspace/${workspace.id}`
+  const updatedAt =
+    previewQuery.data?.updatedAt ??
+    (workspace.addedAt ? new Date(workspace.addedAt).getTime() : undefined)
+  const workspaceHref = workspace.href
 
   return (
     <div className="group flex min-w-0 flex-col gap-3">
@@ -195,7 +213,7 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
           aria-label={`Open ${name}`}
           className="absolute inset-0 rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         />
-        {previewQuery.data && (
+        {previewQuery.data && !workspace.remote && (
           <Tooltip>
             <TooltipTrigger
               render={
@@ -236,7 +254,11 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
           />
           <span className="truncate text-sm font-medium text-foreground">{name}</span>
         </div>
-        <span className="text-xs text-muted-foreground">{formatUpdatedAt(updatedAt)}</span>
+        {(updatedAt !== undefined || workspace.ownerName) && (
+          <span className="text-xs text-muted-foreground">
+            {updatedAt !== undefined ? formatUpdatedAt(updatedAt) : workspace.ownerName}
+          </span>
+        )}
       </Link>
     </div>
   )

@@ -1,3 +1,4 @@
+import { queryClient as appQueryClient } from '@/client/api/query-client'
 import * as appConfig from '@/client/api/app-config'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { act, useState } from 'react'
@@ -81,6 +82,7 @@ function mountNavigation(
     act(callback)
   })
 
+  appQueryClient.setQueryData(workspaceKeys.descriptor('abc'), {})
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   // The fake server's copy of the workspace state.
   let server: WorkspaceState = {
@@ -209,6 +211,7 @@ function mountNavigation(
     await act(async () => {
       root.unmount()
       queryClient.clear()
+      appQueryClient.removeQueries({ queryKey: workspaceKeys.descriptor('abc') })
       await Bun.sleep(0)
     })
     notifyManager.setNotifyFunction(callback => callback())

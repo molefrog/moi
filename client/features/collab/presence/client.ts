@@ -1,5 +1,4 @@
-import { remoteTarget } from '@/client/features/workspace/remote'
-import { workspaceApiBase } from '@/lib/workspace-config'
+import { ownerApiBase } from '@/client/features/workspace/remote'
 import { getWorkspaceDirectory, subscribeWorkspaceDirectory } from '../members/store'
 import { wsUrl } from '@/client/lib/ws-url'
 import { COLLAB_PROTOCOL_VERSION } from '@/lib/collab/protocol'
@@ -162,11 +161,7 @@ export class CollabClient implements CollabEngineApi {
     if (this.socket) return
     clearTimeout(this.retry)
     this.store.connecting()
-    // Presence is the one connection a visitor opens to the owner directly.
-    const remote = remoteTarget(this.workspaceId)
-    const socket = new WebSocket(
-      wsUrl(`${workspaceApiBase(remote?.workspace_id ?? this.workspaceId, remote?.user_id)}/collab`)
-    )
+    const socket = new WebSocket(wsUrl(`${ownerApiBase(this.workspaceId)}/collab`))
     this.socket = socket
     socket.onopen = () => {
       if (socket !== this.socket) return

@@ -1,3 +1,4 @@
+import { ownerApiBase } from '@/client/features/workspace/remote'
 import { requestJson } from '@/client/api/http'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -64,7 +65,7 @@ export function useScratchpadSnapshot(workspaceId: string): {
 
   useEffect(() => {
     let cancelled = false
-    requestJson<ScratchpadFetch>(`/api/workspaces/${workspaceId}/scratchpad`)
+    requestJson<ScratchpadFetch>(`${ownerApiBase(workspaceId)}/scratchpad`)
       .then((data: ScratchpadFetch) => {
         if (cancelled) return
         let snapshot: TLEditorSnapshot['document'] | undefined

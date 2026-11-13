@@ -15,7 +15,7 @@ export const newWorkspaceId = customAlphabet(ALPHABET, 10)
 // request. A workspace registered under one of these would persist fine and
 // then be unreachable in the app. `server/api/reserved-ids.test.ts` re-derives
 // this list from the router so a new collection route cannot outgrow it.
-export const RESERVED_WORKSPACE_IDS = ['create', 'discover', 'order', 'previews', 'ws']
+export const RESERVED_WORKSPACE_IDS = ['create', 'discover', 'order', 'previews', 'shared', 'ws']
 
 // Ids may also be chosen by hand (`moi init --id <id>`), so they are validated
 // rather than assumed. Slightly wider than the generated alphabet — dashes and

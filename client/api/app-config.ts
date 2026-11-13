@@ -43,5 +43,9 @@ export async function loadAppConfig(): Promise<ClientAppConfig | undefined> {
 }
 
 export function useAppConfig(): ClientAppConfig {
-  return useSyncExternalStore(subscribe, () => current)
+  return useSyncExternalStore(
+    subscribe,
+    () => current,
+    () => current
+  )
 }

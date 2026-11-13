@@ -25,10 +25,13 @@ export type LocalWorkspaceConfig = Omit<WorkspaceLayout, 'version' | 'layoutMode
 
 export type WorkspaceFileConfig = LocalWorkspaceConfig | RemoteWorkspaceConfig
 
+// Shared address format for workspace APIs, Cloud membership, and CLI operations.
+export function workspaceAddress(id: string, userId?: string): string {
+  return userId ? `${encodeURIComponent(userId)}:${encodeURIComponent(id)}` : encodeURIComponent(id)
+}
+
 export function workspaceApiBase(id: string, userId?: string): string {
-  return userId
-    ? `/api/workspaces/${encodeURIComponent(userId)}:${encodeURIComponent(id)}`
-    : `/api/workspaces/${encodeURIComponent(id)}`
+  return `/api/workspaces/${workspaceAddress(id, userId)}`
 }
 
 export function personalWorkspaceConfig(value: Record<string, unknown>): WorkspacePersonalConfig {

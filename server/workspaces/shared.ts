@@ -1,7 +1,6 @@
 import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Mutex } from 'async-mutex'
-import { fetchSharedWorkspaces } from '../remote/client'
 import { createdWorkspacesRoot } from '../app-config'
 import { workspaceIdFromName } from '@/lib/workspace-name'
 import type { RemoteWorkspaceTarget } from '@/lib/workspace-config'
@@ -12,9 +11,8 @@ import { publishEvent } from '../events'
 
 const opening = new Mutex()
 export async function openSharedWorkspace(remote: RemoteWorkspaceTarget) {
-  const shares = await fetchSharedWorkspaces()
-  if (!shares.some(share => share.id === remote.workspace_id && share.owner.id === remote.user_id))
-    throw new Error('This workspace is no longer shared with you')
+  if (![remote.user_id, remote.workspace_id].every(id => /^[A-Za-z0-9_-]{1,64}$/.test(id)))
+    throw new Error('Invalid shared workspace address')
   return opening.runExclusive(async () => {
     const matches = (target?: RemoteWorkspaceTarget) =>
       target?.user_id === remote.user_id && target.workspace_id === remote.workspace_id

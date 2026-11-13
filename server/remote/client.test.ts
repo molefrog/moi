@@ -26,7 +26,9 @@ beforeEach(async () => {
     async fetch(request) {
       requests++
       const path = new URL(request.url).pathname
-      if (!path.startsWith('/api/workspaces/')) expect(path).toStartWith('/custom/cloud/api/')
+      expect(path.startsWith('/custom/cloud/api/') || path.startsWith('/api/workspaces/')).toBe(
+        true
+      )
       if (responseMode === 'invalid') return new Response('{"access_token":"secret-example"')
       if (responseMode === 'reject') return new Response(null, { status: 401 })
       if (responseMode === 'redirect') return Response.redirect(server.url.origin + '/leak')
@@ -226,21 +228,19 @@ test('development requires a target; published installs default to production', 
   }
 })
 
-test('owner requests refresh credentials and replace visitor headers', async () => {
+test('workspace content requests authenticate and refresh through the same client', async () => {
   await credentials()
-  const response = await client.fetchWorkspace('owner', 'workspace', '/config?view=one', {
-    headers: { cookie: 'browser=session', authorization: 'Bearer untrusted' }
-  })
-  expect(response.ok).toBe(true)
+  const response = await client.workspaceRequest('alice', 'board', '/widgets')
+  expect(response.status).toBe(200)
   expect(refreshes).toBe(1)
-  await expect(client.fetchWorkspace('owner', 'workspace', '/../../leak')).rejects.toThrow(
-    'Invalid workspace path'
-  )
 })
 
-test('owner requests never follow redirects with credentials', async () => {
+test('workspace content requests reject path escapes and authenticated redirects', async () => {
   await credentials(Date.now() / 1000 + 3600)
+  await expect(client.workspaceRequest('alice', 'board', '/../../leak')).rejects.toThrow(
+    'Invalid workspace path'
+  )
   responseMode = 'redirect'
-  await expect(client.fetchWorkspace('owner', 'workspace')).rejects.toThrow()
+  await expect(client.workspaceRequest('alice', 'board', '/widgets')).rejects.toThrow()
   expect(requests).toBe(1)
 })

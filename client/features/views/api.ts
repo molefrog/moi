@@ -1,3 +1,4 @@
+import { ownerApiBase } from '@/client/features/workspace/remote'
 import type { SpeedMode } from '@/lib/types'
 import type {
   CompiledView,
@@ -23,7 +24,7 @@ export function compiledViewsOptions(workspaceId: string) {
   return {
     queryKey: workspaceKeys.views(workspaceId),
     queryFn: async () =>
-      (await requestJson<{ views: CompiledView[] }>(`/api/workspaces/${workspaceId}/views`)).views,
+      (await requestJson<{ views: CompiledView[] }>(`${ownerApiBase(workspaceId)}/views`)).views,
     staleTime: 30_000,
     gcTime: 5 * 60_000,
     refetchOnMount: true,
@@ -75,7 +76,13 @@ export function useViews(workspaceId: string) {
   const compiled = useQuery(compiledViewsOptions(workspaceId))
   const pending = useWorkspaceState(workspaceId, selectPendingViews)
   const data = useMemo(() => mergeViews(compiled.data, pending.data), [compiled.data, pending.data])
-  return { data, isLoading: compiled.isLoading || pending.isLoading }
+  return {
+    data,
+    isLoading: compiled.isLoading || pending.isLoading,
+    isError: compiled.isError || pending.isError,
+    isFetching: compiled.isFetching || pending.isFetching,
+    refetch: () => Promise.all([compiled.refetch(), pending.refetch()])
+  }
 }
 function useViewMutation<T, Input>(workspaceId: string, mutationFn: (input: Input) => Promise<T>) {
   const queryClient = useQueryClient()
@@ -87,7 +94,7 @@ function useViewMutation<T, Input>(workspaceId: string, mutationFn: (input: Inpu
 export function useRenameView(workspaceId: string) {
   return useViewMutation(workspaceId, ({ viewId, title }: { viewId: string; title: string }) =>
     requestJson<ViewInfo>(
-      `/api/workspaces/${workspaceId}/views/${encodeURIComponent(viewId)}`,
+      `${ownerApiBase(workspaceId)}/views/${encodeURIComponent(viewId)}`,
       jsonRequest('PATCH', { title }),
       'Couldn’t rename view'
     )
@@ -96,7 +103,7 @@ export function useRenameView(workspaceId: string) {
 export function useDeleteView(workspaceId: string) {
   return useViewMutation(workspaceId, (viewId: string) =>
     requestVoid(
-      `/api/workspaces/${workspaceId}/views/${encodeURIComponent(viewId)}`,
+      `${ownerApiBase(workspaceId)}/views/${encodeURIComponent(viewId)}`,
       { method: 'DELETE' },
       'Couldn’t delete view'
     )
@@ -105,7 +112,7 @@ export function useDeleteView(workspaceId: string) {
 export function useCreateView(workspaceId: string) {
   return useViewMutation(workspaceId, () =>
     requestJson<PendingView>(
-      `/api/workspaces/${workspaceId}/views`,
+      `${ownerApiBase(workspaceId)}/views`,
       jsonRequest('POST'),
       'Couldn’t create view'
     )
@@ -116,7 +123,7 @@ export function useSaveViewDraft(workspaceId: string) {
     workspaceId,
     ({ viewId, requirements }: { viewId: string; requirements: string }) =>
       requestJson<PendingView>(
-        `/api/workspaces/${workspaceId}/views/${viewId}`,
+        `${ownerApiBase(workspaceId)}/views/${viewId}`,
         jsonRequest('PATCH', { requirements }),
         'Couldn’t save view requirements'
       )
@@ -137,7 +144,7 @@ export type SubmitViewInput = {
 export function useSubmitView(workspaceId: string) {
   return useViewMutation(workspaceId, ({ viewId, ...input }: SubmitViewInput) =>
     requestJson<{ viewId: string; sessionId: string }>(
-      `/api/workspaces/${workspaceId}/views/${viewId}/submit`,
+      `${ownerApiBase(workspaceId)}/views/${viewId}/submit`,
       jsonRequest('POST', input),
       'Couldn’t start view chat'
     )

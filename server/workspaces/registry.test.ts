@@ -57,12 +57,12 @@ describe('registerWorkspace', () => {
 
   test('validates chosen ids inside the lock and recovers after rejection', async () => {
     const results = await Promise.allSettled([
-      registerWorkspace(join(tmpDir, 'a'), { id: 'shared' }),
-      registerWorkspace(join(tmpDir, 'b'), { id: 'shared' }),
+      registerWorkspace(join(tmpDir, 'a'), { id: 'chosen' }),
+      registerWorkspace(join(tmpDir, 'b'), { id: 'chosen' }),
       registerWorkspace(join(tmpDir, 'c'), { id: 'other' })
     ])
     expect(results.map(result => result.status)).toEqual(['fulfilled', 'rejected', 'fulfilled'])
-    expect((await listWorkspaces()).map(entry => entry.id)).toEqual(['other', 'shared'])
+    expect((await listWorkspaces()).map(entry => entry.id)).toEqual(['other', 'chosen'])
   })
 
   test('serializes removal and reordering with registration', async () => {
@@ -136,10 +136,10 @@ describe('registerWorkspace with a chosen id', () => {
   })
 
   test('rejects an id already taken by another workspace', async () => {
-    await registerWorkspace('/Users/foo/project-a', { id: 'shared' })
+    await registerWorkspace('/Users/foo/project-a', { id: 'chosen' })
 
-    await expect(registerWorkspace('/Users/foo/project-b', { id: 'shared' })).rejects.toThrow(
-      'Workspace id shared is already taken'
+    await expect(registerWorkspace('/Users/foo/project-b', { id: 'chosen' })).rejects.toThrow(
+      'Workspace id chosen is already taken'
     )
     expect(await listWorkspaces()).toHaveLength(1)
   })

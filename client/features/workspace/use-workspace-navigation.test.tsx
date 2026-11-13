@@ -1,3 +1,4 @@
+import { queryClient as appQueryClient } from '@/client/api/query-client'
 import * as appConfig from '@/client/api/app-config'
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -22,6 +23,9 @@ import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import * as workspaceEvents from '@/client/runtime/use-workspace-events'
 import { WorkspaceLayoutContext } from './workspace-layout-context'
 import { useWorkspaceNavigation } from './use-workspace-navigation'
+
+beforeEach(() => appQueryClient.setQueryData(workspaceKeys.descriptor('abc'), {}))
+afterEach(() => appQueryClient.removeQueries({ queryKey: workspaceKeys.descriptor('abc') }))
 
 type ReadNavigationOptions = {
   base?: string

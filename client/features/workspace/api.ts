@@ -1,3 +1,4 @@
+import { workspaceApiBase, personalWorkspaceConfig } from '@/lib/workspace-config'
 import { remoteTarget } from './remote'
 import { toast } from '@/client/components/ui/toast'
 import { receiveWorkspaceHarness } from './harness-transition'
@@ -21,9 +22,34 @@ import type {
 export type { WorkspaceLayoutResponse } from '@/lib/types'
 
 export function useWorkspaceLayout(workspaceId: string) {
+  const client = useQueryClient()
   return useQuery<WorkspaceLayoutResponse>({
     queryKey: workspaceKeys.layout(workspaceId),
-    queryFn: () => requestJson(`/api/workspaces/${workspaceId}`),
+    queryFn: async ({ signal }) => {
+      const local = await requestJson<WorkspaceLayoutResponse>(`/api/workspaces/${workspaceId}`, {
+        signal
+      })
+      if (signal.aborted) throw signal.reason
+      client.setQueryData(workspaceKeys.descriptor(workspaceId), local)
+      if (!local.remote) return local
+      const owner = await requestJson<WorkspaceLayoutResponse>(
+        workspaceApiBase(local.remote.workspace_id, local.remote.user_id),
+        { signal }
+      )
+      const {
+        selectedModel: _model,
+        selectedEffort: _effort,
+        selectedSpeedMode: _speed,
+        ...shared
+      } = owner
+      return {
+        ...shared,
+        ...personalWorkspaceConfig(local as unknown as Record<string, unknown>),
+        tabs: local.tabs,
+        remote: local.remote,
+        cwd: local.cwd
+      }
+    },
     ...WORKSPACE_RESOURCE_OPTIONS
   })
 }
@@ -112,15 +138,37 @@ export function useUpdateWorkspaceSkills(workspaceId: string) {
   })
 }
 
+export type WorkspaceLayoutMutation = WorkspaceLayoutSave & { saveShared?: boolean }
+
 export function useSaveLayout(workspaceId: string) {
   const queryClient = useQueryClient()
-  return useMutation<void, Error, WorkspaceLayoutSave>({
-    mutationFn: layout =>
-      requestVoid(
+  return useMutation<void, Error, WorkspaceLayoutMutation>({
+    mutationFn: async ({ saveShared, ...layout }) => {
+      const remote = remoteTarget(workspaceId, queryClient)
+      if (!remote)
+        return requestVoid(
+          `/api/workspaces/${workspaceId}`,
+          jsonRequest('PUT', { ...layout, origin: BROWSER_TAB_ID })
+        )
+      const { tabs, layoutMode, selectedModel, selectedEffort, selectedSpeedMode, ...shared } =
+        layout
+      await requestVoid(
         `/api/workspaces/${workspaceId}`,
-        jsonRequest('PUT', { ...layout, origin: BROWSER_TAB_ID }),
-        'Failed to save layout'
-      ),
+        jsonRequest('PUT', {
+          version: 2,
+          tabs,
+          layoutMode,
+          selectedModel,
+          selectedEffort,
+          selectedSpeedMode
+        })
+      )
+      if (!saveShared) return
+      await requestVoid(
+        workspaceApiBase(remote.workspace_id, remote.user_id),
+        jsonRequest('PUT', { ...shared, origin: BROWSER_TAB_ID })
+      )
+    },
     onError: error => {
       toast.add({ title: 'Couldn’t save workspace', description: error.message, type: 'error' })
       void queryClient.invalidateQueries({ queryKey: workspaceKeys.layout(workspaceId) })
