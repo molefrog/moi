@@ -1,5 +1,5 @@
 import { WorkspacePendingScreen } from './workspace-pending-screen'
-import { RecoveryMessage, WorkspaceLoadingState } from './setup/workspace-recovery-states'
+import { WorkspaceOpenError, WorkspaceLoadingState } from './setup/workspace-recovery-states'
 import { type ReactNode, createContext, useCallback, useContext, useMemo, useRef } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
@@ -153,13 +153,11 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
         </WorkspacePendingScreen>
       ) : query.isError && !query.data ? (
         <WorkspacePendingScreen setupRequired>
-          <RecoveryMessage
-            title="Couldn’t open workspace"
+          <WorkspaceOpenError
+            error={query.error}
             retrying={query.isFetching}
             onRetry={() => void query.refetch()}
-          >
-            {query.error.message}
-          </RecoveryMessage>
+          />
         </WorkspacePendingScreen>
       ) : (
         children

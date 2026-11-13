@@ -1,3 +1,5 @@
+import { useLocation } from 'wouter'
+import { parseRemoteWorkspaceTarget, workspaceAddress } from '@/lib/workspace-config'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAppConfig } from '@/client/api/app-config'
 import { jsonRequest } from '@/client/api/http'
@@ -51,17 +53,20 @@ export function WorkspaceInvitations() {
 type InvitationRowProps = { invitation: WorkspaceInvitation }
 function InvitationRow({ invitation }: InvitationRowProps) {
   const client = useQueryClient()
+  const [, navigate] = useLocation()
   const accept = useMutation({
-    mutationFn: () =>
-      cloudRequest(
+    mutationFn: async () => {
+      const response = await cloudRequest(
         `/api/invitations/${encodeURIComponent(invitation.id)}/accept`,
         jsonRequest('POST', {})
-      ),
-    onSuccess: async () => {
-      await Promise.all([
-        client.invalidateQueries({ queryKey: invitationsKey }),
-        client.invalidateQueries({ queryKey: ['shared-workspaces'] })
-      ])
+      )
+      const { remote } = (await response.json()) as { remote: unknown }
+      return parseRemoteWorkspaceTarget(remote)
+    },
+    onSuccess: remote => {
+      void client.invalidateQueries({ queryKey: invitationsKey })
+      void client.invalidateQueries({ queryKey: ['shared-workspaces'] })
+      navigate(`/workspace/${workspaceAddress(remote.workspace_id, remote.user_id)}`)
     }
   })
   return (

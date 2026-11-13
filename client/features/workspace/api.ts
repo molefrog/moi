@@ -61,7 +61,8 @@ export function useWorkspaceLayout(workspaceId: string) {
         cwd: local.cwd
       }
     },
-    ...WORKSPACE_RESOURCE_OPTIONS
+    ...WORKSPACE_RESOURCE_OPTIONS,
+    retry: false
   })
 }
 

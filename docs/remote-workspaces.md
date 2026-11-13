@@ -17,7 +17,11 @@ Name, icon, layout, harness, theme, and content come from the owner. The folder 
 
 ## Routing
 
-An unopened share uses `/workspace/{userId}:{workspaceId}`. That route creates or reuses the local reference, then redirects to `/workspace/{localId}`, preserving the destination path and query. Registered workspaces use the local registration ID directly. The workspace info response includes `apiBase` and `isRemote`: local responses contain a complete layout, while remote responses contain the reference. The client loads the owner layout before mounting workspace content. The loader keeps them in the workspace query and exposes the prefix through context:
+An unopened share uses `/workspace/{userId}:{workspaceId}`. It checks access through a fresh owner info request, creates or reuses the local reference, then redirects to `/workspace/{localId}`, preserving the path and query. Accepting in Moi opens this route immediately. Shares accepted in Batiok or the CLI use it when clicked.
+
+Denied access creates no reference. A 404 shows “Workspace not found or you don’t have access” with **Back to home**. Temporary failures offer **Try again**, without repeating acceptance. Workspace info requests do not retry automatically.
+
+Registered workspaces use their local ID. Their info response provides `apiBase` and `isRemote`; the loader fetches owner content when needed and exposes the prefix through context:
 
 - local: `/api/workspaces/{localId}`
 - remote: `/api/workspaces/{user_id}:{workspace_id}`
@@ -33,7 +37,7 @@ The standalone Moi UI supports local workspaces only: it hides remote registrati
 In Cloud mode the home page lists accepted shares from `/cloud/api/workspaces/shared` in the same grid as registered workspaces.
 
 - Discovery lists are merged and deduplicated before requesting current names, icons, and themes from each owner. These requests wake machines when needed, run independently, and use the same workspace info queries as the workspace loader, home, and sidebar, so slow owners do not delay other cards. Cards select their display fields from the full info response; there is no separate metadata cache. If an owner request fails, the card keeps its registered metadata or falls back to the workspace ID.
-- Accepting an invitation creates no local files. Opening a share creates the reference under the workspace root (normally `~/moi`), installs the skill, and registers it. Later opens leave an existing reference and skill untouched.
+- Accepting an invitation in the UI immediately opens the shared workspace. Opening a share creates the reference under the workspace root (normally `~/moi`), installs the skill, and registers it. Later opens leave an existing reference and skill untouched.
 - A registered reference stays in the grid and sidebar after the share disappears from Cloud.
 
 Presence uses `{prefix}/collab`. Membership controls use `/cloud${apiBase}/members` and `/cloud${apiBase}/invitations`. Non-React consumers read the same workspace query; there is no separate routing cache. These fields are response metadata and are never saved in the workspace config. The host and accepted human members can invite and remove members. Leaving a workspace from the UI is not available yet.
@@ -50,4 +54,8 @@ bun scripts/mock-remote-workspace.ts
 
 Open [localhost:9898](http://localhost:9898). No Batiok environment changes or restart needed.
 
+Each start removes the mock from the local Moi registry and removes its generated visitor folder if it contains only the original reference and skill. Extra or modified files and manually linked folders are preserved, as is owner data. Invitations start pending again. Moi must be running on `13337` (override with `MOCK_VISITOR_ORIGIN`). If Moi uses a custom `MOI_DATA_DIR`, pass the same value to the script. Reload any open mock page after restarting.
+
 Coverage: [mock workspace flow](../scripts/mock-remote-workspace.test.ts), [owner API boundaries](../server/api/remote-workspace.test.ts), [CLI requests](../server/cli/remote-control.test.ts), and [visual states](../tests/visual/workspace.visual.ts).
+
+The mock checks membership before forwarding content or opening collaboration connections. Pending invitations and removed members get a 404. Existing connections are not revoked mid-session.

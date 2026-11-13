@@ -1,10 +1,11 @@
 // Local remote-workspace fixture and browser proxy.
-import { mkdir, rm, symlink } from 'node:fs/promises'
+import { lstat, mkdir, readdir, readlink, rename, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import { createServer, request as httpRequest, type IncomingMessage } from 'node:http'
 import { connect } from 'node:net'
 import { Readable } from 'node:stream'
+import envPaths from 'env-paths'
 
 // Local-only Cloud fixture. State resets when the mock owner restarts.
 type MockMember = {
@@ -16,7 +17,6 @@ type MockMember = {
   membershipId?: string
 }
 export function createMockRemoteInvitations() {
-  const accepted = new Set<string>()
   const members: MockMember[] = [
     { id: 'alice', type: 'user', name: 'Alice', email: 'alice@example.com', isAnonymous: false },
     {
@@ -37,7 +37,7 @@ export function createMockRemoteInvitations() {
     const viewer = JSON.parse(decodeURIComponent(viewerHeader)) as MockMember
     if (path === '/mock/cloud/api/workspaces/invitations' && request.method === 'GET')
       return Response.json({
-        invitations: accepted.has(viewer.id)
+        invitations: members.some(member => member.id === viewer.id)
           ? []
           : [
               {
@@ -51,7 +51,6 @@ export function createMockRemoteInvitations() {
       path === '/mock/cloud/api/invitations/mock-owner-invite/accept' &&
       request.method === 'POST'
     ) {
-      accepted.add(viewer.id)
       if (!members.some(member => member.id === viewer.id))
         members.push({ ...viewer, membershipId: `member-${viewer.id}` })
       return Response.json({
@@ -62,7 +61,7 @@ export function createMockRemoteInvitations() {
     }
     if (path === '/mock/cloud/api/workspaces/shared' && request.method === 'GET')
       return Response.json({
-        workspaces: accepted.has(viewer.id)
+        workspaces: members.some(member => member.id === viewer.id)
           ? [
               {
                 id: 'owner-board',
@@ -72,8 +71,12 @@ export function createMockRemoteInvitations() {
             ]
           : []
       })
-    if (!accepted.has(viewer.id))
-      return Response.json({ error: 'Accept the mock invitation first' }, { status: 403 })
+    if (!members.some(member => member.id === viewer.id))
+      return Response.json(
+        { error: 'Workspace not available', code: 'WORKSPACE_NOT_AVAILABLE' },
+        { status: 404 }
+      )
+    if (path === '/mock/access') return new Response(null, { status: 204 })
     if (suffix === '/members' && request.method === 'GET')
       return Response.json({ members, invitations }, { headers: { 'cache-control': 'no-store' } })
     if (suffix === '/invitations' && request.method === 'POST') {
@@ -118,8 +121,8 @@ export function createMockRemoteProxy(batiok: string, owner: string) {
       throw new Error('Mock upstreams must be local HTTP origins')
   }
   const cloud = createMockRemoteInvitations()
+  const remote = /^\/api\/workspaces\/alice:owner-board(?=\/|\?|$)/
   const target = (path: string) => {
-    const remote = /^\/api\/workspaces\/alice:owner-board(?=\/|\?|$)/
     return new URL(
       path.replace(remote, '/api/workspaces/owner-board'),
       remote.test(path) ? owner : batiok
@@ -134,6 +137,32 @@ export function createMockRemoteProxy(batiok: string, owner: string) {
       headers.referer = new URL(batiok).origin + headers.referer.slice(browserOrigin.length)
     return headers
   }
+  const authorize = async (req: IncomingMessage) => {
+    const origin = req.headers.origin
+    if (
+      (origin && origin !== `http://${req.headers.host}`) ||
+      req.headers['sec-fetch-site'] === 'cross-site'
+    )
+      return { response: Response.json({ error: 'Invalid origin' }, { status: 403 }) }
+    const session = await fetch(new URL('/cloud/api/auth/get-session', batiok), {
+      headers: { cookie: req.headers.cookie ?? '' },
+      redirect: 'manual'
+    })
+    if (!session.ok) throw new Error('Could not read the Batiok session')
+    const identity = (await session.json()) as { user?: MockMember } | null
+    if (!identity?.user || identity.user.isAnonymous)
+      return { response: Response.json({ error: 'Sign in required' }, { status: 401 }) }
+    const headers = new Headers({
+      'x-moi-mock-viewer': encodeURIComponent(JSON.stringify({ ...identity.user, type: 'user' }))
+    })
+    return { headers, session }
+  }
+  const ownerAccess = async (req: IncomingMessage) => {
+    const auth = await authorize(req)
+    return (
+      auth.response ?? cloud(new Request('http://localhost/mock/access', { headers: auth.headers }))
+    )
+  }
   const server = createServer(async (req, res) => {
     const path = new URL(req.url!, 'http://localhost').pathname
     const sharing =
@@ -147,24 +176,13 @@ export function createMockRemoteProxy(batiok: string, owner: string) {
     ].includes(path)
     try {
       if (discovery || sharing) {
-        const session = await fetch(new URL('/cloud/api/auth/get-session', batiok), {
-          headers: { cookie: req.headers.cookie ?? '' },
-          redirect: 'manual'
-        })
-        if (!session.ok) throw new Error('Could not read the Batiok session')
-        const identity = (await session.json()) as {
-          user?: { id: string; name: string; email: string; isAnonymous: boolean }
-        } | null
-        if (!identity?.user || identity.user.isAnonymous) {
-          res.writeHead(401, { 'content-type': 'application/json' })
-          res.end(JSON.stringify({ error: 'Sign in required' }))
+        const auth = await authorize(req)
+        if (auth.response) {
+          res.writeHead(auth.response.status, { 'content-type': 'application/json' })
+          res.end(await auth.response.text())
           return
         }
-        const headers = new Headers({
-          'x-moi-mock-viewer': encodeURIComponent(
-            JSON.stringify({ ...identity.user, type: 'user' })
-          )
-        })
+        const { headers, session } = auth
         const response = await cloud(
           new Request(
             `http://localhost${sharing ? `/mock/sharing${sharing[1]}` : `/mock${path}`}`,
@@ -184,6 +202,14 @@ export function createMockRemoteProxy(batiok: string, owner: string) {
         })
         res.end(await response.text())
         return
+      }
+      if (remote.test(req.url!)) {
+        const access = await ownerAccess(req)
+        if (!access.ok) {
+          res.writeHead(access.status, { 'content-type': 'application/json' })
+          res.end(await access.text())
+          return
+        }
       }
       const url = target(req.url!)
       const upstream = httpRequest(
@@ -212,7 +238,21 @@ export function createMockRemoteProxy(batiok: string, owner: string) {
     }
   })
   // Translate upgrade headers too, then tunnel bytes for collaboration and live updates.
-  server.on('upgrade', (req, socket, head) => {
+  server.on('upgrade', async (req, socket, head) => {
+    try {
+      if (remote.test(req.url!)) {
+        const access = await ownerAccess(req)
+        if (!access.ok) {
+          socket.end(
+            `HTTP/1.1 ${access.status} Rejected\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`
+          )
+          return
+        }
+      }
+    } catch {
+      socket.destroy()
+      return
+    }
     const url = target(req.url!)
     const upstream = connect(Number(url.port || 80), url.hostname, () => {
       const headers = forwardHeaders(req, url)
@@ -238,8 +278,107 @@ export function createMockRemoteProxy(batiok: string, owner: string) {
   return server
 }
 
+// The API deliberately blocks remote removal. Reset only this local fixture's registry entry.
+export async function resetMockRegistration(
+  visitorOrigin: string,
+  registryPath = join(
+    process.env.MOI_DATA_DIR || envPaths('moi', { suffix: '' }).data,
+    'workspaces.json'
+  )
+) {
+  const url = new URL(visitorOrigin)
+  if (url.protocol !== 'http:' || !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))
+    throw new Error('Mock visitor must be a local HTTP origin')
+  const response = await fetch(new URL('/api/workspaces', url))
+  if (!response.ok) throw new Error('Could not list visitor workspaces; start Moi first')
+  const entries = (await response.json()) as {
+    id: string
+    path: string
+    remote?: { user_id: string; workspace_id: string }
+  }[]
+  const hash = new Bun.CryptoHasher('sha256')
+    .update(JSON.stringify(['alice', 'owner-board']))
+    .digest('hex')
+    .slice(0, 12)
+  const generatedName = `shared-owner-board-${hash}`
+  for (const entry of entries) {
+    if (entry.remote?.user_id !== 'alice' || entry.remote.workspace_id !== 'owner-board') continue
+    const registry = (await Bun.file(registryPath).json()) as { id: string; path: string }[]
+    if (!registry.some(item => item.id === entry.id && item.path === entry.path))
+      throw new Error(
+        `Mock workspace ${entry.id} does not match the local registry; check MOI_DATA_DIR`
+      )
+    const temporary = `${registryPath}.${crypto.randomUUID()}.tmp`
+    try {
+      await Bun.write(
+        temporary,
+        JSON.stringify(
+          registry.filter(item => item.id !== entry.id),
+          null,
+          2
+        )
+      )
+      await rename(temporary, registryPath)
+    } finally {
+      await rm(temporary, { force: true })
+    }
+    if (basename(entry.path) === generatedName && (await isGeneratedReference(entry.path))) {
+      await rm(entry.path, { recursive: true })
+      console.log(`Reset mock reference: ${entry.path}`)
+    } else console.log(`Unregistered mock; preserved folder: ${entry.path}`)
+  }
+}
+
+async function isGeneratedReference(root: string): Promise<boolean> {
+  try {
+    if (!(await lstat(root)).isDirectory()) return false
+    const config = await Bun.file(join(root, '.moi/.workspace.json')).json()
+    if (
+      config.version !== 2 ||
+      config.remote?.user_id !== 'alice' ||
+      config.remote?.workspace_id !== 'owner-board' ||
+      Object.keys(config).some(key => !['version', 'remote'].includes(key)) ||
+      Object.keys(config.remote).some(key => !['user_id', 'workspace_id'].includes(key))
+    )
+      return false
+    const parents = new Set(['', '.moi', '.agents', '.agents/skills', '.claude', '.claude/skills'])
+    const skill = '.agents/skills/moi-workspace'
+    async function check(path: string): Promise<boolean> {
+      const full = join(root, path)
+      const stat = await lstat(full)
+      if (path === '.claude/skills/moi-workspace')
+        return (
+          stat.isSymbolicLink() && (await readlink(full)) === '../../.agents/skills/moi-workspace'
+        )
+      if (stat.isSymbolicLink()) return false
+      if (path === '.moi/.workspace.json') return stat.isFile()
+      if (parents.has(path)) {
+        if (!stat.isDirectory()) return false
+      } else if (path === skill || path.startsWith(skill + '/')) {
+        const source = join(import.meta.dir, '../skill', path.slice(skill.length))
+        const original = await lstat(source)
+        if (stat.isFile())
+          return (
+            original.isFile() &&
+            Buffer.from(await Bun.file(full).arrayBuffer()).equals(
+              Buffer.from(await Bun.file(source).arrayBuffer())
+            )
+          )
+        if (!stat.isDirectory() || !original.isDirectory()) return false
+      } else return false
+      for (const name of await readdir(full))
+        if (!(await check(path ? `${path}/${name}` : name))) return false
+      return true
+    }
+    return await check('')
+  } catch {
+    return false
+  }
+}
+
 if (import.meta.main) {
   const root = resolve(process.env.MOCK_OWNER_DATA_DIR ?? join(tmpdir(), 'moi-mock-owner'))
+  await resetMockRegistration(process.env.MOCK_VISITOR_ORIGIN ?? 'http://localhost:13337')
   // Set isolation before loading server modules, which capture DATA_DIR at import time.
   process.env.MOI_DATA_DIR = root
   process.env.MOI_SECRET_BACKEND = 'file'
@@ -284,105 +423,54 @@ if (import.meta.main) {
     for (const suffix of ['tsx', 'server.ts'])
       await rm(join(owner, `.moi/${kind}/counter.${suffix}`), { force: true })
 
-  const tasks = [
-    {
-      id: 'positioning',
-      title: 'Agree on the launch story',
-      owner: 'Alice',
-      area: 'Messaging',
-      done: true
-    },
-    {
-      id: 'landing',
-      title: 'Review the landing page',
-      owner: 'Jamie',
-      area: 'Website',
-      done: false
-    },
-    {
-      id: 'demo',
-      title: 'Record the two-minute demo',
-      owner: 'Alice',
-      area: 'Content',
-      done: false
-    },
-    {
-      id: 'email',
-      title: 'Write the customer announcement',
-      owner: 'Sam',
-      area: 'Messaging',
-      done: true
-    },
-    { id: 'qa', title: 'Test signup on mobile', owner: 'Jamie', area: 'Quality', done: false },
-    { id: 'support', title: 'Prepare support answers', owner: 'Sam', area: 'Support', done: false }
-  ]
-  const data = Bun.file(join(owner, '.moi/launch-tasks.json'))
-  if (!(await data.exists())) await Bun.write(data, JSON.stringify(tasks, null, 2))
-  const functions = `
-const file = () => Bun.file('.moi/launch-tasks.json');
-type Task = { id: string; title: string; owner: string; area: string; done: boolean };
-export async function read(): Promise<Task[]> { return file().json(); }
-export async function setDone(id: string, done: boolean) {
-  const tasks = await read();
-  const task = tasks.find(task => task.id === id);
-  if (!task || typeof done !== 'boolean') throw new Error('Invalid task');
-  task.done = done;
-  await Bun.write(file(), JSON.stringify(tasks, null, 2));
-  return tasks;
+  const brief = `
+export const config = { colSpan: 2, rowSpan: 1 };
+export default function LaunchBrief() {
+  return <div className="h-full w-full bg-background p-4 text-foreground">
+    <h2 className="text-sm font-medium">Launch brief</h2>
+    <p className="mt-3 text-sm">A private beta for our first 50 customers.</p>
+    <p className="mt-2 text-xs text-muted-foreground">Alice · Team review this week</p>
+  </div>;
 }`
-  const checklist = (view: boolean) => `
-import { useEffect, useState } from 'react';
-import { read, setDone } from './${view ? 'launch-plan' : 'launch-progress'}.server';
-export const config = ${view ? "{ title: 'Launch plan', icon: 'rocket' }" : '{ colSpan: 2, rowSpan: 2 }'};
+  const progress = `
+export const config = { colSpan: 2, rowSpan: 1 };
+export default function LaunchProgress() {
+  return <div className="h-full w-full bg-background p-4 text-foreground">
+    <h2 className="text-sm font-medium">Launch readiness</h2>
+    <p className="mt-3 text-2xl font-medium">2 of 6 ready</p>
+    <p className="mt-2 text-xs text-muted-foreground">Next: review the landing page</p>
+  </div>;
+}`
+  const plan = `
+export const config = { title: 'Launch plan', icon: 'rocket' };
 export default function LaunchPlan() {
-  const [tasks, setTasks] = useState<Awaited<ReturnType<typeof read>>>([]);
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-  useEffect(() => { read().then(setTasks).catch(error => setError(error.message)); }, []);
-  const completed = tasks.filter(task => task.done).length;
-  async function update(id: string, done: boolean) {
-    setBusy(true); setError('');
-    try { setTasks(await setDone(id, done)); } catch (error) { setError(String(error)); }
-    finally { setBusy(false); }
-  }
-  return <div className="h-full w-full overflow-auto bg-background text-foreground ${view ? 'p-6 sm:p-10' : 'p-5'}">
-    <div className="mx-auto max-w-3xl">
-      <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">${view ? 'Product launch / Team checklist' : 'Launch readiness'}</p>
-      <h1 className="mt-3 ${view ? 'text-3xl' : 'text-2xl'} font-medium">${view ? 'A clear path to launch' : '{completed} / {tasks.length} ready'}</h1>
-      <p className="mt-2 text-sm text-muted-foreground">${view ? 'Finish the essentials together. Tick off an item when it is ready to ship.' : 'The essentials before we go live.'}</p>
-      <progress aria-label="Launch readiness" className="my-4 h-2 w-full accent-emerald-600" value={completed} max={tasks.length || 1} />
-      {error && <p role="alert" className="mb-3 text-sm text-red-600">{error}</p>}
-      {!tasks.length && !error && <p className="text-sm text-muted-foreground">Loading launch plan…</p>}
-      <div className="space-y-4">{${view ? 'tasks' : 'tasks.filter(task => !task.done).slice(0, 3)'}.map(task =>
-        <label key={task.id} className="flex cursor-pointer items-start gap-3">
-          <input type="checkbox" className="mt-1 size-4 accent-emerald-600" checked={task.done} disabled={busy} onChange={event => void update(task.id, event.target.checked)} />
-          <span><span className={task.done ? 'text-sm text-muted-foreground line-through' : 'text-sm font-medium'}>{task.title}</span>
-          <span className="mt-1 block text-xs text-muted-foreground">{task.owner} · {task.area}</span></span>
-        </label>)}</div>
-      ${view ? '' : '<p className="mt-4 text-xs text-muted-foreground">Full checklist in the Launch plan view.</p>'}
+  return <div className="h-full w-full overflow-auto bg-background p-6 text-foreground">
+    <div className="mx-auto max-w-2xl">
+      <h1 className="text-xl font-medium">Launch plan</h1>
+      <p className="mt-2 text-sm text-muted-foreground">The essentials for our private beta.</p>
+      <ul className="mt-6 divide-y divide-border">
+        {[
+          ['Launch story', 'Alice', 'Ready'],
+          ['Landing page', 'Jamie', 'In review'],
+          ['Product demo', 'Alice', 'To do'],
+          ['Customer email', 'Sam', 'Ready'],
+          ['Mobile signup', 'Jamie', 'To do'],
+          ['Support answers', 'Sam', 'To do']
+        ].map(([task, owner, status]) => <li key={task} className="flex items-center gap-4 py-3 text-sm">
+          <span className="min-w-0 flex-1">{task}<span className="mt-1 block text-xs text-muted-foreground">{owner}</span></span>
+          <span className="shrink-0 text-xs text-muted-foreground">{status}</span>
+        </li>)}
+      </ul>
     </div>
   </div>;
 }`
-  const brief = `
-export const config = { colSpan: 2, rowSpan: 2 };
-export default function LaunchBrief() {
-  return <div className="h-full w-full overflow-auto bg-emerald-50 p-5 text-emerald-950">
-    <p className="text-xs font-medium uppercase tracking-widest text-emerald-700">Launch brief</p>
-    <h2 className="mt-4 text-2xl font-medium">Ready for the first hello.</h2>
-    <p className="mt-3 text-sm leading-relaxed">Introduce our new team workspace to the first 50 customers. Keep the story clear and the first session effortless.</p>
-    <dl className="mt-6 space-y-3 text-sm">
-      <div className="flex justify-between gap-3"><dt className="text-emerald-700">Stage</dt><dd>Private beta</dd></div>
-      <div className="flex justify-between gap-3"><dt className="text-emerald-700">Launch lead</dt><dd>Alice</dd></div>
-      <div className="flex justify-between gap-3"><dt className="text-emerald-700">Next milestone</dt><dd>Team review</dd></div>
-    </dl>
-  </div>;
-}`
+  // These applets are static fixtures. Leave any saved owner data untouched.
+  for (const path of ['widgets/launch-progress.server.ts', 'views/launch-plan.server.ts'])
+    await rm(join(owner, '.moi', path), { force: true })
   for (const [path, source] of Object.entries({
     'widgets/launch-brief.tsx': brief,
-    'widgets/launch-progress.tsx': checklist(false),
-    'widgets/launch-progress.server.ts': functions,
-    'views/launch-plan.tsx': checklist(true),
-    'views/launch-plan.server.ts': functions
+    'widgets/launch-progress.tsx': progress,
+    'views/launch-plan.tsx': plan
   }))
     await Bun.write(join(owner, '.moi', path), source)
   await buildAllViews(owner)

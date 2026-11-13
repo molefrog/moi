@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { HttpError } from '@/client/api/http'
 import { useLocation } from 'wouter'
 import { IconFolderOff } from '@tabler/icons-react'
 
@@ -87,10 +88,28 @@ export function WorkspaceLoadingState() {
   )
 }
 
+type WorkspaceOpenErrorProps = RecoveryRetryProps & { error: Error }
+
+export function WorkspaceOpenError({ error, retrying, onRetry }: WorkspaceOpenErrorProps) {
+  const [, navigate] = useLocation()
+  const missing = error instanceof HttpError && error.status === 404
+  return (
+    <RecoveryMessage
+      title={missing ? 'Workspace not found or you don’t have access' : 'Couldn’t open workspace'}
+      retrying={!missing && retrying}
+      onRetry={missing ? () => navigate('/') : onRetry}
+      actionLabel={missing ? 'Back to home' : 'Try again'}
+    >
+      {missing ? undefined : error.message}
+    </RecoveryMessage>
+  )
+}
+
 type RecoveryMessageProps = RecoveryRetryProps & {
   title: string
   type?: WorkspaceType
-  children: ReactNode
+  children?: ReactNode
+  actionLabel?: string
 }
 
 export function RecoveryMessage({
@@ -98,7 +117,8 @@ export function RecoveryMessage({
   type,
   children,
   retrying,
-  onRetry
+  onRetry,
+  actionLabel = 'Try again'
 }: RecoveryMessageProps) {
   return (
     <div className="flex flex-1 items-center justify-center p-6">
@@ -106,11 +126,13 @@ export function RecoveryMessage({
         {type && <img src={workspaceProviderIcon[type]} alt="" className="size-10 self-center" />}
         <h1 className="text-center text-xl font-medium">{title}</h1>
         <div role="alert" className="flex flex-col items-center gap-4">
-          <p className="text-sm wrap-anywhere whitespace-pre-wrap text-muted-foreground">
-            {children}
-          </p>
+          {children && (
+            <p className="text-sm wrap-anywhere whitespace-pre-wrap text-muted-foreground">
+              {children}
+            </p>
+          )}
           <Button variant="secondary" disabled={retrying} onClick={onRetry}>
-            Try again
+            {actionLabel}
           </Button>
         </div>
       </div>

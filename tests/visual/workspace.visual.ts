@@ -226,18 +226,67 @@ test(
   { api: remoteAnswers }
 )
 
-test(
-  'remote workspace owner unavailable',
-  async page => {
-    await page.route(`**${ownerBase}`, route =>
-      route.fulfill({ status: 502, body: 'Couldn’t reach the workspace owner' })
-    )
-    await page.goto(remotePage)
-    await expect(page.getByRole('alert')).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible()
+for (const failure of [
+  {
+    name: 'missing local reference',
+    path: remoteBase,
+    status: 404,
+    message: 'Workspace not found'
   },
-  { api: remoteAnswers }
-)
+  {
+    name: 'owner access denied',
+    path: ownerBase,
+    status: 404,
+    message: 'Workspace not available'
+  },
+  {
+    name: 'owner unavailable',
+    path: ownerBase,
+    status: 502,
+    message: 'Couldn’t reach the workspace owner'
+  }
+]) {
+  test(
+    `workspace info ${failure.name} shows the appropriate recovery action`,
+    async page => {
+      let requests = 0
+      let available = false
+      await page.route(`**${failure.path}`, route => {
+        requests++
+        return route.fulfill(
+          available
+            ? { json: remoteAnswers[failure.path as keyof typeof remoteAnswers] }
+            : { status: failure.status, body: failure.message }
+        )
+      })
+      await page.goto(remotePage)
+      if (failure.status === 404) {
+        await expect(
+          page.getByRole('heading', {
+            name: 'Workspace not found or you don’t have access',
+            exact: true
+          })
+        ).toBeVisible()
+        await expect(page.getByRole('button', { name: 'Try again', exact: true })).toHaveCount(0)
+        expect(requests).toBe(1)
+        await takeSnapshot('workspace not found')
+        await page.getByRole('button', { name: 'Back to home', exact: true }).click()
+        await expect(page.getByRole('heading', { name: 'Workspaces', exact: true })).toBeVisible()
+        return
+      }
+      await expect(page.getByText(failure.message, { exact: true })).toBeVisible()
+      expect(requests).toBe(1)
+      await takeSnapshot('workspace info failed')
+      available = true
+      await page.getByRole('button', { name: 'Try again', exact: true }).click()
+      await expect(
+        page.getByRole('button', { name: 'Shared board menu', exact: true })
+      ).toBeVisible()
+      expect(requests).toBe(2)
+    },
+    { api: remoteAnswers }
+  )
+}
 
 for (const state of ['loading', 'error'] as const) {
   test(
@@ -269,26 +318,69 @@ test(
     await page.goto('/#/workspace/alice:board')
     await expect(page.getByRole('status', { name: 'Opening shared workspace' })).toBeVisible()
   },
-  { api: { '/api/config': { environment: 'cloud', demo: false }, '/cloud/api/me': sharingUser } }
+  { api: { ...remoteAnswers, '/api/workspaces/alice:board': remoteAnswers[ownerBase] } }
 )
 test(
-  'shared workspace setup failed',
+  'shared workspace setup failure can be retried after access succeeds',
   async page => {
-    await page.route('**/api/workspaces/shared/open', route =>
-      route.fulfill({ status: 503, body: 'Could not initialize workspace' })
-    )
-    await page.goto('/#/workspace/alice:board')
-    await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Back', exact: true })).toBeVisible()
+    let attempts = 0
+    await page.route('**/api/workspaces/shared/open', route => {
+      attempts++
+      return route.fulfill(
+        attempts === 1
+          ? { status: 503, body: 'Could not initialize workspace' }
+          : { json: { id: REMOTE, path: '/visitor', addedAt: '' } }
+      )
+    })
+    await page.goto('/#/workspace/alice:owner-board')
+    await expect(page.getByText('Could not initialize workspace', { exact: false })).toBeVisible()
+    await takeSnapshot('workspace registration failed')
+    await page.getByRole('button', { name: 'Try again', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Shared board menu', exact: true })).toBeVisible()
+    expect(attempts).toBe(2)
   },
-  { api: { '/api/config': { environment: 'cloud', demo: false }, '/cloud/api/me': sharingUser } }
+  { api: remoteAnswers }
+)
+
+test(
+  'shared workspace access denied creates no reference and returns home',
+  async page => {
+    let registrations = 0
+    await page.route(`**${ownerBase}`, route =>
+      route.fulfill({ status: 404, json: { error: 'Workspace not available' } })
+    )
+    await page.route('**/api/workspaces/shared/open', route => {
+      registrations++
+      return route.fulfill({ json: { id: REMOTE, path: '/visitor', addedAt: '' } })
+    })
+    await page.goto('/#/workspace/alice:owner-board')
+    await expect(
+      page.getByRole('heading', {
+        name: 'Workspace not found or you don’t have access',
+        exact: true
+      })
+    ).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Try again', exact: true })).toHaveCount(0)
+    expect(registrations).toBe(0)
+    await takeSnapshot('workspace access denied')
+    await page.getByRole('button', { name: 'Back to home', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Workspaces', exact: true })).toBeVisible()
+    expect(registrations).toBe(0)
+  },
+  { api: remoteAnswers }
 )
 
 test(
   'owner-qualified workspace registers and opens the local reference',
   async page => {
     let registrations = 0
+    let checkedAccess = false
+    await page.route(`**${ownerBase}`, route => {
+      checkedAccess = true
+      return route.fulfill({ json: remoteAnswers[ownerBase] })
+    })
     await page.route('**/api/workspaces/shared/open', route => {
+      expect(checkedAccess).toBe(true)
       registrations++
       expect(route.request().method()).toBe('POST')
       return route.fulfill({ json: { id: REMOTE, path: '/visitor', addedAt: '' } })
@@ -368,10 +460,10 @@ test(
 )
 
 test(
-  'accept invitation stays home and does not provision',
+  'accept invitation registers and opens the workspace',
   async page => {
     let accepted = false
-    let provisioned = false
+    let registrations = 0
     await page.route('**/cloud/api/workspaces/invitations', route =>
       route.fulfill({
         contentType: 'application/json',
@@ -384,32 +476,44 @@ test(
     )
     await page.route('**/cloud/api/invitations/invite/accept', route => {
       accepted = true
-      return route.fulfill({ contentType: 'application/json', body: '{"success":true}' })
+      return route.fulfill({
+        json: { success: true, remote: { user_id: 'alice', workspace_id: 'owner-board' } }
+      })
     })
     await page.route('**/cloud/api/workspaces/shared', route =>
       route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify({
-          workspaces: accepted ? [{ id: 'notes', owner: { id: 'alice', name: 'Alice' } }] : []
+          workspaces: accepted ? [{ id: 'owner-board', owner: { id: 'alice', name: 'Alice' } }] : []
         })
       })
     )
+    let checkedAccess = false
+    await page.route(`**${ownerBase}`, route => {
+      checkedAccess = accepted
+      return route.fulfill(
+        accepted
+          ? { json: remoteAnswers[ownerBase] }
+          : { status: 404, json: { error: 'Workspace not available' } }
+      )
+    })
     await page.route('**/api/workspaces/shared/open', route => {
-      provisioned = true
-      return route.fulfill({ status: 500, body: 'Should not provision yet' })
+      expect(accepted && checkedAccess).toBe(true)
+      registrations++
+      expect(route.request().method()).toBe('POST')
+      return route.fulfill({ json: { id: REMOTE, path: '/visitor', addedAt: '' } })
     })
     await page.goto('/#/')
     await expect(page.getByRole('button', { name: 'Accept', exact: true })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Invitations', exact: true })).toBeVisible()
     await takeSnapshot('pending invitation')
     await page.getByRole('button', { name: 'Accept', exact: true }).click()
-    await expect(page.getByRole('link', { name: 'Open Team notes', exact: true })).toBeVisible()
-    expect(provisioned).toBe(false)
+    await expect(page.getByRole('button', { name: 'Shared board menu', exact: true })).toBeVisible()
+    expect(registrations).toBe(1)
   },
   {
     api: {
-      '/api/config': { environment: 'cloud', demo: false },
-      '/api/workspaces/alice:notes': { name: 'Team notes' }
+      ...remoteAnswers
     }
   }
 )
