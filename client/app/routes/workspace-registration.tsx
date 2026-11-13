@@ -1,7 +1,7 @@
 import { useAppConfig } from '@/client/api/app-config'
 import { useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useLocation } from 'wouter'
+import { Link, useLocation, useSearch } from 'wouter'
 import { SidebarLayout } from '../shell/sidebar-layout'
 import { requestJson, jsonRequest } from '@/client/api/http'
 import { workspaceKeys } from '@/client/api/workspace-keys'
@@ -12,10 +12,11 @@ import {
 import { WorkspacePendingScreen } from '@/client/features/workspace/workspace-pending-screen'
 import type { WorkspaceEntry } from '@/lib/types'
 
-type SharedWorkspaceRouteProps = { userId: string; workspaceId: string }
-export function SharedWorkspaceRoute({ userId, workspaceId }: SharedWorkspaceRouteProps) {
+type WorkspaceRegistrationProps = { userId: string; workspaceId: string }
+export function WorkspaceRegistration({ userId, workspaceId }: WorkspaceRegistrationProps) {
   const cloud = useAppConfig().environment === 'cloud'
-  const [, navigate] = useLocation()
+  const [location, navigate] = useLocation()
+  const search = useSearch()
   const client = useQueryClient()
   const query = useQuery({
     queryKey: ['open-shared-workspace', userId, workspaceId],
@@ -36,8 +37,9 @@ export function SharedWorkspaceRoute({ userId, workspaceId }: SharedWorkspaceRou
     }
     if (!query.data) return
     void client.invalidateQueries({ queryKey: workspaceKeys.all })
-    navigate(`/workspace/${query.data.id}`, { replace: true })
-  }, [query.data, client, navigate, cloud])
+    const destination = location.replace(/^\/workspace\/[^/]+/, `/workspace/${query.data.id}`)
+    navigate(`${destination}${search ? `?${search}` : ''}`, { replace: true })
+  }, [query.data, client, navigate, cloud, location, search])
   return (
     <SidebarLayout>
       <WorkspacePendingScreen setupRequired={query.isError}>

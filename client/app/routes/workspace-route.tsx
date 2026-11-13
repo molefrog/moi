@@ -1,3 +1,4 @@
+import { WorkspaceRegistration } from './workspace-registration'
 import { RecoveryMessage } from '@/client/features/workspace/setup/workspace-recovery-states'
 import { WorkspacePendingScreen } from '@/client/features/workspace/workspace-pending-screen'
 import { useWorkspaceMembers } from '@/client/features/collab/members/hooks'
@@ -30,6 +31,14 @@ type WorkspaceRouteProps = {
 // are decoded exactly once; the route only owns the workspace ID.
 export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
   const { environment } = useAppConfig()
+  const separator = id.indexOf(':')
+  if (separator !== -1)
+    return (
+      <WorkspaceRegistration
+        userId={id.slice(0, separator)}
+        workspaceId={id.slice(separator + 1)}
+      />
+    )
   return (
     <SidebarLayout>
       <Workspace id={id}>

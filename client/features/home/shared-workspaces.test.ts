@@ -27,7 +27,7 @@ test('keeps saved registration order with unopened shares first, deduplicated by
   )
   expect(result.map(item => item.name)).toEqual(['alpha', 'Zebra', 'Bravo', 'Delta'])
   expect(result.map(item => item.href)).toEqual([
-    '/shared/bob/board',
+    '/workspace/bob:board',
     '/workspace/local',
     '/workspace/alias',
     '/workspace/manual'

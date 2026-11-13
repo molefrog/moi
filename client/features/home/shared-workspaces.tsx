@@ -65,7 +65,7 @@ export function homeWorkspaces(
       type: share.type,
       remote: { user_id: share.owner.id, workspace_id: share.id },
       ownerName: share.owner.name,
-      href: `/shared/${encodeURIComponent(share.owner.id)}/${encodeURIComponent(share.id)}`
+      href: `/workspace/${address}`
     })
   }
   return [...unopened, ...workspaces]

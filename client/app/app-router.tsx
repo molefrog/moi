@@ -1,4 +1,3 @@
-import { SharedWorkspaceRoute } from './routes/shared-workspace-route'
 import { OnboardingRoute } from './routes/onboarding-route'
 import { Suspense, lazy, useEffect } from 'react'
 
@@ -52,9 +51,6 @@ export function AppRouter() {
           the URL is the tab address, read downstream with `useParams`. This
           pattern is its only definition. Keyed by workspace id only, so tab
           switches never remount the workspace tree. */}
-      <Route path="/shared/:userId/:workspaceId">
-        {params => <SharedWorkspaceRoute userId={params.userId} workspaceId={params.workspaceId} />}
-      </Route>
       <Route path="/workspace/:id/*?">
         {(params: { id: string }) => <WorkspaceRoute key={params.id} id={params.id} />}
       </Route>

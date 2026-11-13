@@ -17,7 +17,7 @@ Name, icon, layout, harness, theme, and content come from the owner. The folder 
 
 ## Routing
 
-The browser URL uses the local registration ID: `/workspace/{localId}`. The workspace info response includes `apiBase` and `isRemote`. The loader keeps them in the workspace query and exposes the prefix through context:
+An unopened share uses `/workspace/{userId}:{workspaceId}`. That route creates or reuses the local reference, then redirects to `/workspace/{localId}`, preserving the destination path and query. Registered workspaces use the local registration ID directly. The workspace info response includes `apiBase` and `isRemote`. The loader keeps them in the workspace query and exposes the prefix through context:
 
 - local: `/api/workspaces/{localId}`
 - remote: `/api/workspaces/{user_id}:{workspace_id}`

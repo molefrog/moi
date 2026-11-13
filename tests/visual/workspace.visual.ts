@@ -266,7 +266,7 @@ test(
   'shared workspace opening',
   async page => {
     await page.route('**/api/workspaces/shared/open', () => new Promise(() => {}))
-    await page.goto('/#/shared/alice/board')
+    await page.goto('/#/workspace/alice:board')
     await expect(page.getByRole('status', { name: 'Opening shared workspace' })).toBeVisible()
   },
   { api: { '/api/config': { environment: 'cloud', demo: false }, '/cloud/api/me': sharingUser } }
@@ -277,11 +277,27 @@ test(
     await page.route('**/api/workspaces/shared/open', route =>
       route.fulfill({ status: 503, body: 'Could not initialize workspace' })
     )
-    await page.goto('/#/shared/alice/board')
+    await page.goto('/#/workspace/alice:board')
     await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Back', exact: true })).toBeVisible()
   },
   { api: { '/api/config': { environment: 'cloud', demo: false }, '/cloud/api/me': sharingUser } }
+)
+
+test(
+  'owner-qualified workspace registers and opens the local reference',
+  async page => {
+    let registrations = 0
+    await page.route('**/api/workspaces/shared/open', route => {
+      registrations++
+      expect(route.request().method()).toBe('POST')
+      return route.fulfill({ json: { id: REMOTE, path: '/visitor', addedAt: '' } })
+    })
+    await page.goto('/#/workspace/alice:owner-board')
+    await expect(page.getByRole('button', { name: 'Shared board menu', exact: true })).toBeVisible()
+    expect(registrations).toBe(1)
+  },
+  { api: remoteAnswers }
 )
 
 test(
