@@ -400,6 +400,7 @@ test(
     })
     await page.goto('/#/')
     await expect(page.getByRole('button', { name: 'Accept', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Invitations', exact: true })).toBeVisible()
     await takeSnapshot('pending invitation')
     await page.getByRole('button', { name: 'Accept', exact: true }).click()
     await expect(page.getByRole('link', { name: 'Open Team notes', exact: true })).toBeVisible()

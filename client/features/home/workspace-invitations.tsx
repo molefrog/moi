@@ -27,7 +27,7 @@ export function WorkspaceInvitations() {
   if (!cloud || query.data?.invitations.length === 0) return null
   return (
     <section className="mb-8">
-      <h2 className="mb-3 text-sm font-medium">Workspace invitations</h2>
+      <h2 className="mb-4 text-sm font-medium">Invitations</h2>
       {query.isPending ? (
         <p className="text-sm text-muted-foreground">Loading invitations…</p>
       ) : query.isError ? (
@@ -38,9 +38,11 @@ export function WorkspaceInvitations() {
           </Button>
         </div>
       ) : (
-        query.data.invitations.map(invitation => (
-          <InvitationRow key={invitation.id} invitation={invitation} />
-        ))
+        <ul className="border-t border-border">
+          {query.data.invitations.map(invitation => (
+            <InvitationRow key={invitation.id} invitation={invitation} />
+          ))}
+        </ul>
       )}
     </section>
   )
@@ -63,8 +65,8 @@ function InvitationRow({ invitation }: InvitationRowProps) {
     }
   })
   return (
-    <div className="border-b border-border py-3">
-      <div className="flex items-center gap-3">
+    <li className="border-b border-border px-1 py-3">
+      <div className="flex items-center gap-2">
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{invitation.workspaceName}</p>
           <p className="text-xs text-muted-foreground">Invited by {invitation.inviter.name}</p>
@@ -89,6 +91,6 @@ function InvitationRow({ invitation }: InvitationRowProps) {
           {accept.error.message}
         </p>
       )}
-    </div>
+    </li>
   )
 }
