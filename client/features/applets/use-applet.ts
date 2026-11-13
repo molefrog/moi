@@ -1,6 +1,7 @@
+import { isRemoteWorkspace } from '@/client/features/workspace/remote'
 import type { ComponentType } from 'react'
 import { useRouter } from 'wouter'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import {
   type AppletSegment,
@@ -86,15 +87,26 @@ function loadApplet(
 function useApplet(kind: AppletKindSpec, name: string): AppletState {
   const workspaceId = useWorkspaceId()
   const { base } = useRouter()
-  const [state, setState] = useState<AppletState>({ status: 'loading', version: 0 })
+  const key = appletKey(kind.segment, workspaceId, name)
+  const generation = useRef(0)
+  const [loaded, setLoaded] = useState<{ key: string; state: AppletState }>({
+    key,
+    state: { status: 'loading', version: 0 }
+  })
+  const state: AppletState = loaded.key === key ? loaded.state : { status: 'loading', version: 0 }
 
   const load = useCallback(() => {
-    setState(prev => ({ status: 'loading', version: prev.version }))
+    const request = ++generation.current
     loadApplet(kind, workspaceId, name, base)
-      .then(Component =>
-        setState(prev => ({ status: 'ready', Component, version: prev.version + 1 }))
-      )
+      .then(Component => {
+        if (request !== generation.current) return
+        setLoaded(prev => ({
+          key,
+          state: { status: 'ready', Component, version: prev.state.version + 1 }
+        }))
+      })
       .catch(err => {
+        if (request !== generation.current) return
         // Journal the load failure so `moi debug logs` can surface it to the
         // agent — otherwise only this tab ever sees it (docs/self-correction.md).
         reportAppletError(workspaceId, {
@@ -104,12 +116,22 @@ function useApplet(kind: AppletKindSpec, name: string): AppletState {
           message: String(err),
           ...(err instanceof Error && err.stack ? { stack: err.stack } : {})
         })
-        setState(prev => ({ status: 'error', error: String(err), version: prev.version + 1 }))
+        setLoaded(prev =>
+          prev.key === key && prev.state.status === 'ready'
+            ? prev
+            : {
+                key,
+                state: { status: 'error', error: String(err), version: prev.state.version + 1 }
+              }
+        )
       })
-  }, [base, kind, workspaceId, name])
+  }, [base, kind, workspaceId, name, key])
 
   useEffect(() => {
     load()
+    return () => {
+      generation.current++
+    }
   }, [load])
 
   // Reload the MOUNTED applet the moment the server says its bundle changed or
@@ -125,6 +147,17 @@ function useApplet(kind: AppletKindSpec, name: string): AppletState {
     }
   })
 
+  // Owner events don't reach visitors yet, so a remote applet reloads on focus.
+  const remote = isRemoteWorkspace(workspaceId)
+  useEffect(() => {
+    if (!remote) return
+    const refresh = () => {
+      invalidateApplet(kind.segment, workspaceId, name)
+      load()
+    }
+    window.addEventListener('focus', refresh)
+    return () => window.removeEventListener('focus', refresh)
+  }, [remote, kind.segment, workspaceId, name, load])
   return state
 }
 

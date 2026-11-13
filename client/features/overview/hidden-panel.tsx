@@ -46,7 +46,7 @@ const ROW_SPAN: Record<number, string> = {
 type HiddenPanelProps = {
   items: GridItem[]
   renderItem: (id: string) => ReactNode
-  onCreateWidget: () => void
+  onCreateWidget?: () => void
   onClose: () => void
   onRestore: (id: string) => void
   ref?: Ref<HTMLDivElement>
@@ -67,10 +67,12 @@ export function HiddenPanel({
       ref={ref}
       title="Widgets"
       actions={
-        <Button type="button" variant="secondary" size="sm" onClick={onCreateWidget}>
-          <IconPlus data-icon="inline-start" stroke={1.75} />
-          New widget
-        </Button>
+        onCreateWidget && (
+          <Button type="button" variant="secondary" size="sm" onClick={onCreateWidget}>
+            <IconPlus data-icon="inline-start" stroke={1.75} />
+            New widget
+          </Button>
+        )
       }
       onClose={onClose}
       className="max-h-[60vh]"

@@ -1,15 +1,18 @@
+import { WorkspacePendingScreen } from './workspace-pending-screen'
+import { WorkspaceOpenError, WorkspaceLoadingState } from './setup/workspace-recovery-states'
 import { type ReactNode, createContext, useCallback, useContext, useMemo, useRef } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
 
 import {
   type WorkspaceLayoutResponse,
+  type WorkspaceLayoutMutation,
   useSaveLayout,
   useWorkspaceLayout
 } from '@/client/features/workspace/api'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
-import type { WorkspaceLayout, WorkspaceLayoutSave, WorkspaceType } from '@/lib/types'
+import type { WorkspaceLayout, WorkspaceType } from '@/lib/types'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 
 import { accumulateLayoutSave } from './layout-save'
@@ -31,6 +34,9 @@ export type WorkspaceLayoutContextValue = {
   // The workspace's registry id (the route param), so descendants can key
   // their own queries (e.g. the model picker) without prop-drilling.
   workspaceId: string
+  apiBase: string
+  chatAvailable: boolean
+  isRemote: boolean
   isLoading: boolean
 }
 
@@ -55,7 +61,15 @@ export function useWorkspaceThemeSetting(): WorkspaceLayout['theme'] {
 // Strip the server-only metadata so what we PUT back (and expose as `layout`)
 // is just the persisted `WorkspaceLayout`.
 function stripMeta(data: WorkspaceLayoutResponse): WorkspaceLayout {
-  const { cwd: _cwd, name: _name, provider: _provider, agentId: _agentId, ...layout } = data
+  const {
+    cwd: _cwd,
+    name: _name,
+    provider: _provider,
+    agentId: _agentId,
+    apiBase: _apiBase,
+    isRemote: _isRemote,
+    ...layout
+  } = data
   return layout
 }
 
@@ -75,7 +89,7 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
   // reconcile), so reach the latest mutate via a ref instead of closing over it.
   const saveRef = useLatestRef(save.mutate)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pendingSave = useRef<WorkspaceLayoutSave | null>(null)
+  const pendingSave = useRef<WorkspaceLayoutMutation | null>(null)
 
   const setLayout = useCallback(
     (update: Partial<WorkspaceLayout>) => {
@@ -89,7 +103,8 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
       qc.setQueryData<WorkspaceLayoutResponse>(key, next)
       pendingSave.current = {
         ...accumulateLayoutSave(stripMeta(next), update, pendingSave.current),
-        harness: next.provider ?? 'claude-code'
+        harness: next.provider ?? 'claude-code',
+        saveShared: Boolean(pendingSave.current?.saveShared || update.widgetGrid || update.theme)
       }
 
       if (timer.current) clearTimeout(timer.current)
@@ -121,10 +136,32 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
       cwd: query.data?.cwd ?? null,
       provider: query.data ? (query.data.provider ?? 'claude-code') : null,
       workspaceId: id,
+      apiBase: query.data?.apiBase ?? '',
+      isRemote: query.data?.isRemote ?? false,
+      // Remote chat support is deferred.
+      chatAvailable: !query.data?.isRemote,
       isLoading: query.isLoading
     }),
     [query.data, query.isLoading, setLayout, id]
   )
 
-  return <WorkspaceLayoutContext value={value}>{children}</WorkspaceLayoutContext>
+  return (
+    <WorkspaceLayoutContext value={value}>
+      {query.isPending ? (
+        <WorkspacePendingScreen>
+          <WorkspaceLoadingState />
+        </WorkspacePendingScreen>
+      ) : query.isError && !query.data ? (
+        <WorkspacePendingScreen setupRequired>
+          <WorkspaceOpenError
+            error={query.error}
+            retrying={query.isFetching}
+            onRetry={() => void query.refetch()}
+          />
+        </WorkspacePendingScreen>
+      ) : (
+        children
+      )}
+    </WorkspaceLayoutContext>
+  )
 }

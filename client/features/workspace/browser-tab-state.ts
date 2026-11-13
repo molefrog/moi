@@ -29,15 +29,15 @@ export function writeWorkspaceTabs(workspaceId: string, tabs: WorkspaceTabsState
 
 export function useWorkspaceTabs() {
   const { workspaceId, layout, setLayout } = useWorkspaceLayoutCtx()
-  const cloud = useAppConfig().environment === 'cloud'
+  const storeTabsInBrowser = useAppConfig().environment === 'cloud'
   const defaults = useMemo(() => normalizeWorkspaceTabs(layout.tabs), [layout.tabs])
   const [local, setLocal] = useState<WorkspaceTabsState>(() =>
-    cloud ? readWorkspaceTabs(workspaceId, defaults) : defaults
+    storeTabsInBrowser ? readWorkspaceTabs(workspaceId, defaults) : defaults
   )
   const setTabs = useCallback(
     (tabs: WorkspaceTabsState) => {
       const next = normalizeWorkspaceTabs(tabs)
-      if (cloud) {
+      if (storeTabsInBrowser) {
         setLocal(next)
         writeWorkspaceTabs(workspaceId, next)
       } else {
@@ -45,7 +45,7 @@ export function useWorkspaceTabs() {
       }
       return next
     },
-    [cloud, setLayout, workspaceId]
+    [storeTabsInBrowser, setLayout, workspaceId]
   )
-  return [cloud ? local : defaults, setTabs] as const
+  return [storeTabsInBrowser ? local : defaults, setTabs] as const
 }

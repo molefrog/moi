@@ -1,3 +1,5 @@
+import { seedWorkspaceInfo } from '@/client/features/workspace/workspace-test-utils'
+import { queryClient as appQueryClient } from '@/client/api/query-client'
 import * as appConfig from '@/client/api/app-config'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { act, useState } from 'react'
@@ -28,7 +30,8 @@ afterEach(() => cleanup())
 function mountNavigation(
   path: string,
   cloud: boolean,
-  tabs: WorkspaceTabsState = { open: ['overview', 'scratchpad'], active: 'scratchpad' }
+  tabs: WorkspaceTabsState = { open: ['overview', 'scratchpad'], active: 'scratchpad' },
+  remote = false
 ) {
   const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>')
   const location = new URL(`http://localhost/prefix/workspace/abc/${path}`)
@@ -81,6 +84,7 @@ function mountNavigation(
     act(callback)
   })
 
+  seedWorkspaceInfo('abc', remote ? { user_id: 'alice', workspace_id: 'board' } : undefined)
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   // The fake server's copy of the workspace state.
   let server: WorkspaceState = {
@@ -191,6 +195,9 @@ function mountNavigation(
           cwd: null,
           provider: null,
           workspaceId: 'abc',
+          apiBase: remote ? '/api/workspaces/alice:board' : '/api/workspaces/abc',
+          isRemote: remote,
+          chatAvailable: true,
           isLoading: false
         }}
       >
@@ -208,6 +215,7 @@ function mountNavigation(
     await act(async () => {
       root.unmount()
       queryClient.clear()
+      appQueryClient.removeQueries({ queryKey: workspaceKeys.layout('abc') })
       await Bun.sleep(0)
     })
     notifyManager.setNotifyFunction(callback => callback())
@@ -491,3 +499,15 @@ for (const cloud of [false, true]) {
     )
   })
 }
+
+test('remote tab navigation persists in browser storage without changing the reference', async () => {
+  const fixture = mountNavigation('overview', true, undefined, true)
+  await fixture.render()
+  await act(async () => {
+    const click = new fixture.window.Event('click', { bubbles: true, cancelable: true })
+    Object.assign(click, { button: 0 })
+    fixture.document.querySelector('button[data-tab="scratchpad"]')!.dispatchEvent(click)
+  })
+  expect(JSON.parse(fixture.storage.get('moi:collab:abc:tabs')!).active).toBe('scratchpad')
+  expect(fixture.writes()).toEqual([])
+})

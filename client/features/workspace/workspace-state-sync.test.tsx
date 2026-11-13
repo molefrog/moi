@@ -14,6 +14,8 @@ import type { WorkspaceEvent } from '@/client/runtime/use-workspace-events'
 import type { CompiledView, WorkspaceState } from '@/lib/types'
 import { useViews } from '@/client/features/views/api'
 import { Workspace } from './workspace-context'
+import { WorkspaceLayoutContext } from './workspace-layout-context'
+import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import {
   receiveWorkspaceState,
   useWorkspaceState,
@@ -131,7 +133,24 @@ test('a finished view stays visible through pending cleanup and a stale list rep
     }, [data])
     return null
   }
-  await fixture.render(<Probe />)
+  await fixture.render(
+    <WorkspaceLayoutContext.Provider
+      value={{
+        layout: createDefaultWorkspaceLayout(),
+        setLayout: () => {},
+        name: null,
+        cwd: null,
+        provider: 'claude-code',
+        workspaceId: WORKSPACE_ID,
+        apiBase: `/api/workspaces/${WORKSPACE_ID}`,
+        chatAvailable: true,
+        isRemote: false,
+        isLoading: false
+      }}
+    >
+      <Probe />
+    </WorkspaceLayoutContext.Provider>
+  )
   expect(rendered.at(-1)).toEqual(['board:submitted'])
 
   const request = fixture.queryClient.refetchQueries({ queryKey })

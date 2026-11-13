@@ -11,13 +11,11 @@ import { withDefaultWidgets } from '@/lib/default-widgets'
 import type { WidgetInfo } from '@/lib/types'
 
 export function useWidgets(workspaceId: string) {
-  const { layout, setLayout } = useWorkspaceLayoutCtx()
+  const { layout, setLayout, apiBase } = useWorkspaceLayoutCtx()
   const query = useQuery<WidgetInfo[]>({
     queryKey: workspaceKeys.widgets(workspaceId),
     queryFn: async () => {
-      const data = await requestJson<{ widgets: WidgetInfo[] }>(
-        `/api/workspaces/${workspaceId}/widgets`
-      )
+      const data = await requestJson<{ widgets: WidgetInfo[] }>(`${apiBase}/widgets`)
       return data.widgets
     },
     ...WORKSPACE_RESOURCE_OPTIONS
@@ -26,5 +24,5 @@ export function useWidgets(workspaceId: string) {
 
   useGridReconcile(workspaceId, query.data ? widgets : undefined, layout, setLayout)
 
-  return { ...query, data: widgets }
+  return { ...query, data: widgets, hasData: query.data !== undefined }
 }

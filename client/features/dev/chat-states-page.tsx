@@ -61,6 +61,9 @@ const layoutCtxValue: WorkspaceLayoutContextValue = {
   cwd: DEV_CWD,
   provider: 'openclaw',
   workspaceId: DEV_WORKSPACE_ID,
+  apiBase: '/api/workspaces/test',
+  chatAvailable: true,
+  isRemote: false,
   isLoading: false
 }
 

@@ -1,3 +1,4 @@
+import { remoteControl } from './remote-control'
 import { accessSync, constants } from 'node:fs'
 import { CONTROL_URL } from '../constants'
 import { controlFailureMessage, probeControlServer } from '../control-client'
@@ -46,14 +47,27 @@ export async function registerViaControl(absPath: string): Promise<string> {
   })
 }
 
-// Round-trip one request through the control port and hand the reply to
-// `onResult`. Mirrors the `bundle`/`theme` commands: one socket per invocation,
-// print, exit. Shared by `scratch`, `call-server-fn`, and `debug logs`.
-export function sendControl(
+// Shared data in a linked folder uses the owner API. Browser actions and local
+// workspaces use visitor control. Both paths keep output/file IO on the caller.
+export async function sendControl(
   path: string,
   payload: Record<string, unknown>,
   onResult: (res: Record<string, unknown>) => void | Promise<void>
 ) {
+  try {
+    const result = await remoteControl(path, payload)
+    if (result) {
+      if (result.error) throw new Error(String(result.error))
+      await onResult(result)
+      const notice = await staleSkillNotice(path)
+      if (notice) console.error('\n' + pc.yellow(notice) + '\n')
+      return
+    }
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : 'Remote command failed')
+    process.exitCode = 1
+    return
+  }
   const ws = new WebSocket(CONTROL_URL)
   let connected = false
   let responded = false

@@ -5,6 +5,8 @@ import type { ClientMessage, StatusSnapshotMessage } from '@/lib/types'
 import { isMoiContext } from '@/lib/moi-context'
 
 import { rm } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
+import { startOperations, stopOperations } from './operations/server'
 
 import index from '../client/index.html'
 import devSandbox from '../client/dev/index.html'
@@ -124,6 +126,10 @@ if (unixSocket) await rm(unixSocket, { force: true })
 const listen = unixSocket
   ? { unix: unixSocket }
   : { port: PORT, hostname: process.env.HOST ?? '127.0.0.1' }
+
+const operations = unixSocket
+  ? await startOperations(join(dirname(unixSocket), 'ops.sock'))
+  : undefined
 
 export const app = Bun.serve<WsData>({
   // Bun types the port and Unix-socket listeners as separate overloads, so a
@@ -321,6 +327,8 @@ async function shutdown() {
   shuttingDown = true
   try {
     app.stop(true)
+    operations?.stop(true)
+    stopOperations()
   } catch {}
   try {
     control.stop(true)

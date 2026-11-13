@@ -1,4 +1,12 @@
-import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { workspaceApiBase, type RemoteWorkspaceTarget } from '@/lib/workspace-config'
+import { workspaceInfoOptions } from '../workspace/api'
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueries,
+  useQueryClient
+} from '@tanstack/react-query'
 
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { workspaceKeys } from '@/client/api/workspace-keys'
@@ -8,11 +16,41 @@ import type { DiscoveredWorkspace, WorkspaceEntry, WorkspacePreview } from '@/li
 export function useWorkspaces() {
   return useQuery<WorkspaceEntry[]>({
     queryKey: workspaceKeys.all,
-    queryFn: () => requestJson('/api/workspaces'),
+    queryFn: () => requestJson<WorkspaceEntry[]>('/api/workspaces'),
     // Live events invalidate the list on every change. This only bounds how
     // long a missed event (socket down) can leave it wrong; route switches
     // within the window reuse the cache.
     staleTime: 5 * 60_000
+  })
+}
+
+// Enrich a deduplicated list independently: local cards and healthy owners never
+// wait for a slow owner. Home and sidebar share the same metadata requests.
+export function useWorkspaceMetadata<T extends { remote?: RemoteWorkspaceTarget }>(
+  entries: T[]
+): T[] {
+  const addresses = [
+    ...new Set(
+      entries.flatMap(entry =>
+        entry.remote ? [workspaceApiBase(entry.remote.workspace_id, entry.remote.user_id)] : []
+      )
+    )
+  ]
+  const queries = useQueries({ queries: addresses.map(workspaceInfoOptions) })
+  const byAddress = new Map(addresses.map((address, i) => [address, queries[i]?.data]))
+  return entries.map(entry => {
+    const info =
+      entry.remote &&
+      byAddress.get(workspaceApiBase(entry.remote.workspace_id, entry.remote.user_id))
+    if (!info || info.isRemote) return entry
+    return {
+      ...entry,
+      ...(info.name && { name: info.name }),
+      icon: info.icon,
+      theme: info.theme,
+      type: info.provider,
+      agentId: info.agentId
+    }
   })
 }
 

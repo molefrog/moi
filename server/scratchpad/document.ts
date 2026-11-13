@@ -1,3 +1,5 @@
+import type { WorkspaceApiTarget } from '../workspaces/api'
+import { requestWorkspace } from '../workspaces/api'
 import { readdir } from 'node:fs/promises'
 import { join } from 'path'
 
@@ -185,10 +187,10 @@ function extractText(props: unknown): string | undefined {
 // them for one image. Ids match with or without the `shape:` prefix (read
 // surfaces them stripped).
 export async function readScratchpadImage(
-  workspacePath: string,
+  workspace: string | WorkspaceApiTarget,
   id: string
 ): Promise<{ src: string } | { error: string }> {
-  const { document } = await loadScratchpadDoc(workspacePath)
+  const { document } = await readSnapshot(workspace)
   const store = document?.store
   if (!store || typeof store !== 'object') return { error: `No shape named "${id}"` }
 
@@ -212,12 +214,12 @@ export async function readScratchpadImage(
     if (a.typeName === 'asset' && a.id === assetId && typeof a.props?.src === 'string') {
       const fileName = assetSrcFileName(a.props.src)
       if (!fileName) return { src: a.props.src }
-      const resolved = scratchpadAssetFile(workspacePath, fileName)
-      if (!resolved || !(await resolved.file.exists())) {
+      const resolved = await readAsset(workspace, fileName)
+      if (!resolved) {
         return { error: `Image "${id}" file is missing from .moi/.scratchpad` }
       }
-      const bytes = Buffer.from(await resolved.file.arrayBuffer())
-      return { src: `data:${resolved.mimeType};base64,${bytes.toString('base64')}` }
+      const bytes = Buffer.from(await resolved.arrayBuffer())
+      return { src: `data:${resolved.type};base64,${bytes.toString('base64')}` }
     }
   }
   return { error: `Image "${id}" has no stored data` }
@@ -225,8 +227,10 @@ export async function readScratchpadImage(
 
 // no browser needed. Ids are reported without tldraw's `shape:` prefix so they
 // round-trip with `createShapeId(name)` on the draw side.
-export async function readScratchpadShapes(workspacePath: string): Promise<ScratchShape[]> {
-  const { document } = await loadScratchpadDoc(workspacePath)
+export async function readScratchpadShapes(
+  workspace: string | WorkspaceApiTarget
+): Promise<ScratchShape[]> {
+  const { document } = await readSnapshot(workspace)
   const store = document?.store
   if (!store || typeof store !== 'object') return []
 
@@ -244,10 +248,7 @@ export async function readScratchpadShapes(workspacePath: string): Promise<Scrat
     if (typeof a.props?.src === 'string') {
       assetSrc.set(a.id, a.props.src)
       const fileName = assetSrcFileName(a.props.src)
-      if (fileName) {
-        const resolved = scratchpadAssetFile(workspacePath, fileName)
-        if (!resolved || !(await resolved.file.exists())) assetGone.add(a.id)
-      }
+      if (fileName && !(await readAsset(workspace, fileName))) assetGone.add(a.id)
     }
   }
 
@@ -288,4 +289,23 @@ export async function readScratchpadShapes(workspacePath: string): Promise<Scrat
     })
   }
   return shapes
+}
+
+async function readSnapshot(workspace: string | WorkspaceApiTarget): Promise<ScratchpadSnapshot> {
+  return typeof workspace === 'string'
+    ? loadScratchpadDoc(workspace)
+    : (await requestWorkspace(workspace, '/scratchpad')).json()
+}
+
+async function readAsset(
+  workspace: string | WorkspaceApiTarget,
+  fileName: string
+): Promise<Blob | undefined> {
+  if (typeof workspace !== 'string')
+    return (
+      await requestWorkspace(workspace, `/scratchpad/assets/${encodeURIComponent(fileName)}`)
+    ).blob()
+  const asset = scratchpadAssetFile(workspace, fileName)
+  if (!asset || !(await asset.file.exists())) return undefined
+  return asset.file.slice(0, asset.file.size, asset.mimeType)
 }

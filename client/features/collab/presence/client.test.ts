@@ -1,3 +1,4 @@
+import { seedWorkspaceInfo } from '@/client/features/workspace/workspace-test-utils'
 import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test'
 
 import { colorForId } from '@/lib/collab/colors'
@@ -86,6 +87,7 @@ class TestSocket {
 
 beforeEach(() => {
   signOut()
+  for (const id of ['workspace', 'other-workspace']) seedWorkspaceInfo(id)
   sockets = []
   service = new CollabService((connectionId, message) => {
     sockets
@@ -413,4 +415,24 @@ test('cloud presence waits for this workspace membership and closes when access 
   expect(sockets[0]!.readyState).toBe(3)
   expect(engine.getSnapshot().connections).toEqual([])
   expect(engine.getDirectory()).toEqual([])
+})
+
+test('remote presence connects to the owner with the same membership rules', () => {
+  signIn({ id: 'visitor', name: 'Visitor' })
+  clearWorkspaceMembers()
+  const id = 'visitor-board'
+  seedWorkspaceInfo(id, { user_id: 'alice', workspace_id: 'board' })
+  setWorkspaceMembers(id, {
+    members: [{ id: 'visitor', type: 'user', name: 'Visitor', email: '', isAnonymous: false }],
+    invitations: []
+  })
+  const engine = new CollabClient(id)
+  stop = engine.start()
+  expect(sockets).toHaveLength(1)
+  expect(new URL(sockets[0]!.url).pathname).toBe('/api/workspaces/alice:board/collab')
+  sockets[0]!.open()
+  expect(engine.getSnapshot().status).toBe('connected')
+  expect(engine.getSnapshot().users.some(user => user.id === 'visitor')).toBe(true)
+  signOut()
+  expect(engine.getSnapshot().status).toBe('disconnected')
 })

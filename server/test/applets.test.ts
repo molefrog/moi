@@ -3,7 +3,6 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync 
 import { dirname, join } from 'path'
 
 import {
-  apiBaseFor,
   buildApplets,
   getAppletPaths,
   parseAppletTail,
@@ -209,12 +208,6 @@ describe('parseAppletTail', () => {
         file: 'index.js'
       }
     )
-  })
-})
-
-describe('apiBaseFor', () => {
-  test('builds the workspace API base', () => {
-    expect(apiBaseFor('abc')).toBe('/api/workspaces/abc')
   })
 })
 

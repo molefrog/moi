@@ -1,4 +1,7 @@
-import type { WorkspaceType } from '@/lib/types'
+import { initializeRemoteWorkspace } from '../../remote/workspace'
+import { loadWorkspaceFileConfig } from '../../workspaces/layout'
+import { parseRemoteWorkspaceAddress } from '@/lib/workspace-config'
+import type { WorkspaceType, WorkspaceEntry } from '@/lib/types'
 import { defineCommand } from 'citty'
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'path'
@@ -119,9 +122,11 @@ async function resolveInitHarness(
 export const init = defineCommand({
   meta: {
     name: 'init',
-    description: 'Initialize workspace, copy skills and scaffold folder with widgets'
+    description: 'Initialize a local or remote workspace and install its skill'
   },
   args: {
+    remote: { type: 'string', description: 'Remote workspace address: ownerId:workspaceId' },
+    json: { type: 'boolean', description: 'Print remote initialization as JSON' },
     dir: {
       type: 'positional',
       default: '.',
@@ -143,13 +148,23 @@ export const init = defineCommand({
     }
   },
   async run({ args }) {
+    if (
+      (args.remote !== undefined && (args.harness || args.id)) ||
+      (args.json && (args.remote === undefined || args.web))
+    ) {
+      console.error(
+        '--remote cannot be combined with --harness or --id; --json requires --remote without --web'
+      )
+      process.exitCode = 1
+      return
+    }
     const requested = resolve(args.dir)
     // Locate the workspace root first: if invoked from inside a `.moi/` (or a
     // deeper accidental `.moi/.moi/…`), lift to the directory that owns it
     // instead of scaffolding a nested workspace. This is what stops the
     // `.moi/.moi` bug at the source.
     const target = liftToWorkspaceRoot(requested)
-    if (target !== requested) {
+    if (target !== requested && !args.json) {
       console.log(
         '\n' +
           pc.yellow('◆') +
@@ -163,7 +178,7 @@ export const init = defineCommand({
     // Flag a stray nested `.moi/.moi` left by the old cwd bug — harmless but
     // confusing, and easy to remove.
     const stray = join(target, '.moi', '.moi')
-    if (existsSync(stray)) {
+    if (existsSync(stray) && !args.json) {
       console.log(
         '\n' +
           pc.yellow('⚠') +
@@ -188,52 +203,80 @@ export const init = defineCommand({
     const projectRoot = PACKAGE_ROOT
     const isInteractive = process.stdout.isTTY
 
-    // Which backend this workspace is for has to be settled before
-    // provisioning: each harness reads skills from a different directory, and
-    // agent-owned ones (OpenClaw, Hermes) need their agent metadata on the
-    // registry entry — same as `moi <provider> init`.
-    const { type, agent } = await resolveInitHarness(target, args.harness)
-
-    // Provision: bundled skills + the `.moi/` bootstrap (widgets dir +
-    // package.json + bun install). An existing `.moi/` is left untouched.
-    console.log()
-    const { scaffold, skillsDir, installLogPath } = await provisionWorkspace(target, type)
-    if (scaffold !== 'exists') {
-      if (scaffold === 'installing') {
-        console.log(pc.dim('  Widget dependencies still installing in .moi/ (background)'))
-        console.log(pc.dim('  Install log: ' + installLogPath))
-      } else if (scaffold === 0) {
-        console.log(pc.dim('  Installed widget dependencies in .moi/'))
-      } else {
-        console.warn(
-          pc.yellow(`  bun install failed (exit ${scaffold}) — run it manually in .moi/`)
+    let entry: Pick<WorkspaceEntry, 'id'>
+    if (args.remote !== undefined) {
+      try {
+        const result = await initializeRemoteWorkspace(
+          target,
+          parseRemoteWorkspaceAddress(args.remote)
         )
-        console.warn(pc.dim('  Install log: ' + installLogPath))
+        if (args.json) {
+          console.log(JSON.stringify(result))
+          return
+        }
+        entry = result
+        console.log(pc.green('✓') + ' Initialized ' + pc.bold(result.path) + ' for ' + args.remote)
+      } catch (error) {
+        console.error(error instanceof Error ? error.message : 'Remote initialization failed')
+        process.exitCode = 1
+        return
       }
+    } else {
+      const config = await loadWorkspaceFileConfig(target)
+      if (config.remote) {
+        console.error(
+          `This is a remote workspace — use moi init --remote ${config.remote.user_id}:${config.remote.workspace_id}`
+        )
+        process.exitCode = 1
+        return
+      }
+      // Which backend this workspace is for has to be settled before
+      // provisioning: each harness reads skills from a different directory, and
+      // agent-owned ones (OpenClaw, Hermes) need their agent metadata on the
+      // registry entry — same as `moi <provider> init`.
+      const { type, agent } = await resolveInitHarness(target, args.harness)
+
+      // Provision: bundled skills + the `.moi/` bootstrap (widgets dir +
+      // package.json + bun install). An existing `.moi/` is left untouched.
+      console.log()
+      const { scaffold, skillsDir, installLogPath } = await provisionWorkspace(target, type)
+      if (scaffold !== 'exists' && scaffold !== 'skipped') {
+        if (scaffold === 'installing') {
+          console.log(pc.dim('  Widget dependencies still installing in .moi/ (background)'))
+          console.log(pc.dim('  Install log: ' + installLogPath))
+        } else if (scaffold === 0) {
+          console.log(pc.dim('  Installed widget dependencies in .moi/'))
+        } else {
+          console.warn(
+            pc.yellow(`  bun install failed (exit ${scaffold}) — run it manually in .moi/`)
+          )
+          console.warn(pc.dim('  Install log: ' + installLogPath))
+        }
+      }
+
+      // Always register the workspace in the persistent registry
+      entry = await registerWorkspace(target, {
+        ...(args.id ? { id: args.id } : {}),
+        type,
+        ...(agent
+          ? {
+              name: agent.name,
+              agentId: agent.agentId,
+              isDefault: agent.isDefault,
+              lastRunAt: agent.lastRunAt
+            }
+          : {})
+      })
+
+      console.log(pc.green('✓') + ' Initialized ' + pc.bold(target) + pc.dim(' (' + type + ')'))
+      console.log(
+        '  Skills installed to ' +
+          pc.dim(skillsDir) +
+          ' — ask ' +
+          (type === 'claude-code' ? 'Claude' : 'your agent') +
+          ' to build a widget or a view to get started\n'
+      )
     }
-
-    // Always register the workspace in the persistent registry
-    const entry = await registerWorkspace(target, {
-      ...(args.id ? { id: args.id } : {}),
-      type,
-      ...(agent
-        ? {
-            name: agent.name,
-            agentId: agent.agentId,
-            isDefault: agent.isDefault,
-            lastRunAt: agent.lastRunAt
-          }
-        : {})
-    })
-
-    console.log(pc.green('✓') + ' Initialized ' + pc.bold(target) + pc.dim(' (' + type + ')'))
-    console.log(
-      '  Skills installed to ' +
-        pc.dim(skillsDir) +
-        ' — ask ' +
-        (type === 'claude-code' ? 'Claude' : 'your agent') +
-        ' to build a widget or a view to get started\n'
-    )
 
     // If --web and server not running, start it (stay alive as wrapper)
     let running = await isServerRunning()

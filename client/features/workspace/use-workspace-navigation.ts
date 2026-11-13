@@ -45,7 +45,7 @@ type UseWorkspaceNavigationOptions = {
 
 export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNavigationOptions) {
   const queryClient = useQueryClient()
-  const { workspaceId } = useWorkspaceLayoutCtx()
+  const { workspaceId, chatAvailable, apiBase } = useWorkspaceLayoutCtx()
   const [tabsState, saveTabs] = useWorkspaceTabs()
   const latest = useRef({ views, tabsState, onOpenChat })
   useLayoutEffect(() => {
@@ -99,7 +99,7 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
       { replace = false }: NavigationOptions = {},
       controller = new AbortController()
     ) => {
-      const target = resolveUrl(href, { workspaceId, base })
+      const target = resolveUrl(href, { workspaceId, base, apiBase })
       navigationRequest.current?.controller.abort()
       if (!target.startsWith(prefix)) {
         navigationRequest.current = null
@@ -118,6 +118,8 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
       }
       try {
         const targetPath = target.slice(prefix.length).split('?', 1)[0]
+        if (!chatAvailable && (targetPath === 'chat' || targetPath.startsWith('chats/')))
+          throw new Error('This destination is unavailable in this workspace')
         if (targetPath === 'chat' || targetPath.startsWith('chats/')) {
           const { tab, href } = currentPage()
           const destination =
@@ -130,7 +132,7 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
                 )
           const destinationHref =
             destination && destination !== tab ? tabUrl(remembered, destination) : href
-          commit(resolveUrl(destinationHref, { workspaceId, base }))
+          commit(resolveUrl(destinationHref, { workspaceId, base, apiBase }))
           if (destination) latest.current.onOpenChat()
           return
         }
@@ -160,6 +162,8 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
       prefix,
       queryClient,
       remembered,
+      chatAvailable,
+      apiBase,
       selectLinkedChat,
       setLocation,
       workspaceId

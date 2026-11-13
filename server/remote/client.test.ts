@@ -26,7 +26,9 @@ beforeEach(async () => {
     async fetch(request) {
       requests++
       const path = new URL(request.url).pathname
-      expect(path).toStartWith('/custom/cloud/api/')
+      expect(path.startsWith('/custom/cloud/api/') || path.startsWith('/api/workspaces/')).toBe(
+        true
+      )
       if (responseMode === 'invalid') return new Response('{"access_token":"secret-example"')
       if (responseMode === 'reject') return new Response(null, { status: 401 })
       if (responseMode === 'redirect') return Response.redirect(server.url.origin + '/leak')
@@ -59,6 +61,11 @@ beforeEach(async () => {
         return new Response(null, { status: 200 })
       }
       expect(request.headers.get('authorization')).toStartWith('Bearer ')
+      if (path.startsWith('/api/workspaces/')) {
+        expect(request.headers.get('cookie')).toBeNull()
+        expect(request.headers.get('authorization')).not.toBe('Bearer untrusted')
+        return Response.json({ ok: true })
+      }
       if (path.endsWith('/me'))
         return Response.json({ id: 'u1', name: 'Test', email: 'test@example.com' })
       return Response.json({
@@ -219,4 +226,21 @@ test('development requires a target; published installs default to production', 
   ]) {
     expect(() => resolveRemoteConfig({ url }, true)).toThrow()
   }
+})
+
+test('workspace content requests authenticate and refresh through the same client', async () => {
+  await credentials()
+  const response = await client.workspaceRequest('alice', 'board', '/widgets')
+  expect(response.status).toBe(200)
+  expect(refreshes).toBe(1)
+})
+
+test('workspace content requests reject path escapes and authenticated redirects', async () => {
+  await credentials(Date.now() / 1000 + 3600)
+  await expect(client.workspaceRequest('alice', 'board', '/../../leak')).rejects.toThrow(
+    'Invalid workspace path'
+  )
+  responseMode = 'redirect'
+  await expect(client.workspaceRequest('alice', 'board', '/widgets')).rejects.toThrow()
+  expect(requests).toBe(1)
 })

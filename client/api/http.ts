@@ -1,6 +1,16 @@
+export class HttpError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string
+  ) {
+    super(message)
+    this.name = 'HttpError'
+  }
+}
+
 async function errorFrom(response: Response, fallback: string) {
   const detail = await response.text()
-  return new Error(detail || fallback)
+  return new HttpError(response.status, detail || fallback)
 }
 
 export async function requestJson<T>(

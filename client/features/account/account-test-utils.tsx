@@ -1,3 +1,4 @@
+import { seedWorkspaceInfo } from '@/client/features/workspace/workspace-test-utils'
 import { expect, spyOn } from 'bun:test'
 import { act, useLayoutEffect } from 'react'
 import type { ReactNode } from 'react'
@@ -126,7 +127,7 @@ export async function mountAccount({
               ? Response.json(cloudSession)
               : Response.json({ error: 'No session' }, { status: 401 })
         }
-        if (path.endsWith('/members') && (!init?.method || init.method === 'GET')) {
+        if (path.split('?')[0]!.endsWith('/members') && (!init?.method || init.method === 'GET')) {
           if (pendingMembership) await membershipRequest.promise
           return failures.membership
             ? Response.json({ error: 'Members unavailable' }, { status: 503 })
@@ -198,6 +199,7 @@ export async function mountAccount({
   )
   const qc = queryClient
   qc.clear()
+  for (const id of ['one', 'two']) seedWorkspaceInfo(id, undefined, qc)
   qc.setDefaultOptions({ queries: { retry: false }, mutations: { retry: false } })
   setIdentity(null)
   if (!loadingSession && !failSession && environment === 'cloud') setIdentity(cloudSession)

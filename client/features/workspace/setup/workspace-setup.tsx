@@ -1,3 +1,4 @@
+import { useWorkspaceLayoutCtx } from '../workspace-layout-context'
 import { useHarnessStatus, useRetryHarnessStatus } from '@/client/features/harness/api'
 import { useCallback } from 'react'
 import { useAppConfig } from '@/client/api/app-config'
@@ -21,11 +22,13 @@ export function useWorkspaceSetup(
   contentPending = false,
   welcome: WorkspaceWelcomeStateProps = {}
 ) {
+  // Remote chat support is deferred, so the visitor's agent needs no setup.
+  const { chatAvailable } = useWorkspaceLayoutCtx()
   const { environment, demo } = useAppConfig()
   const workspace = useWorkspaceHarness(workspaceId)
   const { data } = workspace
   const status = useHarnessStatus(
-    data?.hasAuthOverrides || data?.isFolderMissing ? undefined : data?.provider
+    !chatAvailable || data?.hasAuthOverrides || data?.isFolderMissing ? undefined : data?.provider
   )
   const retry = useRetryHarnessStatus()
   const readiness = status.isEnabled ? status : workspace
@@ -83,9 +86,12 @@ export function useWorkspaceSetup(
     )
   }
 
+  const welcoming = useWorkspaceWelcome(workspaceId)
+  if (!chatAvailable) {
+    return { content: <WorkspaceLoadingState />, ready: !contentPending, setupRequired: false }
+  }
   const recovery = renderRecovery()
   const ready = !recovery && !contentPending && !checking
-  const welcoming = useWorkspaceWelcome(workspaceId)
   return {
     content: welcoming ? (
       <WorkspaceWelcomeState {...welcome} />

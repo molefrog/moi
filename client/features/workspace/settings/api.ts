@@ -1,3 +1,4 @@
+import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-layout-context'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
@@ -32,14 +33,11 @@ export function useUpdateEnv(workspaceId: string) {
 }
 
 export function useSaveWorkspaceName(workspaceId: string) {
+  const { apiBase } = useWorkspaceLayoutCtx()
   const queryClient = useQueryClient()
   return useMutation<void, Error, string | null>({
     mutationFn: name =>
-      requestVoid(
-        `/api/workspaces/${workspaceId}/config`,
-        jsonRequest('PUT', { name }),
-        'Failed to save name'
-      ),
+      requestVoid(`${apiBase}/config`, jsonRequest('PUT', { name }), 'Failed to save name'),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: workspaceKeys.layout(workspaceId) })
       queryClient.invalidateQueries({ queryKey: workspaceKeys.all })
@@ -53,6 +51,7 @@ type WorkspaceIconMutation =
   | { kind: 'reset' }
 
 export function useUpdateWorkspaceIcon(workspaceId: string) {
+  const { apiBase } = useWorkspaceLayoutCtx()
   const queryClient = useQueryClient()
   const mutationKey = ['workspace-icon', workspaceId]
   return useMutation<void, Error, WorkspaceIconMutation>({
@@ -61,21 +60,17 @@ export function useUpdateWorkspaceIcon(workspaceId: string) {
     mutationFn: async update => {
       if (update.kind === 'set') {
         await requestVoid(
-          `/api/workspaces/${workspaceId}/config`,
+          `${apiBase}/config`,
           jsonRequest('PUT', { icon: update.icon, origin: BROWSER_TAB_ID }),
           'Failed to save icon'
         )
         return
       }
       if (update.kind === 'reset') {
-        await requestVoid(
-          `/api/workspaces/${workspaceId}/icon`,
-          { method: 'DELETE' },
-          'Failed to reset icon'
-        )
+        await requestVoid(`${apiBase}/icon`, { method: 'DELETE' }, 'Failed to reset icon')
         return
       }
-      await requestJson(`/api/workspaces/${workspaceId}/icon`, {
+      await requestJson(`${apiBase}/icon`, {
         method: 'PUT',
         headers: { 'Content-Type': update.file.type || 'application/octet-stream' },
         body: update.file

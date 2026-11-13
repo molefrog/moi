@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 
 import { ScreenShell } from '@/client/components/shared/screen-shell'
-import { WorkspacePane } from './workspace-frame'
+import { WorkspacePane } from './workspace-pane'
 
 type WorkspacePendingScreenProps = {
   setupRequired?: boolean

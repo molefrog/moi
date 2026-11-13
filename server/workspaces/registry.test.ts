@@ -57,12 +57,12 @@ describe('registerWorkspace', () => {
 
   test('validates chosen ids inside the lock and recovers after rejection', async () => {
     const results = await Promise.allSettled([
-      registerWorkspace(join(tmpDir, 'a'), { id: 'shared' }),
-      registerWorkspace(join(tmpDir, 'b'), { id: 'shared' }),
+      registerWorkspace(join(tmpDir, 'a'), { id: 'chosen' }),
+      registerWorkspace(join(tmpDir, 'b'), { id: 'chosen' }),
       registerWorkspace(join(tmpDir, 'c'), { id: 'other' })
     ])
     expect(results.map(result => result.status)).toEqual(['fulfilled', 'rejected', 'fulfilled'])
-    expect((await listWorkspaces()).map(entry => entry.id)).toEqual(['other', 'shared'])
+    expect((await listWorkspaces()).map(entry => entry.id)).toEqual(['other', 'chosen'])
   })
 
   test('serializes removal and reordering with registration', async () => {
@@ -136,10 +136,10 @@ describe('registerWorkspace with a chosen id', () => {
   })
 
   test('rejects an id already taken by another workspace', async () => {
-    await registerWorkspace('/Users/foo/project-a', { id: 'shared' })
+    await registerWorkspace('/Users/foo/project-a', { id: 'chosen' })
 
-    await expect(registerWorkspace('/Users/foo/project-b', { id: 'shared' })).rejects.toThrow(
-      'Workspace id shared is already taken'
+    await expect(registerWorkspace('/Users/foo/project-b', { id: 'chosen' })).rejects.toThrow(
+      'Workspace id chosen is already taken'
     )
     expect(await listWorkspaces()).toHaveLength(1)
   })
@@ -497,4 +497,54 @@ describe('getWorkspace', () => {
     const found = await getWorkspace('00000000-0000-0000-0000-000000000000')
     expect(found).toBeNull()
   })
+})
+
+test('remote references get their own ids, one registration per owner workspace', async () => {
+  const local = await registerWorkspace(join(tmpDir, 'local'), { id: 'board' })
+  const reference = async (folder: string, user_id: string) => {
+    const path = join(tmpDir, folder)
+    await mkdir(join(path, '.moi'), { recursive: true })
+    await Bun.write(
+      join(path, '.moi/.workspace.json'),
+      JSON.stringify({ version: 2, remote: { user_id, workspace_id: 'board' } })
+    )
+    return registerWorkspace(path)
+  }
+  const alice = await reference('alice', 'alice')
+  const bob = await reference('bob', 'bob')
+  expect(new Set([local.id, alice.id, bob.id]).size).toBe(3)
+  expect((await getWorkspace(alice.id))?.remote).toEqual({
+    user_id: 'alice',
+    workspace_id: 'board'
+  })
+  expect((await getWorkspace('board'))?.path).toBe(local.path)
+  // A second folder pointing at the same owner workspace reuses the registration.
+  expect((await reference('alice-again', 'alice')).id).toBe(alice.id)
+  expect(await listWorkspaces()).toHaveLength(3)
+  await removeWorkspace(alice.id)
+  expect(await getWorkspace(alice.id)).toBeNull()
+  expect(await getWorkspace(bob.id)).not.toBeNull()
+})
+
+test('remote routing comes only from config and is omitted from registry writes', async () => {
+  const path = join(tmpDir, 'reference')
+  await mkdir(join(path, '.moi'), { recursive: true })
+  const configFile = Bun.file(join(path, '.moi/.workspace.json'))
+  const remote = { user_id: 'alice', workspace_id: 'board' }
+  await Bun.write(configFile, JSON.stringify({ version: 2, remote }))
+  const entry = await registerWorkspace(path)
+  expect(entry.remote).toEqual(remote)
+  const registryFile = Bun.file(join(tmpDir, 'data/workspaces.json'))
+  const stored = await registryFile.json()
+  expect(stored[0]).not.toHaveProperty('remote')
+  // Ignore an old duplicate even when it disagrees with the config.
+  stored[0].remote = { user_id: 'wrong-owner', workspace_id: 'wrong-board' }
+  await Bun.write(registryFile, JSON.stringify(stored))
+  expect((await listWorkspaces())[0]?.remote).toEqual(remote)
+  await reorderWorkspaces([entry.id])
+  expect((await registryFile.json())[0]).not.toHaveProperty('remote')
+  // Removing the reference in config must not resurrect a stored remote value.
+  await Bun.write(registryFile, JSON.stringify(stored))
+  await Bun.write(configFile, JSON.stringify({ version: 1, widgetGrid: [] }))
+  expect((await listWorkspaces())[0]).not.toHaveProperty('remote')
 })

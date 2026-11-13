@@ -21,7 +21,7 @@ type WorkspaceMenuProps = {
 }
 
 export function WorkspaceMenu({ onOpenTheme }: WorkspaceMenuProps) {
-  const { layout, name, provider } = useWorkspaceLayoutCtx()
+  const { layout, name, provider, isRemote } = useWorkspaceLayoutCtx()
   const [iconHovered, setIconHovered] = useState(false)
 
   return (
@@ -51,14 +51,16 @@ export function WorkspaceMenu({ onOpenTheme }: WorkspaceMenuProps) {
               <IconLetterCase stroke={1.75} />
               Theme
             </DropdownMenuItem>
-            <DropdownMenuItem
-              nativeButton
-              render={<WorkspaceSettingsDialogTrigger />}
-              className="w-full"
-            >
-              <IconSettings stroke={1.75} />
-              Settings
-            </DropdownMenuItem>
+            {!isRemote && (
+              <DropdownMenuItem
+                nativeButton
+                render={<WorkspaceSettingsDialogTrigger />}
+                className="w-full"
+              >
+                <IconSettings stroke={1.75} />
+                Settings
+              </DropdownMenuItem>
+            )}
           </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>

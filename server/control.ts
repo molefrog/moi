@@ -342,7 +342,9 @@ export const control = Bun.serve({
             if (!href.startsWith('moi:/') || href.startsWith('moi:/files/'))
               throw new Error('Navigation needs a workspace page address')
             const tab = href.slice(5).split('?', 1)[0]
-            if (isWorkspaceTabId(tab)) assertNavigableTab(tab, await getWorkspaceViews(match))
+            // A linked folder's views live on the owner; the browser checks the tab itself.
+            if (isWorkspaceTabId(tab) && !match.remote)
+              assertNavigableTab(tab, await getWorkspaceViews(match))
             await navigationRelay.navigate(match.id, href)
             ws.send(JSON.stringify({ ok: true, href }))
           } catch (error) {
@@ -361,18 +363,27 @@ export const control = Bun.serve({
         // `only` narrows to one kind or applet; default is both kinds.
         // `widget:refresh` is the pre-filter message name older CLIs send.
         if (data.type === 'applets:refresh' || data.type === 'widget:refresh') {
+          const match = data.path ? await resolveWorkspace(ws, data.path) : undefined
+          if (data.path && !match) return
+          const scope = match ? { workspaceId: match.id } : {}
           const only = typeof data.only === 'string' ? parseAppletSelector(data.only) : undefined
           if (data.only && !only) {
             ws.send(JSON.stringify({ error: `Invalid applet selector "${data.only}"` }))
             return
           }
+          // No `workspaceId`: `moi refresh` names no workspace, so every open one reloads.
           if (only?.id) {
             publishEvent({
               type: only.segment === 'widgets' ? 'widget:updated' : 'view:updated',
+              ...scope,
               name: only.id
             })
           } else {
-            publishEvent({ type: 'applets:refresh', ...(data.only ? { only: data.only } : {}) })
+            publishEvent({
+              type: 'applets:refresh',
+              ...scope,
+              ...(data.only ? { only: data.only } : {})
+            })
           }
           ws.send(JSON.stringify({ ok: true }))
           return

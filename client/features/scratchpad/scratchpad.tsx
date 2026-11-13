@@ -1,3 +1,4 @@
+import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-layout-context'
 import { useCallback, useRef, useState } from 'react'
 
 import {
@@ -71,8 +72,8 @@ function makeExecutor(editor: Editor) {
 // the record; `resolve` maps it back to the serving URL at render time. Legacy
 // snapshots still holding data URLs pass through `resolve` untouched (the
 // server extracts them to files on the next save). See server/scratchpad/assets.ts.
-function makeAssetStore(workspaceId: string): TLAssetStore {
-  const base = `/api/workspaces/${workspaceId}/scratchpad/assets`
+function makeAssetStore(apiBase: string): TLAssetStore {
+  const base = `${apiBase}/scratchpad/assets`
   return {
     async upload(_asset, file) {
       const res = await fetch(base, {
@@ -188,6 +189,7 @@ export function Scratchpad() {
 }
 
 function WorkspaceScratchpad({ workspaceId }: { workspaceId: string }) {
+  const { apiBase } = useWorkspaceLayoutCtx()
   const editorRef = useRef<Editor | null>(null)
   // The whole scratchpad region (canvas + tool bar + style bar). Focus is driven
   // off whether a pointerdown lands inside this, so clicking a tool keeps the
@@ -201,10 +203,10 @@ function WorkspaceScratchpad({ workspaceId }: { workspaceId: string }) {
   const applyingRemote = useRef(false)
   // Reactive handle to the mounted editor, used to render the custom tool bar.
   const [editor, setEditor] = useState<Editor | null>(null)
-  const { loaded, snapshot, skew, flagSkew } = useScratchpadSnapshot(workspaceId)
+  const { loaded, snapshot, skew, flagSkew } = useScratchpadSnapshot()
   // This keyed component gives each workspace one stable asset store. A fresh
   // identity makes <Tldraw> remount the editor and drop unsaved edits.
-  const [assetStore] = useState<TLAssetStore>(() => makeAssetStore(workspaceId))
+  const [assetStore] = useState<TLAssetStore>(() => makeAssetStore(apiBase))
 
   const save = useCallback(() => {
     const editor = editorRef.current
@@ -215,12 +217,12 @@ function WorkspaceScratchpad({ workspaceId }: { workspaceId: string }) {
     } catch {
       return
     }
-    void fetch(`/api/workspaces/${workspaceId}/scratchpad`, {
+    void fetch(`${apiBase}/scratchpad`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ document, origin: BROWSER_TAB_ID })
     }).catch(() => {})
-  }, [workspaceId])
+  }, [apiBase])
 
   // A remote save (another tab, or an agent draw landing in another tab) — pull
   // the new snapshot and load it into the live store. Skip our own echo. The
@@ -232,7 +234,7 @@ function WorkspaceScratchpad({ workspaceId }: { workspaceId: string }) {
     if (e.type !== 'scratchpad:updated' || e.workspaceId !== workspaceId) return
     if (e.origin && e.origin === BROWSER_TAB_ID) return
     if (!editorRef.current) return
-    fetch(`/api/workspaces/${workspaceId}/scratchpad`)
+    fetch(`${apiBase}/scratchpad`)
       .then(r => r.json())
       .then((d: ScratchpadFetch) => {
         const editor = editorRef.current

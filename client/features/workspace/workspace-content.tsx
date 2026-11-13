@@ -60,7 +60,8 @@ import { composerDraftKey, draftSessionId } from '@/lib/session-drafts'
 import type { CompiledView, PendingView, ViewInfo, WidgetInfo, WorkspaceTabId } from '@/lib/types'
 import { viewIdFromTab, viewTabId } from '@/lib/workspace-tabs'
 
-import { WorkspaceFrame, WorkspacePane, useWorkspaceFrame } from './workspace-frame'
+import { WorkspaceFrame, useWorkspaceFrame } from './workspace-frame'
+import { WorkspacePane } from './workspace-pane'
 import { UnavailablePage } from './unavailable-page'
 
 const Scratchpad = lazy(() =>
@@ -119,7 +120,7 @@ function tabItemFor(
 
 export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentProps) {
   const { environment } = useAppConfig()
-  const { layout, workspaceId } = useWorkspaceLayoutCtx()
+  const { layout, workspaceId, chatAvailable } = useWorkspaceLayoutCtx()
   const theme = resolveWorkspaceTheme(layout.theme)
   const viewActions = useViewActions()
   const frame = useWorkspaceFrame()
@@ -219,6 +220,7 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
   const startupPending = !pinnedSessionId && activePendingView?.status === 'starting'
   const visibleChatLoaded = chatLoaded && !startupPending
   const canAnnotate =
+    chatAvailable &&
     widgetMode === 'idle' &&
     ((activeTab === 'overview' && hasAppletWidgets) || activeView !== undefined)
   const {
@@ -344,6 +346,7 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
   }
 
   const openChat = (intent?: string) => {
+    if (!chatAvailable) return
     if (intent !== undefined) {
       useUiStore
         .getState()
@@ -364,6 +367,14 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
   // see is worse than a panel that opens itself.
   useAppletChatMessage({ sessionId, send, revealChat: openChat, agentAvailability })
   useAppletChatAttachment(composerSessionId, openChat)
+
+  const onCreateView = chatAvailable ? createView : undefined
+  const onCreateWidget = chatAvailable
+    ? () => {
+        selectSession(null)
+        openChat('Create widget')
+      }
+    : undefined
 
   const createItems: CreateWorkspaceTabItem[] = [
     ...(!openSet.has('scratchpad')
@@ -387,12 +398,16 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
           onClick: () => openTab(tab)
         })
       ),
-    {
-      key: 'create-view',
-      Icon: IconBrowserPlus,
-      label: 'New view',
-      onClick: createView
-    }
+    ...(onCreateView
+      ? [
+          {
+            key: 'create-view',
+            Icon: IconBrowserPlus,
+            label: 'New view',
+            onClick: onCreateView
+          }
+        ]
+      : [])
   ]
 
   const removeViewDrawing = useCallback(() => {
@@ -466,11 +481,8 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
               widgets={widgets}
               views={allViews}
               onOpenView={viewId => openTab(viewTabId(viewId))}
-              onCreateView={createView}
-              onCreateWidget={() => {
-                selectSession(null)
-                openChat('Create widget')
-              }}
+              onCreateView={onCreateView}
+              onCreateWidget={onCreateWidget}
             />
           ) : activeTab === 'scratchpad' ? (
             <Suspense fallback={null}>
@@ -578,10 +590,10 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
     <WorkspaceFrame
       frame={frame}
       workspace={workspacePanel}
-      chat={dockedChat}
+      chat={chatAvailable ? dockedChat : undefined}
       onClick={onNavigationClick}
     >
-      {mode === 'fullscreen' && (
+      {chatAvailable && mode === 'fullscreen' && (
         <ChatPopup
           agent={theme.agent}
           loading={hasRunningSession}

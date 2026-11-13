@@ -226,7 +226,7 @@ export function WorkspaceTabs({
         />
       </div>
       <div className="shrink-0">
-        <CreateTabMenu items={createItems} />
+        {createItems.length > 0 && <CreateTabMenu items={createItems} />}
       </div>
     </div>
   )

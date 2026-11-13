@@ -32,7 +32,7 @@ import { WorkspaceName } from './workspace-name'
 import { WidgetCanvas } from './widget-canvas'
 
 type NoWidgetsCreatedProps = {
-  onCreateWidget: () => void
+  onCreateWidget?: () => void
   showOnboarding: boolean
 }
 
@@ -53,18 +53,20 @@ function NoWidgetsCreated({ onCreateWidget, showOnboarding }: NoWidgetsCreatedPr
           </div>
         )}
       </div>
-      <Button
-        type="button"
-        variant="outline"
-        className={cn(
-          'absolute inset-0 m-auto h-fit w-fit',
-          'flex-col gap-1 rounded-2xl border-0 py-4 pr-8 pl-8! text-xs shadow-sm transition-shadow duration-300 ease-out squircle hover:bg-background hover:shadow-lg [&_svg]:size-8'
-        )}
-        onClick={onCreateWidget}
-      >
-        <IconPlus data-icon="inline-start" stroke={1.5} />
-        New widget
-      </Button>
+      {onCreateWidget && (
+        <Button
+          type="button"
+          variant="outline"
+          className={cn(
+            'absolute inset-0 m-auto h-fit w-fit',
+            'flex-col gap-1 rounded-2xl border-0 py-4 pr-8 pl-8! text-xs shadow-sm transition-shadow duration-300 ease-out squircle hover:bg-background hover:shadow-lg [&_svg]:size-8'
+          )}
+          onClick={onCreateWidget}
+        >
+          <IconPlus data-icon="inline-start" stroke={1.5} />
+          New widget
+        </Button>
+      )}
     </div>
   )
 }
@@ -124,6 +126,7 @@ function OverviewHeader({
   onCustomizingChange,
   onThemingChange
 }: OverviewHeaderProps) {
+  const { isRemote } = useWorkspaceLayoutCtx()
   return (
     <div className="flex size-full items-center gap-4">
       <WorkspaceName />
@@ -140,11 +143,13 @@ function OverviewHeader({
           active={theming}
           onClick={() => onThemingChange(!theming)}
         />
-        <WorkspaceSettingsDialog>
-          <WorkspaceSettingsDialogTrigger
-            render={<OverviewHeaderAction Icon={IconSettings} label="Settings" />}
-          />
-        </WorkspaceSettingsDialog>
+        {!isRemote && (
+          <WorkspaceSettingsDialog>
+            <WorkspaceSettingsDialogTrigger
+              render={<OverviewHeaderAction Icon={IconSettings} label="Settings" />}
+            />
+          </WorkspaceSettingsDialog>
+        )}
       </div>
     </div>
   )
@@ -166,8 +171,8 @@ function usePanelHeight() {
 }
 
 type OverviewProps = {
-  onCreateWidget: () => void
-  onCreateView: () => void
+  onCreateWidget?: () => void
+  onCreateView?: () => void
   onOpenView: (viewId: string) => void
   customizing: boolean
   theming: boolean

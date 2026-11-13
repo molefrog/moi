@@ -1,3 +1,4 @@
+import type { RemoteWorkspaceTarget } from './workspace-config'
 import type { PreviewBlock, StreamEvent } from './format'
 import type { IdentityIconId } from './identity-icons'
 import type { MoiContext } from './moi-context'
@@ -523,6 +524,8 @@ export type McpServer = {
 }
 
 export type WorkspaceEntry = {
+  // Derived from .moi/.workspace.json; not persisted in workspaces.json.
+  remote?: RemoteWorkspaceTarget
   id: string
   path: string
   addedAt: string
@@ -662,13 +665,19 @@ export type WorkspaceLayout = {
   theme?: WorkspaceTheme
 }
 
-// GET /api/workspaces/:id: layout plus the local workspace registration.
-export type WorkspaceLayoutResponse = WorkspaceLayout & {
-  cwd: string
-  name: string
-  provider?: WorkspaceType
-  agentId?: string
-}
+// GET /api/workspaces/:id returns either a complete local layout or a remote reference.
+type WorkspaceRouting = { apiBase: string; cwd: string }
+type WorkspaceMetadata = { name: string; provider?: WorkspaceType; agentId?: string }
+export type WorkspaceInfoResponse =
+  | (WorkspaceLayout & WorkspaceRouting & WorkspaceMetadata & { isRemote: false })
+  | (WorkspaceRouting & { version: 2; isRemote: true; remote: RemoteWorkspaceTarget })
+
+// The client resolves a remote reference before exposing a complete layout to consumers.
+export type WorkspaceLayoutResponse = WorkspaceLayout &
+  WorkspaceRouting &
+  WorkspaceMetadata & {
+    isRemote: boolean
+  }
 
 // One applet's thumbnail freshness record. Image bytes live as files in the
 // workspace's `.moi/.cache/thumbnails/` (server/applets/thumbnails.ts), never in

@@ -231,11 +231,12 @@ const MAX_IMAGE_BYTES = 50 * 1024 * 1024
 
 async function processCanvasImage(
   path: string,
-  quality: ScratchImageQuality
+  quality: ScratchImageQuality,
+  imageBytes?: Uint8Array
 ): Promise<{ data: Buffer; w: number; h: number; mimeType: string; name: string }> {
   const file = Bun.file(path)
-  if (!(await file.exists())) throw new Error(`Image file not found: ${path}`)
-  const bytes = new Uint8Array(await file.arrayBuffer())
+  if (!imageBytes && !(await file.exists())) throw new Error(`Image file not found: ${path}`)
+  const bytes = imageBytes ?? new Uint8Array(await file.arrayBuffer())
   if (bytes.length === 0) throw new Error(`Image file is empty: ${path}`)
   if (bytes.length > MAX_IMAGE_BYTES) {
     throw new Error(`Image is too large (${Math.round(bytes.length / 1e6)}MB, max 50MB): ${path}`)
@@ -256,7 +257,8 @@ async function processCanvasImage(
 async function applyAddImage(
   store: HeadlessStore,
   workspacePath: string,
-  op: Extract<ScratchOp, { kind: 'add-image' }>
+  op: Extract<ScratchOp, { kind: 'add-image' }>,
+  imageBytes?: Uint8Array
 ): Promise<ScratchOpResult> {
   const pageId = firstPageId(store)
   // Re-adding under an existing id replaces that shape; note its current asset so
@@ -265,7 +267,11 @@ async function applyAddImage(
     | { props?: { assetId?: unknown } }
     | undefined
   const prevAssetId = typeof prev?.props?.assetId === 'string' ? prev.props.assetId : undefined
-  const { data, w, h, mimeType, name } = await processCanvasImage(op.path, op.quality ?? 'lo')
+  const { data, w, h, mimeType, name } = await processCanvasImage(
+    op.path,
+    op.quality ?? 'lo',
+    imageBytes
+  )
   const { src } = await storeScratchpadAsset(workspacePath, data, mimeType)
   const assetId = AssetRecordType.createId()
   store.put([
@@ -474,14 +480,17 @@ function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
 export function executeScratchOp(
   workspacePath: string,
   workspaceId: string,
-  op: ScratchOp
+  op: ScratchOp,
+  imageBytes?: Uint8Array
 ): Promise<ScratchOpResult> {
   return withLock(workspacePath, async () => {
     const { document, writer } = await loadScratchpadDoc(workspacePath)
     const store = buildStore(document, writer)
     // add-image decodes/resizes the file first, so it's the one async op.
     const result =
-      op.kind === 'add-image' ? await applyAddImage(store, workspacePath, op) : applyOp(store, op)
+      op.kind === 'add-image'
+        ? await applyAddImage(store, workspacePath, op, imageBytes)
+        : applyOp(store, op)
     const next = store.getStoreSnapshot() as unknown as ScratchpadDoc
     await saveScratchpadDoc(next, workspacePath)
     publishEvent({ type: 'scratchpad:updated', workspaceId })

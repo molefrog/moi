@@ -1,8 +1,13 @@
+import { workspaceKeys } from '@/client/api/workspace-keys'
+import type { WorkspaceLayoutResponse } from '@/lib/types'
+import { useAppConfig } from '@/client/api/app-config'
+import { CloudApiError } from '../../account/api'
+import { isRemoteWorkspace } from '@/client/features/workspace/remote'
 import { useMutation, useMutationState, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useWorkspaces } from '../../home/api'
 import { getAccountGeneration } from '../../identity/store'
 import { useIdentity } from '../../identity/use-identity'
-import { ownerOnlyWorkspaceMembers } from './store'
+import { ownerOnlyWorkspaceMembers, removeWorkspaceMembers } from './store'
 import { memberKeys } from './keys'
 import { identityKey } from '../../identity/types'
 import {
@@ -39,23 +44,39 @@ export function applyPendingMembership(
   return { members, invitations }
 }
 export function useWorkspaceMembers(workspaceId: string | undefined) {
+  const cloud = useAppConfig().environment === 'cloud'
   const identity = useIdentity()
   const accountId = identity ? identityKey(identity) : undefined
-  const enabled = !!workspaceId && identity?.type === 'user' && !identity.isAnonymous
+  const remote = workspaceId ? isRemoteWorkspace(workspaceId) : undefined
+  const enabled = cloud && !!workspaceId && identity?.type === 'user' && !identity.isAnonymous
   const accountGeneration = getAccountGeneration()
   const mutationKey = ['workspace-members-action', accountGeneration, workspaceId]
   const query = useQuery({
     queryKey: memberKeys.workspace(accountId, workspaceId ?? ''),
-    initialData: ownerOnlyWorkspaceMembers,
+    initialData: remote ? undefined : ownerOnlyWorkspaceMembers,
     queryFn: async ({ signal }) => {
-      const snapshot = await fetchWorkspaceMembers(workspaceId!, signal)
-      if (signal.aborted || accountGeneration !== getAccountGeneration())
-        throw new Error('Identity changed')
-      return snapshot
+      try {
+        const snapshot = await fetchWorkspaceMembers(workspaceId!, signal)
+        if (signal.aborted || accountGeneration !== getAccountGeneration())
+          throw new Error('Identity changed')
+        return snapshot
+      } catch (error) {
+        if (
+          remote &&
+          !signal.aborted &&
+          accountGeneration === getAccountGeneration() &&
+          error instanceof CloudApiError &&
+          (error.status === 403 || error.status === 404)
+        ) {
+          removeWorkspaceMembers(workspaceId!)
+        }
+        throw error
+      }
     },
     enabled,
     retry: false,
-    staleTime: 30_000
+    staleTime: 30_000,
+    refetchInterval: 30_000
   })
   const pending = useMutationState({
     filters: { mutationKey, status: 'pending', exact: true },
@@ -85,7 +106,12 @@ export function useMembershipAction(workspaceId: string) {
       )
         throw new Error('Sign in to manage workspace members')
       if (action.type === 'invite') {
-        const name = workspaces.data?.find(workspace => workspace.id === workspaceId)?.name
+        const layout = client.getQueryData<WorkspaceLayoutResponse>(
+          workspaceKeys.layout(workspaceId)
+        )
+        const name = layout?.isRemote
+          ? layout.name
+          : workspaces.data?.find(workspace => workspace.id === workspaceId)?.name
         return inviteWorkspaceMember(workspaceId, action.email, name?.trim() || undefined)
       }
       if (action.type === 'remove') return removeWorkspaceMember(workspaceId, action.membershipId)

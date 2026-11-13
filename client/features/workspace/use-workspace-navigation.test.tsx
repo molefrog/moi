@@ -1,3 +1,5 @@
+import { seedWorkspaceInfo } from '@/client/features/workspace/workspace-test-utils'
+import { queryClient as appQueryClient } from '@/client/api/query-client'
 import * as appConfig from '@/client/api/app-config'
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -22,6 +24,9 @@ import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import * as workspaceEvents from '@/client/runtime/use-workspace-events'
 import { WorkspaceLayoutContext } from './workspace-layout-context'
 import { useWorkspaceNavigation } from './use-workspace-navigation'
+
+beforeEach(() => seedWorkspaceInfo('abc'))
+afterEach(() => appQueryClient.removeQueries({ queryKey: workspaceKeys.layout('abc') }))
 
 type ReadNavigationOptions = {
   base?: string
@@ -84,6 +89,9 @@ function readNavigation(
                 cwd: null,
                 provider: null,
                 workspaceId: 'abc',
+                apiBase: '/api/workspaces/abc',
+                chatAvailable: true,
+                isRemote: false,
                 isLoading: false
               }}
             >

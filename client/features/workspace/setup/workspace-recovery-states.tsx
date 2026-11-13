@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { HttpError } from '@/client/api/http'
 import { useLocation } from 'wouter'
 import { IconFolderOff } from '@tabler/icons-react'
 
@@ -87,24 +88,51 @@ export function WorkspaceLoadingState() {
   )
 }
 
+type WorkspaceOpenErrorProps = RecoveryRetryProps & { error: Error }
+
+export function WorkspaceOpenError({ error, retrying, onRetry }: WorkspaceOpenErrorProps) {
+  const [, navigate] = useLocation()
+  const missing = error instanceof HttpError && error.status === 404
+  return (
+    <RecoveryMessage
+      title={missing ? 'Workspace not found or you don’t have access' : 'Couldn’t open workspace'}
+      retrying={!missing && retrying}
+      onRetry={missing ? () => navigate('/') : onRetry}
+      actionLabel={missing ? 'Back to home' : 'Try again'}
+    >
+      {missing ? undefined : error.message}
+    </RecoveryMessage>
+  )
+}
+
 type RecoveryMessageProps = RecoveryRetryProps & {
   title: string
   type?: WorkspaceType
-  children: ReactNode
+  children?: ReactNode
+  actionLabel?: string
 }
 
-function RecoveryMessage({ title, type, children, retrying, onRetry }: RecoveryMessageProps) {
+export function RecoveryMessage({
+  title,
+  type,
+  children,
+  retrying,
+  onRetry,
+  actionLabel = 'Try again'
+}: RecoveryMessageProps) {
   return (
     <div className="flex flex-1 items-center justify-center p-6">
       <div className="flex w-full max-w-md flex-col gap-6">
         {type && <img src={workspaceProviderIcon[type]} alt="" className="size-10 self-center" />}
         <h1 className="text-center text-xl font-medium">{title}</h1>
         <div role="alert" className="flex flex-col items-center gap-4">
-          <p className="text-sm wrap-anywhere whitespace-pre-wrap text-muted-foreground">
-            {children}
-          </p>
+          {children && (
+            <p className="text-sm wrap-anywhere whitespace-pre-wrap text-muted-foreground">
+              {children}
+            </p>
+          )}
           <Button variant="secondary" disabled={retrying} onClick={onRetry}>
-            Try again
+            {actionLabel}
           </Button>
         </div>
       </div>

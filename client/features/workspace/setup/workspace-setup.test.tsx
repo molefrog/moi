@@ -25,9 +25,14 @@ import { welcomeNewWorkspace } from './workspace-welcome-state'
 type ScreenFixtureProps = {
   workspaceId?: string
   contentPending?: boolean
+  chatAvailable?: boolean
 }
 
-function ScreenFixture({ workspaceId = 'test', contentPending = false }: ScreenFixtureProps) {
+function ScreenFixture({
+  workspaceId = 'test',
+  contentPending = false,
+  chatAvailable = true
+}: ScreenFixtureProps) {
   return (
     <WorkspaceLayoutContext
       value={{
@@ -37,6 +42,9 @@ function ScreenFixture({ workspaceId = 'test', contentPending = false }: ScreenF
         name: 'Test workspace',
         cwd: null,
         provider: 'codex',
+        apiBase: '/api/workspaces/test',
+        chatAvailable,
+        isRemote: !chatAvailable,
         isLoading: false
       }}
     >
@@ -54,7 +62,8 @@ async function mount(
   globalConnected = false,
   contentPending = false,
   check?: Promise<HarnessAvailability>,
-  environment: 'local' | 'cloud' = 'cloud'
+  environment: 'local' | 'cloud' = 'cloud',
+  chatAvailable = true
 ) {
   const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>')
   const globals = {
@@ -191,7 +200,7 @@ async function mount(
   const render = () => {
     root.render(
       <QueryClientProvider client={client}>
-        <ScreenFixture contentPending={contentPending} />
+        <ScreenFixture contentPending={contentPending} chatAvailable={chatAvailable} />
       </QueryClientProvider>
     )
   }
@@ -631,4 +640,21 @@ test('missing local agents reuse install while cloud keeps manual recovery', asy
   const cloud = await mount(missing)
   expect(cloud.document.body.textContent).toContain('Install instructions')
   expect(cloud.document.body.textContent).not.toContain('Install ChatGPT')
+})
+
+test('chat availability from context skips agent setup while preserving content loading', async () => {
+  const { document, setContentPending } = await mount(
+    { status: 'login-required', reason: 'Sign in' },
+    false,
+    false,
+    true,
+    undefined,
+    'cloud',
+    false
+  )
+  expect(document.querySelector('[aria-label="Loading"]')).not.toBeNull()
+  expect(document.body.textContent).not.toContain('Set up ChatGPT')
+  await setContentPending(false)
+  expect(document.querySelector('[data-content]')).not.toBeNull()
+  expect(document.querySelector('[aria-label="Loading"]')).toBeNull()
 })

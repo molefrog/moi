@@ -21,7 +21,8 @@ export function useImportWorkspace() {
     mutationFn: input =>
       requestJson('/api/workspaces', jsonRequest('POST', input), 'Failed to add workspace'),
     onSuccess: (entry, input) => {
-      useUiStore.getState().markWorkspacePendingAnalysis(entry.id)
+      // Remote chat support is deferred, so there is no analysis to start.
+      if (!entry.remote) useUiStore.getState().markWorkspacePendingAnalysis(entry.id)
       queryClient.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, previous =>
         upsertWorkspaceEntry(previous, entry)
       )

@@ -5,7 +5,11 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'wouter'
 
 import { useAppConfig } from '@/client/api/app-config'
-import { useReorderWorkspaces, useWorkspaces } from '@/client/features/home/api'
+import {
+  useReorderWorkspaces,
+  useWorkspaceMetadata,
+  useWorkspaces
+} from '@/client/features/home/api'
 import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
 import {
   UpdateButton as UpdateButtonComponent,
@@ -48,7 +52,8 @@ type SidebarLayoutProps = {
 // App shell: a slim icon rail beside the page content. The page owns the panel's
 // header and body.
 export function SidebarLayout({ children, showWorkspaces = true }: SidebarLayoutProps) {
-  const { data: workspaces } = useWorkspaces()
+  const { data: entries } = useWorkspaces()
+  const workspaces = useWorkspaceMetadata(entries ?? [])
 
   // Identity, theme, and registry changes can all alter a workspace's sidebar
   // presentation. Refetch the list so the sidebar reflects them live. Exact:

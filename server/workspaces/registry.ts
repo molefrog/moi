@@ -1,3 +1,4 @@
+import { loadWorkspaceFileConfig } from './layout'
 import { existsSync, realpathSync } from 'node:fs'
 import { readdir, rename, rm, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
@@ -46,16 +47,26 @@ async function readRegistry(): Promise<WorkspaceEntry[]> {
   if (!existsSync(_registryPath)) return []
   try {
     const text = await Bun.file(_registryPath).text()
-    return JSON.parse(text) as WorkspaceEntry[]
+    const entries = JSON.parse(text) as WorkspaceEntry[]
+    return entries.map(({ remote: _storedRemote, ...entry }) => entry)
   } catch {
     return []
   }
 }
 
+// Owner routing lives in each folder's config. Reading it costs a file per
+// entry, so only listings and single lookups pay for it, never every registry read.
+async function withRemote(entry: WorkspaceEntry): Promise<WorkspaceEntry> {
+  const config = await loadWorkspaceFileConfig(entry.path).catch(() => undefined)
+  return config?.remote ? { ...entry, remote: config.remote } : entry
+}
+
 async function writeRegistry(entries: WorkspaceEntry[]): Promise<void> {
   const temporaryPath = `${_registryPath}.${crypto.randomUUID()}.tmp`
   try {
-    await Bun.write(temporaryPath, JSON.stringify(entries, null, 2))
+    // Owner routing is derived from each folder's config, never persisted here.
+    const stored = entries.map(({ remote: _remote, ...entry }) => entry)
+    await Bun.write(temporaryPath, JSON.stringify(stored, null, 2))
     await rename(temporaryPath, _registryPath)
   } finally {
     await rm(temporaryPath, { force: true })
@@ -128,15 +139,26 @@ export async function registerWorkspace(
 ): Promise<WorkspaceEntry> {
   return locked(async () => {
     const normalPath = resolve(absPath)
+    const remote = (await loadWorkspaceFileConfig(normalPath).catch(() => undefined))?.remote
     const entries = await readRegistry()
     if (opts.id) {
       const error = workspaceIdError(entries, normalPath, opts.id)
       if (error) throw new Error(error)
     }
     const existing = entries.find(e => e.path === normalPath)
-    if (existing) return existing
+    if (existing) return remote ? { ...existing, remote } : existing
+    if (remote) {
+      // One registration per owner workspace, whichever folder points at it.
+      const duplicate = (await Promise.all(entries.map(withRemote))).find(
+        entry =>
+          entry.remote?.user_id === remote.user_id &&
+          entry.remote.workspace_id === remote.workspace_id
+      )
+      if (duplicate) return withDisplayPath(duplicate)
+    }
     const entry: WorkspaceEntry = {
       id: opts.id ?? (await previousWorkspaceId(entries, normalPath)) ?? newWorkspaceId(),
+      ...(remote ? { remote } : {}),
       path: normalPath,
       addedAt: new Date().toISOString(),
       ...(opts.type ? { type: opts.type } : {}),
@@ -151,8 +173,8 @@ export async function registerWorkspace(
 }
 
 export async function getWorkspace(id: string): Promise<WorkspaceEntry | null> {
-  const entries = await readRegistry()
-  return entries.find(e => e.id === id) ?? null
+  const entry = (await readRegistry()).find(e => e.id === id)
+  return entry ? withRemote(entry) : null
 }
 
 export async function removeWorkspace(id: string): Promise<boolean> {
@@ -166,7 +188,7 @@ export async function removeWorkspace(id: string): Promise<boolean> {
 }
 
 export async function listWorkspaces(): Promise<WorkspaceEntry[]> {
-  const entries = await readRegistry()
+  const entries = await Promise.all((await readRegistry()).map(withRemote))
   return entries.map(withDisplayPath)
 }
 
@@ -185,7 +207,7 @@ export async function reorderWorkspaces(ids: string[]): Promise<WorkspaceEntry[]
 
     const ordered = next as WorkspaceEntry[]
     await writeRegistry(ordered)
-    return ordered.map(withDisplayPath)
+    return (await Promise.all(ordered.map(withRemote))).map(withDisplayPath)
   })
 }
 

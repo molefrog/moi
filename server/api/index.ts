@@ -1,3 +1,8 @@
+import { openSharedWorkspace } from '../workspaces/shared'
+import { executeScratchOp } from '../scratchpad/executor'
+import type { ScratchOp, WorkspaceInfoResponse } from '@/lib/types'
+import { workspaceApiBase } from '@/lib/workspace-config'
+import { loadWorkspaceFileConfig } from '../workspaces/layout'
 import { resolveWorkspaceEnv } from '../workspaces/env'
 import { changeWorkspaceHarness } from '../workspaces/change-harness'
 import { HarnessTransitionError, reserveWorkspaceOperation } from '../workspaces/harness-transition'
@@ -34,7 +39,7 @@ import { harnesses } from './harnesses'
 import { clientAppConfig, createdWorkspacesRoot, getAppConfig } from '../app-config'
 import { getAppSettings, pickAppSettingsPatch, saveAppSettings } from '../app-settings'
 import { appletForModule, recordAppletError } from '../applets/log'
-import { apiBaseFor, parseAppletTail, serveWorkspaceFile } from '../applets'
+import { parseAppletTail, serveWorkspaceFile } from '../applets'
 import { applyEnvChanged } from '../workspaces/env-apply'
 import { publishEvent } from '../events'
 import { callFunction, parseFunctionPath } from '../applets/functions'
@@ -83,6 +88,7 @@ import { requiredEnvFor } from '../workspaces/required-env'
 import {
   deleteView,
   listCompiledViews,
+  getWorkspaceViews,
   listViews,
   serveView,
   updateViewTitle,
@@ -160,6 +166,11 @@ async function handleFunctionCall(
   }
 }
 
+// Routes that describe the person using a workspace, not the workspace itself.
+// A visitor's Moi answers them from its own folder; an owner never serves them
+// to visitors.
+const PERSONAL_ROUTE_RE = /^\/(?:sessions|state|harness|skills)(?:\/|$)/
+
 // Resolve `:id` to a registered workspace once, 404 if unknown, and stash it on
 // the context. Mounted on the single-workspace sub-app so every nested route
 // shares the lookup instead of repeating `getWorkspace(...) ?? 404`.
@@ -172,6 +183,18 @@ const withWorkspace = createMiddleware<ApiEnv>(async (c, next) => {
       release = reserveWorkspaceOperation(id)
     const ws = await getWorkspace(id)
     if (!ws) return c.text('Workspace not found', 404)
+    const config = await loadWorkspaceFileConfig(ws.path)
+    const suffix = (c.req.path.split(`/workspaces/${encodeURIComponent(id)}`)[1] ?? '').replace(
+      /\/$/,
+      ''
+    )
+    const personal = PERSONAL_ROUTE_RE.test(suffix)
+    if (config.remote && suffix === '' && c.req.method === 'DELETE')
+      return c.text('Leaving remote workspaces is not available yet', 403)
+    if (config.remote && getAppConfig().environment !== 'cloud')
+      return c.text('Remote workspaces require Cloud mode', 403)
+    if (config.remote && suffix !== '' && !personal)
+      return c.text('Use the owner workspace address', 404)
     c.set('ws', ws)
     await next()
   } catch (error) {
@@ -208,12 +231,16 @@ one.get('/widgets/*', c => {
   const ws = c.get('ws')
   const { name, file } = parseAppletTail(c.req.url, ws.id, 'widgets')
   if (!name) return c.text('Not found', 404)
-  return serveWidget(name, file, ws.path, apiBaseFor(ws.id), c.req.header('if-none-match'))
+  return serveWidget(name, file, ws.path, workspaceApiBase(ws.id), c.req.header('if-none-match'))
 })
 
 // Views — full-screen agent apps. Mirrors the widget pair above: the exact path
 // lists (in manifest/nav order), `/*` serves one bundle file.
-one.get('/views', c => listViews(c.get('ws').path))
+one.get('/views', async c =>
+  c.req.query('includePending') === 'true'
+    ? c.json({ views: await getWorkspaceViews(c.get('ws')) })
+    : listViews(c.get('ws').path)
+)
 
 one.patch('/views/:viewId', async c => {
   const ws = c.get('ws')
@@ -275,7 +302,7 @@ one.get('/views/*', c => {
   const ws = c.get('ws')
   const { name, file } = parseAppletTail(c.req.url, ws.id, 'views')
   if (!name) return c.text('Not found', 404)
-  return serveView(name, file, ws.path, apiBaseFor(ws.id), c.req.header('if-none-match'))
+  return serveView(name, file, ws.path, workspaceApiBase(ws.id), c.req.header('if-none-match'))
 })
 
 one.post('/views', async c => {
@@ -347,7 +374,7 @@ one.post('/views/:viewId/submit', async c => {
 // localhost binding is NOT the guard.
 one.get('/files/*', c => {
   const ws = c.get('ws')
-  const tail = new URL(c.req.url).pathname.split(`/api/workspaces/${ws.id}/files/`)[1] ?? ''
+  const tail = new URL(c.req.url).pathname.split(`${workspaceApiBase(ws.id)}/files/`)[1] ?? ''
   return serveWorkspaceFile(ws.path, tail, c.req.header('range'), c.req.header('if-none-match'))
 })
 
@@ -356,7 +383,7 @@ one.get('/files/*', c => {
 // `…/rpc/<module>/<fn>`.
 one.post('/rpc/*', c => {
   const ws = c.get('ws')
-  const tail = new URL(c.req.url).pathname.split(`/api/workspaces/${ws.id}/rpc/`)[1] ?? ''
+  const tail = new URL(c.req.url).pathname.split(`${workspaceApiBase(ws.id)}/rpc/`)[1] ?? ''
   return handleFunctionCall(c.req.raw, tail, ws.path)
 })
 
@@ -412,7 +439,7 @@ one.post('/applet-log', async c => {
 // images only, resized server-side (see server/workspaces/preview.ts).
 one.get('/preview/*', c => {
   const ws = c.get('ws')
-  const tail = new URL(c.req.url).pathname.split(`/api/workspaces/${ws.id}/preview/`)[1] ?? ''
+  const tail = new URL(c.req.url).pathname.split(`${workspaceApiBase(ws.id)}/preview/`)[1] ?? ''
   return serveWorkspaceImagePreview(ws.path, tail, c.req.header('if-none-match'))
 })
 
@@ -789,6 +816,24 @@ one.put('/config', async c => {
 // `origin` is the writing tab's id — echoed in the broadcast so that tab can
 // ignore its own save. This is the browser's write path; the agent's draws are
 // written server-side (see server/scratchpad/executor.ts). See docs/moi-scratchpad.md.
+one.post('/scratchpad/ops', async c => {
+  try {
+    const form = await c.req.formData()
+    const op = JSON.parse(String(form.get('op'))) as ScratchOp | null
+    if (!op || typeof op.kind !== 'string') return c.text('Invalid scratchpad edit', 400)
+    let imageBytes: Uint8Array | undefined
+    if (op.kind === 'add-image') {
+      const image = form.get('image')
+      if (!(image instanceof File)) return c.text('Image file is required', 400)
+      imageBytes = new Uint8Array(await image.arrayBuffer())
+    }
+    const ws = c.get('ws')
+    return c.json(await executeScratchOp(ws.path, ws.id, op, imageBytes))
+  } catch (error) {
+    return c.text(error instanceof Error ? error.message : 'Scratchpad edit failed', 400)
+  }
+})
+
 one.get('/scratchpad', async c => {
   return c.json(await loadScratchpadDoc(c.get('ws').path))
 })
@@ -875,15 +920,28 @@ one.delete('/icon', async c => {
 // DELETE unregisters.
 one.get('/', async c => {
   const ws = c.get('ws')
-  const layout = await loadLayout(ws.path)
+  const config = await loadWorkspaceFileConfig(ws.path)
+  if (config.remote) {
+    return c.json({
+      version: 2,
+      remote: config.remote,
+      apiBase: workspaceApiBase(config.remote.workspace_id, config.remote.user_id),
+      isRemote: true,
+      cwd: ws.path
+    } satisfies WorkspaceInfoResponse)
+  }
+
+  const layout = config
   return c.json({
     ...layout,
+    apiBase: workspaceApiBase(ws.id),
+    isRemote: false,
     // Resolved display name: the settings override, or the folder name.
     name: layout.name || basename(ws.path),
     cwd: ws.path,
     provider: ws.type,
     agentId: ws.agentId
-  })
+  } satisfies WorkspaceInfoResponse)
 })
 
 // Thumbnail freshness records, without image bytes — the capture hook compares
@@ -936,11 +994,20 @@ one.put('/applet-thumbnails', async c => {
 one.put('/', async c => {
   const ws = c.get('ws')
   const body = await c.req.json()
-  if (!body || body.version !== 1) return c.text('Bad request', 400)
+  if (!body) return c.text('Bad request', 400)
   // `origin` is the writing tab's id, echoed so that tab skips its own event.
-  const { origin, harness, ...layout } = body
+  const { origin, harness, apiBase: _apiBase, isRemote: _isRemote, ...layout } = body
   // Preserve server-owned identity (name/icon) across a grid/theme save so the
   // client's PUT can't erase a `moi config`-set name. See mergeLayoutForSave.
+  const config = await loadWorkspaceFileConfig(ws.path)
+  if (config.remote) {
+    return c.text(
+      'Remote references contain only the owner address; save shared content to the owner',
+      403
+    )
+  }
+
+  if (body.version !== 1) return c.text('Bad request', 400)
   const existing = await loadLayout(ws.path)
   const next = mergeLayoutForSave(existing, layout)
   if (harness !== undefined && harness !== (ws.type ?? 'claude-code')) {
@@ -973,7 +1040,12 @@ const workspaces = new Hono<ApiEnv>()
 async function mergeWorkspaceList(entries: WorkspaceEntry[]) {
   return Promise.all(
     entries.map(async e => {
-      const layout = await loadLayout(e.path)
+      const layout = await loadWorkspaceFileConfig(e.path).catch(() => null)
+      if (!layout) return e
+      if (layout.remote) {
+        return { ...e, remote: layout.remote, name: layout.remote.workspace_id }
+      }
+
       return {
         ...e,
         name: layout.name ?? e.name,
@@ -984,11 +1056,36 @@ async function mergeWorkspaceList(entries: WorkspaceEntry[]) {
   )
 }
 
+workspaces.post('/shared/open', async c => {
+  if (getAppConfig().demo || getAppConfig().environment !== 'cloud')
+    return c.text('Shared workspaces require Cloud mode', 403)
+  const body = await c.req.json().catch(() => null)
+  if (
+    !body ||
+    typeof body.user_id !== 'string' ||
+    typeof body.workspace_id !== 'string' ||
+    !body.user_id ||
+    !body.workspace_id
+  )
+    return c.text('Invalid shared workspace', 400)
+  try {
+    return c.json(
+      await openSharedWorkspace({ user_id: body.user_id, workspace_id: body.workspace_id })
+    )
+  } catch (error) {
+    return c.text(error instanceof Error ? error.message : 'Could not open shared workspace', 503)
+  }
+})
+
 workspaces.get('/', async c => {
   // Merge each workspace's live identity and theme over the registry snapshot
   // so app-wide workspace lists render the same presentation as the workspace.
   const entries = await listWorkspaces()
-  return c.json(await mergeWorkspaceList(entries))
+  return c.json(
+    await mergeWorkspaceList(
+      getAppConfig().environment === 'cloud' ? entries : entries.filter(entry => !entry.remote)
+    )
+  )
 })
 
 workspaces.put('/order', async c => {
@@ -997,12 +1094,20 @@ workspaces.put('/order', async c => {
     return c.text('Expected { ids: string[] }', 400)
   }
   try {
-    const entries = await reorderWorkspaces(body.ids)
+    const hiddenIds =
+      getAppConfig().environment === 'cloud'
+        ? []
+        : (await listWorkspaces()).filter(entry => entry.remote).map(entry => entry.id)
+    const entries = await reorderWorkspaces([...body.ids, ...hiddenIds])
     // List-only change: a narrow event so clients refetch just the sidebar
     // list, not every per-workspace query (`workspace:updated` also triggers
     // layout refetches in open workspaces).
     publishEvent({ type: 'workspaces-list:updated', origin: eventOrigin(body.origin) })
-    return c.json(await mergeWorkspaceList(entries))
+    return c.json(
+      await mergeWorkspaceList(
+        getAppConfig().environment === 'cloud' ? entries : entries.filter(entry => !entry.remote)
+      )
+    )
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return c.text(message, 400)
@@ -1045,7 +1150,7 @@ workspaces.post('/', async c => {
     type,
     ...metadata
   })
-  return c.json(entry, 201)
+  return c.json((await mergeWorkspaceList([entry]))[0], 201)
 })
 
 workspaces.get('/discover', async c => c.json(await discoverWorkspaces()))
@@ -1056,6 +1161,12 @@ workspaces.get('/previews', async c => {
   const entries = await listWorkspaces()
   const previews = await Promise.all(
     entries.map(async ws => {
+      const config = await loadWorkspaceFileConfig(ws.path).catch(() => null)
+      if (!config) return [ws.id, { thumbnails: [] }] as const
+      if (config.remote) {
+        return [ws.id, { thumbnails: [] }] as const
+      }
+
       const views = await listCompiledViews(ws.path).catch(() => [])
       const preview = await getWorkspacePreview(ws.path, {
         getProviderPreview: includeFirstUserMessage =>

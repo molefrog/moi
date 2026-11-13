@@ -1,3 +1,4 @@
+import { seedWorkspaceInfo } from '@/client/features/workspace/workspace-test-utils'
 import { afterEach, expect, test } from 'bun:test'
 import { act } from 'react'
 import { cleanupAccount, mountAccount } from '../../account/account-test-utils'
@@ -106,3 +107,36 @@ for (const name of ['Weekly Review', '', '   ']) {
     })
   })
 }
+
+function RemoteMembersProbe() {
+  const id = 'visitor-board'
+  seedWorkspaceInfo(id, { user_id: 'alice', workspace_id: 'board' })
+  const members = useWorkspaceMembers(id)
+  return <span data-enabled>{String(members.isEnabled)}</span>
+}
+
+test('remote workspace membership queries address the owner', async () => {
+  const ui = await mountAccount({ children: <RemoteMembersProbe /> })
+  await ui.settle()
+  expect(ui.document.querySelector('[data-enabled]')?.textContent).toBe('true')
+  expect(ui.calls.some(call => call.path === '/cloud/api/workspaces/alice:board/members')).toBe(
+    true
+  )
+})
+
+test('remote invitations use the resolved owner name', async () => {
+  const ui = await mountAccount({ children: <Probe /> })
+  await ui.settle()
+  await act(async () => {
+    ui.qc.setQueryData(workspaceKeys.layout('one'), {
+      apiBase: '/api/workspaces/alice:board',
+      isRemote: true,
+      name: 'Owner board'
+    })
+  })
+  await ui.click('Invite Tony')
+  expect(ui.calls.find(call => call.path.endsWith('/invitations'))).toEqual({
+    path: '/cloud/api/workspaces/alice:board/invitations',
+    body: { email: 'tony@example.com', workspaceName: 'Owner board' }
+  })
+})
