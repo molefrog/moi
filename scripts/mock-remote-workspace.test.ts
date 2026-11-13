@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test
 import { mkdtemp, mkdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { parse, stringify } from 'devalue'
 import { createMockRemoteInvitations, createMockRemoteProxy } from './mock-remote-workspace'
 
 describe('owner startup', () => {
@@ -59,17 +60,45 @@ describe('owner startup', () => {
     if (child) await child.exited
     if (root) await rm(root, { recursive: true, force: true })
   })
-  test('legacy fixture gets the Views widget without resetting counter or visitor settings', async () => {
+  test('owner provides two launch widgets and a persistent plan without resetting visitor settings', async () => {
     const layout = await (await fetch(origin + '/api/workspaces/owner-board')).json()
     expect(layout.widgetGrid.map((item: { i: string }) => item.i)).toEqual([
       '_moi_views',
-      'counter'
+      'launch-brief',
+      'launch-progress'
     ])
     expect(layout.selectedModel).toBe('keep-model')
     expect(await Bun.file(join(root, 'owner-board/.moi/count.json')).json()).toBe(7)
     expect(await Bun.file(join(root, 'visitor/.moi/.workspace.json')).json()).toEqual(remoteConfig)
     const { views } = await (await fetch(origin + '/api/workspaces/owner-board/views')).json()
-    expect(views.some((view: { id: string }) => view.id === 'counter')).toBe(true)
+    expect(views.some((view: { id: string }) => view.id === 'launch-plan')).toBe(true)
+    expect(layout.name).toBe('Product launch')
+    const widgets = await (await fetch(origin + '/api/workspaces/owner-board/widgets')).json()
+    expect(widgets.widgets.map((widget: { id: string }) => widget.id).sort()).toEqual([
+      'launch-brief',
+      'launch-progress'
+    ])
+    const update = await fetch(
+      origin + '/api/workspaces/owner-board/rpc/views/launch-plan/setDone',
+      {
+        method: 'POST',
+        body: stringify(['landing', true])
+      }
+    )
+    expect(update.status).toBe(200)
+    expect(
+      parse(await update.text()).find((task: { id: string }) => task.id === 'landing').done
+    ).toBe(true)
+    const read = await fetch(
+      origin + '/api/workspaces/owner-board/rpc/widgets/launch-progress/read',
+      {
+        method: 'POST',
+        body: stringify([])
+      }
+    )
+    expect(
+      parse(await read.text()).find((task: { id: string }) => task.id === 'landing').done
+    ).toBe(true)
   })
 })
 
@@ -296,7 +325,7 @@ test('invitation acceptance reveals the share for that viewer and resets on rest
     })
   const pending = await (await cloud(request('workspaces/invitations'))).json()
   expect(pending.invitations).toEqual([
-    { id: 'mock-owner-invite', workspaceName: 'Shared counter', inviter: { name: 'Alice' } }
+    { id: 'mock-owner-invite', workspaceName: 'Product launch', inviter: { name: 'Alice' } }
   ])
   expect(await (await cloud(request('workspaces/shared'))).json()).toEqual({ workspaces: [] })
   const accept = () => cloud(request('invitations/mock-owner-invite/accept', 'POST'))
@@ -308,7 +337,7 @@ test('invitation acceptance reveals the share for that viewer and resets on rest
   expect(await (await cloud(request('workspaces/invitations'))).json()).toEqual({ invitations: [] })
   expect(await (await cloud(request('workspaces/shared'))).json()).toEqual({
     workspaces: [
-      { id: 'owner-board', name: 'Shared counter', owner: { id: 'alice', name: 'Alice' } }
+      { id: 'owner-board', name: 'Product launch', owner: { id: 'alice', name: 'Alice' } }
     ]
   })
   const sharing = request('workspaces/shared')

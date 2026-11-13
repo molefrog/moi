@@ -1,5 +1,5 @@
 // Local remote-workspace fixture and browser proxy.
-import { mkdir, symlink } from 'node:fs/promises'
+import { mkdir, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { createServer, request as httpRequest, type IncomingMessage } from 'node:http'
@@ -42,7 +42,7 @@ export function createMockRemoteInvitations() {
           : [
               {
                 id: 'mock-owner-invite',
-                workspaceName: 'Shared counter',
+                workspaceName: 'Product launch',
                 inviter: { name: 'Alice' }
               }
             ]
@@ -66,7 +66,7 @@ export function createMockRemoteInvitations() {
           ? [
               {
                 id: 'owner-board',
-                name: 'Shared counter',
+                name: 'Product launch',
                 owner: { id: 'alice', name: 'Alice' }
               }
             ]
@@ -263,39 +263,128 @@ if (import.meta.main) {
     if (error.code !== 'EEXIST') throw error
   })
   await registerWorkspace(owner, { id: 'owner-board', type: 'claude-code' })
-  if (!(await Bun.file(join(owner, '.moi/.workspace.json')).exists()))
-    await saveLayout(
-      {
-        ...createDefaultWorkspaceLayout(),
-        name: 'Shared counter',
-        widgetGrid: [...createDefaultWorkspaceLayout().widgetGrid, { i: 'counter', x: 0, y: 1 }],
-        tabs: { open: ['overview', 'views/counter'], active: 'overview' }
-      },
-      owner
-    )
-  // Upgrade the original counter-only fixture without resetting personal settings or data.
   const layout = await loadLayout(owner)
-  if (
-    layout.widgetGrid.length === 1 &&
-    layout.widgetGrid[0]?.i === 'counter' &&
-    layout.widgetGrid[0].y === 0
-  )
+  if (!layout.name || layout.name === 'Shared counter') {
     await saveLayout(
       {
         ...layout,
-        widgetGrid: [...createDefaultWorkspaceLayout().widgetGrid, { i: 'counter', x: 0, y: 1 }]
+        name: 'Product launch',
+        widgetGrid: [
+          ...createDefaultWorkspaceLayout().widgetGrid,
+          { i: 'launch-brief', x: 0, y: 1 },
+          { i: 'launch-progress', x: 2, y: 1 }
+        ],
+        tabs: { open: ['overview', 'views/launch-plan'], active: 'overview' }
       },
       owner
     )
-
-  const component = `import { useEffect, useState } from 'react'; import { read, increment } from './counter.server'; export const config = { title: 'Counter', colSpan: 1, rowSpan: 1 }; export default function Counter() { const [count, setCount] = useState(0); useEffect(() => { read().then(setCount) }, []); return <div className="p-4"><p>Owner count: {count}</p><button onClick={() => increment().then(setCount)}>Increment owner count</button></div> }`
-  const functions = `import { join } from 'node:path'; const file = Bun.file(join(import.meta.dir, '../count.json')); export async function read() { return file.json().catch(() => 0) } export async function increment() { const next = (await read()) + 1; await Bun.write(file, JSON.stringify(next)); return next }`
-  for (const kind of ['views', 'widgets']) {
-    if (!(await Bun.file(join(owner, `.moi/${kind}/counter.tsx`)).exists()))
-      await Bun.write(join(owner, `.moi/${kind}/counter.tsx`), component)
-    if (!(await Bun.file(join(owner, `.moi/${kind}/counter.server.ts`)).exists()))
-      await Bun.write(join(owner, `.moi/${kind}/counter.server.ts`), functions)
   }
+  // Retire only the original generated applets; keep their saved counter data.
+  for (const kind of ['views', 'widgets'])
+    for (const suffix of ['tsx', 'server.ts'])
+      await rm(join(owner, `.moi/${kind}/counter.${suffix}`), { force: true })
+
+  const tasks = [
+    {
+      id: 'positioning',
+      title: 'Agree on the launch story',
+      owner: 'Alice',
+      area: 'Messaging',
+      done: true
+    },
+    {
+      id: 'landing',
+      title: 'Review the landing page',
+      owner: 'Jamie',
+      area: 'Website',
+      done: false
+    },
+    {
+      id: 'demo',
+      title: 'Record the two-minute demo',
+      owner: 'Alice',
+      area: 'Content',
+      done: false
+    },
+    {
+      id: 'email',
+      title: 'Write the customer announcement',
+      owner: 'Sam',
+      area: 'Messaging',
+      done: true
+    },
+    { id: 'qa', title: 'Test signup on mobile', owner: 'Jamie', area: 'Quality', done: false },
+    { id: 'support', title: 'Prepare support answers', owner: 'Sam', area: 'Support', done: false }
+  ]
+  const data = Bun.file(join(owner, '.moi/launch-tasks.json'))
+  if (!(await data.exists())) await Bun.write(data, JSON.stringify(tasks, null, 2))
+  const functions = `
+const file = () => Bun.file('.moi/launch-tasks.json');
+type Task = { id: string; title: string; owner: string; area: string; done: boolean };
+export async function read(): Promise<Task[]> { return file().json(); }
+export async function setDone(id: string, done: boolean) {
+  const tasks = await read();
+  const task = tasks.find(task => task.id === id);
+  if (!task || typeof done !== 'boolean') throw new Error('Invalid task');
+  task.done = done;
+  await Bun.write(file(), JSON.stringify(tasks, null, 2));
+  return tasks;
+}`
+  const checklist = (view: boolean) => `
+import { useEffect, useState } from 'react';
+import { read, setDone } from './${view ? 'launch-plan' : 'launch-progress'}.server';
+export const config = ${view ? "{ title: 'Launch plan', icon: 'rocket' }" : '{ colSpan: 2, rowSpan: 2 }'};
+export default function LaunchPlan() {
+  const [tasks, setTasks] = useState<Awaited<ReturnType<typeof read>>>([]);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { read().then(setTasks).catch(error => setError(error.message)); }, []);
+  const completed = tasks.filter(task => task.done).length;
+  async function update(id: string, done: boolean) {
+    setBusy(true); setError('');
+    try { setTasks(await setDone(id, done)); } catch (error) { setError(String(error)); }
+    finally { setBusy(false); }
+  }
+  return <div className="h-full w-full overflow-auto bg-background text-foreground ${view ? 'p-6 sm:p-10' : 'p-5'}">
+    <div className="mx-auto max-w-3xl">
+      <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">${view ? 'Product launch / Team checklist' : 'Launch readiness'}</p>
+      <h1 className="mt-3 ${view ? 'text-3xl' : 'text-2xl'} font-medium">${view ? 'A clear path to launch' : '{completed} / {tasks.length} ready'}</h1>
+      <p className="mt-2 text-sm text-muted-foreground">${view ? 'Finish the essentials together. Tick off an item when it is ready to ship.' : 'The essentials before we go live.'}</p>
+      <progress aria-label="Launch readiness" className="my-4 h-2 w-full accent-emerald-600" value={completed} max={tasks.length || 1} />
+      {error && <p role="alert" className="mb-3 text-sm text-red-600">{error}</p>}
+      {!tasks.length && !error && <p className="text-sm text-muted-foreground">Loading launch plan…</p>}
+      <div className="space-y-4">{${view ? 'tasks' : 'tasks.filter(task => !task.done).slice(0, 3)'}.map(task =>
+        <label key={task.id} className="flex cursor-pointer items-start gap-3">
+          <input type="checkbox" className="mt-1 size-4 accent-emerald-600" checked={task.done} disabled={busy} onChange={event => void update(task.id, event.target.checked)} />
+          <span><span className={task.done ? 'text-sm text-muted-foreground line-through' : 'text-sm font-medium'}>{task.title}</span>
+          <span className="mt-1 block text-xs text-muted-foreground">{task.owner} · {task.area}</span></span>
+        </label>)}</div>
+      ${view ? '' : '<p className="mt-4 text-xs text-muted-foreground">Full checklist in the Launch plan view.</p>'}
+    </div>
+  </div>;
+}`
+  const brief = `
+export const config = { colSpan: 2, rowSpan: 2 };
+export default function LaunchBrief() {
+  return <div className="h-full w-full overflow-auto bg-emerald-50 p-5 text-emerald-950">
+    <p className="text-xs font-medium uppercase tracking-widest text-emerald-700">Launch brief</p>
+    <h2 className="mt-4 text-2xl font-medium">Ready for the first hello.</h2>
+    <p className="mt-3 text-sm leading-relaxed">Introduce our new team workspace to the first 50 customers. Keep the story clear and the first session effortless.</p>
+    <dl className="mt-6 space-y-3 text-sm">
+      <div className="flex justify-between gap-3"><dt className="text-emerald-700">Stage</dt><dd>Private beta</dd></div>
+      <div className="flex justify-between gap-3"><dt className="text-emerald-700">Launch lead</dt><dd>Alice</dd></div>
+      <div className="flex justify-between gap-3"><dt className="text-emerald-700">Next milestone</dt><dd>Team review</dd></div>
+    </dl>
+  </div>;
+}`
+  for (const [path, source] of Object.entries({
+    'widgets/launch-brief.tsx': brief,
+    'widgets/launch-progress.tsx': checklist(false),
+    'widgets/launch-progress.server.ts': functions,
+    'views/launch-plan.tsx': checklist(true),
+    'views/launch-plan.server.ts': functions
+  }))
+    await Bun.write(join(owner, '.moi', path), source)
   await buildAllViews(owner)
   await buildAllWidgets(owner)
 
