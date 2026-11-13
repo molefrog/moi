@@ -144,7 +144,7 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
       chatAvailable: !query.data?.isRemote,
       isLoading: query.isLoading
     }),
-    [query.data, query.isLoading, setLayout, id, qc]
+    [query.data, query.isLoading, setLayout, id]
   )
 
   return (
