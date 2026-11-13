@@ -64,8 +64,9 @@ holds only the reference and skills.
   `config`, `tabs`, `call-server-fn`, `debug logs`, and scratchpad reads/edits act on the owner.
 - `moi refresh`, `navigate`, and `scratch view` act on your user's running Moi and browser. Refresh
   after remote changes.
-- Paths to images you pass in or write out (`config icon`, `scratch add image`,
-  `scratch read-image`, `scratch view --out`) are on this machine.
+- Image input and output paths refer to the machine running the CLI. `config icon` and
+  `scratch add image` upload local files to the owner; `scratch read-image` saves the owner's
+  image locally, and `scratch view --out` saves the visitor browser's canvas screenshot locally.
 - Never create local applet copies or fall back to local content when the owner is unavailable.
   Remote chat and the settings UI are unavailable.
 
