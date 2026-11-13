@@ -3,10 +3,10 @@ import { mkdtemp, rm, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import * as client from './client'
-import { linkRemoteWorkspace, unlinkRemoteWorkspace, currentRemoteWorkspace } from './workspace'
+import { initializeRemoteWorkspace, currentRemoteWorkspace } from './workspace'
 import { setRegistryPath, DEFAULT_REGISTRY_PATH, listWorkspaces } from '../workspaces/registry'
 
-test('link, report, and unlink preserve workspace files and cloud membership', async () => {
+test('remote initialization is repeatable and preserves workspace files', async () => {
   const root = await mkdtemp(join(tmpdir(), 'moi-link-')),
     folder = join(root, 'workspace')
   const shares = spyOn(client, 'fetchSharedWorkspaces').mockResolvedValue([
@@ -16,7 +16,10 @@ test('link, report, and unlink preserve workspace files and cloud membership', a
   try {
     await mkdir(folder)
     await Bun.write(join(folder, 'notes.txt'), 'keep me')
-    const result = await linkRemoteWorkspace(folder, { user_id: 'owner', workspace_id: 'board' })
+    const result = await initializeRemoteWorkspace(folder, {
+      user_id: 'owner',
+      workspace_id: 'board'
+    })
     expect(result.path).toBe(folder)
     expect(await currentRemoteWorkspace(folder)).toEqual({
       path: folder,
@@ -30,16 +33,11 @@ test('link, report, and unlink preserve workspace files and cloud membership', a
       version: 2,
       remote: { user_id: 'owner', workspace_id: 'board' }
     })
-    await unlinkRemoteWorkspace(folder)
-    expect(await currentRemoteWorkspace(folder)).toBeUndefined()
     expect(await Bun.file(join(folder, 'notes.txt')).text()).toBe('keep me')
-    expect(await Bun.file(join(folder, '.moi/.workspace.json')).exists()).toBe(false)
-    expect(await listWorkspaces()).toEqual([])
-    // An unlinked folder can be linked again.
-    await linkRemoteWorkspace(folder, { user_id: 'owner', workspace_id: 'board' })
+    await initializeRemoteWorkspace(folder, { user_id: 'owner', workspace_id: 'board' })
     expect((await listWorkspaces()).map(workspace => workspace.path)).toEqual([folder])
     await expect(
-      linkRemoteWorkspace(join(root, 'other'), { user_id: 'stranger', workspace_id: 'board' })
+      initializeRemoteWorkspace(join(root, 'other'), { user_id: 'stranger', workspace_id: 'board' })
     ).rejects.toThrow('not shared')
   } finally {
     shares.mockRestore()
@@ -48,7 +46,7 @@ test('link, report, and unlink preserve workspace files and cloud membership', a
   }
 })
 
-test('link targets the requested folder even inside a registered parent', async () => {
+test('remote initialization targets the requested folder even inside a registered parent', async () => {
   const root = await mkdtemp(join(tmpdir(), 'moi-link-parent-'))
   const folder = join(root, 'nested')
   const shares = spyOn(client, 'fetchSharedWorkspaces').mockResolvedValue([
@@ -58,9 +56,12 @@ test('link targets the requested folder even inside a registered parent', async 
   setRegistryPath(join(root, 'registry.json'))
   try {
     await mkdir(folder)
-    await linkRemoteWorkspace(root, { user_id: 'owner', workspace_id: 'parent' })
+    await initializeRemoteWorkspace(root, { user_id: 'owner', workspace_id: 'parent' })
     const before = await Bun.file(join(root, '.moi/.workspace.json')).text()
-    const linked = await linkRemoteWorkspace(folder, { user_id: 'owner', workspace_id: 'child' })
+    const linked = await initializeRemoteWorkspace(folder, {
+      user_id: 'owner',
+      workspace_id: 'child'
+    })
     expect(linked.path).toBe(folder)
     expect(await currentRemoteWorkspace(folder)).toEqual({
       path: folder,
@@ -69,11 +70,11 @@ test('link targets the requested folder even inside a registered parent', async 
     })
     expect(await Bun.file(join(root, '.moi/.workspace.json')).text()).toBe(before)
     await expect(
-      linkRemoteWorkspace(join(root, 'another'), {
+      initializeRemoteWorkspace(join(root, 'another'), {
         user_id: 'owner',
         workspace_id: 'child'
       })
-    ).rejects.toThrow('already linked')
+    ).rejects.toThrow('already initialized')
     expect(await Bun.file(join(root, 'another/.moi/.workspace.json')).exists()).toBe(false)
   } finally {
     shares.mockRestore()

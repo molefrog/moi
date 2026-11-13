@@ -75,7 +75,8 @@ test('profile names cannot inject terminal commands', async () => {
 test('human CLI login, status, invitations, acceptance and logout', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'moi-human-commands-'))
   let accepted = false,
-    revoked = false
+    revoked = false,
+    sharedReads = 0
   const server = Bun.serve({
     port: 0,
     async fetch(request): Promise<Response> {
@@ -103,7 +104,10 @@ test('human CLI login, status, invitations, acceptance and logout', async () => 
       expect(request.headers.get('authorization')).toStartWith('Bearer ')
       if (path.endsWith('/me'))
         return Response.json({ id: 'human', name: 'Alex', email: 'alex@example.com' })
-      if (path.endsWith('/workspaces/shared')) return Response.json({ workspaces: [] })
+      if (path.endsWith('/workspaces/shared')) {
+        sharedReads++
+        return Response.json({ workspaces: [] })
+      }
       if (path.endsWith('/workspaces/invitations'))
         return Response.json({
           invitations: [
@@ -118,7 +122,11 @@ test('human CLI login, status, invitations, acceptance and logout', async () => 
         })
       if (path.endsWith('/invitations/invite/accept')) {
         accepted = true
-        return Response.json({ success: true, workspaceId: 'board', membershipId: 'member' })
+        return Response.json({
+          success: true,
+          remote: { user_id: 'owner', workspace_id: 'board' },
+          membershipId: 'member'
+        })
       }
       return new Response(null, { status: 404 })
     }
@@ -149,13 +157,43 @@ test('human CLI login, status, invitations, acceptance and logout', async () => 
     expect(await cli(['login', '--no-browser'])).toContain('Congratulations!')
     expect(JSON.parse(await cli(['--json'])).me.id).toBe('human')
     expect(JSON.parse(await cli(['invitations', '--json']))).toHaveLength(1)
-    await cli(['accept', 'invite', '--json'])
+    const beforeAcceptance = sharedReads
+    expect(JSON.parse(await cli(['accept', 'invite', '--json'])).remote).toEqual({
+      user_id: 'owner',
+      workspace_id: 'board'
+    })
+    expect(await cli(['accept', 'invite'])).toContain('moi init --remote owner:board')
     expect(accepted).toBe(true)
+    expect(sharedReads).toBe(beforeAcceptance)
     await cli(['logout'])
     expect(revoked).toBe(true)
     expect(await Bun.file(join(directory, 'remote-auth.json')).exists()).toBe(false)
   } finally {
     server.stop(true)
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('invalid or unauthenticated acceptance leaves credentials untouched', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'moi-accept-signed-out-'))
+  const { createRemoteClient } = await import('../../remote/client')
+  const url = 'http://localhost:8787/cloud'
+  try {
+    await Bun.write(join(directory, 'config.json'), JSON.stringify({ remote: { url } }))
+    const client = createRemoteClient(directory)
+    for (const invite of ['invitation', `${url}/invite/id?token=${'A'.repeat(43)}`]) {
+      await expect(client.accept(invite, 'Agent', 'other')).rejects.toThrow('remote login')
+    }
+    await expect(client.accept(`${url}/agent-invite/id?token=${'A'.repeat(43)}`)).rejects.toThrow(
+      '--name and --client'
+    )
+    for (const invalid of ['Grok Bot', 'openclaw', 'unknown', ''])
+      await expect(
+        client.accept(`${url}/agent-invite/id?token=${'A'.repeat(43)}`, 'Agent', invalid)
+      ).rejects.toThrow('Invalid client')
+    expect(await Bun.file(join(directory, 'remote-auth.json')).exists()).toBe(false)
+    expect(await Bun.file(join(directory, 'remote-agent-pending.json')).exists()).toBe(false)
+  } finally {
     await rm(directory, { recursive: true, force: true })
   }
 })

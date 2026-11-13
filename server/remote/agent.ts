@@ -1,6 +1,10 @@
 import { calculateJwkThumbprint, exportJWK, generateKeyPair, importJWK, SignJWT } from 'jose'
 import { z } from 'zod'
 
+export const AGENT_CLIENTS = ['grok-bot', 'instinct', 'muse', 'dot', 'duet', 'other'] as const
+export const agentClientSchema = z.enum(AGENT_CLIENTS)
+export type AgentClient = z.infer<typeof agentClientSchema>
+
 const privateKey = z.object({
   kty: z.literal('OKP'),
   crv: z.literal('Ed25519'),
@@ -78,7 +82,7 @@ export async function agentJoinBody(
   keys: AgentCredentials,
   token: string,
   name: string,
-  client: string
+  client: AgentClient
 ) {
   const unsigned = {
     token,

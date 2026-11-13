@@ -26,7 +26,7 @@ The browser calls the remote prefix directly with its Batiok session. Batiok che
 
 The standalone Moi UI supports local workspaces only: it hides remote registrations and makes no Cloud discovery, sharing, or collaboration calls.
 
-CLI commands in a linked folder resolve the same config and authenticate through the Cloud login. See [Remote operations](remote-cli.md#remote-operations) for which command runs where.
+`moi init [directory] --remote ownerId:workspaceId` installs the reference and skill. CLI commands use that config and the saved Cloud login. See [Remote operations](remote-cli.md#remote-operations) for where commands run.
 
 ## Discovery and collaboration
 

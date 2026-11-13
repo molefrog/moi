@@ -11,7 +11,7 @@ function canonical(value: unknown): string {
     return JSON.stringify(value, Object.keys(value).sort())
   return JSON.stringify(value)
 }
-test('agent lifecycle uses real signatures, preserves keys on ambiguous joins, and confirms logout', async () => {
+test('agent lifecycle uses real signatures, preserves keys on ambiguous acceptance, and confirms logout', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'moi-agent-'))
   let keys: { host: JWK; agent: JWK } | undefined
   let agentId = '',
@@ -72,7 +72,7 @@ test('agent lifecycle uses real signatures, preserves keys on ambiguous joins, a
         }
         return Response.json({
           success: true,
-          workspaceId: 'one',
+          remote: { user_id: 'owner', workspace_id: 'one' },
           membershipId: 'm1',
           agentId,
           hostId
@@ -114,10 +114,14 @@ test('agent lifecycle uses real signatures, preserves keys on ambiguous joins, a
         })
       if (path.endsWith('/invitations/second/accept')) {
         members.add('two')
-        return Response.json({ success: true, workspaceId: 'two', membershipId: 'm2' })
+        return Response.json({
+          success: true,
+          remote: { user_id: 'owner', workspace_id: 'two' },
+          membershipId: 'm2'
+        })
       }
       if (path.endsWith('/leave')) {
-        members.delete('one')
+        members.delete(path.split('/').at(-2)!.split(':')[1]!)
         return Response.json({ success: true })
       }
       if (path.endsWith('/agents/logout')) {
@@ -132,23 +136,30 @@ test('agent lifecycle uses real signatures, preserves keys on ambiguous joins, a
     await Bun.write(join(dir, 'config.json'), JSON.stringify({ remote: { url } }))
     const client = createRemoteClient(dir),
       invite = url + '/agent-invite/first?token=' + 'A'.repeat(43)
-    await expect(client.joinAgent(invite, 'Lawyer', 'Muse')).rejects.toThrow('keys kept')
-    expect((await stat(join(dir, 'remote-agent-pending.json'))).mode & 0o777).toBe(0o600)
     async function cli(args: string[], code = 0) {
-      const process = Bun.spawn(
-        [Bun.which('bun')!, join(import.meta.dir, '../cli.ts'), 'remote', ...args],
+      const child = Bun.spawn(
+        [
+          process.execPath,
+          join(import.meta.dir, '../cli.ts'),
+          ...(args[0] === 'init' ? args : ['remote', ...args])
+        ],
         { env: { ...Bun.env, MOI_DATA_DIR: dir, NO_COLOR: '1' }, stdout: 'pipe', stderr: 'pipe' }
       )
       const [stdout, stderr, exit] = await Promise.all([
-        new Response(process.stdout).text(),
-        new Response(process.stderr).text(),
-        process.exited
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+        child.exited
       ])
       expect(exit).toBe(code)
       if (code === 0) expect(stderr).toBe('')
       return { stdout, stderr }
     }
-    await cli(['join', invite, '--json'])
+    expect(
+      (await cli(['accept', invite, '--name', 'Lawyer', '--client', 'muse'], 1)).stderr
+    ).toContain('keys kept')
+    expect((await stat(join(dir, 'remote-agent-pending.json'))).mode & 0o777).toBe(0o600)
+    const acceptance = JSON.parse((await cli(['accept', invite, '--json'])).stdout)
+    expect(acceptance.remote).toEqual({ user_id: 'owner', workspace_id: 'one' })
     expect(await Bun.file(join(dir, 'remote-agent-pending.json')).exists()).toBe(false)
     expect((await stat(join(dir, 'remote-auth.json'))).mode & 0o777).toBe(0o600)
     expect((await client.remoteStatus()).me).toMatchObject({ type: 'agent', name: 'Lawyer' })
@@ -157,18 +168,61 @@ test('agent lifecycle uses real signatures, preserves keys on ambiguous joins, a
     expect((await client.remoteStatus()).me.name).toBe('Legal assistant')
     expect(JSON.parse((await cli(['invitations', '--json'])).stdout)).toHaveLength(1)
     const folder = join(dir, 'workspace')
-    await cli(['link', '--owner-id', 'owner', '--workspace-id', 'one', '--path', folder, '--json'])
+    const firstInit = JSON.parse(
+      (await cli(['init', folder, '--remote', 'owner:one', '--json'])).stdout
+    )
+    expect(
+      JSON.parse((await cli(['init', folder, '--remote', 'owner:one', '--json'])).stdout)
+    ).toEqual(firstInit)
+    const configFile = Bun.file(join(folder, '.moi/.workspace.json'))
+    const originalConfig = await configFile.text()
+    expect(JSON.parse(originalConfig)).toEqual({ version: 2, remote: acceptance.remote })
+    for (const [flags, error] of [
+      [[], 'use moi init --remote owner:one'],
+      [['--remote', 'owner:two'], 'not shared'],
+      [['--remote', ''], 'ownerId:workspaceId'],
+      [['--remote', 'invalid'], 'ownerId:workspaceId'],
+      [['--remote', 'owner:one', '--harness', 'codex'], '--harness']
+    ] as const) {
+      expect((await cli(['init', folder, ...flags], 1)).stderr).toContain(error)
+    }
+    expect(await configFile.text()).toBe(originalConfig)
+    expect(await Bun.file(join(folder, '.agents/skills/moi-workspace/SKILL.md')).exists()).toBe(
+      true
+    )
+    expect(await Bun.file(join(folder, '.moi/package.json')).exists()).toBe(false)
     expect(
       JSON.parse((await cli(['--json', '--path', folder])).stdout).currentWorkspace.workspace_id
     ).toBe('one')
-    await cli(['unlink', '--path', folder, '--json'])
-    expect(
-      JSON.parse((await cli(['--json', '--path', folder])).stdout).currentWorkspace
-    ).toBeUndefined()
-    await cli(['join', 'second', '--json'])
+    expect((await cli(['accept', 'second'])).stdout).toContain('moi init --remote owner:two')
     expect(await client.fetchSharedWorkspaces()).toHaveLength(2)
-    await cli(['leave', '--owner-id', 'owner', '--workspace-id', 'one', '--json'])
+    expect((await cli(['init', folder, '--remote', 'owner:two', '--json'], 1)).stderr).toContain(
+      'different workspace configuration'
+    )
+    expect(await configFile.text()).toBe(originalConfig)
+    const localFolder = join(dir, 'local-workspace')
+    const localConfig = Bun.file(join(localFolder, '.moi/.workspace.json'))
+    await Bun.write(
+      localConfig,
+      JSON.stringify({ version: 1, widgetGrid: [], layoutMode: 'split' })
+    )
+    const localBefore = await localConfig.text()
+    expect(
+      (await cli(['init', localFolder, '--remote', 'owner:two', '--json'], 1)).stderr
+    ).toContain('different workspace configuration')
+    expect(await localConfig.text()).toBe(localBefore)
+    expect((await cli(['leave', '', '--path', folder], 1)).stderr).toContain(
+      'workspace address or --path'
+    )
+    expect((await cli(['leave', ''], 1)).stderr).toContain('ownerId:workspaceId')
+    expect(await client.fetchSharedWorkspaces()).toHaveLength(2)
+    await cli(['leave', '--path', folder, '--json'])
     expect(await client.fetchSharedWorkspaces()).toHaveLength(1)
+    expect(await configFile.text()).toBe(originalConfig)
+    await cli(['leave', 'owner:two', '--json'])
+    expect(await client.fetchSharedWorkspaces()).toEqual([])
+    for (const removed of ['join', 'link', 'unlink'])
+      expect((await cli([removed], 1)).stderr).toContain(`Unknown command ${removed}`)
     expect((await cli(['logout'], 1)).stderr).toContain('--yes')
     expect(active).toBe(true)
     await cli(['logout', '--yes'])
@@ -194,7 +248,7 @@ test('human credentials cannot be overwritten by an agent invitation', async () 
     }
     await Bun.write(file, JSON.stringify(credentials))
     await expect(
-      createRemoteClient(dir).joinAgent(
+      createRemoteClient(dir).accept(
         url + '/agent-invite/a?token=' + 'A'.repeat(43),
         'Lawyer',
         'muse'

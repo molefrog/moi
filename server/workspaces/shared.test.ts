@@ -1,4 +1,4 @@
-import { linkRemoteWorkspace } from '../remote/workspace'
+import { initializeRemoteWorkspace } from '../remote/workspace'
 import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -94,7 +94,7 @@ test.each(['a b', '-board', 'a:b', 'create'])(
   async workspace_id => {
     const invalid = { user_id: 'alice', workspace_id }
     await expect(openSharedWorkspace(invalid)).rejects.toThrow()
-    await expect(linkRemoteWorkspace(join(root, 'invalid'), invalid)).rejects.toThrow()
+    await expect(initializeRemoteWorkspace(join(root, 'invalid'), invalid)).rejects.toThrow()
     expect(await listWorkspaces()).toEqual([])
     expect(await Bun.file(join(root, 'invalid/.moi/.workspace.json')).exists()).toBe(false)
   }

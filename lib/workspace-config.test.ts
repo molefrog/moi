@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  parseRemoteWorkspaceAddress,
   parseRemoteWorkspaceConfig,
   parseRemoteWorkspaceTarget,
   workspaceApiBase,
@@ -7,17 +8,6 @@ import {
 } from './workspace-config'
 
 describe('workspace config', () => {
-  test('remote references contain only version and destination', () => {
-    expect(
-      parseRemoteWorkspaceConfig({
-        version: 2,
-        remote: { user_id: 'alice', workspace_id: 'board' }
-      })
-    ).toEqual({
-      version: 2,
-      remote: { user_id: 'alice', workspace_id: 'board' }
-    })
-  })
   test('remote config contains only its version and destination', () => {
     expect(
       parseRemoteWorkspaceConfig({
@@ -62,4 +52,20 @@ test('remote addresses share the registered workspace ID rules', () => {
     user_id: 'alice-1',
     workspace_id: 'board_1'
   })
+})
+
+test('remote CLI addresses use the same target validation', () => {
+  expect(parseRemoteWorkspaceAddress('alice:board')).toEqual({
+    user_id: 'alice',
+    workspace_id: 'board'
+  })
+  for (const invalid of [
+    'board',
+    'alice:board:extra',
+    ':board',
+    'alice:',
+    'alice:../board',
+    'alice:create'
+  ])
+    expect(() => parseRemoteWorkspaceAddress(invalid)).toThrow()
 })

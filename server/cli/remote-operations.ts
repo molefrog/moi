@@ -51,7 +51,10 @@ const fileSuffix = (value: string) => {
 }
 async function target(folder?: string) {
   const current = await currentRemoteWorkspace(folder)
-  if (!current) throw new Error('This folder is not linked — run moi remote link first')
+  if (!current)
+    throw new Error(
+      'This folder is not a remote workspace — run moi init --remote ownerId:workspaceId first'
+    )
   return (suffix: string, options?: Parameters<typeof operation>[3]) =>
     operation(current.user_id, current.workspace_id, suffix, options)
 }

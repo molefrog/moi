@@ -1,4 +1,4 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import {
   parseRemoteWorkspaceConfig,
   parseRemoteWorkspaceTarget,
@@ -195,15 +195,4 @@ export async function initializeRemoteWorkspaceConfig(
   await writeFile(getLayoutPath(workspacePath), JSON.stringify({ version: 2, remote }, null, 2), {
     flag: 'wx'
   })
-}
-
-/** Disconnect the reference without deleting workspace files or cloud membership. */
-export async function unlinkRemoteWorkspaceConfig(
-  workspacePath: string
-): Promise<RemoteWorkspaceTarget> {
-  const config = await loadWorkspaceFileConfig(workspacePath)
-  if (!config.remote) throw new Error('This folder is not linked to a remote workspace')
-  // A reference holds nothing but the owner address, so unlinking leaves no config behind.
-  await rm(getLayoutPath(workspacePath))
-  return config.remote
 }

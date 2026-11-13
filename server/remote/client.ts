@@ -12,7 +12,14 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { DATA_DIR } from '../data-dir'
 import { PACKAGE_ROOT } from '../version'
-import { agentCredentialsSchema, agentAuthorization, agentJoinBody, createAgentKeys } from './agent'
+import {
+  agentCredentialsSchema,
+  agentAuthorization,
+  agentJoinBody,
+  createAgentKeys,
+  agentClientSchema,
+  AGENT_CLIENTS
+} from './agent'
 
 type RemoteRequestOptions = {
   method?: string
@@ -51,7 +58,7 @@ const agentProfileSchema = z.object({
   id: z.string(),
   type: z.literal('agent'),
   name: z.string(),
-  client: z.string()
+  client: agentClientSchema
 })
 const profileSchema = z.union([agentProfileSchema, humanProfileSchema])
 const workspacesSchema = z.object({
@@ -390,13 +397,13 @@ export function createRemoteClient(directory: string) {
   function invitation(value: string, config: RemoteConfig) {
     if (!value.includes('://')) {
       if (!/^[A-Za-z0-9_-]{1,240}$/.test(value)) throw new Error('Invalid invitation ID')
-      return { id: value, token: undefined }
+      return { id: value, token: undefined, agent: false }
     }
     const url = new URL(value)
     const root = new URL(config.url)
     const prefix = root.pathname.replace(/\/$/, '')
     const match = new RegExp(
-      `^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/(?:agent-invite|invite)/([A-Za-z0-9_-]{1,240})$`
+      `^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/(agent-invite|invite)/([A-Za-z0-9_-]{1,240})$`
     ).exec(url.pathname)
     const token = url.searchParams.get('token')
     if (
@@ -408,31 +415,39 @@ export function createRemoteClient(directory: string) {
       !/^[A-Za-z0-9_-]{43}$/.test(token)
     )
       throw new Error('Use an invitation URL from your configured Cloud URL')
-    return { id: match[1]!, token }
+    return { id: match[2]!, token, agent: match[1] === 'agent-invite' }
   }
   const accepted = z.object({
     success: z.literal(true),
-    workspaceId: z.string(),
+    remote: z
+      .object({ user_id: z.string(), workspace_id: z.string() })
+      .transform(parseRemoteWorkspaceTarget),
     membershipId: z.string()
   })
-  async function accept(value: string) {
+  async function accept(value: string, name?: string, client?: string) {
+    if (client !== undefined && !agentClientSchema.safeParse(client).success)
+      throw new Error(`Invalid client — choose ${AGENT_CLIENTS.join(', ')}`)
     const config = await remoteConfig(),
       target = invitation(value, config)
-    const pair = await access(config)
-    if (isAgent(pair))
-      throw new Error('Signed in as an agent — use moi remote join for agent invitations')
-    return cloudJson(
-      config,
-      pair,
-      `/invitations/${encodeURIComponent(target.id)}/accept`,
-      target.token ? { token: target.token } : {},
-      accepted
-    )
-  }
-  async function joinAgent(value: string, name?: string, client?: string) {
-    const config = await remoteConfig()
+    if (await Bun.file(authFile).exists()) {
+      const saved = await read(config)
+      if (!isAgent(saved) && (target.agent || name !== undefined || client !== undefined))
+        throw new Error(
+          'Already signed in as a human — use a separate Moi data directory for this agent'
+        )
+      return cloudJson(
+        config,
+        await access(config),
+        `/invitations/${encodeURIComponent(target.id)}/accept`,
+        target.token ? { token: target.token } : {},
+        accepted
+      )
+    }
+    if (!target.agent)
+      throw new CloudSignInRequired(
+        'Sign in with moi remote login before accepting a human invitation'
+      )
     if (config.managed) throw new Error('Cloud manages sign-in on this machine')
-    const target = invitation(value, config)
     return locked(async assertLock => {
       if (await Bun.file(authFile).exists()) {
         const pair = await read(config)
@@ -448,12 +463,12 @@ export function createRemoteClient(directory: string) {
           accepted
         )
       }
-      if (!target.token) throw new Error('First agent join requires an invitation URL')
+      if (!target.token) throw new Error('First agent acceptance requires an invitation URL')
       const fingerprint = new Bun.CryptoHasher('sha256').update(target.token).digest('hex')
       const pendingSchema = z.object({
         fingerprint: z.string(),
         name: z.string(),
-        client: z.string(),
+        client: agentClientSchema,
         keys: agentCredentialsSchema
       })
       let pending: z.infer<typeof pendingSchema>
@@ -475,18 +490,12 @@ export function createRemoteClient(directory: string) {
             'Retry the original pending agent invitation before switching accounts or clouds'
           )
       } else {
-        if (
-          !name?.trim() ||
-          name.trim().length > 80 ||
-          !client?.trim() ||
-          client.trim().length > 200 ||
-          !/[a-z0-9]/i.test(client)
-        )
-          throw new Error('First agent join requires --name and --client')
+        if (!name?.trim() || name.trim().length > 80 || !client)
+          throw new Error('First agent acceptance requires --name and --client')
         pending = {
           fingerprint,
           name: name.trim(),
-          client: client.trim(),
+          client: agentClientSchema.parse(client),
           keys: await createAgentKeys(config)
         }
         await writePrivate(pendingFile, pending, assertLock)
@@ -501,7 +510,7 @@ export function createRemoteClient(directory: string) {
       })
       if (!response.ok)
         throw new Error(
-          `Agent join failed (${response.status}); keys kept so you can retry the same invitation`
+          `Agent acceptance failed (${response.status}); keys kept so you can retry the same invitation`
         )
       const joined = await json(
         response,
@@ -636,7 +645,6 @@ export function createRemoteClient(directory: string) {
     operation,
     invitations,
     accept,
-    joinAgent,
     renameAgent,
     leave
   }
@@ -652,7 +660,6 @@ export const {
   operation,
   invitations,
   accept,
-  joinAgent,
   renameAgent,
   leave
 } = createRemoteClient(DATA_DIR)

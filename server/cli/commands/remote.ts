@@ -1,13 +1,10 @@
+import { AGENT_CLIENTS } from '../../remote/agent'
 import { defineCommand } from 'citty'
 import open from 'open'
 import { remoteOperations } from '../remote-operations'
 import { clearLine, cursorTo } from 'node:readline'
-import { createInterface } from 'node:readline/promises'
-import {
-  currentRemoteWorkspace,
-  linkRemoteWorkspace,
-  unlinkRemoteWorkspace
-} from '../../remote/workspace'
+import { currentRemoteWorkspace } from '../../remote/workspace'
+import { parseRemoteWorkspaceAddress } from '@/lib/workspace-config'
 import pc from '../pc'
 import {
   login as signIn,
@@ -17,7 +14,6 @@ import {
   remoteStatus,
   invitations as listInvitations,
   accept as acceptInvitation,
-  joinAgent,
   renameAgent,
   leave as leaveWorkspace
 } from '../../remote/client'
@@ -115,23 +111,6 @@ const pathArg = {
   type: 'string' as const,
   description: 'Local workspace folder (defaults to current folder)'
 }
-const ownerArg = { type: 'string' as const, description: 'Workspace owner user ID' }
-const workspaceArg = { type: 'string' as const, description: 'Original workspace ID' }
-const join = defineCommand({
-  meta: { name: 'join', description: 'Join an invited workspace as an agent' },
-  args: {
-    invite: { type: 'positional', required: true },
-    name: { type: 'string' },
-    client: { type: 'string' },
-    json: jsonArg
-  },
-  async run({ args }) {
-    await reportErrors(async () => {
-      const result = await joinAgent(args.invite, args.name, args.client)
-      console.log(args.json ? JSON.stringify(result) : 'Joined the workspace')
-    })
-  }
-})
 const rename = defineCommand({
   meta: { name: 'rename-agent', description: 'Change your agent name across workspaces' },
   args: { name: { type: 'positional', required: true }, json: jsonArg },
@@ -159,78 +138,46 @@ const invitations = defineCommand({
   }
 })
 const accept = defineCommand({
-  meta: { name: 'accept', description: 'Accept a human workspace invitation' },
-  args: { invite: { type: 'positional', required: true }, json: jsonArg },
+  meta: { name: 'accept', description: 'Accept a workspace invitation as a human or agent' },
+  args: {
+    invite: { type: 'positional', required: true },
+    name: { type: 'string', description: 'Name for a new agent identity' },
+    client: { type: 'string', description: 'Agent client: ' + AGENT_CLIENTS.join(', ') },
+    json: jsonArg
+  },
   async run({ args }) {
     await reportErrors(async () => {
-      const result = await acceptInvitation(args.invite)
-      console.log(args.json ? JSON.stringify(result) : 'Invitation accepted')
-    })
-  }
-})
-const link = defineCommand({
-  meta: { name: 'link', description: 'Link a folder to a shared workspace' },
-  args: { 'owner-id': ownerArg, 'workspace-id': workspaceArg, path: pathArg, json: jsonArg },
-  async run({ args }) {
-    await reportErrors(async () => {
-      let owner = args['owner-id'],
-        workspace = args['workspace-id']
-      if (Boolean(owner) !== Boolean(workspace))
-        throw new Error('Provide both --owner-id and --workspace-id')
-      if (!owner || !workspace) {
-        const status = await remoteStatus()
-        if (!('email' in status.me) || !process.stdin.isTTY || !process.stdout.isTTY)
-          throw new Error('Provide --owner-id and --workspace-id in noninteractive or agent mode')
-        if (!status.workspaces.length) throw new Error('No shared workspaces available')
-        status.workspaces.forEach((w, i) =>
-          console.log(`${i + 1}. ${text(w.owner.name)} — ${text(w.id)}`)
-        )
-        const prompt = createInterface({ input: process.stdin, output: process.stdout })
-        try {
-          const choice = Number(await prompt.question('Select a workspace: '))
-          const selected = Number.isInteger(choice) ? status.workspaces[choice - 1] : undefined
-          if (!selected) throw new Error('Invalid workspace selection')
-          owner = selected.owner.id
-          workspace = selected.id
-        } finally {
-          prompt.close()
-        }
-      }
-      const result = await linkRemoteWorkspace(args.path ?? process.cwd(), {
-        user_id: owner,
-        workspace_id: workspace
-      })
+      const result = await acceptInvitation(args.invite, args.name, args.client)
       console.log(
         args.json
           ? JSON.stringify(result)
-          : `Linked ${text(result.path)} to ${text(owner)}:${text(workspace)}`
+          : `Invitation accepted\n\nmoi init --remote ${result.remote.user_id}:${result.remote.workspace_id}`
       )
-    })
-  }
-})
-const unlink = defineCommand({
-  meta: { name: 'unlink', description: 'Unlink this folder; keep cloud membership' },
-  args: { path: pathArg, json: jsonArg },
-  async run({ args }) {
-    await reportErrors(async () => {
-      const result = await unlinkRemoteWorkspace(args.path)
-      console.log(args.json ? JSON.stringify(result) : 'Folder unlinked; cloud membership kept')
     })
   }
 })
 const leave = defineCommand({
   meta: { name: 'leave', description: 'Leave a shared workspace; keep local files' },
-  args: { 'owner-id': ownerArg, 'workspace-id': workspaceArg, path: pathArg, json: jsonArg },
+  args: {
+    workspace: {
+      type: 'positional',
+      required: false,
+      description: 'ownerId:workspaceId (defaults to current folder)'
+    },
+    path: pathArg,
+    json: jsonArg
+  },
   async run({ args }) {
     await reportErrors(async () => {
-      const current = args['owner-id'] ? undefined : await currentRemoteWorkspace(args.path)
-      const owner = args['owner-id'] ?? current?.user_id,
-        workspace = args['workspace-id'] ?? current?.workspace_id
-      if (Boolean(args['owner-id']) !== Boolean(args['workspace-id']))
-        throw new Error('Provide both --owner-id and --workspace-id')
-      if (!owner || !workspace)
-        throw new Error('No linked workspace — provide --owner-id and --workspace-id')
-      const result = await leaveWorkspace(owner, workspace)
+      if (args.workspace !== undefined && args.path)
+        throw new Error('Use a workspace address or --path, not both')
+      const target =
+        args.workspace !== undefined
+          ? parseRemoteWorkspaceAddress(args.workspace)
+          : await currentRemoteWorkspace(args.path)
+      if (!target)
+        throw new Error('No remote workspace here — provide ownerId:workspaceId or --path')
+      const result = await leaveWorkspace(target.user_id, target.workspace_id)
       console.log(args.json ? JSON.stringify(result) : 'Left the workspace; local files kept')
     })
   }
@@ -239,12 +186,9 @@ const remoteSubCommands = {
   ...remoteOperations(reportErrors),
   login,
   logout,
-  join,
   'rename-agent': rename,
   invitations,
   accept,
-  link,
-  unlink,
   leave
 }
 
@@ -270,13 +214,13 @@ export const remote = defineCommand({
       )
       if (status.currentWorkspace)
         console.log(
-          `Linked workspace: ${text(status.currentWorkspace.user_id)}:${text(status.currentWorkspace.workspace_id)}\n`
+          `Remote workspace: ${text(status.currentWorkspace.user_id)}:${text(status.currentWorkspace.workspace_id)}\n`
         )
       console.log('Shared workspaces')
       if (!status.workspaces.length) console.log('  No shared workspaces')
       for (const workspace of status.workspaces)
         console.log(
-          `  ${text(workspace.id)}  — ${text(workspace.owner.name || workspace.owner.email)} <${text(workspace.owner.email)}>\n    Owner ID: ${text(workspace.owner.id)}`
+          `  ${text(workspace.owner.id)}:${text(workspace.id)}  — ${text(workspace.owner.name || workspace.owner.email)} <${text(workspace.owner.email)}>`
         )
       console.log()
     })

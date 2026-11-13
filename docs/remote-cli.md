@@ -1,53 +1,64 @@
 # Moi Cloud CLI
 
-`moi remote login` opens your browser to sign in to Moi Cloud. Approve the displayed code, then return to the terminal. Use `moi remote login --no-browser` to open the printed link yourself.
+`moi remote login` opens the browser for human sign-in; `--no-browser` prints the link.
+`moi remote [--json]` shows your account, accepted workspaces, and this folder's remote target.
+Use `moi status` for local workspaces.
 
-`moi remote` shows your account, the workspaces shared with you, and the current folder's remote link, if any. It does not list local workspaces; use `moi status` for those. `moi remote --json` prints the same cloud data as JSON.
+Human credentials live in `remote-auth.json` in Moi's data directory, with owner-only permissions
+on macOS and Linux. Access tokens refresh automatically. `remote logout` revokes the refresh token
+and deletes credentials; if Cloud is unreachable, it keeps them for retry. Existing access tokens
+may remain valid for up to one hour. Cloud-managed credentials cannot be replaced or logged out.
 
-`moi remote logout` revokes your refresh token and removes local credentials. If the cloud is unreachable, credentials remain so you can retry. Cloud-managed credentials cannot be replaced or logged out with these commands.
+## Invitations and workspace setup
 
-Credentials live in `remote-auth.json` in Moi's data directory, with owner-only permissions on macOS and Linux. The file contains the access token, refresh token, Cloud URL, and public client ID. Access tokens refresh automatically; no client secret is needed. Keep this file private.
-
-Logout revokes future refreshes. An already issued access token can remain valid for up to one hour.
-
-## Invitations and folders
-
-```sh
-moi remote invitations
-moi remote accept <invitation-id-or-url>
-moi remote link
-moi remote link --owner-id <owner> --workspace-id <workspace> --path ./project
-moi remote unlink --path ./project
-moi remote leave --owner-id <owner> --workspace-id <workspace>
-```
-
-Humans accept human invitations with `accept`. `link` offers a workspace selection in an interactive terminal; agents and scripts supply both IDs. It records the remote target in `.moi/.workspace.json`, installs the workspace skill, and registers the folder with Moi. It refuses to overwrite a different workspace configuration. It does not download remote files.
-
-`unlink` removes the folder's remote link and its entry in Moi's workspace list, and keeps its other files and cloud membership. The folder can be linked again. `leave` removes cloud membership and keeps local files. Without IDs, `leave` uses the current folder's link. Folder commands also accept `--path`, and status, invitation, and folder commands support `--json`.
-
-## Invited agents
-
-An agent cannot sign up without an invitation. Give it a separate Moi data directory if a human already uses this installation:
+Humans sign in with `moi remote login`. A new agent accepts an agent invitation URL with a name
+and client. Use a separate `MOI_DATA_DIR` if this installation already has a human login.
 
 ```sh
-moi remote join <invite-url> --name "Lawyer" --client "Grok Bot"
-moi remote
-moi remote rename-agent "Legal assistant"
-moi remote invitations
-moi remote join <another-invitation-id-or-url>
-moi remote logout
-moi remote logout --yes
+moi remote accept "<agent-invite-url>" --name "Lawyer" --client grok-bot
+# Use the address printed by accept
+moi init ./project --remote <ownerId>:<workspaceId> --json
 ```
 
-The first join creates the agent identity. The cloud normalizes the reported client, for example `Grok Bot` becomes `grok-bot`. Later joins reuse that identity. Agents use `join`, while humans use `accept`; neither command replaces the other kind of login. Agents can link, unlink, and leave workspaces using the same commands as humans.
+Later `accept` calls reuse the saved identity. `--name` and `--client` apply only to creation;
+rename an agent with `moi remote rename-agent "Legal assistant"`. Client must be `grok-bot`,
+`instinct`, `muse`, `dot`, `duet`, or `other`.
 
-Agent credentials contain locally generated private keys and their agent/host IDs in `remote-auth.json`, with owner-only permissions. Each request gets a fresh, short-lived signature; there is no agent refresh token. During the first join, keys are saved in `remote-agent-pending.json` before sending the request. If the response is lost, retry the same invitation to keep the same identity.
+`accept` prints the init command. With `--json`, it returns `remote: { user_id, workspace_id }`
+matching the config, plus `success` and `membershipId`. First agent acceptance also returns
+`agentId` and `hostId`.
 
-Agent logout first prints a warning. `logout --yes` revokes the login and deletes its local keys; that login cannot be restored. Leaving every workspace keeps the agent identity, so it can receive another invitation.
+```sh
+moi remote invitations --json
+moi remote accept "<invitation-id-or-url>"
+moi remote leave                        # Current folder's remote workspace
+moi remote leave <ownerId>:<workspaceId> # Explicit workspace
+moi remote leave --path ./project       # Another folder's remote workspace
+```
+
+`moi init [directory]` creates a local workspace at version 1. With `--remote`, it writes the
+version 2 remote reference, installs the skill, and registers the folder without downloading
+files. The directory defaults to the current folder. Repeat initialization is safe for the same
+target; conflicting configs and duplicate registrations at other paths are rejected.
+
+Remote initialization supports `--json` or `--web` separately. `--web` starts the local UI;
+otherwise no local server is needed. `--harness` and `--id` are local-only.
+
+`leave` removes cloud membership and keeps local files and registration. To remove only the
+registration, use Moi's workspace UI. Removing a registration or folder keeps cloud access.
+
+## Agent credentials
+
+Agent keys and IDs live in `remote-auth.json`, with owner-only permissions. Requests use fresh,
+short-lived signatures. First acceptance saves keys in `remote-agent-pending.json` before sending;
+if the response is lost, retry the same invitation to reuse the identity, name, and client.
+
+`moi remote logout --yes` revokes the agent login and deletes its keys permanently. Leaving all
+workspaces keeps the identity available for future invitations.
 
 ## Remote operations
 
-Run these from a linked folder, or add `--path ./linked-folder`.
+Run these from a remote workspace folder, or add `--path ./project`.
 
 ```sh
 moi remote read notes.txt
@@ -59,7 +70,7 @@ moi remote file-download assets/photo.png ./download.png
 moi remote exec 'pwd; ls -la'
 ```
 
-The ordinary workspace commands also work in a linked folder, with their usual arguments and output. There are no `moi remote bundle` or similar aliases. Where each one runs:
+Ordinary workspace commands keep their usual arguments and output:
 
 | Commands                                                                             | Runs on                           | Through                                                |
 | ------------------------------------------------------------------------------------ | --------------------------------- | ------------------------------------------------------ |

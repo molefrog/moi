@@ -36,6 +36,12 @@ export function parseRemoteWorkspaceTarget(value: unknown): RemoteWorkspaceTarge
   return { user_id: target.user_id, workspace_id: target.workspace_id }
 }
 
+export function parseRemoteWorkspaceAddress(value: string): RemoteWorkspaceTarget {
+  const parts = value.split(':')
+  if (parts.length !== 2) throw new Error('Use a remote workspace address: ownerId:workspaceId')
+  return parseRemoteWorkspaceTarget({ user_id: parts[0], workspace_id: parts[1] })
+}
+
 export function parseRemoteWorkspaceConfig(value: Record<string, unknown>): RemoteWorkspaceConfig {
   if (value.version !== 2) throw new Error('Invalid remote workspace config')
   return { version: 2, remote: parseRemoteWorkspaceTarget(value.remote) }
