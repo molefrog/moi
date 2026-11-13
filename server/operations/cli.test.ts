@@ -6,6 +6,7 @@ import { createOperationsHandler } from './server'
 import { initializeRemoteWorkspaceConfig } from '../workspaces/layout'
 
 let root: string, local: string, data: string, server: ReturnType<typeof Bun.serve>
+const bundleCalls: unknown[] = []
 beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), 'moi-ops-cli-'))
   local = join(root, 'local')
@@ -21,6 +22,11 @@ beforeAll(async () => {
     async fetch(request) {
       expect(request.headers.get('authorization')).toStartWith('Bearer ')
       const url = new URL(request.url)
+      if (url.pathname === '/cloud/api/workspaces/owner:test/ops/commands') {
+        const body = await request.clone().json()
+        bundleCalls.push(body)
+        return Response.json({ exitCode: 0, stdout: 'Built on remote host\n', stderr: '' })
+      }
       url.pathname = url.pathname.replace(
         '/cloud/api/workspaces/owner:test/ops',
         '/workspaces/test'
@@ -47,9 +53,14 @@ afterAll(async () => {
   server?.stop(true)
   await rm(root, { recursive: true, force: true })
 })
-async function cli(args: string[], input?: string) {
+async function cli(args: string[], input?: string, shortcut = false) {
   const child = Bun.spawn(
-    [process.execPath, join(import.meta.dir, '../cli.ts'), 'remote', ...args],
+    [
+      process.execPath,
+      join(import.meta.dir, '../cli.ts'),
+      ...(shortcut ? [] : ['remote']),
+      ...args
+    ],
     {
       cwd: local,
       env: { ...process.env, MOI_DATA_DIR: data, NO_COLOR: '1' },
@@ -65,7 +76,19 @@ async function cli(args: string[], input?: string) {
   ])
   return { stdout, stderr, code }
 }
+test('plain bundle uses the remote link without a local server and preserves its options', async () => {
+  expect(await cli(['bundle', '--only', 'widgets/example', '--force'], undefined, true)).toEqual({
+    code: 0,
+    stdout: 'Built on remote host\n',
+    stderr: ''
+  })
+  expect(bundleCalls).toEqual([
+    { command: 'bundle', args: ['--only', 'widgets/example', '--force'] }
+  ])
+})
 test('standalone CLI writes, reads and patches without a local Moi server', async () => {
+  expect((await cli(['write', 'stdin.txt', '--json'], 'piped content\n')).code).toBe(0)
+  expect((await cli(['read', 'stdin.txt'])).stdout).toBe('piped content\n')
   expect((await cli(['write', 'hello.txt', 'hello\n', '--json'])).code).toBe(0)
   expect(await cli(['read', 'hello.txt'])).toEqual({ code: 0, stdout: 'hello\n', stderr: '' })
   const patch = await cli(['patch', 'hello.txt', '--json'], '@@ -1 +1 @@\n-hello\n+world\n')
@@ -88,7 +111,35 @@ test('CLI relays stdout, stderr, JSON events, nonzero exit and commands', async 
   const events = await cli(['exec', 'printf yes', '--json'])
   expect(events.code).toBe(0)
   expect(events.stdout).toContain('"type":"exit","code":0')
-  const check = await cli(['check', '--json'])
-  expect(check.stdout).toContain('"exitCode"')
+  const check = await cli(['check'], undefined, true)
+  expect(check.code).toBe(0)
   expect((await cli(['read', '../outside'])).code).toBe(1)
+})
+
+test('workspace commands dispatch directly and removed remote aliases fail', async () => {
+  const cases = [
+    ['check', '--only', 'views/example'],
+    ['theme', '--font', 'mono'],
+    ['config', 'name', 'My project'],
+    ['tabs'],
+    ['refresh'],
+    ['debug', 'logs'],
+    ['scratch', 'add', 'text', '--text', 'Hello', '--at', '0,0'],
+    ['views', 'set', 'example', '--title', 'Hello'],
+    ['call-server-fn', 'views/example/test', '[]'],
+    ['ui-components', 'docs', 'button']
+  ]
+  for (const args of cases) {
+    const before = bundleCalls.length
+    const result = await cli(args, undefined, true)
+    expect(result.code).toBe(0)
+    expect(bundleCalls.slice(before)).toEqual([{ command: args[0], args: args.slice(1) }])
+  }
+  for (const command of ['bundle', 'theme', 'views', 'check']) {
+    const before = bundleCalls.length
+    const result = await cli([command])
+    expect(result.code).toBe(1)
+    expect(result.stderr).toContain('Unknown command')
+    expect(bundleCalls.length).toBe(before)
+  }
 })

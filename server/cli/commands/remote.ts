@@ -276,7 +276,7 @@ export const remote = defineCommand({
       if (!status.workspaces.length) console.log('  No shared workspaces')
       for (const workspace of status.workspaces)
         console.log(
-          `  ${text(workspace.id)}  — ${text(workspace.owner.name || workspace.owner.email)} <${text(workspace.owner.email)}>`
+          `  ${text(workspace.id)}  — ${text(workspace.owner.name || workspace.owner.email)} <${text(workspace.owner.email)}>\n    Owner ID: ${text(workspace.owner.id)}`
         )
       console.log()
     })

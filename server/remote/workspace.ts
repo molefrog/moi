@@ -7,7 +7,7 @@ import {
   unlinkRemoteWorkspaceConfig
 } from '../workspaces/layout'
 import { provisionWorkspace } from '../workspaces/init'
-import { registerWorkspace } from '../workspaces/registry'
+import { listWorkspaces, registerWorkspace } from '../workspaces/registry'
 import { resolveWorkspaceRoot } from '../skills/version'
 
 export async function currentRemoteWorkspace(path = process.cwd()) {
@@ -24,7 +24,19 @@ export async function linkRemoteWorkspace(path: string, target: RemoteWorkspaceT
   const shares = await fetchSharedWorkspaces()
   if (!shares.some(w => w.id === target.workspace_id && w.owner.id === target.user_id))
     throw new Error('This workspace is not shared with this account')
-  const root = await resolveWorkspaceRoot(resolve(path))
+  // Linking creates a workspace at the requested folder. An ancestor's
+  // registration must not redirect this write into a different directory.
+  const root = resolve(path)
+  const existing = (await listWorkspaces()).find(
+    workspace =>
+      workspace.remote?.user_id === target.user_id &&
+      workspace.remote.workspace_id === target.workspace_id &&
+      resolve(workspace.path) !== root
+  )
+  if (existing)
+    throw new Error(
+      `This workspace is already linked at ${existing.path} — unlink that folder first`
+    )
   const file = Bun.file(`${root}/.moi/.workspace.json`)
   if (await file.exists()) {
     const config = await loadWorkspaceFileConfig(root)

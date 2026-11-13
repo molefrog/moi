@@ -45,11 +45,9 @@ beforeEach(async () => {
   local = `/api/workspaces/${visitorId}`
   // The gateway: owner-prefixed requests land on the owner's API (this same process).
   spies.push(
-    spyOn(client, 'remoteConfig').mockResolvedValue({
-      url: 'http://gateway.test/cloud',
-      clientId: 'moi-cli',
-      managed: false
-    }),
+    spyOn(client, 'fetchWorkspace').mockImplementation((owner, workspace, suffix = '', init) =>
+      fetch(`http://gateway.test/api/workspaces/${owner}:${workspace}${suffix}`, init)
+    ),
     spyOn(globalThis, 'fetch').mockImplementation(
       Object.assign(
         async (input: RequestInfo | URL, init?: RequestInit) => {

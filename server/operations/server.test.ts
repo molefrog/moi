@@ -29,6 +29,7 @@ test('binary upload, download, HEAD, overwrite and empty files', async () => {
   expect(await head.text()).toBe('')
   expect((await request('files/sub/file.bin', { method: 'PUT', body: '' })).status).toBe(200)
   expect(await (await request('files/sub/file.bin')).text()).toBe('')
+  expect((await request('files/sub/file.bin', { method: 'PUT' })).status).toBe(200)
 })
 test('patches match exactly and conflicts preserve original', async () => {
   await request('files/patch.txt', { method: 'PUT', body: 'one\ntwo\n' })
@@ -128,4 +129,43 @@ test('operations socket permissions match gateway group access', async () => {
   } finally {
     server.stop(true)
   }
+})
+
+test('explicit cancellation stops only the matching caller and prevents a late start', async () => {
+  const id = crypto.randomUUID()
+  const start = await request('exec', {
+    method: 'POST',
+    headers: { 'x-moi-user-id': 'agent-a' },
+    body: JSON.stringify({
+      id,
+      command: 'printf ready; sleep 0.1; printf alive; sleep 1; touch cancel-should-not-exist'
+    })
+  })
+  const reader = start.body!.getReader()
+  await reader.read()
+  await request('exec', {
+    method: 'POST',
+    headers: { 'x-moi-user-id': 'agent-b' },
+    body: JSON.stringify({ cancel: id })
+  })
+  expect(new TextDecoder().decode((await reader.read()).value)).toContain('alive')
+  await request('exec', {
+    method: 'POST',
+    headers: { 'x-moi-user-id': 'agent-a' },
+    body: JSON.stringify({ cancel: id })
+  })
+  while (!(await reader.read()).done) {
+    // Drain output until the cancelled process closes its stream.
+  }
+  await Bun.sleep(1100)
+  expect(await Bun.file(join(root, 'cancel-should-not-exist')).exists()).toBe(false)
+  expect(
+    (
+      await request('exec', {
+        method: 'POST',
+        headers: { 'x-moi-user-id': 'agent-a' },
+        body: JSON.stringify({ id, command: 'true' })
+      })
+    ).status
+  ).toBe(409)
 })

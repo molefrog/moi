@@ -49,6 +49,9 @@ Agent logout first prints a warning. `logout --yes` revokes the login and delete
 
 Run these from a linked folder. Add `--path ./linked-folder` to select one explicitly.
 No local Moi server is needed; execution happens on the host of the shared workspace.
+Workspace commands automatically use the linked remote host; in local workspaces
+they keep their existing local behavior. There are no `moi remote bundle`,
+`moi remote check`, or equivalent aliases.
 
 ```sh
 moi remote read notes.txt
@@ -58,17 +61,17 @@ moi remote patch notes.txt --patch-file ./change.diff
 moi remote file-upload ./photo.png assets/photo.png
 moi remote file-download assets/photo.png ./download.png
 moi remote exec 'pwd; ls -la'
-moi remote bundle --only widgets/hello
-moi remote check
-moi remote refresh
-moi remote theme --color blue
-moi remote config name "Project"
-moi remote tabs
-moi remote views set my-view --title "My view"
-moi remote scratch read
-moi remote call-server-fn widgets/hello/getGreeting '["Ann"]'
-moi remote ui-components
-moi remote debug logs
+moi bundle --only widgets/hello
+moi check
+moi refresh
+moi theme --color blue
+moi config name "Project"
+moi tabs
+moi views set my-view --title "My view"
+moi scratch read
+moi call-server-fn widgets/hello/getGreeting '["Ann"]'
+moi ui-components
+moi debug logs
 ```
 
 File paths are relative to the remote workspace root. Upload sources, download
@@ -81,10 +84,13 @@ their working directory; the working directory is not an operating-system sandbo
 Ctrl-C cancels it and kills its process group. `--json` emits newline-delimited
 `stdout`, `stderr`, and final `exit` events. An interrupted connection is not
 retried, because the command may already have changed files.
+Ctrl-C sends a signed cancellation request for that execution ID before closing
+the stream. Only the same caller in the same workspace can cancel that command.
 
-Workspace commands accept the ordinary command arguments, except `--dir`: the
-link selects the workspace. With `--json`, commands return
-`{ exitCode, stdout, stderr }`; without it, their output is printed directly.
+Workspace commands keep their ordinary arguments and output, including native
+`--json` options where supported. Their directory argument selects a local linked
+folder; it is never passed to the remote host. The operations API returns
+`{ exitCode, stdout, stderr }`, which the CLI displays as ordinary command output.
 Commands finish before returning (up to 8 MiB per output stream); use `exec` for
 long streamed output. Start, stop, install, navigation and other machine-management
 commands are not part of this API.

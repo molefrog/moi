@@ -587,6 +587,49 @@ export function createRemoteClient(directory: string) {
     return response
   }
 
+  /** Read or forward the owner's browser API using this installation's identity. */
+  async function fetchWorkspace(
+    ownerId: string,
+    workspaceId: string,
+    suffix = '',
+    init: RequestInit = {}
+  ): Promise<Response> {
+    if (![ownerId, workspaceId].every(id => /^[A-Za-z0-9_-]+$/.test(id)))
+      throw new Error('Invalid remote workspace')
+    if (suffix && (!/^[/?]/.test(suffix) || suffix.startsWith('//')))
+      throw new Error('Invalid workspace path')
+    const config = await remoteConfig()
+    const base = new URL(`/api/workspaces/${ownerId}:${workspaceId}`, config.url)
+    const url = new URL(base.href + suffix)
+    if (
+      url.origin !== base.origin ||
+      (url.pathname !== base.pathname && !url.pathname.startsWith(base.pathname + '/'))
+    )
+      throw new Error('Invalid workspace path')
+    const pair = await access(config)
+    const method = init.method ?? 'GET'
+    const body =
+      init.body == null ? undefined : new Uint8Array(await new Response(init.body).arrayBuffer())
+    if (isAgent(pair) && body && body.byteLength > 16 * 1024 * 1024)
+      throw new Error('Agent uploads are limited to 16 MiB')
+    const headers = new Headers(init.headers)
+    for (const name of ['cookie', 'authorization', 'host', 'content-length']) headers.delete(name)
+    headers.set(
+      'authorization',
+      isAgent(pair)
+        ? await agentAuthorization(pair, url.href, method, body ?? '')
+        : `Bearer ${pair.accessToken}`
+    )
+    return fetch(url, {
+      ...init,
+      method,
+      body,
+      headers,
+      redirect: 'error',
+      signal: init.signal ?? AbortSignal.timeout(30_000)
+    })
+  }
+
   async function remoteStatus(): Promise<RemoteStatus> {
     const config = await remoteConfig()
     const pair = await access(config)
@@ -603,6 +646,7 @@ export function createRemoteClient(directory: string) {
     logout,
     fetchSharedWorkspaces,
     remoteStatus,
+    fetchWorkspace,
     operation,
     invitations,
     accept,
@@ -618,6 +662,7 @@ export const {
   logout,
   fetchSharedWorkspaces,
   remoteStatus,
+  fetchWorkspace,
   operation,
   invitations,
   accept,
